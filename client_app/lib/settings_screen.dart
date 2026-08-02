@@ -707,12 +707,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         key: Key(keyBase),
         title: Text(
           part.label,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
-        subtitle: const Text(kSuitePartVpnRequiredLabel),
-        trailing: const Text(
+        subtitle: Text(kSuitePartVpnRequiredLabel),
+        trailing: Text(
           kSuitePartInstalledLabel,
-          style: TextStyle(fontWeight: FontWeight.w700, color: kPrimary),
+          style: TextStyle(fontWeight: FontWeight.w700, color: suitePrimaryOf(context)),
         ),
       );
     }
@@ -729,7 +729,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ? TextButton(
               key: Key('suite_part_uninstall_btn_${part.id.name}'),
               onPressed: _busy ? null : () => _confirmUninstallPart(part.id),
-              child: const Text(kSuitePartUninstallLabel),
+              child: Text(kSuitePartUninstallLabel),
             )
           : TextButton(
               key: Key('suite_part_reinstall_settings_${part.id.name}'),
@@ -781,78 +781,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kChromeBg,
+      backgroundColor: suiteChromeBgOf(context),
       appBar: AppBar(
-        backgroundColor: kPanelBg,
-        foregroundColor: kText,
+        backgroundColor: suitePanelBgOf(context),
+        foregroundColor: suiteTextOf(context),
         elevation: 0,
-        title: const Text('Settings'),
+        title: Text('Settings'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Container(
-            decoration: BoxDecoration(
-              color: kPanelBg,
+          Material(
+            color: suitePanelBgOf(context),
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(kCornerRadius),
-              border: Border.all(color: kBorder),
+              side: BorderSide(color: suiteBorderOf(context)),
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
                 SwitchListTile(
-                  title: const Text(
+                  title: Text(
                     'Run at device startup',
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'Start Privacy Restored when the device boots or you sign in',
                   ),
                   value: _settings.runAtStartup,
-                  activeThumbColor: kWhite,
-                  activeTrackColor: kPrimary,
+                  activeThumbColor: suiteOnPrimaryOf(context),
+                  activeTrackColor: suitePrimaryOf(context),
                   onChanged: _busy ? null : _setRunAtStartup,
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
-                  title: const Text(
+                  title: Text(
                     'Autoconnect on launch',
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'When the app opens, start Connect automatically',
                   ),
                   value: _settings.autoconnectOnLaunch,
-                  activeThumbColor: kWhite,
-                  activeTrackColor: kPrimary,
+                  activeThumbColor: suiteOnPrimaryOf(context),
+                  activeTrackColor: suitePrimaryOf(context),
                   onChanged: _busy ? null : _setAutoconnect,
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
                   key: const Key(kSuiteUpdateSettingsSwitchMarker),
-                  title: const Text(
+                  title: Text(
                     kSuiteUpdateSettingsTitle,
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  subtitle: const Text(kSuiteUpdateSettingsSubtitle),
+                  subtitle: Text(kSuiteUpdateSettingsSubtitle),
                   value: _settings.checkBreadcrumbs,
-                  activeThumbColor: kWhite,
-                  activeTrackColor: kPrimary,
+                  activeThumbColor: suiteOnPrimaryOf(context),
+                  activeTrackColor: suitePrimaryOf(context),
                   onChanged: _busy ? null : _setCheckBreadcrumbs,
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
                   key: const Key('suite_appearance_light_switch'),
-                  title: const Text(
+                  title: Text(
                     'Light appearance',
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'Off = Evolve dark chrome (default). On = light Evolve palette. '
                     'Only controlled here in Settings.',
                   ),
                   value: _settings.isLightAppearance,
-                  activeThumbColor: kWhite,
-                  activeTrackColor: kPrimary,
+                  activeThumbColor: suiteOnPrimaryOf(context),
+                  activeTrackColor: suitePrimaryOf(context),
                   onChanged: _busy ? null : _setLightAppearance,
                 ),
               ],
@@ -867,14 +868,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'unpack until you allow it. Unpacking still requires your click on the '
             'VPN main screen ($kSuiteUpdateUnpackButtonLabel). '
             'Appearance (dark/light) is only changed in this Settings panel.',
-            style: TextStyle(color: kTextMuted, fontSize: 12),
+            style: TextStyle(color: suiteTextMutedOf(context), fontSize: 12),
           ),
           const SizedBox(height: 20),
           Text(
             kSuitePartsSettingsTitle,
             key: const Key('suite_parts_section_title'),
             style: TextStyle(
-              color: kPrimaryDark,
+              color: suitePrimaryOf(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -882,15 +883,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 6),
           Text(
             kSuitePartsSettingsSubtitle,
-            style: TextStyle(color: kTextMuted, fontSize: 12),
+            style: TextStyle(color: suiteTextMutedOf(context), fontSize: 12),
           ),
           const SizedBox(height: 10),
           Material(
             key: const Key('suite_parts_panel'),
-            color: kPanelBg,
+            color: suitePanelBgOf(context),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(kCornerRadius),
-              side: const BorderSide(color: kBorder),
+              side: BorderSide(color: suiteBorderOf(context)),
             ),
             clipBehavior: Clip.antiAlias,
             child: Column(
@@ -907,7 +908,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             kSuiteUsageNotifierTitle,
             key: const Key('suite_usage_section_title'),
             style: TextStyle(
-              color: kPrimaryDark,
+              color: suitePrimaryOf(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -915,10 +916,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 6),
           Material(
             key: const Key('suite_usage_panel'),
-            color: kPanelBg,
+            color: suitePanelBgOf(context),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(kCornerRadius),
-              side: const BorderSide(color: kBorder),
+              side: BorderSide(color: suiteBorderOf(context)),
             ),
             clipBehavior: Clip.antiAlias,
             child: Column(
@@ -969,7 +970,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Text(
               kPrivacyScaleTitle,
               style: TextStyle(
-                color: kPrimaryDark,
+                color: suitePrimaryOf(context),
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -977,29 +978,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 6),
             Text(
               kExplainerCoreVpn,
-              style: TextStyle(color: kTextMuted, fontSize: 12),
+              style: TextStyle(color: suiteTextMutedOf(context), fontSize: 12),
             ),
             const SizedBox(height: 10),
             Container(
               decoration: BoxDecoration(
-                color: kPanelBg,
+                color: suitePanelBgOf(context),
                 borderRadius: BorderRadius.circular(kCornerRadius),
-                border: Border.all(color: kBorder),
+                border: Border.all(color: suiteBorderOf(context)),
               ),
               child: Column(
                 children: [
                   // Residual IPv4 is product always-on (not adjustable).
                   ListTile(
-                    title: const Text(
+                    title: Text(
                       'IPv4 residual',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    subtitle: const Text(kExplainerResidualIpv4),
-                    trailing: const Text(
+                    subtitle: Text(kExplainerResidualIpv4),
+                    trailing: Text(
                       'Always on',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        color: kPrimary,
+                        color: suitePrimaryOf(context),
                       ),
                     ),
                   ),
@@ -1009,14 +1010,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     message: kTooltipResidualIpv6,
                     waitDuration: const Duration(milliseconds: 400),
                     child: SwitchListTile(
-                      title: const Text(
+                      title: Text(
                         'IPv6 residual',
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      subtitle: const Text(kExplainerResidualIpv6),
+                      subtitle: Text(kExplainerResidualIpv6),
                       value: _settings.residualIpv6,
-                      activeThumbColor: kWhite,
-                      activeTrackColor: kPrimary,
+                      activeThumbColor: suiteOnPrimaryOf(context),
+                      activeTrackColor: suitePrimaryOf(context),
                       onChanged: _busy
                           ? null
                           : (v) => _setResidualStack(ipv6: v),
@@ -1024,42 +1025,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const Divider(height: 1),
                   SwitchListTile(
-                    title: const Text(
+                    title: Text(
                       'Traffic shaping',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    subtitle: const Text(kExplainerTrafficShape),
+                    subtitle: Text(kExplainerTrafficShape),
                     value: _settings.privacyTrafficShape,
-                    activeThumbColor: kWhite,
-                    activeTrackColor: kPrimary,
+                    activeThumbColor: suiteOnPrimaryOf(context),
+                    activeTrackColor: suitePrimaryOf(context),
                     onChanged: _busy
                         ? null
                         : (v) => _setPrivacyScale(trafficShape: v),
                   ),
                   const Divider(height: 1),
                   SwitchListTile(
-                    title: const Text(
+                    title: Text(
                       'Outer obfuscation',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    subtitle: const Text(kExplainerOuterObfuscation),
+                    subtitle: Text(kExplainerOuterObfuscation),
                     value: _settings.privacyOuterObfuscation,
-                    activeThumbColor: kWhite,
-                    activeTrackColor: kPrimary,
+                    activeThumbColor: suiteOnPrimaryOf(context),
+                    activeTrackColor: suitePrimaryOf(context),
                     onChanged: _busy
                         ? null
                         : (v) => _setPrivacyScale(outerObfuscation: v),
                   ),
                   const Divider(height: 1),
                   SwitchListTile(
-                    title: const Text(
+                    title: Text(
                       'Multi-hop residual',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    subtitle: const Text(kExplainerMultihop),
+                    subtitle: Text(kExplainerMultihop),
                     value: _settings.privacyMultihop,
-                    activeThumbColor: kWhite,
-                    activeTrackColor: kPrimary,
+                    activeThumbColor: suiteOnPrimaryOf(context),
+                    activeTrackColor: suitePrimaryOf(context),
                     onChanged:
                         _busy ? null : (v) => _setPrivacyScale(multihop: v),
                   ),
@@ -1071,7 +1072,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Text(
               'Free edition ($kFreeTierVersion)',
               style: TextStyle(
-                color: kPrimaryDark,
+                color: suitePrimaryOf(context),
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -1081,14 +1082,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               'Basic Iceland residual only — privacy options are fixed and '
               'cannot be changed. Single-hop entry; no multi-hop, traffic '
               'shaping, or outer obfuscation toggles.',
-              style: TextStyle(color: kTextMuted, fontSize: 12),
+              style: TextStyle(color: suiteTextMutedOf(context), fontSize: 12),
             ),
           ],
           const SizedBox(height: 20),
           Text(
             kPingStatsTitle,
             style: TextStyle(
-              color: kPrimaryDark,
+              color: suitePrimaryOf(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -1096,12 +1097,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 6),
           Text(
             kPingStatsDisclaimer,
-            style: TextStyle(color: kTextMuted, fontSize: 12),
+            style: TextStyle(color: suiteTextMutedOf(context), fontSize: 12),
           ),
           const SizedBox(height: 8),
-          Text(_entryPing, style: const TextStyle(fontSize: 13, color: kText)),
+          Text(_entryPing, style: TextStyle(fontSize: 13, color: suiteTextOf(context))),
           const SizedBox(height: 4),
-          Text(_exitPing, style: const TextStyle(fontSize: 13, color: kText)),
+          Text(_exitPing, style: TextStyle(fontSize: 13, color: suiteTextOf(context))),
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
@@ -1114,7 +1115,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text(
             kLicencePromptTitle,
             style: TextStyle(
-              color: kPrimaryDark,
+              color: suitePrimaryOf(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -1124,47 +1125,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _licenceAccepted
                 ? 'Accepted on this device. Connect is allowed.'
                 : 'Not accepted — Connect is blocked until you accept.',
-            style: const TextStyle(fontSize: 12, color: kText),
+            style: TextStyle(fontSize: 12, color: suiteTextOf(context)),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             kShortLicenceSummary,
-            style: TextStyle(fontSize: 12, color: kTextMuted),
+            style: TextStyle(fontSize: 12, color: suiteTextMutedOf(context)),
           ),
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
             child: FilledButton(
               onPressed: _acceptLicence,
-              style: FilledButton.styleFrom(backgroundColor: kPrimary),
-              child: const Text(kLicenceAcceptButton),
+              style: FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
+              child: Text(kLicenceAcceptButton),
             ),
           ),
           const SizedBox(height: 20),
           Text(
             'Payment entitlement / keygen',
             style: TextStyle(
-              color: kPrimaryDark,
+              color: suitePrimaryOf(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             kPaymentConnectDisclaimerPlain,
-            style: TextStyle(fontSize: 12, color: kTextMuted),
+            style: TextStyle(fontSize: 12, color: suiteTextMutedOf(context)),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             kKeygenUnlockInstruction,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kText),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: suiteTextOf(context)),
           ),
           const SizedBox(height: 6),
           Text(
             _paymentOk
                 ? 'Payment status: $_paymentStatus — Connect allowed for payment.'
                 : 'Payment status: $_paymentStatus — Connect blocked until keygen unlocks an active subscription.',
-            style: const TextStyle(fontSize: 12, color: kText),
+            style: TextStyle(fontSize: 12, color: suiteTextOf(context)),
           ),
           const SizedBox(height: 8),
           KeygenEntryField(
@@ -1179,34 +1180,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
             alignment: Alignment.centerLeft,
             child: FilledButton(
               onPressed: _busy ? null : _verifyPayment,
-              style: FilledButton.styleFrom(backgroundColor: kPrimary),
-              child: const Text('Verify keygen / unlock Connect'),
+              style: FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
+              child: Text('Verify keygen / unlock Connect'),
             ),
           ),
           const SizedBox(height: 12),
           Text(
             kAnonRegistrationTitle,
             style: TextStyle(
-              color: kPrimaryDark,
+              color: suitePrimaryOf(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             kAnonRegistrationSummary,
-            style: TextStyle(fontSize: 12, color: kTextMuted),
+            style: TextStyle(fontSize: 12, color: suiteTextMutedOf(context)),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             kOsPrivilegeHonesty,
-            style: TextStyle(fontSize: 12, color: kTextMuted),
+            style: TextStyle(fontSize: 12, color: suiteTextMutedOf(context)),
           ),
           const SizedBox(height: 20),
           Text(
             kConnectionLogTitle,
             style: TextStyle(
-              color: kPrimaryDark,
+              color: suitePrimaryOf(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -1214,12 +1215,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 6),
           Text(
             kConnectionLogDisclaimer,
-            style: TextStyle(color: kTextMuted, fontSize: 12),
+            style: TextStyle(color: suiteTextMutedOf(context), fontSize: 12),
           ),
           const SizedBox(height: 4),
           Text(
             kSupportLogFindHint,
-            style: TextStyle(color: kTextMuted, fontSize: 11),
+            style: TextStyle(color: suiteTextMutedOf(context), fontSize: 11),
           ),
           const SizedBox(height: 8),
           Container(
@@ -1227,9 +1228,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             constraints: const BoxConstraints(minHeight: 100, maxHeight: 160),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: kPanelBg,
+              color: suitePanelBgOf(context),
               borderRadius: BorderRadius.circular(kCornerRadius),
-              border: Border.all(color: kBorder),
+              border: Border.all(color: suiteBorderOf(context)),
             ),
             child: SingleChildScrollView(
               child: Text(
@@ -1245,8 +1246,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               FilledButton(
                 onPressed: _exportLog,
-                style: FilledButton.styleFrom(backgroundColor: kPrimary),
-                child: const Text(kExportLogButton),
+                style: FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
+                child: Text(kExportLogButton),
               ),
               const SizedBox(width: 8),
               TextButton(
@@ -1259,7 +1260,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text(
             kLeakTestTitle,
             style: TextStyle(
-              color: kPrimaryDark,
+              color: suitePrimaryOf(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -1267,29 +1268,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 6),
           Text(
             kLeakTestDisclaimer,
-            style: TextStyle(color: kTextMuted, fontSize: 12),
+            style: TextStyle(color: suiteTextMutedOf(context), fontSize: 12),
           ),
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
             child: FilledButton(
               onPressed: runLeakTest,
-              style: FilledButton.styleFrom(backgroundColor: kPrimary),
-              child: const Text(kLeakTestButton),
+              style: FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
+              child: Text(kLeakTestButton),
             ),
           ),
           if (_leakResult != null) ...[
             const SizedBox(height: 8),
             Text(
               _leakResult!,
-              style: const TextStyle(fontSize: 12, color: kText),
+              style: TextStyle(fontSize: 12, color: suiteTextOf(context)),
             ),
           ],
           const SizedBox(height: 20),
           Text(
             kDpiMitigationTitle,
             style: TextStyle(
-              color: kPrimaryDark,
+              color: suitePrimaryOf(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -1299,20 +1300,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: kPanelBg,
+              color: suitePanelBgOf(context),
               borderRadius: BorderRadius.circular(kCornerRadius),
-              border: Border.all(color: kBorder),
+              border: Border.all(color: suiteBorderOf(context)),
             ),
             child: Text(
               '$kDpiMitigationDisclaimer\n\n$kConnectedIdlePowerHonesty',
-              style: const TextStyle(fontSize: 12, color: kText),
+              style: TextStyle(fontSize: 12, color: suiteTextOf(context)),
             ),
           ),
           const SizedBox(height: 20),
           Text(
             'Documents',
             style: TextStyle(
-              color: kPrimaryDark,
+              color: suitePrimaryOf(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -1320,9 +1321,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
-              color: kPanelBg,
+              color: suitePanelBgOf(context),
               borderRadius: BorderRadius.circular(kCornerRadius),
-              border: Border.all(color: kBorder),
+              border: Border.all(color: suiteBorderOf(context)),
             ),
             child: Column(
               children: [
@@ -1331,32 +1332,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ListTile(
                     title: Text(
                       kLegalDocLinks[i].label,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: kPrimary,
+                      style: TextStyle(fontWeight: FontWeight.w600, color: suitePrimaryOf(context),
                         decoration: TextDecoration.underline,
                       ),
                     ),
-                    trailing: const Icon(Icons.open_in_new, size: 18, color: kPrimary),
+                    trailing: Icon(Icons.open_in_new, size: 18, color: suitePrimaryOf(context)),
                     onTap: () => _openLegalDoc(kLegalDocLinks[i]),
                   ),
                 ],
                 const Divider(height: 1),
                 ListTile(
                   key: const Key('easter_egg_loft_link'),
-                  title: const Text(
+                  title: Text(
                     kEasterEggSettingsLabel,
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
-                      color: kTextMuted,
+                      color: suiteTextMutedOf(context),
                       fontSize: 13,
                     ),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'http://127.0.0.1:18765  ·  while the app is open',
-                    style: TextStyle(fontSize: 11, color: kTextMuted),
+                    style: TextStyle(fontSize: 11, color: suiteTextMutedOf(context)),
                   ),
-                  trailing: const Icon(Icons.open_in_new, size: 16, color: kTextMuted),
+                  trailing: Icon(Icons.open_in_new, size: 16, color: suiteTextMutedOf(context)),
                   onTap: _openEasterEggLoft,
                 ),
               ],
@@ -1364,7 +1363,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           if (_note != null) ...[
             const SizedBox(height: 12),
-            Text(_note!, style: const TextStyle(color: kPrimaryDark, fontSize: 12)),
+            Text(_note!, style: TextStyle(color: suitePrimaryOf(context), fontSize: 12)),
           ],
         ],
       ),

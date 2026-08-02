@@ -134,8 +134,8 @@ class _SuiteWalletTabState extends State<SuiteWalletTab> {
     }
 
     if (!_ready || _wallet == null || _locale == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: kPrimary),
+      return Center(
+        child: CircularProgressIndicator(color: suitePrimaryOf(context)),
       );
     }
 
@@ -183,7 +183,7 @@ class _SuiteTabError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: kChromeBg,
+      color: suiteChromeBgOf(context),
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -192,17 +192,17 @@ class _SuiteTabError extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: kText,
+                  color: suiteTextOf(context),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: kTextMuted),
+                style: TextStyle(color: suiteTextMutedOf(context)),
               ),
               const SizedBox(height: 16),
               FilledButton(

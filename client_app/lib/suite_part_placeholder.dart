@@ -23,7 +23,7 @@ class SuitePartReinstallPlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = suitePartLabel(partId);
     return ColoredBox(
-      color: kChromeBg,
+      color: suiteChromeBgOf(context),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -33,36 +33,33 @@ class SuitePartReinstallPlaceholder extends StatelessWidget {
               Text(
                 kSuitePartReinstallTitle,
                 key: Key('suite_part_reinstall_title_${partId.name}'),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: kText,
+                  color: suiteTextOf(context),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 '“$label” is not active on this device.',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: kTextMuted,
+                  color: suiteTextMutedOf(context),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
                 kSuitePartReinstallBody,
                 key: Key('suite_part_reinstall_body_${partId.name}'),
-                style: const TextStyle(
-                  fontSize: 13,
-                  height: 1.45,
-                  color: kText,
+                style: TextStyle(fontSize: 13, height: 1.45, color: suiteTextOf(context),
                 ),
               ),
               const SizedBox(height: 24),
               FilledButton(
                 key: Key('suite_part_reinstall_btn_${partId.name}'),
                 onPressed: busy ? null : onReinstall,
-                style: FilledButton.styleFrom(backgroundColor: kPrimary),
+                style: FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
                 child: Text(kSuitePartReinstallLabel),
               ),
             ],

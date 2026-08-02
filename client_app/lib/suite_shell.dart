@@ -10,7 +10,6 @@ import 'suite_parts_store.dart';
 import 'suite_rpai_tab.dart';
 import 'suite_version.dart';
 import 'suite_wallet_tab.dart';
-import 'theme.dart';
 
 /// Unified Restore Privacy Suite shell: **VPN** · **%** · **EVOLVE** · **rpAI**.
 ///

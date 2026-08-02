@@ -22,7 +22,7 @@ Future<SuiteAccountPromptOutcome> showSuiteAccountPrompt(
     isScrollControlled: true,
     isDismissible: true,
     enableDrag: true,
-    backgroundColor: kPanelBg,
+    backgroundColor: suitePanelBgOf(context),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -132,13 +132,13 @@ class _SuiteAccountPromptBodyState extends State<_SuiteAccountPromptBody> {
             kSuiteAccountPromptTitle,
             key: const Key('suite_account_prompt_title'),
             style: TextStyle(
-              color: kPrimaryDark,
+              color: suitePrimaryOf(context),
               fontSize: 18,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             kSuiteAccountPromptBody,
             key: Key('suite_account_prompt_body'),
             style: TextStyle(fontSize: 13),
@@ -170,14 +170,14 @@ class _SuiteAccountPromptBodyState extends State<_SuiteAccountPromptBody> {
             Text(
               _status,
               key: const Key('suite_account_status'),
-              style: const TextStyle(fontSize: 12),
+              style: TextStyle(fontSize: 12),
             ),
           ],
           const SizedBox(height: 12),
           FilledButton(
             key: const Key('suite_account_submit'),
             onPressed: _busy ? null : _submit,
-            style: FilledButton.styleFrom(backgroundColor: kPrimary),
+            style: FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
             child: Text(
               _busy
                   ? 'Please wait…'

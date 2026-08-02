@@ -147,9 +147,9 @@ class _SuiteUpdateHonestyPanelState extends State<SuiteUpdateHonestyPanel> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: kPanelBg,
+        color: suitePanelBgOf(context),
         borderRadius: BorderRadius.circular(kCornerRadius),
-        border: Border.all(color: kBorder),
+        border: Border.all(color: suiteBorderOf(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -157,7 +157,7 @@ class _SuiteUpdateHonestyPanelState extends State<SuiteUpdateHonestyPanel> {
           Text(
             kSuiteUpdateExplainerHeading,
             style: TextStyle(
-              color: kPrimaryDark,
+              color: suitePrimaryOf(context),
               fontWeight: FontWeight.w800,
               fontSize: widget.compact ? 13 : 14,
             ),
@@ -168,7 +168,7 @@ class _SuiteUpdateHonestyPanelState extends State<SuiteUpdateHonestyPanel> {
             // trims visual height only via font/spacing — body stays complete.
             kSuiteUpdateExplainerBody,
             style: TextStyle(
-              color: kTextMuted,
+              color: suiteTextMutedOf(context),
               fontSize: widget.compact ? 11 : 12,
               height: widget.compact ? 1.3 : 1.45,
             ),
@@ -201,7 +201,7 @@ class _SuiteUpdateHonestyPanelState extends State<SuiteUpdateHonestyPanel> {
                   : const Icon(Icons.system_update_alt, size: 18),
               label: Text(kSuiteUpdateUnpackButtonLabel),
               style: FilledButton.styleFrom(
-                backgroundColor: kPrimary,
+                backgroundColor: suitePrimaryOf(context),
                 foregroundColor: kWhite,
                 disabledBackgroundColor: kBorder,
                 disabledForegroundColor: kTextMuted,
@@ -212,7 +212,7 @@ class _SuiteUpdateHonestyPanelState extends State<SuiteUpdateHonestyPanel> {
             const SizedBox(height: 8),
             Text(
               _note!,
-              style: const TextStyle(color: kPrimaryDark, fontSize: 11),
+              style: TextStyle(color: suitePrimaryOf(context), fontSize: 11),
             ),
           ],
         ],

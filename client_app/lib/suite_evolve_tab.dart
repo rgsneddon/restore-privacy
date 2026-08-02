@@ -186,26 +186,26 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
   Widget build(BuildContext context) {
     if (_error != null) {
       return ColoredBox(
-        color: kChromeBg,
+        color: suiteChromeBgOf(context),
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   'EVOLVE',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: kText,
+                    color: suiteTextOf(context),
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   '$_error',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: kTextMuted),
+                  style: TextStyle(color: suiteTextMutedOf(context)),
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
@@ -216,7 +216,7 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
                     });
                     _boot();
                   },
-                  child: const Text('Retry'),
+                  child: Text('Retry'),
                 ),
               ],
             ),
@@ -230,8 +230,8 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
         _wallet == null ||
         _locale == null ||
         _fcg == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: kPrimary),
+      return Center(
+        child: CircularProgressIndicator(color: suitePrimaryOf(context)),
       );
     }
 

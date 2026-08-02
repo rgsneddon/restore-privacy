@@ -346,7 +346,7 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
                   Text(
                     kSuiteProductName,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: kWhite,
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
@@ -363,7 +363,7 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
                     ),
                   ),
                   const SizedBox(height: 28),
-                  const Text(
+                  Text(
                     kEntryAccessTitle,
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -398,7 +398,7 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
                     FilledButton(
                       onPressed: _busy ? null : _acceptLicence,
                       style: FilledButton.styleFrom(
-                        backgroundColor: kPrimary,
+                        backgroundColor: suitePrimaryOf(context),
                         foregroundColor: kWhite,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
@@ -453,7 +453,7 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
                         ? null
                         : _tryUnlock,
                     style: FilledButton.styleFrom(
-                      backgroundColor: kPrimary,
+                      backgroundColor: suitePrimaryOf(context),
                       foregroundColor: kWhite,
                       disabledBackgroundColor: kPrimary.withValues(alpha: 0.4),
                       padding: const EdgeInsets.symmetric(vertical: 14),

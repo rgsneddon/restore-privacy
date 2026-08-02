@@ -103,9 +103,9 @@ class _NodeWipeTimerPanelState extends State<NodeWipeTimerPanel> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: kPanelBg,
+        color: suitePanelBgOf(context),
         borderRadius: BorderRadius.circular(kCornerRadius),
-        border: Border.all(color: kBorder),
+        border: Border.all(color: suiteBorderOf(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -114,8 +114,7 @@ class _NodeWipeTimerPanelState extends State<NodeWipeTimerPanel> {
             kNodeWipeHeading,
             key: const Key(kNodeWipeSettingsHeadingKey),
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: kPrimaryDark,
+            style: TextStyle(color: suitePrimaryOf(context),
               fontSize: 16,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.02,
@@ -126,8 +125,7 @@ class _NodeWipeTimerPanelState extends State<NodeWipeTimerPanel> {
             kAllNodesDataClearedLabel,
             key: const Key(kNodeWipeSettingsLabelKey),
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: kPrimary,
+            style: TextStyle(color: suitePrimaryOf(context),
               fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.04,
@@ -168,8 +166,7 @@ class _NodeWipeTimerPanelState extends State<NodeWipeTimerPanel> {
             kNodeWipeHonestyBlurb,
             key: const Key(kNodeWipeSettingsBlurbKey),
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: kTextMuted,
+            style: TextStyle(color: suiteTextMutedOf(context),
               fontSize: 12,
               height: 1.45,
             ),
@@ -198,15 +195,14 @@ class _UnitBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: kLightAccent,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBorder),
+        border: Border.all(color: suiteBorderOf(context)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             value.toString().padLeft(2, '0'),
-            style: const TextStyle(
-              color: kText,
+            style: TextStyle(color: suiteTextOf(context),
               fontSize: 18,
               fontWeight: FontWeight.w800,
               fontFeatures: [FontFeature.tabularFigures()],
@@ -215,8 +211,7 @@ class _UnitBox extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(
-              color: kTextMuted,
+            style: TextStyle(color: suiteTextMutedOf(context),
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.06,

@@ -4,8 +4,11 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:restore_privacy_client/main.dart';
+import 'package:restore_privacy_client/settings_screen.dart';
 import 'package:restore_privacy_client/settings_store.dart';
 import 'package:restore_privacy_client/suite_parts.dart';
+import 'package:restore_privacy_client/suite_shell.dart';
 import 'package:restore_privacy_client/theme.dart';
 
 void main() {
@@ -67,6 +70,136 @@ void main() {
       expect(normalizeSuiteAppearance(loaded3.appearance), kAppearanceDark);
       expect(suiteThemeModeFromAppearance(loaded3.appearance), ThemeMode.dark);
     });
+
+    testWidgets(
+      'light appearance paints VPN home and Settings scaffolds light Evolve',
+      (tester) async {
+        final map = <String, dynamic>{};
+        final store = SettingsStore(MemorySettingsBackend(map));
+        await store.save(const ProductSettings(appearance: 'light'));
+
+        // Probe: suiteChromeBgOf / suitePanelBgOf honor MaterialApp light theme.
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: buildSuiteThemeLight(),
+            darkTheme: buildSuiteThemeDark(),
+            themeMode: suiteThemeModeFromAppearance('light'),
+            home: Builder(
+              builder: (context) {
+                return Scaffold(
+                  key: const Key('probe_chrome_scaffold'),
+                  backgroundColor: suiteChromeBgOf(context),
+                  body: ColoredBox(
+                    key: const Key('probe_panel'),
+                    color: suitePanelBgOf(context),
+                    child: Text(
+                      'chrome-probe',
+                      style: TextStyle(color: suiteTextOf(context)),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pump();
+        final probe = tester.widget<Scaffold>(
+          find.byKey(const Key('probe_chrome_scaffold')),
+        );
+        expect(probe.backgroundColor, kEvolveLightBg);
+        expect(probe.backgroundColor, isNot(kEvolveBg));
+        final panel = tester.widget<ColoredBox>(find.byKey(const Key('probe_panel')));
+        expect(panel.color, kEvolveLightCard);
+
+        // Production shell scaffold under light themeMode.
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: buildSuiteThemeLight(),
+            darkTheme: buildSuiteThemeDark(),
+            themeMode: ThemeMode.light,
+            home: SuiteShell(
+              preferInitialParts: true,
+              initialParts: SuitePartsState.allInstalled,
+              vpnTab: Scaffold(
+                key: const Key('vpn_home_probe'),
+                backgroundColor: kEvolveLightBg, // set by TunnelHome via suiteChromeBgOf
+                body: Builder(
+                  builder: (context) {
+                    // Mirror TunnelHome: resolve chrome from theme helpers.
+                    return Scaffold(
+                      key: const Key('vpn_home_themed'),
+                      backgroundColor: suiteChromeBgOf(context),
+                      body: const Center(child: Text('VPN_HOME_PROBE')),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        final shell = tester.widget<Scaffold>(
+          find.byKey(const Key('suite_shell_scaffold')),
+        );
+        expect(shell.backgroundColor, kEvolveLightBg);
+        expect(shell.backgroundColor, isNot(kEvolveBg));
+        final vpnThemed = tester.widget<Scaffold>(
+          find.byKey(const Key('vpn_home_themed')),
+        );
+        expect(vpnThemed.backgroundColor, kEvolveLightBg);
+        expect(vpnThemed.backgroundColor, isNot(kChromeBg));
+        expect(vpnThemed.backgroundColor, isNot(kEvolveBg));
+
+        // Settings scaffold (real shipped SettingsScreen build).
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: buildSuiteThemeLight(),
+            darkTheme: buildSuiteThemeDark(),
+            themeMode: ThemeMode.light,
+            home: SettingsScreen(
+              store: store,
+              initial: const ProductSettings(appearance: 'light'),
+            ),
+          ),
+        );
+        await tester.pump();
+        final settingsScaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+        expect(settingsScaffold.backgroundColor, kEvolveLightBg);
+        expect(settingsScaffold.backgroundColor, isNot(kEvolveBg));
+        expect(settingsScaffold.backgroundColor, isNot(kChromeBg));
+        expect(
+          find.byKey(const Key('suite_appearance_light_switch')),
+          findsOneWidget,
+        );
+
+        // Dark mode still resolves dark Evolve chrome (regression guard).
+        // Wrap with Theme(data: dark) so the probe does not depend on
+        // MaterialApp themeMode + platform brightness interaction in tests.
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Theme(
+              data: buildSuiteThemeDark(),
+              child: Builder(
+                builder: (context) => Scaffold(
+                  key: const Key('probe_dark'),
+                  backgroundColor: suiteChromeBgOf(context),
+                  body: const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(
+          tester.widget<Scaffold>(find.byKey(const Key('probe_dark'))).backgroundColor,
+          kEvolveBg,
+        );
+        expect(
+          tester.widget<Scaffold>(find.byKey(const Key('probe_dark'))).backgroundColor,
+          isNot(kEvolveLightBg),
+        );
+      },
+    );
   });
 
   group('suite swipe order VPN → % → Evolve → rpAI', () {

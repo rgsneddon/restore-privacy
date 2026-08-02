@@ -222,6 +222,45 @@ ThemeData buildSuiteThemeLight() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Theme-resolved chrome (use these so Settings light/dark recolors the UI).
+// Hard-coded kChromeBg/kPanelBg stay as dark Evolve defaults for non-widget
+// code and tests that do not mount MaterialApp.
+// ---------------------------------------------------------------------------
+
+bool suiteThemeIsDark(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark;
+
+Color suiteChromeBgOf(BuildContext context) =>
+    Theme.of(context).scaffoldBackgroundColor;
+
+Color suitePanelBgOf(BuildContext context) =>
+    Theme.of(context).colorScheme.surface;
+
+Color suitePrimaryOf(BuildContext context) =>
+    Theme.of(context).colorScheme.primary;
+
+Color suiteSecondaryOf(BuildContext context) =>
+    Theme.of(context).colorScheme.secondary;
+
+Color suiteOnPrimaryOf(BuildContext context) =>
+    Theme.of(context).colorScheme.onPrimary;
+
+Color suiteTextOf(BuildContext context) =>
+    Theme.of(context).colorScheme.onSurface;
+
+Color suiteTextMutedOf(BuildContext context) => suiteThemeIsDark(context)
+    ? kEvolveTextMuted
+    : kEvolveLightTextMuted;
+
+Color suiteBorderOf(BuildContext context) => suiteThemeIsDark(context)
+    ? kBorder
+    : kEvolveLightBorder;
+
+Color suiteAccentFillOf(BuildContext context) => suiteThemeIsDark(context)
+    ? kLightAccent
+    : kEvolveLightPrimary.withValues(alpha: 0.12);
+
 /// Single control label for the Connect / Disconnect button.
 String connectButtonLabel(bool connected) =>
     connected ? 'Disconnect' : 'Connect';

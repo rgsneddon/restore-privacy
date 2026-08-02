@@ -337,15 +337,14 @@ class _UpgradeBannerState extends State<UpgradeBanner> {
         decoration: BoxDecoration(
           color: kLightAccent,
           borderRadius: BorderRadius.circular(kCornerRadius),
-          border: Border.all(color: kBorder),
+          border: Border.all(color: suiteBorderOf(context)),
         ),
         child: Row(
           children: [
             Expanded(
               child: Text(
                 _message!,
-                style: const TextStyle(
-                  color: kPrimaryDark,
+                style: TextStyle(color: suitePrimaryOf(context),
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -353,10 +352,10 @@ class _UpgradeBannerState extends State<UpgradeBanner> {
             ),
             TextButton(
               onPressed: _open,
-              child: const Text(
+              child: Text(
                 'Get update',
                 style: TextStyle(
-                  color: kPrimary,
+                  color: suitePrimaryOf(context),
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                 ),

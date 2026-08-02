@@ -440,7 +440,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: kPanelBg,
+      backgroundColor: suitePanelBgOf(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -454,22 +454,22 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
               Text(
                 kLicencePromptTitle,
                 style: TextStyle(
-                  color: kPrimaryDark,
+                  color: suitePrimaryOf(context),
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(kShortLicenceSummary, style: TextStyle(fontSize: 13)),
+              Text(kShortLicenceSummary, style: TextStyle(fontSize: 13)),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 kAnonRegistrationSummary,
-                style: TextStyle(fontSize: 12, color: kTextMuted),
+                style: TextStyle(fontSize: 12, color: suiteTextMutedOf(context)),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 kOsPrivilegeHonesty,
-                style: TextStyle(fontSize: 12, color: kTextMuted),
+                style: TextStyle(fontSize: 12, color: suiteTextMutedOf(context)),
               ),
               const SizedBox(height: 16),
               FilledButton(
@@ -487,8 +487,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   // after this sheet returns so we never stack two keygen sheets.
                   Navigator.of(ctx).pop();
                 },
-                style: FilledButton.styleFrom(backgroundColor: kPrimary),
-                child: const Text(kLicenceAcceptButton),
+                style: FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
+                child: Text(kLicenceAcceptButton),
               ),
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
@@ -513,7 +513,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: kPanelBg,
+      backgroundColor: suitePanelBgOf(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -532,29 +532,27 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
               Text(
                 kRenewLicencePromptTitle,
                 style: TextStyle(
-                  color: kPrimaryDark,
+                  color: suitePrimaryOf(context),
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'Your subscription is EXPIRED. Renew your licence *here*:',
                 style: TextStyle(fontSize: 14),
               ),
               const SizedBox(height: 10),
               SelectableText(
                 url,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: kPrimary,
+                style: TextStyle(fontSize: 13, color: suitePrimaryOf(context),
                   decoration: TextDecoration.underline,
                 ),
               ),
               const SizedBox(height: 12),
               Text(
                 body,
-                style: const TextStyle(fontSize: 12, color: kTextMuted),
+                style: TextStyle(fontSize: 12, color: suiteTextMutedOf(context)),
               ),
               const SizedBox(height: 16),
               FilledButton(
@@ -571,7 +569,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     }
                   }
                 },
-                style: FilledButton.styleFrom(backgroundColor: kPrimary),
+                style: FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
                 child: const Text('Open payment portal'),
               ),
               TextButton(
@@ -624,7 +622,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
             isDismissible: false,
             enableDrag: false,
             useRootNavigator: useRoot,
-            backgroundColor: kPanelBg,
+            backgroundColor: suitePanelBgOf(context),
             shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
@@ -684,20 +682,20 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                         Text(
                           kKeygenPromptTitle,
                           style: TextStyle(
-                            color: kPrimaryDark,
+                            color: suitePrimaryOf(context),
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         const SizedBox(height: 10),
-                        const Text(
+                        Text(
                           kKeygenPromptBody,
                           style: TextStyle(fontSize: 13),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           kConnectBlockedKeygenMsg,
-                          style: TextStyle(fontSize: 12, color: kTextMuted),
+                          style: TextStyle(fontSize: 12, color: suiteTextMutedOf(context)),
                         ),
                         const SizedBox(height: 12),
                         KeygenEntryField(
@@ -721,13 +719,13 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                         ),
                         if (statusLine.isNotEmpty) ...[
                           const SizedBox(height: 8),
-                          Text(statusLine, style: const TextStyle(fontSize: 12)),
+                          Text(statusLine, style: TextStyle(fontSize: 12)),
                         ],
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: busy ? null : tryUnlock,
                           style:
-                              FilledButton.styleFrom(backgroundColor: kPrimary),
+                              FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
                           child: Text(busy ? 'Verifying…' : 'Unlock Connect'),
                         ),
                         TextButton(
@@ -1235,7 +1233,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     // Nested under SuiteShell chrome + bottom nav: avoid SafeArea double-padding
     // and allow the body to shrink/scroll when height is tight.
     return Scaffold(
-      backgroundColor: kChromeBg,
+      backgroundColor: suiteChromeBgOf(context),
       body: SafeArea(
         top: false,
         bottom: false,
@@ -1264,14 +1262,14 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: kPrimaryDark,
+                          color: suitePrimaryOf(context),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         alignment: Alignment.center,
-                        child: const Text(
+                        child: Text(
                           'RP',
                           style: TextStyle(
-                            color: kWhite,
+                            color: suiteOnPrimaryOf(context),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -1283,18 +1281,18 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           kAppTitle,
                           style: TextStyle(
-                            color: kPrimaryDark,
+                            color: suitePrimaryOf(context),
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
                           ),
                         ),
-                        const Text(
+                        Text(
                           kBannerTitle,
                           style: TextStyle(
-                            color: kTextMuted,
+                            color: suiteTextMutedOf(context),
                             fontSize: 12,
                           ),
                         ),
@@ -1302,7 +1300,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                         Text(
                           kSeamlessTagline,
                           style: TextStyle(
-                            color: kPrimary,
+                            color: suitePrimaryOf(context),
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1313,7 +1311,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   IconButton(
                     tooltip: 'Settings',
                     onPressed: _openSettings,
-                    icon: const Icon(Icons.settings, color: kPrimaryDark),
+                    icon: Icon(Icons.settings, color: suitePrimaryOf(context)),
                   ),
                 ],
               ),
@@ -1330,9 +1328,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                 UpgradeBanner(runningVersion: kSuiteVersion),
               Container(
                 decoration: BoxDecoration(
-                  color: kPanelBg,
+                  color: suitePanelBgOf(context),
                   borderRadius: BorderRadius.circular(kCornerRadius),
-                  border: Border.all(color: kBorder),
+                  border: Border.all(color: suiteBorderOf(context)),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                 child: Column(
@@ -1340,11 +1338,11 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   children: [
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'VPN status',
                             style: TextStyle(
-                              color: kTextMuted,
+                              color: suiteTextMutedOf(context),
                               fontSize: 11,
                             ),
                           ),
@@ -1387,8 +1385,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     const SizedBox(height: 4),
                     Text(
                       _status,
-                      style: const TextStyle(
-                        color: kTextMuted,
+                      style: TextStyle(color: suiteTextMutedOf(context),
                         fontSize: 12,
                       ),
                     ),
@@ -1399,9 +1396,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                         child: FilledButton(
                           onPressed: _showLicenceSheet,
                           style: FilledButton.styleFrom(
-                            backgroundColor: kPrimary,
+                            backgroundColor: suitePrimaryOf(context),
                           ),
-                          child: const Text(kLicenceAcceptButton),
+                          child: Text(kLicenceAcceptButton),
                         ),
                       ),
                     ],
@@ -1450,9 +1447,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
               Container(
                 height: tight ? 96 : 140,
                 decoration: BoxDecoration(
-                  color: kPanelBg,
+                  color: suitePanelBgOf(context),
                   borderRadius: BorderRadius.circular(kCornerRadius),
-                  border: Border.all(color: kBorder),
+                  border: Border.all(color: suiteBorderOf(context)),
                 ),
                 padding: const EdgeInsets.all(10),
                 child: ListView.builder(
@@ -1460,8 +1457,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   itemCount: _log.length,
                   itemBuilder: (_, i) => Text(
                     _log[i],
-                    style: const TextStyle(
-                      color: kText,
+                    style: TextStyle(color: suiteTextOf(context),
                       fontSize: 13,
                       height: 1.35,
                     ),
@@ -1470,10 +1466,10 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
               ),
               SizedBox(height: tight ? 8 : 14),
               // Entry country (flags) — main shell above Connect, not Settings-only
-              const Text(
+              Text(
                 'Entry country',
                 style: TextStyle(
-                  color: kTextMuted,
+                  color: suiteTextMutedOf(context),
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1482,9 +1478,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  color: kPanelBg,
+                  color: suitePanelBgOf(context),
                   borderRadius: BorderRadius.circular(kCornerRadius),
-                  border: Border.all(color: kBorder),
+                  border: Border.all(color: suiteBorderOf(context)),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
@@ -1496,7 +1492,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                           value: o.code,
                           child: Text(
                             o.label,
-                            style: const TextStyle(fontSize: 15),
+                            style: TextStyle(fontSize: 15),
                           ),
                         ),
                     ],
@@ -1546,8 +1542,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                 _settings.autoconnectOnLaunch
                     ? 'Autoconnect on launch is ON (Settings). Minimize keeps VPN alive.'
                     : 'Manual Connect, or enable seamless power-up in Settings ⚙',
-                style: const TextStyle(
-                  color: kTextMuted,
+                style: TextStyle(color: suiteTextMutedOf(context),
                   fontSize: 11,
                 ),
               ),
@@ -1561,7 +1556,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     key: const Key('main_quit_button'),
                     onPressed: _busy ? null : _onQuit,
                     style: TextButton.styleFrom(
-                      foregroundColor: kTextMuted,
+                      foregroundColor: suiteTextMutedOf(context),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 4,

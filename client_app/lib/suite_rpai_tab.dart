@@ -191,7 +191,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
         shouldShowNedHowToOffer(registered: _registered);
 
     return ColoredBox(
-      color: kChromeBg,
+      color: suiteChromeBgOf(context),
       child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
@@ -217,7 +217,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
-                          color: kText,
+                          color: suiteTextOf(context),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -226,7 +226,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: kTextMuted,
+                          color: suiteTextMutedOf(context),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -241,7 +241,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: kPrimaryDark,
+                          color: suitePrimaryOf(context),
                         ),
                       ),
                     ],
@@ -253,16 +253,16 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: kPanelBg,
+                color: suitePanelBgOf(context),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: kBorder),
+                border: Border.all(color: suiteBorderOf(context)),
               ),
               child: Text(
                 text,
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.45,
-                  color: kText,
+                  color: suiteTextOf(context),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -273,7 +273,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: kPrimaryDark,
+                color: suitePrimaryOf(context),
               ),
             ),
             const SizedBox(height: 8),
@@ -284,7 +284,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                 fontSize: 12,
                 height: 1.4,
                 fontWeight: FontWeight.w600,
-                color: kText,
+                color: suiteTextOf(context),
               ),
             ),
             const SizedBox(height: 6),
@@ -292,7 +292,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
               'Load balance: available rpS servers · expands as residual/project '
               'nodes heartbeat. Confirmed ChronoFlux admin seals also raise '
               'growth score. Admin rpS page shows the same durable statistics.',
-              style: TextStyle(fontSize: 12, height: 1.4, color: kTextMuted),
+              style: TextStyle(fontSize: 12, height: 1.4, color: suiteTextMutedOf(context)),
             ),
             if (_loading) ...[
               const SizedBox(height: 20),
@@ -304,7 +304,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
-                  color: kPrimaryDark,
+                  color: suitePrimaryOf(context),
                 ),
               ),
               const SizedBox(height: 8),
@@ -315,16 +315,16 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: kPanelBg,
+                      color: suitePanelBgOf(context),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: kBorder),
+                      border: Border.all(color: suiteBorderOf(context)),
                     ),
                     child: Text(
                       line,
                       style: TextStyle(
                         fontSize: 13,
                         height: 1.45,
-                        color: kText,
+                        color: suiteTextOf(context),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -336,8 +336,8 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                 FilledButton(
                   key: const Key('ned_resume_setup'),
                   onPressed: _busy ? null : _onResumeSetup,
-                  style: FilledButton.styleFrom(backgroundColor: kPrimary),
-                  child: const Text(kNedResumeSetupLabel),
+                  style: FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
+                  child: Text(kNedResumeSetupLabel),
                 ),
               ],
               if (showHowToEntry) ...[
@@ -345,7 +345,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                 FilledButton(
                   key: const Key('ned_offer_howto'),
                   onPressed: _busy ? null : _onOfferHowTo,
-                  style: FilledButton.styleFrom(backgroundColor: kPrimary),
+                  style: FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
                   child: const Text(kNedOfferHowToLabel),
                 ),
               ],
@@ -358,7 +358,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                         key: const Key('ned_setup_yes'),
                         onPressed: _busy ? null : _onYesContinueSetup,
                         style:
-                            FilledButton.styleFrom(backgroundColor: kPrimary),
+                            FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
                         child: const Text(kNedYesLabel),
                       ),
                     ),
@@ -382,7 +382,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                         key: const Key('ned_howto_yes'),
                         onPressed: _busy ? null : _onOfferHowTo,
                         style:
-                            FilledButton.styleFrom(backgroundColor: kPrimary),
+                            FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
                         child: const Text(kNedOfferHowToLabel),
                       ),
                     ),
@@ -402,7 +402,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                 FilledButton(
                   key: const Key('ned_continue'),
                   onPressed: _busy ? null : _onContinue,
-                  style: FilledButton.styleFrom(backgroundColor: kPrimary),
+                  style: FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
                   child: const Text(kNedContinueLabel),
                 ),
               ],
@@ -415,7 +415,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                         key: const Key('ned_vpn_tour_yes'),
                         onPressed: _busy ? null : _onYesVpnTour,
                         style:
-                            FilledButton.styleFrom(backgroundColor: kPrimary),
+                            FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
                         child: const Text(kNedYesLabel),
                       ),
                     ),
@@ -476,10 +476,10 @@ class _NedIconAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF0A1628),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kPrimary.withValues(alpha: 0.55), width: 1.5),
+        border: Border.all(color: suitePrimaryOf(context).withValues(alpha: 0.55), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: kPrimary.withValues(alpha: 0.4),
+            color: suitePrimaryOf(context).withValues(alpha: 0.4),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
