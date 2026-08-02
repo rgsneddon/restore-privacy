@@ -159,6 +159,130 @@ class TestMultiNodeProbeSchedule(unittest.TestCase):
         self.assertTrue(slim["privacy"].get("multi_node_probes"))
 
 
+class TestPrimaryLabelSurvivesRedact(unittest.TestCase):
+    def test_write_outputs_primary_peer_is_country_not_vpn_node(self) -> None:
+        """Real write path: redact monopin host then build_markdown.
+
+        Regression: public_label_for_host('Germany (DE)') → 'VPN node' after
+        redact turned the raw IPv4 into a country label.
+        """
+        mod = _load_audit_mod()
+        td = Path(tempfile.mkdtemp(prefix="rpt-audit-primary-"))
+        try:
+            (td / "status_page" / "static").mkdir(parents=True)
+            (td / "status_page" / "public").mkdir(parents=True)
+            old = mod.ROOT
+            mod.ROOT = td
+            results = {
+                "generated_at": "2020-01-01T00:00:00Z",
+                # Raw monopin — write_outputs redacts before build_markdown
+                "node_host": "178.105.187.178",
+                "catalog_version": "1.0.7",
+                "unit_suite": {"ran": False, "ok": True, "modules": []},
+                "tcp_status": {
+                    "ok": True,
+                    "error": None,
+                    "host": "178.105.187.178",
+                    "port": 8080,
+                },
+                "http_status": {
+                    "ok": True,
+                    "status_code": 200,
+                    "body": {"title": "RESTORE PRIVACY"},
+                },
+                "udp": {"sent": True, "error": None},
+                "no_priv": {"ok": True, "hits": []},
+                "package_rag": {
+                    "catalog_version": "1.0.7",
+                    "overall": "Green",
+                    "packages": [],
+                    "legend": {"Green": "OK", "Amber": "A", "Red": "R"},
+                },
+                "section_b": {"ok": True},
+                "multihop_structure": {"ok": True},
+                "live_node_probes": [
+                    {
+                        "code": "IS",
+                        "label": "Iceland (IS)",
+                        "host": "82.221.101.241",
+                        "tcp_status": {"ok": True, "error": None},
+                        "http_status": {
+                            "ok": True,
+                            "status_code": 200,
+                            "body": {"title": "RESTORE PRIVACY"},
+                        },
+                        "udp": {"sent": True, "error": None},
+                        "ok": True,
+                    },
+                    {
+                        "code": "DE",
+                        "label": "Germany (DE)",
+                        "host": "178.105.187.178",
+                        "tcp_status": {"ok": True, "error": None},
+                        "http_status": {
+                            "ok": True,
+                            "status_code": 200,
+                            "body": {"title": "RESTORE PRIVACY"},
+                        },
+                        "udp": {"sent": True, "error": None},
+                        "ok": True,
+                    },
+                ],
+            }
+            out = td / "AUDIT.md"
+            mod.write_outputs(results, out)
+            md = out.read_text(encoding="utf-8")
+            # Primary peer row must be honest country label
+            self.assertIn("| Peer | Germany (DE) |", md)
+            self.assertNotIn("| Peer | VPN node |", md)
+            # Multi-node table rows still present
+            self.assertIn("Iceland (IS)", md)
+            self.assertIn("Germany (DE)", md)
+            # No raw monopin IPs on public AUDIT surface
+            self.assertNotIn("178.105.187.178", md)
+            self.assertNotIn("82.221.101.241", md)
+            # Helper alone must not map already-redacted label to VPN node
+            self.assertEqual(
+                mod.primary_peer_public_label(
+                    {
+                        "node_host": "Germany (DE)",
+                        "live_node_probes": [
+                            {"code": "DE", "label": "Germany (DE)", "host": "Germany (DE)"}
+                        ],
+                    }
+                ),
+                "Germany (DE)",
+            )
+            mod.ROOT = old
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    def test_primary_peer_public_label_prefers_live_probe_label(self) -> None:
+        mod = _load_audit_mod()
+        self.assertEqual(
+            mod.primary_peer_public_label(
+                {
+                    "node_host": "178.105.187.178",
+                    "live_node_probes": [
+                        {
+                            "code": "DE",
+                            "label": "Germany (DE)",
+                            "host": "178.105.187.178",
+                        }
+                    ],
+                }
+            ),
+            "Germany (DE)",
+        )
+        # Already redacted host string without re-map to VPN node
+        self.assertEqual(
+            mod.primary_peer_public_label(
+                {"node_host": "Iceland (IS)", "live_node_probes": []}
+            ),
+            "Iceland (IS)",
+        )
+
+
 class TestWriteTimeStampAdvance(unittest.TestCase):
     def test_write_outputs_advances_generated_at_twice(self) -> None:
         """Two sequential write_outputs stamps advance (sticky last-run fix)."""
