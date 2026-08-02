@@ -1,4 +1,4 @@
-# perc_chain on Helsinki — Restore Privacy Suite v1.0.5
+# perc_chain on Helsinki — Restore Privacy Suite v1.0.6
 
 ## Why Helsinki
 
@@ -40,11 +40,11 @@ Docker (when available):
 
 ```bash
 cd perc_chain
-docker build -t rpt-perc-chain:1.0.5 .
+docker build -t rpt-perc-chain:1.0.6 .
 docker run -d --name rpt-perc-chain -p 9478:9478 \
   -e PERC_PUBLIC_ENDPOINT=http://135.181.152.10:9478 \
   -v /opt/restore-privacy/perc_chain/data:/var/data \
-  rpt-perc-chain:1.0.5
+  rpt-perc-chain:1.0.6
 ```
 
 ## Operator note
@@ -52,3 +52,15 @@ docker run -d --name rpt-perc-chain -p 9478:9478 \
 **evolve-perc-internet is paused to save money.** Point suite clients at Helsinki
 (or an env override). Re-enabling Render requires an explicit operator decision
 and is out of the default suite path.
+
+## Cut Render dual-seed umbilical (env + nginx one-liners)
+
+Client `rendezvousUrl` already uses `https://135.181.152.10.sslip.io/perc`.
+To fully stop Helsinki from pulling peers/ledger from Render, apply:
+
+→ **[deploy/CUT_RENDER_UPSTREAM.md](deploy/CUT_RENDER_UPSTREAM.md)**  
+→ or pipe **[deploy/cut_render_upstream.sh](deploy/cut_render_upstream.sh)** over SSH
+
+**Re-deploy warning:** `scripts/deploy_perc_chain_helsinki.py` still stages
+`PERC_UPSTREAM_RENDEZVOUS_URL=https://evolve-perc-internet.onrender.com` in the
+packaged `helsinki.env` — re-run the cut after any `--upload --install-service`.
