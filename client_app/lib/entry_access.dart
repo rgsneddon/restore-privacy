@@ -9,8 +9,13 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'first_run_gate.dart';
+import 'first_run_portal.dart';
 import 'keygen_field.dart';
 import 'licence_gate.dart';
+import 'prefs_backend.dart';
+import 'settings_store.dart';
+import 'suite_account.dart';
 import 'suite_version.dart';
 import 'theme.dart';
 
@@ -73,16 +78,49 @@ bool entryAccessCopyIsValid(String copy) {
   return true;
 }
 
-/// Whether the device may enter the main Suite shell (existing entitlement rules).
+/// Whether the device may enter the main Suite shell.
+///
+/// Shell entry requires **first-run complete** (account → seed → licence).
+/// Residual Connect still needs trial or KEYGEN ([LicenceGate.mayConnect]) and
+/// is gated inside the shell / Connect path — not at this shell door.
 Future<bool> isAppEntryUnlocked(
   LicenceGate? gate, {
   bool requirePayment = true,
+  FirstRunStore? firstRunStore,
+  SuiteAccountStore? accountStore,
+  SettingsBackend? backend,
 }) async {
   if (gate == null) return false;
-  return gate.mayConnect(requirePayment: requirePayment);
+  FirstRunStore store = firstRunStore ??
+      FirstRunStore(
+        backend: backend ??
+            MemorySettingsBackend(), // tests must inject real backend
+        isAccountRegistered: () async =>
+            accountStore != null && await accountStore.isRegistered(),
+        hasAcceptedLicence: () => gate.hasAcceptedLicence(),
+      );
+  // When no injectable backend was provided, load SharedPreferences.
+  if (firstRunStore == null && backend == null) {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final b = SharedPreferencesBackend(prefs);
+      final accounts = accountStore ?? SuiteAccountStore(b);
+      store = FirstRunStore(
+        backend: b,
+        isAccountRegistered: accounts.isRegistered,
+        hasAcceptedLicence: () => gate.hasAcceptedLicence(),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+  final done = await store.isComplete();
+  return mayEnterSuiteShell(firstRunDone: done);
 }
 
-/// Root gate: entry surface until unlocked, then [child] (Suite shell).
+/// Root gate: first-run portal until complete, then [child] (Suite shell).
+///
+/// Residual Connect / KEYGEN / trial are enforced on Connect, not at shell entry.
 class AppEntryRoot extends StatefulWidget {
   const AppEntryRoot({
     super.key,
@@ -90,16 +128,21 @@ class AppEntryRoot extends StatefulWidget {
     this.licenceGate,
     this.requirePayment = true,
     this.initialUnlocked,
+    this.firstRunStore,
+    this.accountStore,
   });
 
-  /// Main app shell (Suite tabs) after unlock.
+  /// Main app shell (Suite tabs) after first-run.
   final Widget child;
 
   final LicenceGate? licenceGate;
   final bool requirePayment;
 
-  /// When non-null, skips async load (tests).
+  /// When non-null, skips async load (tests) — treats as first-run complete.
   final bool? initialUnlocked;
+
+  final FirstRunStore? firstRunStore;
+  final SuiteAccountStore? accountStore;
 
   @override
   State<AppEntryRoot> createState() => AppEntryRootState();
@@ -109,6 +152,8 @@ class AppEntryRootState extends State<AppEntryRoot> {
   bool? _unlocked;
   Object? _loadError;
   LicenceGate? _gate;
+  FirstRunStore? _firstRun;
+  SuiteAccountStore? _accounts;
 
   bool get isUnlocked => _unlocked == true;
 
@@ -127,9 +172,10 @@ class AppEntryRootState extends State<AppEntryRoot> {
 
   Future<void> _bootstrap() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final backend = SharedPreferencesBackend(prefs);
       var gate = widget.licenceGate;
       if (gate == null) {
-        final prefs = await SharedPreferences.getInstance();
         gate = LicenceGate(
           PrefsLicenceBackend(
             (k) async => prefs.getBool(k),
@@ -143,13 +189,25 @@ class AppEntryRootState extends State<AppEntryRoot> {
           ),
         );
       }
+      final accounts = widget.accountStore ?? SuiteAccountStore(backend);
+      final first = widget.firstRunStore ??
+          FirstRunStore(
+            backend: backend,
+            isAccountRegistered: accounts.isRegistered,
+            hasAcceptedLicence: () => gate!.hasAcceptedLicence(),
+          );
       final ok = await isAppEntryUnlocked(
         gate,
         requirePayment: widget.requirePayment,
+        firstRunStore: first,
+        accountStore: accounts,
+        backend: backend,
       );
       if (!mounted) return;
       setState(() {
         _gate = gate;
+        _accounts = accounts;
+        _firstRun = first;
         _unlocked = ok;
         _loadError = null;
       });
@@ -167,6 +225,8 @@ class AppEntryRootState extends State<AppEntryRoot> {
       final ok = await isAppEntryUnlocked(
         effectiveGate,
         requirePayment: widget.requirePayment,
+        firstRunStore: _firstRun ?? widget.firstRunStore,
+        accountStore: _accounts ?? widget.accountStore,
       );
       if (!mounted) return;
       setState(() {
@@ -182,7 +242,7 @@ class AppEntryRootState extends State<AppEntryRoot> {
     }
   }
 
-  /// Call after successful keygen verify so the shell appears without restart.
+  /// Call after first-run complete or keygen verify so the shell appears.
   Future<void> markUnlockedAndRefresh() async {
     await _refreshUnlock();
   }
@@ -200,12 +260,13 @@ class AppEntryRootState extends State<AppEntryRoot> {
     if (_unlocked == true) {
       return widget.child;
     }
-    return EntryAccessScreen(
+    // First-run portal (account → seed → licence) before shell / permissions.
+    return FirstRunPortal(
       licenceGate: effectiveGate,
-      requirePayment: widget.requirePayment,
-      loadError: _loadError,
-      onUnlocked: () async {
-        await markUnlockedAndRefresh();
+      accountStore: _accounts ?? widget.accountStore,
+      firstRunStore: _firstRun ?? widget.firstRunStore,
+      onComplete: () {
+        markUnlockedAndRefresh();
       },
     );
   }

@@ -29,9 +29,9 @@ class RptConfig {
   static const String sessionName = 'Privacy Restored';
 
   /// Paid catalog pin — must match monorepo ``client/VERSION`` and pubspec.
-  /// Suite monopin is Restore Privacy Suite v 1.0.7.
+  /// Suite monopin is Restore Privacy Suite v 1.0.8.
   /// Free builds report [kFreeTierVersion] via [displayProductVersion].
-  static const String productVersion = '1.0.7';
+  static const String productVersion = '1.0.8';
 
   /// UI / about version (free tier always ``3.3.3``).
   static String get displayProductVersion =>

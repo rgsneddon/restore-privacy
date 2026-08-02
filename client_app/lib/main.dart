@@ -412,6 +412,13 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         await _licence!.refreshEntitlementFromRemote();
       } catch (_) {}
     }
+    // KEYGEN-free 72h trial: claim when no KEYGEN yet (host-bound device pub).
+    final kg = await _licence!.paymentKeygen();
+    if (kg.isEmpty) {
+      try {
+        await _licence!.claimDeviceTrial();
+      } catch (_) {}
+    }
     final licOk = await _licence!.hasAcceptedLicence();
     final canConnect = await _licence!.mayConnect();
     if (!mounted) return;
@@ -420,11 +427,11 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _licenceAccepted = licOk;
       if (!canConnect) {
         _status = licOk
-            ? 'Enter keygen from your fulfilment email (unlock dialog), then Connect.'
-            : 'Accept the licence, enter keygen, then Connect for residual protection.';
+            ? 'Trial ended or KEYGEN required — enter KEYGEN (unlock dialog) or Get keygen at /pay, then Connect.'
+            : 'Complete first-run setup (account, seed, licence) before Connect.';
       } else {
         _status =
-            'Ready. Press Connect when you want residual protection.';
+            'Ready. Press Connect when you want residual protection (3-day trial or KEYGEN).';
       }
     });
   }

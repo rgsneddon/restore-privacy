@@ -1,8 +1,8 @@
 # Privacy Policy — Restore Privacy Suite
 
 **Last updated:** 2 August 2026  
-**Product:** Restore Privacy Suite **v1.0.7** — residual Connect, Perccent wallet (%), Evolve analyser, rpAI (Ned), Backup recovery, and the public VPN APP Shop  
-**Current packages (catalog v1.0.7):** free Suite installers on [restoreprivacy.online](https://restoreprivacy.online/) (VPN APP Shop). Residual Connect needs a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **Linux**, **Android**, **macOS**, **iOS**, and **Windows** monopin **1.0.7** packages are fulfilled from the product host. **macOS** is **Developer ID** + notarized (Team **SFCBP95595**). **iOS** ships as an **Apple Distribution** Team-signed **Runner.app** zip for sideload (same Team); a full App Store–style IPA export still needs `ExportOptions.plist` and is a separate path. Public GitHub Pages ship docs only — not operator admin.
+**Product:** Restore Privacy Suite **v1.0.8** — residual Connect, Perccent wallet (%), Evolve analyser, rpAI (Ned), Backup recovery, and the public VPN APP Shop  
+**Current packages (catalog v1.0.8):** free Suite installers on [restoreprivacy.online](https://restoreprivacy.online/) (VPN APP Shop). Residual Connect needs a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **Linux**, **Android**, **macOS**, **iOS**, and **Windows** monopin **1.0.8** packages are fulfilled from the product host. **macOS** is **Developer ID** + notarized (Team **SFCBP95595**). **iOS** ships as an **Apple Distribution** Team-signed **Runner.app** zip for sideload (same Team); a full App Store–style IPA export still needs `ExportOptions.plist` and is a separate path. Public GitHub Pages ship docs only — not operator admin.
 
 ---
 
@@ -20,6 +20,10 @@ Restore Privacy Suite is one app shell with several surfaces:
 | **Settings / licence** | End-user licence acceptance, KEYGEN unlock, residual toggles |
 
 ---
+
+## First-run account and seed (on-device)
+
+Before residual VPN permissions, you create a **Suite account** (username/password) and a **12-word recovery seed** kept only on your device, then accept the licence. Account credentials auto-enable % and Evolve. Seed phrases are not uploaded to residual nodes.
 
 ## Licence acceptance (your agreement)
 
@@ -74,4 +78,4 @@ You can export local connection logs, delete local wallet data, and stop using r
 
 Related: end-user **LICENSE**, product **README**, and the public security **AUDIT**.
 
-This policy describes product behaviour for catalog **v1.0.7**. It is not a substitute for formal legal advice.
+This policy describes product behaviour for catalog **v1.0.8**. It is not a substitute for formal legal advice.

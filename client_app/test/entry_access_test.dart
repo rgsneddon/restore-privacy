@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:restore_privacy_client/entry_access.dart';
+import 'package:restore_privacy_client/first_run_gate.dart';
+import 'package:restore_privacy_client/first_run_portal.dart';
 import 'package:restore_privacy_client/licence_gate.dart';
 import 'package:restore_privacy_client/main.dart';
+import 'package:restore_privacy_client/settings_store.dart';
+import 'package:restore_privacy_client/suite_account.dart';
 import 'package:restore_privacy_client/suite_shell.dart';
 import 'package:restore_privacy_client/suite_version.dart';
 import 'package:restore_privacy_client/theme.dart';
@@ -40,6 +44,7 @@ void main() {
   test('source files gate entry and omit paywall wording', () {
     expect(kEntryAccessScreenKey, isNotNull);
     expect(kEntryAccessUnlockButtonKey, isNotNull);
+    expect(kFirstRunPortalKey, isNotNull);
     expect(entryAccessCopyIsValid(kEntryAccessGuidanceText), isTrue);
     for (final s in [
       kEntryAccessGuidanceText,
@@ -52,14 +57,22 @@ void main() {
     }
   });
 
-  testWidgets('locked entry shows orange guidance on dark blue before shell',
-      (tester) async {
+  testWidgets('locked entry shows first-run portal before shell', (tester) async {
     final gate = _memoryGate();
+    final b = MemorySettingsBackend();
+    final accounts = SuiteAccountStore(b);
+    final first = FirstRunStore(
+      backend: b,
+      isAccountRegistered: accounts.isRegistered,
+      hasAcceptedLicence: () => gate.hasAcceptedLicence(),
+    );
 
     await tester.pumpWidget(
       MaterialApp(
         home: AppEntryRoot(
           licenceGate: gate,
+          firstRunStore: first,
+          accountStore: accounts,
           initialUnlocked: false,
           child: const Scaffold(
             key: Key('main_shell_marker'),
@@ -68,21 +81,21 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
+    await tester.pump(); // schedule _loadInjected
+    await tester.pump(); // settle portal state
 
-    expect(find.byKey(kEntryAccessScreenKey), findsOneWidget);
-    expect(find.text(kEntryAccessGuidanceText), findsOneWidget);
+    // First-run portal (account → seed → licence), not KEYGEN surface.
+    expect(find.byKey(kFirstRunPortalKey), findsOneWidget);
+    expect(find.text(kFirstRunAccountTitle), findsOneWidget);
     expect(find.text('MAIN_SHELL'), findsNothing);
     expect(find.byKey(const Key('main_shell_marker')), findsNothing);
+    expect(find.byKey(kEntryAccessScreenKey), findsNothing);
 
-    final scaffold = tester.widget<Scaffold>(find.byKey(kEntryAccessScreenKey));
+    final scaffold = tester.widget<Scaffold>(find.byKey(kFirstRunPortalKey));
     expect(scaffold.backgroundColor, kEntryAccessBg);
-
-    final guidance = tester.widget<Text>(find.text(kEntryAccessGuidanceText));
-    expect(guidance.style?.color, kEntryAccessOrange);
   });
 
-  testWidgets('unlocked entry shows main shell without entry surface',
+  testWidgets('unlocked entry shows main shell without first-run portal',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -98,27 +111,38 @@ void main() {
     await tester.pump();
 
     expect(find.text('MAIN_SHELL'), findsOneWidget);
+    expect(find.byKey(kFirstRunPortalKey), findsNothing);
     expect(find.byKey(kEntryAccessScreenKey), findsNothing);
-    expect(find.text(kEntryAccessGuidanceText), findsNothing);
   });
 
-  testWidgets('successful keygen unlock reveals shell without process restart',
+  testWidgets(
+      'first-run complete reveals shell without process restart (KEYGEN alone does not)',
       (tester) async {
-    final gate = _memoryGate(licenceAccepted: true);
+    final gate = _memoryGate();
+    final b = MemorySettingsBackend();
+    final accounts = SuiteAccountStore(b);
+    final first = FirstRunStore(
+      backend: b,
+      isAccountRegistered: accounts.isRegistered,
+      hasAcceptedLicence: () => gate.hasAcceptedLicence(),
+    );
 
     await tester.pumpWidget(
       MaterialApp(
         home: AppEntryRoot(
           licenceGate: gate,
+          firstRunStore: first,
+          accountStore: accounts,
           initialUnlocked: false,
           child: const Scaffold(body: Text('MAIN_SHELL_AFTER_UNLOCK')),
         ),
       ),
     );
     await tester.pump();
-    expect(find.byKey(kEntryAccessScreenKey), findsOneWidget);
+    expect(find.byKey(kFirstRunPortalKey), findsOneWidget);
+    expect(find.text('MAIN_SHELL_AFTER_UNLOCK'), findsNothing);
 
-    // Real gate APIs (shipped path).
+    // KEYGEN / payment alone must not open the shell.
     await gate.recordPaymentSuccess(
       'cs_test_entry',
       keygen: 'RPT-KEY-TEST-ENTRY-AAAA',
@@ -126,12 +150,21 @@ void main() {
     final root = tester.state<AppEntryRootState>(find.byType(AppEntryRoot));
     await root.markUnlockedAndRefresh();
     await tester.pump();
+    expect(find.byKey(kFirstRunPortalKey), findsOneWidget);
+    expect(find.text('MAIN_SHELL_AFTER_UNLOCK'), findsNothing);
+
+    // Real first-run path: account → seed → licence.
+    await accounts.markRegistered('alice');
+    await first.markSeedDone();
+    await gate.acceptLicence();
+    await root.markUnlockedAndRefresh();
+    await tester.pump();
 
     expect(find.text('MAIN_SHELL_AFTER_UNLOCK'), findsOneWidget);
-    expect(find.byKey(kEntryAccessScreenKey), findsNothing);
+    expect(find.byKey(kFirstRunPortalKey), findsNothing);
   });
 
-  testWidgets('RestorePrivacyApp mounts entry gate ahead of suite shell',
+  testWidgets('RestorePrivacyApp mounts first-run gate ahead of suite shell',
       (tester) async {
     await tester.pumpWidget(
       const RestorePrivacyApp(
@@ -142,10 +175,10 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.byKey(kEntryAccessScreenKey), findsOneWidget);
-    expect(find.text(kEntryAccessGuidanceText), findsOneWidget);
+    // Locked root shows first-run portal (or its loading scaffold), never shell.
+    expect(find.byKey(kFirstRunPortalKey), findsOneWidget);
     expect(find.byType(SuiteShell), findsNothing);
-    expect(find.text(kSuiteProductName), findsWidgets);
+    expect(find.byKey(kEntryAccessScreenKey), findsNothing);
   });
 
   testWidgets('RestorePrivacyApp shows suite when entry unlocked', (tester) async {
@@ -159,18 +192,56 @@ void main() {
     await tester.pump();
 
     expect(find.byType(SuiteShell), findsOneWidget);
-    expect(find.byKey(kEntryAccessScreenKey), findsNothing);
+    expect(find.byKey(kFirstRunPortalKey), findsNothing);
   });
 
-  test('isAppEntryUnlocked follows paymentAllowsConnect', () async {
+  test('isAppEntryUnlocked requires first-run complete not KEYGEN alone',
+      () async {
     final gate = _memoryGate(licenceAccepted: true);
-    expect(await isAppEntryUnlocked(gate), isFalse);
+    final b = MemorySettingsBackend();
+    final accounts = SuiteAccountStore(b);
+    final incomplete = FirstRunStore(
+      backend: b,
+      isAccountRegistered: accounts.isRegistered,
+      hasAcceptedLicence: () => gate.hasAcceptedLicence(),
+    );
+    expect(
+      await isAppEntryUnlocked(
+        gate,
+        firstRunStore: incomplete,
+        accountStore: accounts,
+        backend: b,
+      ),
+      isFalse,
+    );
 
     await gate.recordPaymentSuccess(
       'cs_ok',
       keygen: 'RPT-KEY-OK-OK-OK-OK',
     );
-    expect(await isAppEntryUnlocked(gate), isTrue);
+    // Payment/KEYGEN still does not open shell.
+    expect(
+      await isAppEntryUnlocked(
+        gate,
+        firstRunStore: incomplete,
+        accountStore: accounts,
+        backend: b,
+      ),
+      isFalse,
+    );
+
+    await accounts.markRegistered('bob');
+    await incomplete.markSeedDone();
+    // Licence already accepted via _memoryGate.
+    expect(
+      await isAppEntryUnlocked(
+        gate,
+        firstRunStore: incomplete,
+        accountStore: accounts,
+        backend: b,
+      ),
+      isTrue,
+    );
     expect(await isAppEntryUnlocked(null), isFalse);
   });
 }

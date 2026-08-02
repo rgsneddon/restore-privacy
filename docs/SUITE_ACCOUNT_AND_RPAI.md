@@ -1,26 +1,39 @@
 # Suite account (sign-up / sign-in) and rpAI (Ned)
 
-Operator and implementer reference for the **optional unified Suite account**
-and the **rpAI (Ned)** helper tab. Behaviour is defined by shipped Flutter
-modules under `client_app/lib/` — this page describes outcomes, not a second
-product contract.
+Operator and implementer reference for the **unified Suite account** and the
+**rpAI (Ned)** helper tab. Behaviour is defined by shipped Flutter modules under
+`client_app/lib/` — this page describes outcomes, not a second product contract.
 
 | Concern | Source of truth |
 |---------|-----------------|
-| Suite account flags, prompt copy, VPN independence | `client_app/lib/suite_account.dart` |
+| First-run order (account → seed → licence) | `client_app/lib/first_run_gate.dart` |
+| First-run portal UI | `client_app/lib/first_run_portal.dart` |
+| Shell entry gate | `client_app/lib/entry_access.dart` (`AppEntryRoot`) |
+| Suite account flags, prompt copy | `client_app/lib/suite_account.dart` |
 | Unified register/login sheet | `client_app/lib/suite_account_prompt.dart` |
 | Apply one identity to % + EVOLVE | `client_app/lib/suite_account_apply.dart` |
-| Post-KEYGEN offer (deferrable) | `client_app/lib/main.dart` |
 | Ned phases, how-to parts, VPN tour | `client_app/lib/suite_ned_guide.dart` |
 | rpAI tab UI wiring | `client_app/lib/suite_rpai_tab.dart` |
 
 ---
 
-## Optional Suite sign-up / sign-in (after KEYGEN)
+## First-run (Suite 1.0.8+)
 
-Residual **VPN Connect** is gated only by licence + **KEYGEN** entitlement
-(`LicenceGate.mayConnect`). Suite registration is **optional** and **never**
-consulted for Connect.
+On a clean install the app requires **Suite account** (username/password),
+**12-word recovery seed** (write down offline), and **licence acceptance**
+**before** residual VPN permissions or Connect. Perccent (%) and Evolve share
+that account. Residual Connect includes a host-bound **72-hour KEYGEN-free
+trial**; after expiry enter a KEYGEN from `/pay`. Seed and credentials stay
+**on-device** (not uploaded to residual nodes).
+
+---
+
+## Residual Connect after first-run (trial then KEYGEN)
+
+Residual **VPN Connect** is gated by licence acceptance (first-run) plus
+**trial active or KEYGEN** entitlement (`LicenceGate.mayConnect` /
+`connectAllowedTrialOrPaid`). Suite registration is completed at first-run and
+is **not** re-checked for Connect.
 
 ### When the prompt appears
 
@@ -119,14 +132,13 @@ If Suite account **is** registered:
 
 ```
 Install Suite
-    → accept licence
-    → paste KEYGEN  →  residual Connect available
-    → optional prompt: Register for % wallet & Evolve?
-           ├─ Create account / Sign in  → one identity for % + EVOLVE
-           │         └─ later: rpAI Offer how-to → Continue… → optional VPN tour
-           └─ Not now — use VPN only   → Connect still works
-                     └─ later: rpAI Continue wallet & analyser setup
-                               → same unified form
+    → Suite account (username/password) — enables % + Evolve
+    → 12-word seed (write down offline; on-device only)
+    → accept end-user licence
+    → shell + residual permissions allowed
+    → Connect: 72h KEYGEN-free device trial, or paste KEYGEN from /pay
+    → after trial expiry without KEYGEN: blocking unlock surface
+    → rpAI Offer how-to → Continue… → optional VPN tour
 ```
 
 ---
@@ -137,3 +149,5 @@ Install Suite
 - Free download / KEYGEN storefront: [SUITE_FREE_DOWNLOAD.md](SUITE_FREE_DOWNLOAD.md)
 - KEYGEN payment (operators): [SUBSCRIPTION_KEYGEN.md](SUBSCRIPTION_KEYGEN.md)
 - Root install overview: [README.md](../README.md)
+- Windows 1.0.8 handoff: [WINDOWS_HANDOFF_1.0.8.md](../client/windows/WINDOWS_HANDOFF_1.0.8.md)
+- Apple 1.0.8 handoff: [APPLE_HANDOFF_1.0.8.md](../client_app/APPLE_HANDOFF_1.0.8.md)
