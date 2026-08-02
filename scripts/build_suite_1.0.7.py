@@ -201,8 +201,105 @@ def build_macos() -> Path | None:
     return dest
 
 
+def inject_ios_residual_pubs(runner: Path) -> Path:
+    """Embed product residual **public** ElGamal pins into iOS Runner.app.
+
+    Fail-closed: requires ``node_elgamal.pub`` (entry pin). Uses the shipped
+    ``inject_apple_secrets`` path (host ``Runner.app/secrets/`` + PacketTunnel
+    ``.appex/secrets/``). Must run **before** final codesign and catalog zip.
+    """
+    if not runner.is_dir():
+        raise FileNotFoundError(f"iOS Runner.app not found: {runner}")
+    # Import real inject API (same module operators call with --app … --ios).
+    scripts_dir = ROOT / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    import inject_apple_secrets as ias  # type: ignore
+
+    source = ias.resolve_source(None)
+    dest = ias.inject(runner, source, ios=True)
+    entry = dest / ias.NODE_PUB
+    if not entry.is_file() or entry.stat().st_size < 32:
+        raise FileNotFoundError(
+            f"iOS inject did not embed required {ias.NODE_PUB} under {dest}"
+        )
+    print(f"ios residual pins injected -> {dest} ({ias.NODE_PUB}={entry.stat().st_size}B)")
+    return dest
+
+
+def codesign_ios_distribution(runner: Path) -> bool:
+    """Best-effort Apple Distribution sign after inject (covers secrets in seal).
+
+    Returns True when host ``Runner.app`` codesign succeeds. Missing identity is
+    non-fatal so catalog zip can still ship with residual pubs for sideload.
+    """
+    identity = os.environ.get(
+        "RP_IOS_CODESIGN_IDENTITY",
+        "Apple Distribution: Russell Sneddon (SFCBP95595)",
+    )
+    try:
+        # Nested frameworks / bundles first (inside-out).
+        fw_dir = runner / "Frameworks"
+        if fw_dir.is_dir():
+            for fw in sorted(fw_dir.glob("*.framework")):
+                subprocess.run(
+                    ["codesign", "--force", "--timestamp", "--sign", identity, str(fw)],
+                    check=False,
+                )
+        for bundle in sorted(runner.rglob("*.bundle")):
+            if bundle.is_dir():
+                subprocess.run(
+                    ["codesign", "--force", "--timestamp", "--sign", identity, str(bundle)],
+                    check=False,
+                )
+        appex = runner / "PlugIns" / "PacketTunnel.appex"
+        if appex.is_dir():
+            ent = CLIENT_APP / "ios" / "PacketTunnel" / "PacketTunnel.entitlements"
+            cmd = ["codesign", "--force", "--timestamp", "--sign", identity]
+            if ent.is_file():
+                cmd.extend(["--entitlements", str(ent)])
+            cmd.append(str(appex))
+            if subprocess.run(cmd, check=False).returncode != 0:
+                subprocess.run(
+                    ["codesign", "--force", "--timestamp", "--sign", identity, str(appex)],
+                    check=False,
+                )
+        r = subprocess.run(
+            ["codesign", "--force", "--timestamp", "--sign", identity, str(runner)],
+            check=False,
+        )
+        if r.returncode == 0:
+            print(f"ios Distribution codesign OK identity={identity!r}")
+            return True
+        print(f"ios Distribution codesign failed rc={r.returncode} (zip still has pubs)", file=sys.stderr)
+        return False
+    except FileNotFoundError:
+        print("ios codesign tool missing; shipping unsigned zip with residual pubs", file=sys.stderr)
+        return False
+
+
+def package_ios_zip(runner: Path, dest: Path | None = None) -> Path:
+    """Zip Runner.app as catalog ``restore-privacy-client-*-ios.zip``."""
+    dest = dest or (OUT / NAMES["ios"])
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        dest.unlink()
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, _dirs, files in os.walk(runner):
+            for fn in files:
+                fp = Path(root) / fn
+                arc = Path("Runner.app") / fp.relative_to(runner)
+                zf.write(fp, arc.as_posix())
+    print(f"staged {dest.name} flutter ios zip sha256={sha256_file(dest)[:16]}…")
+    return dest
+
+
 def build_ios() -> Path | None:
-    """Team-unsigned iphoneos app zip when Xcode build succeeds."""
+    """Build iphoneos Runner, inject residual pubs, optional Distribution sign, zip.
+
+    Order is fail-closed for residual Connect: inject **must** embed
+    ``node_elgamal.pub`` before the catalog zip is written.
+    """
     try:
         _run(
             [
@@ -221,18 +318,13 @@ def build_ios() -> Path | None:
     runner = CLIENT_APP / "build" / "ios" / "iphoneos" / "Runner.app"
     if not runner.is_dir():
         return None
-    dest = OUT / NAMES["ios"]
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists():
-        dest.unlink()
-    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, _dirs, files in os.walk(runner):
-            for fn in files:
-                fp = Path(root) / fn
-                arc = Path("Runner.app") / fp.relative_to(runner)
-                zf.write(fp, arc.as_posix())
-    print(f"staged {dest.name} flutter ios zip sha256={sha256_file(dest)[:16]}…")
-    return dest
+    try:
+        inject_ios_residual_pubs(runner)
+    except (FileNotFoundError, OSError) as e:
+        print(f"ios residual inject failed (fail-closed): {e}", file=sys.stderr)
+        return None
+    codesign_ios_distribution(runner)
+    return package_ios_zip(runner)
 
 
 def carry_forward(platform_key: str) -> Path | None:

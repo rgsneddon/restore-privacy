@@ -12,10 +12,18 @@ Developer ID + notarize + staple. Team **SFCBP95595**.
 
 ## iOS
 Catalog package is an **Apple Distribution** Team-signed **Runner.app** zip  
-(`restore-privacy-client-1.0.7-ios.zip`) with residual pins injected (no `.priv`).
-Build with `flutter build ios --release --no-codesign`, then codesign host +
-frameworks + PacketTunnel with  
-`Apple Distribution: Russell Sneddon (SFCBP95595)` and re-zip as `Runner.app/…`.
+(`restore-privacy-client-1.0.7-ios.zip`) with residual **public** pins injected
+(no `.priv`): `node_elgamal.pub`, `de_`, `exit_`, `us_`.
+
+`scripts/build_suite_1.0.7.py` **always** runs inject (`inject_apple_secrets`
+with iOS layout) **before** Distribution codesign and catalog zip — do not skip
+inject as a manual afterthought. Equivalent one-liner:
+
+```bash
+python3 scripts/inject_apple_secrets.py \
+  --app client_app/build/ios/iphoneos/Runner.app --ios
+```
+
 Full App Store–style IPA still needs `ios/ExportOptions.plist` + Xcode archive
 export — not required for the catalog sideload zip.
 
