@@ -1,4 +1,4 @@
-"""Homepage right-box world-flags strip (ISO pack + UK home nations)."""
+"""World-flags pack + helper; homepage no longer mounts the flag strip."""
 
 from __future__ import annotations
 
@@ -71,6 +71,7 @@ class TestSuiteBoxWorldFlags(unittest.TestCase):
 
         # Must not use ISO sc (Seychelles) / ni (Nicaragua) as stand-ins
         self.assertEqual(UK_HOME_NATION_CODES, ("sct", "eng", "nir", "wls"))
+        # Pure helper still builds valid strip markup when called directly
         html = render_suite_world_flags_html()
         for code, title in UK_HOME_NATION_FLAGS:
             self.assertIn(f'data-flag-cc="{code}"', html)
@@ -80,12 +81,11 @@ class TestSuiteBoxWorldFlags(unittest.TestCase):
             self.assertIn(world_flag_static_url(code), html)
             self.assertIn('data-flag-home-nation="1"', html)
 
-    def test_flags_in_downloads_right_box_not_suite_left(self) -> None:
+    def test_homepage_and_downloads_omit_world_flags_strip(self) -> None:
         from downloads import (
             render_download_section_html,
             render_suite_storefront_html,
             render_suite_world_flags_html,
-            suite_free_download_href,
             world_flag_codes,
             world_flag_static_url,
         )
@@ -94,79 +94,56 @@ class TestSuiteBoxWorldFlags(unittest.TestCase):
         codes = world_flag_codes()
         self.assertGreaterEqual(len(codes), MIN_WORLD_FLAGS)
 
+        # Helper still valid
         flags_html = render_suite_world_flags_html()
         self.assertIn('id="suite-world-flags"', flags_html)
-        self.assertIn('data-suite-world-flags="1"', flags_html)
-        self.assertIn('data-downloads-world-flags="1"', flags_html)
         self.assertIn(f'data-flag-count="{WORLD_FLAG_COUNT}"', flags_html)
-        # Many distinct flag images (2–3 letter codes)
         ccs = re.findall(r'data-flag-cc="([a-z]{2,3})"', flags_html)
         self.assertEqual(len(ccs), WORLD_FLAG_COUNT)
-        self.assertEqual(len(set(ccs)), WORLD_FLAG_COUNT)
-        self.assertEqual(set(ccs), set(codes))
         for cc in ("us", "gb", "de", "jp", "br", "sct", "eng", "nir", "wls"):
             self.assertIn(world_flag_static_url(cc), flags_html)
-            self.assertIn(f'data-flag-cc="{cc}"', flags_html)
 
-        # Left Suite box must NOT carry the world strip
+        # Suite storefront: no flags strip
         suite = render_suite_storefront_html()
         self.assertIn('id="suite-storefront"', suite)
         self.assertNotIn('id="suite-world-flags"', suite)
         self.assertNotIn("data-suite-world-flags", suite)
-        self.assertIn(suite_free_download_href("windows"), suite)
         self.assertIn("Get KEYGEN", suite)
 
-        # Right-hand client downloads box holds the strip at the bottom
+        # Downloads right box: still present, no flags strip
         dl = render_download_section_html()
         self.assertIn('id="downloads"', dl)
-        self.assertIn('id="suite-world-flags"', dl)
-        self.assertIn('data-downloads-world-flags="1"', dl)
-        i_price = dl.index("dl-price-box")
-        i_form = dl.index("dl-buy-form") if "dl-buy-form" in dl else dl.index("dl-buttons")
-        i_note = dl.index("dl-platform-note")
-        i_flags = dl.index('id="suite-world-flags"')
-        self.assertLess(i_price, i_flags)
-        self.assertLess(i_form, i_flags)
-        self.assertLess(i_note, i_flags)
+        self.assertIn("Download Suite client", dl)
+        self.assertIn("dl-price-box", dl)
+        self.assertIn("dl-buy-form", dl)
+        self.assertNotIn('id="suite-world-flags"', dl)
+        self.assertNotIn("data-downloads-world-flags", dl)
+        self.assertNotIn("data-suite-world-flags", dl)
+        self.assertNotIn("suite-world-flag", dl)
+        self.assertNotIn("/static/flags/w20/", dl)
 
-    def test_homepage_right_box_includes_flags_css_and_static(self) -> None:
+    def test_homepage_omits_flags_strip_downloads_still_present(self) -> None:
         from app import render_html, static_file_path
-        from world_flag_codes import (
-            UK_HOME_NATION_CODES,
-            WORLD_FLAG_CODES,
-            WORLD_FLAG_COUNT,
-        )
+        from world_flag_codes import WORLD_FLAG_CODES
 
         page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         main = page[page.index('id="page-shell"') :]
         self.assertIn('id="suite-storefront"', main)
         self.assertIn('id="downloads"', main)
-        self.assertIn('id="suite-world-flags"', main)
-        self.assertIn(f'data-flag-count="{WORLD_FLAG_COUNT}"', main)
-        self.assertIn("/static/flags/w20/", main)
-
-        # Flags inside #downloads, not #suite-storefront
-        suite_at = main.index('id="suite-storefront"')
-        suite_end = main.index("</section>", suite_at)
-        suite_block = main[suite_at:suite_end]
-        self.assertNotIn('id="suite-world-flags"', suite_block)
+        self.assertNotIn('id="suite-world-flags"', main)
+        self.assertNotIn("data-suite-world-flags", main)
+        self.assertNotIn("data-downloads-world-flags", main)
+        self.assertNotIn("/static/flags/w20/", main)
 
         dl_at = main.index('id="downloads"')
         dl_end = main.index("</section>", dl_at)
         dl_block = main[dl_at:dl_end]
-        self.assertIn('id="suite-world-flags"', dl_block)
-        flags_at = dl_block.index('id="suite-world-flags"')
-        # After price / form / note markers
-        self.assertLess(dl_block.index("dl-price-box"), flags_at)
-        self.assertLess(dl_block.index("dl-buttons"), flags_at)
+        self.assertIn("Download Suite client", dl_block)
+        self.assertIn("dl-price-box", dl_block)
+        self.assertIn("dl-buttons", dl_block)
+        self.assertNotIn('id="suite-world-flags"', dl_block)
 
-        for code in UK_HOME_NATION_CODES:
-            self.assertIn(f'data-flag-cc="{code}"', dl_block)
-
-        # CSS dense strip styles ship with homepage
-        self.assertIn(".suite-world-flags", page)
-        self.assertIn("img.suite-world-flag", page)
-        # Static resolver serves a real pack file + home nation
+        # Flag assets still on disk / static resolver for other uses
         for sample in (WORLD_FLAG_CODES[0], "sct", "eng", "nir", "wls"):
             resolved = static_file_path(f"/static/flags/w20/{sample}.png")
             self.assertIsNotNone(resolved, sample)

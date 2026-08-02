@@ -2380,7 +2380,7 @@ def render_download_section_html(
             f' data-display-currency="{local.currency}"'
             f' data-stripe-presentment="{local.stripe_presentment_currency}"'
         )
-    # Order: title → price → form → note → world flags (bottom of right box).
+    # Order: title → price → form → note (world-flags strip removed from homepage).
     return f"""
   <section class="downloads panel-card" id="downloads"
     aria-label="Download Restore Privacy Suite client"
@@ -2400,6 +2400,5 @@ def render_download_section_html(
     <div class="dl-platform-note-box" id="dl-platform-note-box">
       <p class="dl-platform-note" id="dl-platform-note">{PLATFORM_SELECT_NOTE}</p>
     </div>
-{render_suite_world_flags_html()}
   </section>
 """
