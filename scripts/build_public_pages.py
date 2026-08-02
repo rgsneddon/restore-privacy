@@ -124,15 +124,23 @@ body {
 .keygen-note { margin: 0.75rem auto; max-width: 32rem; color: #fecaca; font-weight: 600; }
 .steps { text-align: left; max-width: 28rem; margin: 0.5rem auto; line-height: 1.55; color: #cfe6f7; }
 .site-foot {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-  gap: 0.65rem 1.25rem; margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted);
+  display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center;
+  justify-content: space-between; gap: 0.5rem 0.75rem; margin-top: 1.5rem;
+  font-size: 0.85rem; color: var(--muted);
 }
-.site-foot .copy { margin: 0; text-align: left; flex: 1 1 auto; }
+.site-foot .copy {
+  margin: 0; text-align: left; flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .site-foot .map-link {
   margin: 0; text-align: right; flex: 0 0 auto; color: #7aa0c0; text-decoration: none;
-  font-size: 0.78rem; letter-spacing: 0.03em;
+  font-size: 0.78rem; letter-spacing: 0.03em; white-space: nowrap;
 }
 .site-foot .map-link:hover { color: #aed0ea; text-decoration: underline; }
+@media (max-width: 420px) {
+  .site-foot { flex-direction: row; flex-wrap: nowrap; gap: 0.4rem 0.5rem; }
+  .site-foot .copy, .site-foot .map-link { font-size: 0.72rem; }
+}
 .free-cta { display: block; max-width: 22rem; margin: 0.75rem auto 1rem; }
 .free-cta img { width: 100%; height: auto; border-radius: 14px; display: block; }
 .map-section { text-align: left; margin: 0.75rem 0 1rem; }

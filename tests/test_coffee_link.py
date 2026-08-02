@@ -52,6 +52,12 @@ class TestCoffeeLinkBuilder(unittest.TestCase):
         self.assertIn("site-footer", css)
         self.assertIn("margin-top: auto", css)
         self.assertIn("space-between", css)
+        # Narrow footer stays one row: copyright left, download map right
+        self.assertIn("flex-wrap: nowrap", css)
+        self.assertNotIn("flex-direction: column", css)
+        self.assertIn("site-footer-inner", html)
+        self.assertIn("site-footer-copyright", html)
+        self.assertIn("site-footer-downloads-map", html)
 
     def test_public_page_footer_copyright_no_bmc(self):
         page = status_app.render_html(

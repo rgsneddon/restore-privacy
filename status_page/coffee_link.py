@@ -64,13 +64,15 @@ def coffee_link_css() -> str:
     }
     .site-footer-inner {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: row;
+      flex-wrap: nowrap;
       align-items: center;
       justify-content: space-between;
-      gap: 0.65rem 1.25rem;
+      gap: 0.5rem 0.75rem;
       width: 100%;
       max-width: 56rem;
       margin: 0 auto;
+      box-sizing: border-box;
     }
     a.coffee-link {
       font-size: 0.8rem;
@@ -89,6 +91,11 @@ def coffee_link_css() -> str:
       margin: 0;
       text-align: left;
       flex: 1 1 auto;
+      min-width: 0;
+      /* Shrink left piece on narrow screens rather than wrapping under map */
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .site-footer-map, #site-footer-downloads-map {
       font-size: 0.78rem;
@@ -116,10 +123,31 @@ def coffee_link_css() -> str:
     [data-theme="light"] #site-footer-copyright {
       color: #0f2340;
     }
+    /* Narrow screens: stay one row — copyright left, download map right */
     @media (max-width: 420px) {
-      .site-footer-inner { flex-direction: column; align-items: stretch; }
-      .site-footer-copyright { text-align: center; }
-      .site-footer-map { text-align: center; white-space: normal; }
+      .coffee-footer, .site-footer {
+        padding-left: 0.65rem;
+        padding-right: 0.65rem;
+      }
+      .site-footer-inner {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.4rem 0.5rem;
+      }
+      .site-footer-copyright, #site-footer-copyright {
+        text-align: left;
+        font-size: 0.72rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .site-footer-map, #site-footer-downloads-map {
+        text-align: right;
+        font-size: 0.72rem;
+        white-space: nowrap;
+      }
     }
 """
 

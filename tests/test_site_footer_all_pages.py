@@ -31,6 +31,19 @@ class TestSiteFooterAllPages(unittest.TestCase):
         css = coffee_link_css()
         self.assertIn("space-between", css)
         self.assertIn("text-align: right", css)
+        # Single-row layout on all widths (no column stack on small screens)
+        self.assertIn("flex-direction: row", css)
+        self.assertIn("flex-wrap: nowrap", css)
+        self.assertIn("max-width: 420px", css)
+        narrow = css[css.index("@media (max-width: 420px)") :]
+        self.assertIn("flex-direction: row", narrow)
+        self.assertNotIn("flex-direction: column", narrow)
+        self.assertIn("space-between", narrow)
+        # Copyright left, map right — not centered stack
+        self.assertIn("text-align: left", narrow)
+        self.assertIn("text-align: right", narrow)
+        self.assertNotIn("text-align: center", narrow)
+        self.assertIn("white-space: nowrap", narrow)
         # Site-wide CSS pulls footer styles so docs shells style the line
         self.assertIn("site-footer", public_site_css())
 
