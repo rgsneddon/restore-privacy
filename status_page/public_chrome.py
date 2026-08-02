@@ -858,6 +858,27 @@ a.product-tab.is-active, .product-tab.is-active {{
     var(--rb-neon-green, #39ff6a) 100%
   ) 1;
 }}
+/* Light mode: active nav label must be dark (not pale/white on light header) */
+[data-theme="light"] .nav-btn.is-active,
+[data-theme="light"] a.nav-btn.is-active {{
+  color: #0a2348 !important;
+}}
+[data-theme="light"] .nav-btn:hover,
+[data-theme="light"] a.nav-btn:hover,
+[data-theme="light"] a.doc-link:hover {{
+  color: #0a2348 !important;
+}}
+@media (prefers-color-scheme: light) {{
+  :root:not([data-theme="dark"]):not([data-theme="light"]) .nav-btn.is-active,
+  :root:not([data-theme="dark"]):not([data-theme="light"]) a.nav-btn.is-active {{
+    color: #0a2348 !important;
+  }}
+  :root:not([data-theme="dark"]):not([data-theme="light"]) .nav-btn:hover,
+  :root:not([data-theme="dark"]):not([data-theme="light"]) a.nav-btn:hover,
+  :root:not([data-theme="dark"]):not([data-theme="light"]) a.doc-link:hover {{
+    color: #0a2348 !important;
+  }}
+}}
 .nav-btn:focus-visible, a.nav-btn:focus-visible, a.doc-link:focus-visible,
 .product-tab:focus-visible {{
   outline: 2px solid var(--rb-neon-cyan);
@@ -1531,6 +1552,40 @@ def suite_home_intro_css() -> str:
     .suite-typewriter.is-done::after { content: none; }
     @keyframes suite-type-caret {
       50% { opacity: 0; }
+    }
+    /* Light mode only: dark blue typewriters + darker intro blurb (dark mode unchanged).
+       Scope .suite-typewriter only — do not recolor free-download .neon-type CTA. */
+    [data-theme="light"] .suite-typewriter,
+    [data-theme="light"] .suite-typewriter.neon-type,
+    [data-theme="light"] .suite-typewriter-welcome,
+    [data-theme="light"] .suite-typewriter-close {
+      color: #0a2a6e;
+      text-shadow: none;
+    }
+    [data-theme="light"] .suite-typewriter.is-typing::after {
+      color: #0a2a6e;
+      text-shadow: none;
+    }
+    [data-theme="light"] .suite-home-lead {
+      color: #0f2340;
+      font-weight: 600;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-typewriter,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-typewriter.neon-type,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-typewriter-welcome,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-typewriter-close {
+        color: #0a2a6e;
+        text-shadow: none;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-typewriter.is-typing::after {
+        color: #0a2a6e;
+        text-shadow: none;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-home-lead {
+        color: #0f2340;
+        font-weight: 600;
+      }
     }
 """
 

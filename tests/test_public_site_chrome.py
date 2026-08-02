@@ -234,6 +234,19 @@ class TestPublicChromeModule(unittest.TestCase):
         light_css = css[light_i : light_i + 1800]
         self.assertIn("--rb-neon-cyan", light_css)
         self.assertIn("--rb-neon-green", light_css)
+        # Light mode: active nav uses dark readable text (not pale white)
+        self.assertIn(
+            '[data-theme="light"] .nav-btn.is-active',
+            css,
+        )
+        active_light_i = css.index('[data-theme="light"] .nav-btn.is-active')
+        active_light = css[active_light_i : active_light_i + 220]
+        self.assertIn("#0a2348", active_light)
+        self.assertIn("!important", active_light)
+        # Dark-mode active still forces white
+        dark_active_i = css.index(".nav-btn.is-active, a.nav-btn.is-active")
+        dark_active = css[dark_active_i : dark_active_i + 280]
+        self.assertIn("#ffffff", dark_active)
         # No yellow palette for nav / settings banner
         self.assertNotIn("#fbbf24", css)
         self.assertNotIn("#fde68a", css)

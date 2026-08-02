@@ -93,6 +93,17 @@ class TestSuiteIntroRenderer(unittest.TestCase):
         self.assertIn(".suite-typewriter", css)
         self.assertIn("#7dffe8", css)
         self.assertIn("39ff88", css)
+        # Light mode only: dark blue typewriters + darker lead (dark neon retained)
+        self.assertIn('[data-theme="light"] .suite-typewriter', css)
+        self.assertIn('[data-theme="light"] .suite-home-lead', css)
+        light_i = css.index('[data-theme="light"] .suite-typewriter')
+        light_block = css[light_i : light_i + 500]
+        self.assertIn("#0a2a6e", light_block)
+        self.assertIn("text-shadow: none", light_block)
+        # Dark-mode neon cyan is still the default typewriter color
+        default_i = css.index(".suite-typewriter,")
+        default_block = css[default_i : default_i + 400]
+        self.assertIn("#7dffe8", default_block)
 
         tag = suite_home_intro_script_tag()
         self.assertIn("/static/suite_home_typewriter.js", tag)

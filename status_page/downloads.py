@@ -1,4 +1,4 @@
-"""Release download catalog + paid download UI (Restore Privacy Suite v1.0.7).
+"""Release download catalog + paid download UI (Restore Privacy Suite v1.0.8).
 
 Primary path: pay **£3.00** (GBP) via Stripe Checkout per package, then a
 time-limited download token (default **12 hours**, reusable until expiry).
@@ -7,7 +7,7 @@ the status host **proxies** the installer (authenticated GitHub API / local
 assets) so fulfilment works when the restore-privacy repo is **private**.
 Buy Me a Coffee is tip/support only.
 
-Current catalog packages: Restore Privacy Suite **1.0.7**
+Current catalog packages: Restore Privacy Suite **1.0.8**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
 iOS Team-signed sideload).
 """
@@ -33,10 +33,10 @@ except ImportError:  # package import path (status_page as package)
         site_copyright_text,
     )
 
-RELEASE_VERSION = "1.0.7"
+RELEASE_VERSION = "1.0.8"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "1.0.7"
+RELEASE_TAG = "1.0.8"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )
@@ -592,6 +592,34 @@ def download_css() -> str:
     .dl-stripe-branding {
       margin: 0.65rem 0 0; font-size: 0.78rem; line-height: 1.4;
       color: rgba(174, 208, 234, 0.88); text-align: center;
+    }
+    /* Light mode only: dark Stripe notes + auto-renew help (dark mode pale stays) */
+    [data-theme="light"] .dl-auto-renew-help,
+    [data-theme="light"] #dl-auto-renew-help {
+      color: #0a2348;
+    }
+    [data-theme="light"] .dl-stripe-branding,
+    [data-theme="light"] #dl-stripe-branding,
+    [data-theme="light"] #suite-stripe-branding,
+    [data-theme="light"] .suite-keygen-cta .dl-stripe-branding {
+      color: #0a2348;
+    }
+    [data-theme="light"] .dl-auto-renew-label {
+      color: #0f2340;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-auto-renew-help,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) #dl-auto-renew-help {
+        color: #0a2348;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-stripe-branding,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) #dl-stripe-branding,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) #suite-stripe-branding {
+        color: #0a2348;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-auto-renew-label {
+        color: #0f2340;
+      }
     }
     .dl-pay-error {
       color: #fecaca; background: rgba(127, 29, 29, 0.35); border: 1px solid #b91c1c;

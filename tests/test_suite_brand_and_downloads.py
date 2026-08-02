@@ -161,6 +161,27 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         self.assertNotIn("Device for KEYGEN", html)
         self.assertIsNone(re.search(r"restore-privacy-client-0\.\d+\.\d+-", html))
 
+    def test_light_mode_stripe_and_auto_renew_help_dark(self) -> None:
+        """Light theme darkens Stripe branding + auto-renew help; dark keeps pale."""
+        from downloads import download_css, render_download_section_html, render_suite_storefront_html
+
+        css = download_css()
+        self.assertIn('[data-theme="light"] .dl-stripe-branding', css)
+        self.assertIn('[data-theme="light"] .dl-auto-renew-help', css)
+        self.assertIn('[data-theme="light"] #suite-stripe-branding', css)
+        light_i = css.index('[data-theme="light"] .dl-stripe-branding')
+        light_block = css[light_i : light_i + 450]
+        self.assertIn("#0a2348", light_block)
+        # Default (dark) pale colors remain for dark mode
+        self.assertIn("rgba(174, 208, 234, 0.88)", css)
+        self.assertIn("rgba(174, 208, 234, 0.9)", css)
+        suite = render_suite_storefront_html()
+        self.assertIn('id="suite-stripe-branding"', suite)
+        dl = render_download_section_html()
+        self.assertIn('id="dl-auto-renew-help"', dl)
+        self.assertIn('id="dl-stripe-branding"', dl)
+        self.assertIn("When on, Stripe bills again", dl)
+
     def test_suite_keygen_cart_button_and_hint_centered(self) -> None:
         """Get KEYGEN + under-button cart text are centred (not left-flush)."""
         from downloads import render_suite_storefront_html, suite_storefront_css
