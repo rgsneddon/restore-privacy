@@ -108,6 +108,45 @@ class TestPublicCopyCatalogPins(unittest.TestCase):
         self.assertNotIn("£2.45", text)
         self.assertIn("£3.00", text)
 
+    def test_audit_generator_and_mirrors_reject_stale_live_price(self) -> None:
+        """Generator template + AUDIT mirrors must not reintroduce £2.45 as live price."""
+        from downloads import PRICE_LABEL, PRICE_YEARLY_LABEL, RELEASE_VERSION
+
+        gen = (ROOT / "scripts" / "run_security_audit.py").read_text(encoding="utf-8")
+        # No live catalog price hardcoded as retired monthly amount in emitted row
+        self.assertNotIn(
+            "paid installers on [status host](https://restoreprivacy.online/) (£2.45",
+            gen,
+        )
+        self.assertNotRegex(
+            gen,
+            r"Public catalog\s*\|[^\n]*£2\.45",
+        )
+        # Template must use shipped price constants (or equivalent current wording)
+        self.assertIn("PRICE_LABEL", gen)
+        self.assertIn("PRICE_YEARLY_LABEL", gen)
+        self.assertIn("catalog_price_note", gen)
+        self.assertIn("{catalog_price_note}", gen)
+
+        for rel in (
+            "AUDIT.md",
+            "status_page/AUDIT.md",
+            "status_page/public/AUDIT.md",
+        ):
+            path = ROOT / rel
+            self.assertTrue(path.is_file(), rel)
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn("£2.45", text, msg=rel)
+            self.assertIn(RELEASE_VERSION, text)
+            # Live catalog credibility row must state current KEYGEN GBP anchors
+            self.assertIn(PRICE_LABEL, text, msg=rel)
+            self.assertIn(PRICE_YEARLY_LABEL, text, msg=rel)
+            self.assertRegex(
+                text,
+                rf"Public catalog\s*\|\s*\*\*{re.escape(RELEASE_VERSION)}\*\*.*{re.escape(PRICE_LABEL)}",
+                msg=f"{rel}: public catalog row must pin version + monthly price",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

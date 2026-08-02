@@ -1355,6 +1355,20 @@ def build_markdown(results: dict) -> str:
     priv = results["no_priv"]
     pkg = results.get("package_rag") or evaluate_catalog_packages(catalog)
     package_section = render_package_rag_section(pkg)
+    # Live KEYGEN GBP anchors from downloads (not a hard-coded retired monthly price)
+    try:
+        sys.path.insert(0, str(ROOT / "status_page"))
+        from downloads import PRICE_LABEL as _price_mo  # type: ignore
+        from downloads import PRICE_YEARLY_LABEL as _price_yr  # type: ignore
+
+        price_mo = str(_price_mo).strip() or "£3.00"
+        price_yr = str(_price_yr).strip() or "£30.00"
+    except Exception:  # pragma: no cover
+        price_mo, price_yr = "£3.00", "£30.00"
+    catalog_price_note = (
+        f"{price_mo}/month or {price_yr}/year KEYGEN; free Suite installers via "
+        "FREE DOWNLOAD; no free GitHub release downloads"
+    )
     try:
         from audit_privacy_probes import render_section_b_markdown
     except ImportError:
@@ -1554,7 +1568,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | Expectation | Notes |
 |-------------|--------|
 | Product host | **{host}** |
-| Public catalog | **{catalog}** paid installers on [status host](https://restoreprivacy.online/) (£2.45; no free GitHub release downloads) |
+| Public catalog | **{catalog}** paid installers on [status host](https://restoreprivacy.online/) ({catalog_price_note}) |
 | Node pub pin | `1b126abf…` |
 | No `.priv` in public package trees | {"OK" if priv.get("ok") else "HITS"} |
 
