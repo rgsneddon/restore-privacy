@@ -182,6 +182,55 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         self.assertIn('id="dl-stripe-branding"', dl)
         self.assertIn("When on, Stripe bills again", dl)
 
+    def test_light_mode_rest_of_site_public_surfaces(self) -> None:
+        """Light-only dark text on storefront, map, downloads notes; dark defaults stay."""
+        from downloads import (
+            download_css,
+            downloads_map_page_css,
+            render_downloads_map_page_html,
+            render_suite_storefront_html,
+            suite_storefront_css,
+        )
+        from settings_explainer import _shared_shell_css
+        from coffee_link import coffee_link_css
+
+        sf = suite_storefront_css()
+        self.assertIn('[data-theme="light"] .suite-storefront', sf)
+        self.assertIn('[data-theme="light"] .suite-storefront .suite-blurb', sf)
+        self.assertIn('[data-theme="light"] .suite-storefront .suite-pay-hint', sf)
+        self.assertIn('[data-theme="light"] .suite-product-submenu a', sf)
+        self.assertIn("#0a2348", sf)
+        self.assertIn("#0f2340", sf)
+        # Dark-mode storefront pale blurb retained
+        self.assertIn("color: #dbeafe", sf)
+        self.assertIn("rgba(174, 208, 234, 0.95)", sf)
+
+        dc = download_css()
+        self.assertIn('[data-theme="light"] .dl-local-price', dc)
+        self.assertIn('[data-theme="light"] .dl-interval-note', dc)
+        self.assertIn('[data-theme="light"] .downloads h2', dc)
+
+        mc = downloads_map_page_css()
+        self.assertIn('[data-theme="light"] .downloads-map-page h1', mc)
+        self.assertIn('[data-theme="light"] .downloads-map-section h2', mc)
+        self.assertIn("color: #e8f2ff", mc)  # dark default map title
+
+        se = _shared_shell_css()
+        self.assertIn('[data-theme="light"] .suite-guide-intro .suite-guide-lead', se)
+        self.assertIn("#0f2340", se)
+
+        foot = coffee_link_css()
+        self.assertIn('[data-theme="light"] .site-footer-map', foot)
+        self.assertIn("#0a2a6e", foot)
+
+        suite = render_suite_storefront_html()
+        self.assertIn('id="suite-storefront"', suite)
+        self.assertIn('id="suite-blurb"', suite)
+        self.assertIn('id="suite-product-submenu"', suite)
+        mmap = render_downloads_map_page_html().decode("utf-8")
+        self.assertIn("downloads-map-page", mmap)
+        self.assertIn("Downloads Map", mmap)
+
     def test_suite_keygen_cart_button_and_hint_centered(self) -> None:
         """Get KEYGEN + under-button cart text are centred (not left-flush)."""
         from downloads import render_suite_storefront_html, suite_storefront_css

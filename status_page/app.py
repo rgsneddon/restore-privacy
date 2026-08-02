@@ -660,6 +660,17 @@ def render_html(
     @media (max-width: 520px) {
       .nw-unit { min-width: 3rem; }
     }
+    /* Light mode: audit/node-wipe cards on light panels — darken soft-token text */
+    [data-theme="light"] .audit-countdown-row {
+      color: #0f2340;
+    }
+    [data-theme="light"] .audit-countdown-blurb,
+    [data-theme="light"] .node-wipe-blurb {
+      color: #0a2348;
+    }
+    [data-theme="light"] .node-wipe-label {
+      color: #0a2a6e;
+    }
 """
     )
     header = public_brand_header_html(

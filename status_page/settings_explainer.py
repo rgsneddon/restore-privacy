@@ -393,6 +393,31 @@ def _shared_shell_css() -> str:
   text-align: center; font-size: 0.88rem; color: var(--rb-muted);
 }
 .footer-nav a { color: var(--rb-link); font-weight: 600; text-decoration: none; }
+/* Light mode: --rb-soft stays pale for panel tints — force dark lead text */
+[data-theme="light"] .suite-guide-intro .suite-guide-lead,
+[data-theme="light"] #suite-guide-lead {
+  color: #0f2340;
+  font-weight: 600;
+}
+[data-theme="light"] .suite-guide-intro .suite-guide-foot,
+[data-theme="light"] #suite-guide-foot {
+  color: #0a2348;
+}
+[data-theme="light"] .suite-howto-item h3,
+[data-theme="light"] .explainer-item h3,
+[data-theme="light"] .howto-steps strong {
+  color: #0a2348;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-guide-intro .suite-guide-lead {
+    color: #0f2340;
+    font-weight: 600;
+  }
+  :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-howto-item h3,
+  :root:not([data-theme="dark"]):not([data-theme="light"]) .explainer-item h3 {
+    color: #0a2348;
+  }
+}
 """
 
 

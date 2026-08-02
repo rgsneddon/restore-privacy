@@ -104,6 +104,18 @@ def coffee_link_css() -> str:
       color: #aed0ea;
       text-decoration: underline;
     }
+    /* Light mode: footer map link darker for contrast on pale footer */
+    [data-theme="light"] .site-footer-map,
+    [data-theme="light"] #site-footer-downloads-map {
+      color: #0a2a6e;
+    }
+    [data-theme="light"] .site-footer-map:hover {
+      color: #0a1628;
+    }
+    [data-theme="light"] .site-footer-copyright,
+    [data-theme="light"] #site-footer-copyright {
+      color: #0f2340;
+    }
     @media (max-width: 420px) {
       .site-footer-inner { flex-direction: column; align-items: stretch; }
       .site-footer-copyright { text-align: center; }

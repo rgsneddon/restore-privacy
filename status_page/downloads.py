@@ -607,6 +607,24 @@ def download_css() -> str:
     [data-theme="light"] .dl-auto-renew-label {
       color: #0f2340;
     }
+    /* Light mode: downloads card sits on light panel-card — darken remaining pale notes */
+    [data-theme="light"] .downloads h2 {
+      color: #0a2348;
+    }
+    [data-theme="light"] .dl-local-price {
+      color: #0f2340;
+    }
+    [data-theme="light"] .dl-interval-note {
+      color: #0a2348;
+    }
+    [data-theme="light"] .dl-buy-field label.dl-buy-label {
+      color: #0a2348;
+    }
+    [data-theme="light"] .download-node-preference,
+    [data-theme="light"] .download-node-preference .node-pref-blurb,
+    [data-theme="light"] .download-node-preference .node-pref-deposit-note {
+      color: #0f2340;
+    }
     @media (prefers-color-scheme: light) {
       :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-auto-renew-help,
       :root:not([data-theme="dark"]):not([data-theme="light"]) #dl-auto-renew-help {
@@ -619,6 +637,12 @@ def download_css() -> str:
       }
       :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-auto-renew-label {
         color: #0f2340;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .downloads h2,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-local-price,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-interval-note,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-buy-field label.dl-buy-label {
+        color: #0a2348;
       }
     }
     .dl-pay-error {
@@ -1574,6 +1598,39 @@ def downloads_map_page_css() -> str:
       margin: 0 0 0.55rem; font-size: 1.02rem; font-weight: 800;
       color: #dbeafe; letter-spacing: 0.03em;
     }
+    /* Light mode: map page body on light shell — darken titles/blurbs */
+    [data-theme="light"] .downloads-map-page h1,
+    [data-theme="light"] .free-packages-page h1 {
+      color: #0a2348;
+    }
+    [data-theme="light"] .downloads-map-page .downloads-map-blurb,
+    [data-theme="light"] .free-packages-page .free-packages-blurb,
+    [data-theme="light"] .downloads-map-page .downloads-map-detect-hint,
+    [data-theme="light"] .free-packages-page .free-packages-detect-hint {
+      color: #0f2340;
+    }
+    [data-theme="light"] .downloads-map-section {
+      background: #ffffff;
+      border-color: rgba(0, 180, 220, 0.35);
+    }
+    [data-theme="light"] .downloads-map-section h2 {
+      color: #0a2348;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .downloads-map-page h1,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .free-packages-page h1,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .downloads-map-section h2 {
+        color: #0a2348;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .downloads-map-page .downloads-map-blurb,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .free-packages-page .free-packages-blurb {
+        color: #0f2340;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .downloads-map-section {
+        background: #ffffff;
+        border-color: rgba(0, 180, 220, 0.35);
+      }
+    }
     .downloads-map-section .downloads-map-list,
     .free-packages-page .free-packages-list {
       list-style: none; margin: 0; padding: 0;
@@ -2077,6 +2134,66 @@ def suite_storefront_css() -> str:
       margin: 0.75rem auto 0; max-width: 34rem;
       font-size: 0.82rem; color: rgba(174, 208, 234, 0.95); line-height: 1.4;
       text-align: center;
+    }
+    /* Light mode: lighten Suite storefront card + darken hard-coded pale copy */
+    [data-theme="light"] .suite-storefront {
+      background:
+        linear-gradient(165deg, #e8f1f8 0%, #ffffff 72%);
+      border-color: rgba(0, 180, 220, 0.38);
+      box-shadow: 0 10px 28px rgba(15, 35, 64, 0.1), inset 0 1px 0 rgba(255,255,255,0.8);
+      color: #0f2340;
+    }
+    [data-theme="light"] .suite-storefront h2,
+    [data-theme="light"] #suite-storefront-title {
+      color: #0a2348;
+    }
+    [data-theme="light"] .suite-storefront .suite-blurb,
+    [data-theme="light"] #suite-blurb {
+      color: #0f2340;
+    }
+    [data-theme="light"] .suite-storefront .suite-pay-hint,
+    [data-theme="light"] #suite-pay-hint {
+      color: #0a2348;
+    }
+    [data-theme="light"] .suite-keygen-cta .suite-cart-hint,
+    [data-theme="light"] #suite-cart-hint {
+      color: #0a2348;
+    }
+    [data-theme="light"] .suite-product-submenu-label,
+    [data-theme="light"] #suite-product-submenu-label {
+      color: #0a2348;
+    }
+    [data-theme="light"] .suite-product-submenu a,
+    [data-theme="light"] .suite-product-submenu a.suite-sub-link {
+      color: #0a2a6e;
+    }
+    [data-theme="light"] .suite-product-submenu a:hover,
+    [data-theme="light"] .suite-product-submenu a:focus-visible,
+    [data-theme="light"] .suite-product-submenu a.is-active {
+      color: #0a1628;
+    }
+    [data-theme="light"] .suite-product-submenu {
+      border-top-color: rgba(0, 180, 220, 0.28);
+    }
+    [data-theme="light"] .suite-detect-hint {
+      color: #0a2348;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-storefront {
+        background: linear-gradient(165deg, #e8f1f8 0%, #ffffff 72%);
+        border-color: rgba(0, 180, 220, 0.38);
+        color: #0f2340;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-storefront h2,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-storefront .suite-blurb,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-storefront .suite-pay-hint,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) #suite-cart-hint,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-product-submenu-label {
+        color: #0a2348;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .suite-product-submenu a {
+        color: #0a2a6e;
+      }
     }
     /* World flags strip — bottom of right-hand downloads (#downloads) box */
     .downloads .suite-world-flags,
