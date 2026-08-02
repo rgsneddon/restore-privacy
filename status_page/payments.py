@@ -5143,7 +5143,7 @@ def render_pay_plan_page_html(
                      aria-label="Monthly VPN plan"/>
               <span class="pay-plan-title">{_esc(product_m)}</span>
               <div class="pay-plan-price">{_esc(monthly_label)} / month</div>
-              <div class="pay-plan-note">{CATALOG_TRIAL_PERIOD_DAYS}-day free trial · no charge until trial ends · then billed monthly</div>
+              <div class="pay-plan-note">KEYGEN after free residual trial (72h, no card) · then billed monthly</div>
             </label>
             <label class="pay-plan-option" id="pay-option-year" data-interval="year">
               <input type="radio" name="interval" value="year"{year_checked}
@@ -5153,7 +5153,7 @@ def render_pay_plan_page_html(
               <div class="pay-plan-price">
                 <span class="pay-was">{_esc(full_yearly)}</span>{_esc(yearly_label)} / year
               </div>
-              <div class="pay-plan-note">{CATALOG_TRIAL_PERIOD_DAYS}-day free trial · no charge until trial ends · then {_esc(yearly_label)}/year (vs 12 × {_esc(monthly_label)} = {_esc(full_yearly)})</div>
+              <div class="pay-plan-note">KEYGEN after free residual trial (72h, no card) · then {_esc(yearly_label)}/year (vs 12 × {_esc(monthly_label)} = {_esc(full_yearly)})</div>
             </label>
           </div>
         </div>

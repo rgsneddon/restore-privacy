@@ -2,11 +2,15 @@
 
 ## Customer flow
 
-1. Pay on [restoreprivacy.online](https://restoreprivacy.online/). Homepage /
-   `/pay` offer **Monthly VPN plan (£3.00)** (licence for **one month**) and
-   **Yearly VPN plan (£30.00)** (licence for **one year**). Both include a **3-day free trial** (no money taken until after the trial ends). Customers can
-   **enable or disable auto-renew** before checkout (default: on).
-2. Status host on `checkout.session.completed`:
+1. Install the Suite free. Residual Connect includes a free **3-day (72-hour)
+   device trial** (**no card**, no KEYGEN). After the trial ends, residual
+   Connect needs a **paid KEYGEN / active subscription**.
+2. Buy a KEYGEN on [restoreprivacy.online](https://restoreprivacy.online/) when
+   ready: Homepage / `/pay` offer **Monthly VPN plan (£3.00)** (one month) and
+   **Yearly VPN plan (£30.00)** (one year). Customers can **enable or disable
+   auto-renew** before checkout (default: on). You do **not** need payment
+   details to start the free residual trial.
+3. Status host on `checkout.session.completed`:
    - mints a **12-hour** download token (reusable until expiry)
    - activates Connect entitlement with **`valid_until`** = Stripe period end
      or calendar **one month / one year** (never unlimited for paid catalog)
@@ -15,9 +19,11 @@
    - mints unique **keygen** (`RPT-KEY-…`) bound to that entitlement
    - records **PPI** (product purchase identifier) for operator recovery
    - sends fulfilment email with **keygen + PPI + download link**
-3. Client: **Install → accept licence terms → enter keygen → unlock Connect**.
-4. Connect re-checks `/api/connect-entitlement?keygen=…` (or session id). The host
-   returns **`licence_status`**: **OK** or **EXPIRED**.
+4. Client: **Install → accept licence → free residual trial (72h) → enter KEYGEN
+   after trial (or anytime) → Connect**.
+5. Connect re-checks `/api/connect-entitlement?keygen=…` (or session id). The host
+   returns **`licence_status`**: **OK** or **EXPIRED** (trial path uses
+   device-entitlement / trial tables until KEYGEN is active).
 
 ## Connect allowed = active subscription + keygen activated
 

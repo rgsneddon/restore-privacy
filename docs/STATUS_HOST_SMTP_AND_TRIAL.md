@@ -4,9 +4,11 @@
 
 1. Production status host can send **keygen + PPI + download** fulfilment email
    (SMTP env vars on Render).
-2. Catalog routes to the site **Select your plan** page (`/pay`) for
-   **Monthly VPN plan (£3.00/month)** or **Yearly VPN plan (£30.00/year)**
-   with a **3-day free trial** (no money taken until after the trial ends), then Stripe **subscription** Checkout Session.
+2. Residual Connect: free **3-day (72-hour) device trial** (**no card**); after
+   expiry a paid KEYGEN is required. Catalog routes to **Select your plan**
+   (`/pay`) for **Monthly VPN plan (£3.00/month)** or **Yearly VPN plan
+   (£30.00/year)** when buying that KEYGEN — Stripe **subscription** Checkout
+   (not “card before residual trial”).
 
 ## SMTP env keys (shipped reader)
 
@@ -127,10 +129,11 @@ rows) in
 [STRIPE_CUSTOM_DOMAINS_AND_BRANDING.md](STRIPE_CUSTOM_DOMAINS_AND_BRANDING.md) §0.
 Verify with `python scripts/verify_stripe_email_domain_dns.py`.
 
-## Stripe products — Monthly / Yearly VPN plan (3-day free trial)
+## Stripe products — Monthly / Yearly VPN plan (KEYGEN purchase)
 
-Catalog **primary path** is site-hosted `/pay` → Checkout Session (not dual
-`buy.stripe.com` Payment Links).
+Residual Connect trial is **device-bound 72h, no card** (status host
+`device_trial`). Catalog **KEYGEN purchase** path is site-hosted `/pay` →
+Checkout Session (not dual `buy.stripe.com` Payment Links).
 
 | Plan | Product name | Unit amount | Interval | Default price id |
 |------|--------------|-------------|----------|------------------|
@@ -144,11 +147,12 @@ Old product **download a vpn** is archived. Override price ids with
 
 1. [Stripe Dashboard → Products](https://dashboard.stripe.com/products) — create
    **Monthly VPN plan** and **Yearly VPN plan** (or open the shipped products).
-2. Recurring prices: **£3.00 GBP / month** and **£30.00 GBP / year**. Catalog Checkout applies a **3-day free trial**.
+2. Recurring prices: **£3.00 GBP / month** and **£30.00 GBP / year** for paid KEYGEN.
 3. Ensure status host has `STRIPE_SECRET_KEY` + webhook so `/pay/checkout` can
-   create subscription Checkout Sessions.
+   create subscription Checkout Sessions after the free residual trial (or anytime).
 4. Confirm catalog tiles open `/pay?platform=…` and the plan page shows
-   Select your plan Monthly | Annual with **SAVE ~17%** on annual (vs 12 × monthly).
+   Select your plan Monthly | Annual with **SAVE ~17%** on annual (vs 12 × monthly)
+   and residual-trial-first notes (no card-before-trial copy).
 
 ### API script (when `STRIPE_SECRET_KEY` is available)
 

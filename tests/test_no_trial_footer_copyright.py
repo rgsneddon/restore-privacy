@@ -68,6 +68,12 @@ class TestCatalogThreeDayTrialOnPublicHtml(unittest.TestCase):
             "no card" in pay.lower() or "72" in pay.lower(),
             pay[:400],
         )
+        # /pay plan radios must not reintroduce card-first residual-adjacent notes
+        self.assertNotIn("no charge until trial ends", pay.lower())
+        self.assertNotIn("no money is taken until after the trial ends", pay.lower())
+        self.assertNotIn("card on file", pay.lower())
+        self.assertNotIn("first charge after", pay.lower())
+        self.assertIn("keygen after free residual trial", pay.lower())
 
         self.assertNotIn("TRIAL", KEYGEN_UNLOCK_INSTRUCTION)
         self.assertEqual(

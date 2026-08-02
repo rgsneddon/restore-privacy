@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Restore Privacy Suite status host (public shop + private admin).
 
-Public surface: Suite brand, KEYGEN trial-gated installers, commercial deposit, docs.
-Brand packages require catalog KEYGEN path (3-day free trial / active entitlement)
-before download. Business-Class requires the compulsory £3000 commercial deposit.
+Public surface: Suite brand, free residual trial then KEYGEN, commercial deposit, docs.
+Residual Connect: free 72h device trial (no card); brand packages / paid path use
+KEYGEN or active entitlement. Business-Class requires the compulsory £3000 commercial deposit.
 Does **not** expose a connected-client count or poll a live session metric.
 Admin (/admin) is auth-only and never part of the public Pages export.
 """

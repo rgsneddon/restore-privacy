@@ -50,10 +50,10 @@ Source of truth in code: `status_page/payments.py` → `STRIPE_WEBHOOK_EVENTS` a
 4. When the period ends, Stripe sends `customer.subscription.deleted` → Connect is
    **revoked** (client gate + bound device removed; node HELLO refuses that device).
 
-Catalog Checkout is **subscription** mode. **Monthly** is £3.00/month; **yearly**
-is £30.00/year (fixed). Catalog subscriptions include a **3-day free trial**
-(no money taken until after the trial ends). Refunds/disputes still revoke Connect immediately
-(`licence_status` **EXPIRED** on clients).
+Catalog Checkout is **subscription** mode for **paid KEYGEN**. **Monthly** is
+£3.00/month; **yearly** is £30.00/year (fixed). Residual Connect first has a free
+**72-hour device trial** (no card); after that a KEYGEN is required. Refunds/disputes
+still revoke Connect immediately (`licence_status` **EXPIRED** on clients).
 
 ## Node residual HELLO
 
