@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-02T15:31:21Z",
+  "generated_at": "2026-08-02T15:42:27Z",
   "node_host": "Germany (DE)",
   "catalog_version": "1.0.7",
   "probe_schedule": [
@@ -70,8 +70,8 @@
   ],
   "unit_suite": {
     "ran": true,
-    "ok": false,
-    "returncode": 1,
+    "ok": true,
+    "returncode": 0,
     "modules": [
       "tests.test_legal_links",
       "tests.test_legal_docs",
@@ -363,7 +363,7 @@
           "MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit)",
           "Iceland peer Iceland (IS) (IS monopin)",
           "Germany peer Germany (DE) (DE monopin / RO replacement)",
-          "United States peer 5.161.242.85:44044 (US monopin)",
+          "live catalog peers IS+DE only (United States residual peer retired)",
           "DEFAULT_ENTRY_COUNTRY=DE (product default residual entry = Germany)"
         ],
         "entry_host": "Iceland (IS)",
@@ -394,12 +394,12 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "is_multihop_active=True for US\u2192DE entry\u2192exit path",
+          "is_multihop_active=True for IS\u2192DE entry\u2192exit path",
           "residual_endpoint dials exit Germany (DE) (residual-via-exit)",
           "multi-hop disabled residual stays entry Germany (DE) (default single-hop DE)",
-          "status text: multi-hop active (2 hops): VPN hop \u2192 Germany (DE) (residual via Germany (DE))"
+          "status text: multi-hop active (2 hops): Iceland (IS) \u2192 Germany (DE) (residual via Germany (DE))"
         ],
-        "status_text": "multi-hop active (2 hops): VPN hop \u2192 Germany (DE) (residual via Germany (DE))"
+        "status_text": "multi-hop active (2 hops): Iceland (IS) \u2192 Germany (DE) (residual via Germany (DE))"
       },
       "multihop_node_host_layout": {
         "ok": true,
@@ -427,7 +427,7 @@
     "multihop_structure": true,
     "firewall_probe_excluded": true
   },
-  "overall_ok": false,
+  "overall_ok": true,
   "privacy": {
     "redacted": true,
     "no_suite_tails": true,
