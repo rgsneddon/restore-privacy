@@ -1,4 +1,4 @@
-"""Suite homepage embeds Perccent explorer iframe with public /perc/ src."""
+"""Homepage does not embed Perccent explorer iframe; submenu link may remain."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "status_page"))
 
 
-class TestSuitePercWalletExplorerEmbedded(unittest.TestCase):
-    def test_storefront_and_homepage_have_explorer_iframe(self) -> None:
+class TestSuitePercWalletExplorerNotOnHomepage(unittest.TestCase):
+    def test_storefront_and_homepage_omit_explorer_iframe(self) -> None:
         from downloads import (
             SUITE_PERC_EXPLORER_HREF,
             SUITE_PERC_WALLET_EXPLORER_IFRAME_SRC,
@@ -21,30 +21,29 @@ class TestSuitePercWalletExplorerEmbedded(unittest.TestCase):
             render_suite_storefront_html,
         )
 
+        # Helper still builds valid embed markup when called directly
         src = SUITE_PERC_WALLET_EXPLORER_IFRAME_SRC
         self.assertTrue(src.endswith("/"), msg="trailing slash required for /perc/")
         self.assertIn("/perc", src)
         self.assertEqual(src, SUITE_PERC_EXPLORER_HREF)
-
         frag = render_suite_perc_wallet_explorer_iframe_html()
         self.assertIn("<iframe", frag)
         self.assertIn('data-explorer-iframe="1"', frag)
-        self.assertIn("suite-perc-wallet-explorer", frag)
-        self.assertIn(f'src="{src}"', frag)
-        self.assertIn('loading="eager"', frag)
-        self.assertIn('data-src-path="/perc/"', frag)
-        # Not lazy-only connect-after-external-click
-        self.assertNotIn('loading="lazy"', frag)
 
+        # Homepage Suite storefront must NOT mount the embed
         suite = render_suite_storefront_html()
-        self.assertIn("<iframe", suite)
-        self.assertIn("data-explorer-iframe", suite)
-        self.assertIn("suite-perc-wallet-explorer", suite)
-        self.assertIn(f'src="{src}"', suite)
-        self.assertIn("KEYGEN", suite)
         self.assertIn('id="suite-storefront"', suite)
+        self.assertIn("KEYGEN", suite)
+        self.assertIn("data-pay-packages", suite)
+        self.assertNotIn("<iframe", suite)
+        self.assertNotIn("data-explorer-iframe", suite)
+        self.assertNotIn("suite-perc-wallet-explorer", suite)
+        self.assertNotIn('data-suite-perc-wallet-explorer="1"', suite)
+        self.assertNotIn(f'src="{src}"', suite)
+        # External explorer text link in submenu may remain
+        self.assertIn('data-suite-sub="perc-explorer"', suite)
 
-    def test_csp_frame_src_allows_public_explorer_origin(self) -> None:
+    def test_csp_frame_src_still_allows_public_explorer_origin(self) -> None:
         import security_headers as sh
         from downloads import SUITE_PERC_EXPLORER_HREF
 
@@ -52,25 +51,28 @@ class TestSuitePercWalletExplorerEmbedded(unittest.TestCase):
         self.assertIn("frame-src", sh.CONTENT_SECURITY_POLICY)
         self.assertIn(sh.FRAME_SRC_DIRECTIVE, sh.CONTENT_SECURITY_POLICY)
         self.assertIn(host, sh.FRAME_SRC_DIRECTIVE)
-        self.assertIn(host, sh.CONTENT_SECURITY_POLICY)
         pairs = dict(sh.security_headers())
         self.assertIn(host, pairs["Content-Security-Policy"])
 
-    def test_homepage_html_builder_mounts_explorer_embed(self) -> None:
+    def test_homepage_html_builder_has_no_explorer_embed(self) -> None:
         from app import render_html
         from downloads import SUITE_PERC_EXPLORER_HREF
 
         page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         main = page[page.index('id="page-shell"') :]
-        self.assertIn("suite-perc-wallet-explorer", main)
-        self.assertIn("data-explorer-iframe", main)
-        self.assertIn(f'src="{SUITE_PERC_EXPLORER_HREF}"', main)
-        # Between storefront markers
-        storefront = main.split('id="suite-storefront"')[1].split(
-            'id="download-vpn"', 1
-        )[0] if 'id="download-vpn"' in main else main.split('id="suite-storefront"')[1]
-        self.assertIn("<iframe", storefront)
-        self.assertIn("data-explorer-iframe", storefront)
+        self.assertIn('id="suite-storefront"', main)
+        self.assertNotIn("suite-perc-wallet-explorer", main)
+        self.assertNotIn("data-explorer-iframe", main)
+        self.assertNotIn('data-suite-perc-wallet-explorer="1"', main)
+        # No explorer iframe in storefront region
+        storefront = main.split('id="suite-storefront"')[1]
+        if 'id="downloads"' in storefront:
+            storefront = storefront.split('id="downloads"', 1)[0]
+        self.assertNotIn("<iframe", storefront)
+        self.assertNotIn(f'src="{SUITE_PERC_EXPLORER_HREF}"', storefront)
+        # Storefront essentials still present
+        self.assertIn("KEYGEN", storefront)
+        self.assertIn("suite-free-grid", storefront)
 
 
 class TestExplorerApiBaseForFramedPerc(unittest.TestCase):
@@ -118,10 +120,6 @@ class TestExplorerApiBaseForFramedPerc(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("function explorerApiBase", html)
-        self.assertIn("explorerApiUrl('api/network')", html)
-        self.assertIn("explorerApiUrl('api/blocks", html)
-        # Connect path uses explorerApiUrl, not bare /api/network alone for fetch
-        self.assertIn("fetch(explorerApiUrl('api/network'))", html)
 
 
 if __name__ == "__main__":

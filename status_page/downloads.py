@@ -1,4 +1,4 @@
-"""Release download catalog + paid download UI (Restore Privacy Suite v1.0.6).
+"""Release download catalog + paid download UI (Restore Privacy Suite v1.0.7).
 
 Primary path: pay **£3.00** (GBP) via Stripe Checkout per package, then a
 time-limited download token (default **12 hours**, reusable until expiry).
@@ -7,7 +7,7 @@ the status host **proxies** the installer (authenticated GitHub API / local
 assets) so fulfilment works when the restore-privacy repo is **private**.
 Buy Me a Coffee is tip/support only.
 
-Current catalog packages: Restore Privacy Suite **1.0.6**
+Current catalog packages: Restore Privacy Suite **1.0.7**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
 iOS Team-signed sideload).
 """
@@ -33,10 +33,10 @@ except ImportError:  # package import path (status_page as package)
         site_copyright_text,
     )
 
-RELEASE_VERSION = "1.0.6"
+RELEASE_VERSION = "1.0.7"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "1.0.6"
+RELEASE_TAG = "1.0.7"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )
@@ -2343,7 +2343,6 @@ def render_suite_storefront_html(
     <span class="suite-version-badge" id="suite-version-badge">{SUITE_VERSION_LABEL}</span>
     <p class="suite-blurb" id="suite-blurb">{SUITE_PRODUCT_SUBTITLE}</p>
 {render_suite_product_submenu_html()}
-{render_suite_perc_wallet_explorer_iframe_html()}
     <p class="suite-keygen-line" id="suite-keygen-line">{SUITE_KEYGEN_HINT}</p>
     <div class="suite-free-primary" id="suite-free-primary" data-pay-packages="1">
       {primary_free}
