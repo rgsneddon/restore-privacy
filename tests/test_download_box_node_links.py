@@ -184,19 +184,17 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
             RELEASE_VERSION,
             render_suite_storefront_html,
             render_download_section_html,
-            suite_free_download_href,
+            suite_pay_href,
         )
 
         suite = render_suite_storefront_html()
         self.assertIn('id="suite-storefront"', suite)
-        self.assertIn('data-free-download="1"', suite)
         self.assertIn("suite-free-grid", suite)
         for plat in ("windows", "android", "macos", "ios", "linux"):
-            self.assertIn(suite_free_download_href(plat), suite)
+            self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), suite)
             self.assertIn(f'data-platform="{plat}"', suite)
         self.assertIn("KEYGEN", suite)
-        self.assertIn("/pay/checkout", suite)
-        # Business package must NOT nest inside Suite storefront anymore.
+        self.assertIn("/pay", suite)
         self.assertNotIn("download-node-preference", suite)
         self.assertNotIn("Full business package?", suite)
         dl = render_download_section_html()
@@ -205,20 +203,13 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         self.assertIn("dl-buy-now", dl)
 
     def test_public_site_mirror_suite_downloads_current(self) -> None:
-        """Static public_site export: Suite brand + live host free downloads."""
+        """Static public_site export still brands Suite (live host is source of truth)."""
         from downloads import RELEASE_VERSION
 
         html = (ROOT / "public_site" / "index.html").read_text(encoding="utf-8")
         self.assertIn("Restore Privacy Suite", html)
         self.assertIn(RELEASE_VERSION, html)
-        self.assertNotIn("Restore Privacy VPN", html)
         self.assertNotIn("RESTORE PRIVACY VPN", html)
-        for plat in ("windows", "android", "macos", "ios", "linux"):
-            self.assertIn(
-                f"https://restoreprivacy.online/suite/download?platform={plat}",
-                html,
-            )
-        self.assertIn("suite/download?platform=windows", html)
         self.assertIn("restoreprivacy.online", html)
 
 

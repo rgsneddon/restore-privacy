@@ -964,9 +964,15 @@ class Handler(BaseHTTPRequestHandler):
                 render_downloads_map_page_html(default_platform=q_plat),
             )
             return
-        # Suite installer download — KEYGEN trial / active entitlement required.
+        # Suite installer download — KEYGEN trial / active entitlement required,
+        # except free_direct=1 (homepage FREE DOWNLOAD CTA only).
         if path in (SUITE_FREE_DOWNLOAD_PATH, f"{SUITE_FREE_DOWNLOAD_PATH}/"):
             plat = (query.get("platform") or "").strip().lower()
+            free_direct = (query.get("free_direct") or query.get("free") or "").strip() in (
+                "1",
+                "true",
+                "yes",
+            )
             fname = platform_filename(plat) if plat else None
             if not plat or not fname:
                 self._send(
@@ -974,29 +980,38 @@ class Handler(BaseHTTPRequestHandler):
                     "text/html; charset=utf-8",
                     _html_page(
                         "Suite download",
-                        '<p class="msg">Choose a platform from the Suite download links, '
-                        "then start the KEYGEN free trial to unlock installers.</p>"
-                        '<p><a href="/pay?product=suite">Start 3-day free trial (KEYGEN)</a>'
-                        " · <a href=\"/#suite-storefront\">Back to Suite</a></p>",
+                        '<p class="msg">Choose a platform from the Suite package links '
+                        "(they open <a href=\"/pay?product=suite\">/pay</a>), or use "
+                        "the home FREE DOWNLOAD button when your device is detected.</p>"
+                        '<p><a href="/pay?product=suite">Start KEYGEN /pay</a>'
+                        " · <a href=\"/#free-download-cta-wrap\">Back to FREE DOWNLOAD</a></p>",
                     ),
                 )
                 return
-            next_q = urllib.parse.urlencode({"platform": plat})
-            gate = self._brand_package_gate(
-                query,
-                next_path=f"{SUITE_FREE_DOWNLOAD_PATH}?{next_q}",
-                platform=plat,
-            )
-            if not gate.get("allow"):
-                loc = str(gate.get("redirect") or "/pay?product=suite")
-                self.send_response(int(gate.get("http_status") or 302))
-                self.send_header("Location", loc)
-                self.send_header("Cache-Control", "no-store")
-                self.send_header("X-RPT-Brand-Gate", str(gate.get("reason") or "deny"))
-                self.send_header("Content-Length", "0")
-                self._security_headers()
-                self.end_headers()
-                return
+            if not free_direct:
+                next_q = urllib.parse.urlencode({"platform": plat})
+                gate = self._brand_package_gate(
+                    query,
+                    next_path=f"{SUITE_FREE_DOWNLOAD_PATH}?{next_q}",
+                    platform=plat,
+                )
+                if not gate.get("allow"):
+                    loc = str(gate.get("redirect") or f"/pay?product=suite&platform={plat}")
+                    self.send_response(int(gate.get("http_status") or 302))
+                    self.send_header("Location", loc)
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("X-RPT-Brand-Gate", str(gate.get("reason") or "deny"))
+                    self.send_header("Content-Length", "0")
+                    self._security_headers()
+                    self.end_headers()
+                    return
+            else:
+                # Homepage FREE DOWNLOAD CTA: anonymous latest Suite for this platform
+                gate = {
+                    "allow": True,
+                    "reason": "free_direct_cta",
+                    "http_status": 200,
+                }
             # Prefer Helsinki host delivery (signed short-lived URL) after gate.
             # Soft-redirect: do not 502 when probe is flaky if a signed HTTPS URL
             # can still be minted (browser→Helsinki often works when Render→store probe fails).

@@ -14,6 +14,7 @@ iOS Team-signed sideload).
 
 from __future__ import annotations
 
+import urllib.parse
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -1093,6 +1094,10 @@ SUITE_KEYGEN_HINT = (
     "Enter the KEYGEN from your fulfilment email to unlock residual Connect and downloads."
 )
 SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
+# Anonymous free-CTA delivery (no KEYGEN / no /pay) — detected platform only
+SUITE_FREE_DIRECT_QUERY = "free_direct"
+SUITE_PAY_PATH = "/pay"
+SUITE_PAY_PRODUCT = "suite"
 DOWNLOADS_SECTION_ID = "downloads"
 # Full-width free-download face (operator asset freebie.jpg) → monopin platform or map
 FREE_PACKAGES_PATH = "/free-packages"
@@ -1227,11 +1232,35 @@ NODE_PREFERENCE_DEPOSIT_NOTE = (
 
 
 def suite_free_download_href(platform: str) -> str:
-    """Relative free-download URL for a Suite platform installer."""
+    """Relative free-download URL for a Suite platform installer (KEYGEN-gated)."""
     plat = (platform or "").strip().lower()
     if not plat:
         return DOWNLOADS_MAP_PATH
     return f"{SUITE_FREE_DOWNLOAD_PATH}?platform={plat}"
+
+
+def suite_pay_href(platform: str = "", *, product: str = SUITE_PAY_PRODUCT) -> str:
+    """Stripe /pay entry for Suite package with optional platform preselect."""
+    plat = (platform or "").strip().lower()
+    prod = (product or SUITE_PAY_PRODUCT).strip() or SUITE_PAY_PRODUCT
+    q: dict[str, str] = {"product": prod}
+    if plat:
+        q["platform"] = plat
+    return f"{SUITE_PAY_PATH}?{urllib.parse.urlencode(q)}"
+
+
+def suite_free_direct_download_href(platform: str) -> str:
+    """Anonymous free-CTA download for latest Suite on *platform* (no /pay)."""
+    plat = (platform or "").strip().lower()
+    if not plat:
+        return DOWNLOADS_MAP_PATH
+    known = {a.platform for a in available_downloads()}
+    if plat not in known:
+        return DOWNLOADS_MAP_PATH
+    return (
+        f"{SUITE_FREE_DOWNLOAD_PATH}?platform={plat}"
+        f"&{SUITE_FREE_DIRECT_QUERY}=1"
+    )
 
 
 def free_asset_href(filename: str, *, version: str | None = None) -> str:
@@ -1374,11 +1403,15 @@ def free_download_cta_css() -> str:
 
 
 def free_download_cta_href(*, default_platform: str = "") -> str:
-    """CTA target: monopin Suite free installer for known platform, else Downloads Map."""
+    """Free CTA: direct latest Suite installer for detected device (no /pay, no picker).
+
+    Unknown device → Downloads Map (Suite-latest pay rows only); never a platform
+    picker on the free button itself.
+    """
     def_plat = (default_platform or "").strip().lower()
     known = {a.platform for a in available_downloads()}
     if def_plat and def_plat in known:
-        return suite_free_download_href(def_plat)
+        return suite_free_direct_download_href(def_plat)
     return DOWNLOADS_MAP_PATH
 
 
@@ -1390,7 +1423,8 @@ def render_free_download_cta_html(
     """Full-width rectangular FREE DOWNLOAD button (text + data-path chrome, no logo face).
 
     When *default_platform* is a known catalog OS (from User-Agent), the button
-    links to that Suite monopin free installer. Unknown/empty → Downloads Map.
+    starts an **immediate** latest Suite download for that device (no /pay).
+    Unknown/empty → Downloads Map (Suite latest via /pay only).
     """
     ver = (version or FREE_DOWNLOAD_FACE_VERSION).strip() or FREE_DOWNLOAD_FACE_VERSION
     def_plat = (default_platform or "").strip().lower()
@@ -1401,26 +1435,35 @@ def render_free_download_cta_html(
     if def_plat:
         title = platform_face_title(def_plat)
         aria = (
-            f"FREE DOWNLOAD for {title} — KEYGEN free trial required before installer"
+            f"FREE DOWNLOAD — latest Restore Privacy Suite for {title} "
+            f"(v{ver}, no payment)"
         )
         detect_attrs = (
             f' data-platform="{_esc_html(def_plat)}"'
             f' data-detected-platform="{_esc_html(def_plat)}"'
         )
+        href_kind = "suite_free_direct"
+        pay_attr = ' data-pay="0" data-free-direct="1"'
     else:
-        aria = "FREE DOWNLOAD — Downloads Map; KEYGEN free trial required before installers"
+        aria = (
+            "FREE DOWNLOAD — open Downloads Map for Restore Privacy Suite "
+            f"v{ver} (device not detected)"
+        )
         detect_attrs = ' data-fallback-map="1"'
+        href_kind = "map"
+        pay_attr = ' data-pay="0"'
     label = FREE_DOWNLOAD_CTA_LABEL
-    href_kind = "platform" if def_plat else "map"
     return f"""
     <div class="free-download-cta-wrap" id="free-download-cta-wrap"
          data-free-download-cta="1" data-face-version="{_esc_html(ver)}"
          data-catalog-version="{_esc_html(RELEASE_VERSION)}"
-         data-cta-shape="rectangle" data-cta-face="typewriter"{detect_attrs}>
+         data-cta-shape="rectangle" data-cta-face="typewriter"
+         data-suite-latest="1"{detect_attrs}>
       <a class="free-download-cta free-download-cta-rect neon-type" id="{FREE_DOWNLOAD_CTA_ID}"
          href="{_esc_html(href)}" data-free-download-v1="1"
          data-version="{_esc_html(ver)}" data-href-kind="{href_kind}"
          data-cta-shape="rectangle" data-cta-face="typewriter"
+         data-suite-latest="1"{pay_attr}
          {detect_attrs}
          aria-label="{_esc_html(aria)}">
         <span class="free-download-cta-label">{_esc_html(label)}</span>
@@ -1510,15 +1553,13 @@ def downloads_map_page_css() -> str:
 def list_downloads_map_rows(
     *, version: str | None = None
 ) -> list[dict[str, str]]:
-    """Pure inventory rows for the Downloads Map (product × platform installers).
+    """Downloads Map rows: Restore Privacy Suite latest clients only → /pay.
 
-    Sourced from brand package inventory + Suite catalog monopin. Each row has
-    product, kind, platform, filename, href, version — href targets Suite free
-    download or free-open ``/assets/{ver}/{file}``.
+    Each row is one Suite monopin platform at *version* (default RELEASE_VERSION).
+    Non-Suite products are not listed.
     """
     ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
     rows: list[dict[str, str]] = []
-    # --- Suite client platforms (primary residual / Suite free storefront) ---
     for p in list_catalog_platform_packages(version=ver):
         plat = str(p.get("platform") or "")
         fname = str(p.get("filename") or "")
@@ -1528,85 +1569,11 @@ def list_downloads_map_rows(
                 "kind": "suite_client",
                 "platform": plat,
                 "filename": fname,
-                "href": suite_free_download_href(plat),
+                "href": suite_pay_href(plat),
                 "version": ver,
-                "label": f"{platform_face_title(plat)} — {fname}",
+                "label": f"{platform_face_title(plat)} — Suite v{ver}",
             }
         )
-    # --- Full brand inventory companions ---
-    try:
-        import sys
-        from pathlib import Path
-
-        root = Path(__file__).resolve().parents[1]
-        scripts = root / "scripts"
-        if str(scripts) not in sys.path:
-            sys.path.insert(0, str(scripts))
-        from brand_package_inventory import list_brand_installer_packages
-
-        for r in list_brand_installer_packages(suite_version=ver, repo_root=root):
-            kind = str(r.get("kind") or "")
-            if kind == "suite_client":
-                continue  # already listed via suite free path
-            product = str(r.get("product") or kind or "Package")
-            plat = str(r.get("platform") or "")
-            fname = str(r.get("filename") or "")
-            if not fname:
-                continue
-            # Prefer suite monopin free-open path so status host can serve
-            href = free_asset_href(fname, version=ver)
-            face = platform_face_title(plat) if plat in {
-                "windows", "android", "macos", "ios", "linux",
-            } else (plat or "package")
-            rows.append(
-                {
-                    "product": product,
-                    "kind": kind,
-                    "platform": plat,
-                    "filename": fname,
-                    "href": href,
-                    "version": str(r.get("version") or ver),
-                    "label": f"{face} — {fname}",
-                }
-            )
-    except Exception:
-        # Fallback: at least Rx extras
-        for pkg in list_suite_extra_packages(version=ver):
-            fname = str(pkg.get("filename") or "")
-            if not fname:
-                continue
-            rows.append(
-                {
-                    "product": str(pkg.get("product") or "Rx Privacy Browser"),
-                    "kind": str(pkg.get("kind") or "browser"),
-                    "platform": str(pkg.get("platform") or ""),
-                    "filename": fname,
-                    "href": free_asset_href(fname, version=ver),
-                    "version": ver,
-                    "label": f"{pkg.get('platform') or 'package'} — {fname}",
-                }
-            )
-    # --- Beam privacy dapp (source pack when present; no binary installer) ---
-    try:
-        from pathlib import Path
-
-        beam_readme = (
-            Path(__file__).resolve().parents[1] / "beam_privacy_dapp" / "README.md"
-        )
-        if beam_readme.is_file():
-            rows.append(
-                {
-                    "product": "Beam Privacy dApp",
-                    "kind": "beam_dapp",
-                    "platform": "source",
-                    "filename": "beam_privacy_dapp/README.md",
-                    "href": "https://github.com/rgsneddon/restore-privacy/tree/main/beam_privacy_dapp",
-                    "version": ver,
-                    "label": "Source / integration docs (Beam dApp)",
-                }
-            )
-    except Exception:
-        pass
     return rows
 
 
@@ -1700,7 +1667,7 @@ def render_downloads_map_page_html(
             f'id="downloads-map-detect-hint" '
             f'data-detected-platform="{_esc_html(def_plat)}">'
             f"Detected your device as <strong>{_esc_html(face)}</strong> — "
-            f"Suite installer highlighted; every product/platform is below.</p>"
+            f"Suite v{_esc_html(ver)} /pay link highlighted; all Suite platforms below.</p>"
         )
         detect_main_attr = f' data-detected-platform="{_esc_html(def_plat)}"'
     else:
@@ -1734,15 +1701,16 @@ def render_downloads_map_page_html(
     <main class="downloads-map-page free-packages-page panel-card"
           id="{DOWNLOADS_MAP_PAGE_ID}" data-downloads-map-page="1"
           data-free-packages-page="1" data-version="{_esc_html(ver)}"
-          aria-label="Downloads Map — all Restore Privacy installers"{detect_main_attr}>
+          aria-label="Downloads Map — Restore Privacy Suite latest only"{detect_main_attr}>
       <div class="downloads-map-center free-packages-center" id="downloads-map-center">
         <h1 id="downloads-map-heading">Downloads Map</h1>
         <p class="downloads-map-blurb free-packages-blurb" id="downloads-map-blurb">
-          Every Restore Privacy installer we ship — Suite, residual VPN client,
-          rpOS, Rx browser, Pens · Tables · Slides, node tools, rpMail, rpOffice,
-          and more. <strong>Download links require a KEYGEN licence first</strong>
-          (start the 3-day free trial on <a href="/pay?product=suite">/pay</a>).
-          Residual Connect also needs that KEYGEN after install.
+          <strong>Restore Privacy Suite v{_esc_html(ver)}</strong> only — one link
+          per device platform (no companion products). Each link opens the
+          <a href="/pay?product=suite">/pay</a> flow (Stripe KEYGEN) so you can
+          confirm or change platform before checkout.
+          For an immediate free Suite download matched to this device, use the
+          home <strong>FREE DOWNLOAD</strong> button.
         </p>
         {detect_hint}
         {sections}
@@ -2278,27 +2246,27 @@ def render_suite_storefront_html(
     primary_free = ""
     if def_plat:
         title = platform_face_title(def_plat)
-        href = suite_free_download_href(def_plat)
+        href = suite_pay_href(def_plat)
         primary_free = (
             f'<a class="suite-dl suite-dl-primary" id="suite-dl-primary" '
             f'href="{_esc_html(href)}" data-platform="{_esc_html(def_plat)}" '
-            f'data-free-download="1" data-keygen-gated="1" data-product="suite" '
+            f'data-pay="1" data-product="suite" data-suite-latest="1" '
             f'data-detected-platform="1">'
-            f"Download for {_esc_html(title)} (after KEYGEN trial)</a>"
+            f"Get Suite for {_esc_html(title)} — KEYGEN /pay</a>"
             f'<p class="suite-detect-hint" id="suite-detect-hint" data-detected-platform="{_esc_html(def_plat)}">'
             f"Detected your device as <strong>{_esc_html(title)}</strong> — "
-            f"start the free trial if you have not yet, or pick another platform below.</p>"
+            f"choose another platform below if needed, then continue on /pay.</p>"
         )
     for a in ordered:
         title = platform_face_title(a.platform)
-        href = suite_free_download_href(a.platform)
+        href = suite_pay_href(a.platform)
         is_det = " is-detected" if def_plat and a.platform == def_plat else ""
         det_attr = ' data-detected-platform="1"' if is_det else ""
         free_links.append(
             f'<a class="suite-dl{_esc_html(is_det)}" id="suite-dl-{_esc_html(a.platform)}" '
             f'href="{_esc_html(href)}" data-platform="{_esc_html(a.platform)}" '
-            f'data-free-download="1" data-keygen-gated="1" data-product="suite"{det_attr}>'
-            f"Download {_esc_html(title)} (KEYGEN trial)</a>"
+            f'data-pay="1" data-product="suite" data-suite-latest="1"{det_attr}>'
+            f"Get Suite {_esc_html(title)} — /pay</a>"
         )
     free_grid = "\n      ".join(free_links)
 
@@ -2346,8 +2314,7 @@ def render_suite_storefront_html(
     return f"""
   <section class="suite-storefront panel-card" id="{SUITE_SECTION_ID}"
            aria-label="Download Restore Privacy Suite"
-           data-product="suite" data-storefront="suite" data-free-download="1"
-           data-keygen-gated="1"
+           data-product="suite" data-storefront="suite" data-pay-packages="1"
            data-suite-version="{_esc_html(RELEASE_VERSION)}"{detect_attr}>
     <h2 id="suite-storefront-title">{SUITE_PRODUCT_TITLE}</h2>
     <span class="suite-version-badge" id="suite-version-badge">{SUITE_VERSION_LABEL}</span>
@@ -2355,10 +2322,10 @@ def render_suite_storefront_html(
 {render_suite_product_submenu_html()}
 {render_suite_perc_wallet_explorer_iframe_html()}
     <p class="suite-keygen-line" id="suite-keygen-line">{SUITE_KEYGEN_HINT}</p>
-    <div class="suite-free-primary" id="suite-free-primary" data-free-download="1">
+    <div class="suite-free-primary" id="suite-free-primary" data-pay-packages="1">
       {primary_free}
     </div>
-    <div class="suite-free-grid" id="suite-free-grid" data-free-download="1">
+    <div class="suite-free-grid" id="suite-free-grid" data-pay-packages="1">
       {free_grid}
     </div>
     <div class="dl-buttons" id="suite-dl-buttons" data-buy-mode="suite-keygen"

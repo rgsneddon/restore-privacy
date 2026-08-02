@@ -158,8 +158,13 @@ def build_index() -> str:
         SUITE_HOME_INTRO_FOOT,
         SUITE_HOME_INTRO_HEADING,
     )
-    from downloads import PRICE_LABEL, RELEASE_VERSION, available_downloads  # noqa: E402
-    from downloads import suite_free_download_href  # noqa: E402
+    from downloads import (  # noqa: E402
+        PRICE_LABEL,
+        RELEASE_VERSION,
+        available_downloads,
+        suite_free_direct_download_href,
+        suite_pay_href,
+    )
 
     origin = "https://restoreprivacy.online"
     labels = {
@@ -169,21 +174,51 @@ def build_index() -> str:
         "ios": "iOS",
         "linux": "Linux",
     }
+    # Non-free package grid → live /pay with platform (shipped suite_pay_href)
     links = []
     for a in available_downloads():
-        href = origin + suite_free_download_href(a.platform)
+        href = origin + suite_pay_href(a.platform)
         label = labels.get(a.platform, a.platform)
         links.append(
-            f'<a class="dl" href="{_esc(href)}">Download {_esc(label)}</a>'
+            f'<a class="dl" href="{_esc(href)}" data-pay="1" data-platform="{_esc(a.platform)}">'
+            f"Get Suite {_esc(label)} — /pay</a>"
         )
     free_grid = "\n      ".join(links)
-    # Large FREE DOWNLOAD CTA → live host map (platform detect is status-host only)
+    # FREE DOWNLOAD: only direct Suite path. Static pages detect UA in JS
+    # (mirrors status_page detect_platform_from_user_agent) and set free_direct.
+    # Fallback when unknown: Downloads Map (Suite /pay rows only).
     free_cta = (
         f'<a class="free-cta" id="free-download-v1-cta" '
-        f'href="{origin}/downloads-map" data-free-download-v1="1">'
+        f'href="{origin}/downloads-map" data-free-download-v1="1" data-pay="0" '
+        f'data-suite-latest="1" data-href-kind="map">'
         f'<img src="assets/freebie.jpg" width="1024" height="1024" '
         f'alt="FREE DOWNLOAD — Restore Privacy Suite"/></a>'
+        f"""
+<script id="free-download-ua-detect">
+(function () {{
+  var origin = {origin!r};
+  var a = document.getElementById("free-download-v1-cta");
+  if (!a) return;
+  var ua = (navigator.userAgent || "").toLowerCase();
+  var plat = "";
+  if (/android/.test(ua)) plat = "android";
+  else if (/iphone|ipad|ipod/.test(ua)) plat = "ios";
+  else if (/mac os x|macintosh/.test(ua) && !/iphone|ipad|ipod/.test(ua)) plat = "macos";
+  else if (/windows/.test(ua)) plat = "windows";
+  else if (/cros|linux/.test(ua)) plat = "linux";
+  if (!plat) return;
+  var href = origin + "/suite/download?platform=" + plat + "&free_direct=1";
+  a.setAttribute("href", href);
+  a.setAttribute("data-platform", plat);
+  a.setAttribute("data-detected-platform", plat);
+  a.setAttribute("data-href-kind", "suite_free_direct");
+  a.setAttribute("data-free-direct", "1");
+  a.setAttribute("data-pay", "0");
+}})();
+</script>"""
     )
+    # Sanity: free_direct builder path matches script template
+    _ = suite_free_direct_download_href("macos")
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -225,9 +260,10 @@ def build_index() -> str:
     <section class="panel" id="suite-storefront" data-free-download="1">
       <h2>FREE DOWNLOAD</h2>
       {free_cta}
-      <p class="muted">Or pick a Suite platform below. Full map of every product:
+      <p class="muted">FREE DOWNLOAD detects your device and starts the latest Suite
+        installer (no /pay). Platform links below open the /pay cart so you can choose device:
         <a href="downloads-map.html">Downloadables Mapped Here</a>.</p>
-      <div class="free-grid" id="suite-free-grid">
+      <div class="free-grid" id="suite-free-grid" data-pay-packages="1">
       {free_grid}
       </div>
       <p class="keygen-note">
@@ -235,15 +271,15 @@ def build_index() -> str:
         After you pay, enter the KEYGEN from your email in the app — then Connect.
       </p>
       <p class="cta-row">
-        <a class="btn" href="https://restoreprivacy.online/#suite-storefront">Get a KEYGEN</a>
+        <a class="btn" href="https://restoreprivacy.online/pay?product=suite">Get a KEYGEN — /pay</a>
       </p>
     </section>
 
     <section class="panel" id="how-it-works">
       <h2>How it works</h2>
       <ol class="steps">
-        <li>Download and install the Suite for free.</li>
-        <li>Take a monthly licence (from {_esc(PRICE_LABEL)}) when you want residual Connect.</li>
+        <li>Download and install the Suite for free (FREE DOWNLOAD button).</li>
+        <li>Take a monthly licence (from {_esc(PRICE_LABEL)}) via /pay when you want residual Connect.</li>
         <li>Paste the KEYGEN from your fulfilment email and connect.</li>
       </ol>
     </section>
@@ -259,7 +295,7 @@ def build_index() -> str:
 
 
 def build_downloads_map() -> str:
-    """Static Downloads Map export — installer links point at live status host."""
+    """Static Downloads Map — Suite latest only; links → live /pay + platform."""
     sys.path.insert(0, str(STATUS))
     from downloads import (  # noqa: E402
         RELEASE_VERSION,
@@ -276,7 +312,11 @@ def build_downloads_map() -> str:
             if href.startswith("/"):
                 href = origin + href
             label = str(r.get("label") or r.get("filename") or "")
-            links.append(f'<li><a href="{_esc(href)}">{_esc(label)}</a></li>')
+            plat = str(r.get("platform") or "")
+            links.append(
+                f'<li><a href="{_esc(href)}" data-pay="1" data-platform="{_esc(plat)}" '
+                f'data-kind="suite_client">{_esc(label)}</a></li>'
+            )
         body = "\n        ".join(links)
         sections.append(
             f'<div class="map-section" data-map-product="{_esc(product)}">'
@@ -303,8 +343,10 @@ def build_downloads_map() -> str:
     </header>
     <section class="panel" id="downloads-map-page" data-downloads-map-page="1">
       <h1>Downloads Map</h1>
-      <p class="muted">Every Restore Privacy installer we ship (Suite monopin {RELEASE_VERSION}
-        and companions). Links open on restoreprivacy.online fulfilment host.</p>
+      <p class="muted">Restore Privacy Suite latest clients only (monopin {RELEASE_VERSION}).
+        Each platform link opens the /pay flow on restoreprivacy.online so you can
+        confirm device and continue to Stripe. For an immediate free Suite download
+        matched to your device, use the home FREE DOWNLOAD button.</p>
       {sections_html}
     </section>
     <footer class="site-foot">

@@ -59,19 +59,21 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
             suite_free_download_href,
         )
 
+        from downloads import suite_pay_href
+
         html = render_suite_storefront_html(default_platform="macos")
         self.assertIn('id="suite-dl-primary"', html)
-        # Shipped storefront primary label (KEYGEN-gated wording)
-        self.assertIn("Download for macOS", html)
+        # Storefront package links go to /pay (not ungated suite/download)
+        self.assertIn(suite_pay_href("macos").replace("&", "&amp;"), html)
         self.assertIn("KEYGEN", html)
-        self.assertIn(suite_free_download_href("macos"), html)
+        self.assertIn("/pay", html)
+        self.assertNotIn(suite_free_download_href("macos"), html)
         self.assertIn('data-detected-platform="macos"', html)
         self.assertIn('id="suite-dl-macos"', html)
         self.assertIn("is-detected", html)
-        # All platforms still listed
         for plat in ("windows", "android", "macos", "ios", "linux"):
             self.assertIn(f'data-platform="{plat}"', html)
-        # KEYGEN select prefers detected
+            self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), html)
         self.assertIn('value="macos" selected', html)
 
     def test_homepage_uses_user_agent_when_no_query_platform(self) -> None:
@@ -88,18 +90,23 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
         page = render_html({"title": "RESTORE PRIVACY"}, default_platform=plat).decode(
             "utf-8"
         )
-        # Homepage free CTA (rectangular typewriter) + storefront primary for detected OS
+        # Homepage free CTA = direct Suite free_direct; storefront = /pay
         self.assertIn("FREE DOWNLOAD", page)
-        self.assertIn("Download for Windows", page)
+        self.assertIn("free_direct=1", page)
+        self.assertIn("platform=windows", page)
+        self.assertIn("/suite/download?platform=windows", page)
+        self.assertIn(
+            "/pay?product=suite&amp;platform=windows", page
+        )  # HTML-escaped href
         self.assertIn('data-detected-platform="windows"', page)
         self.assertIn('id="suite-dl-primary"', page)
         self.assertIn('id="free-download-v1-cta"', page)
-        self.assertIn("/suite/download?platform=windows", page)
-        # CTA is text rectangle, not freebie image face
         self.assertIn('data-cta-shape="rectangle"', page)
         cta_i = page.index('id="free-download-v1-cta"')
-        cta_snip = page[cta_i : cta_i + 700]
+        cta_snip = page[cta_i : cta_i + 900]
         self.assertNotIn("<img", cta_snip)
+        self.assertIn("free_direct=1", cta_snip)
+        self.assertNotIn("/pay", cta_snip)
 
     def test_free_download_cta_links_to_detected_os(self) -> None:
         from app import render_html
@@ -110,42 +117,52 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
             suite_free_download_href,
         )
 
-        # Direct CTA helper
+        from downloads import suite_free_direct_download_href
+
+        # Direct CTA helper — free_direct Suite path (not /pay)
         cta = render_free_download_cta_html(default_platform="macos")
-        self.assertIn(suite_free_download_href("macos"), cta)
+        self.assertIn("platform=macos", cta)
+        self.assertIn("free_direct=1", cta)
+        self.assertIn("/suite/download?", cta)
         self.assertIn("FREE DOWNLOAD", cta)
-        self.assertIn("macOS", cta)  # aria-label names platform
+        self.assertIn("macOS", cta)
+        self.assertNotIn('href="/pay', cta)
         self.assertIn('data-detected-platform="macos"', cta)
         self.assertIn(f'id="{FREE_DOWNLOAD_CTA_ID}"', cta)
         self.assertNotIn(f'href="{DOWNLOADS_MAP_PATH}"', cta)
 
-        # Unknown → Downloads Map
+        # Unknown → Downloads Map (no platform picker on free button)
         chooser = render_free_download_cta_html(default_platform="")
         self.assertIn(f'href="{DOWNLOADS_MAP_PATH}"', chooser)
         self.assertNotIn("data-detected-platform", chooser)
 
-        # Homepage wires UA default into the rectangular text CTA
+        # Homepage wires UA default into free_direct CTA
         page = render_html(
             {"title": "RESTORE PRIVACY"}, default_platform="android"
         ).decode("utf-8")
         i_cta = page.index(f'id="{FREE_DOWNLOAD_CTA_ID}"')
-        cta_snip = page[i_cta : i_cta + 800]
-        self.assertIn(suite_free_download_href("android"), cta_snip)
+        cta_snip = page[i_cta : i_cta + 900]
+        self.assertIn("platform=android", cta_snip)
+        self.assertIn("free_direct=1", cta_snip)
         self.assertIn("Android", cta_snip)
         self.assertIn('data-detected-platform="android"', cta_snip)
         self.assertIn("FREE DOWNLOAD", cta_snip)
         self.assertIn('data-cta-shape="rectangle"', cta_snip)
         self.assertNotIn("<img", cta_snip)
+        self.assertNotIn('href="/pay', cta_snip)
 
     def test_free_packages_page_highlights_detected_os(self) -> None:
         from downloads import render_free_packages_page_html, suite_free_download_href
+
+        from downloads import suite_pay_href
 
         html = render_free_packages_page_html(default_platform="ios").decode("utf-8")
         self.assertIn('data-detected-platform="ios"', html)
         self.assertIn("Detected your device as <strong>iOS</strong>", html)
         self.assertIn("is-detected", html)
-        self.assertIn(suite_free_download_href("ios"), html)
-        # Detected Suite iOS installer is marked on the Downloads Map
+        # Map Suite rows go to /pay (not ungated suite/download)
+        self.assertIn(suite_pay_href("ios").replace("&", "&amp;"), html)
+        self.assertNotIn(suite_free_download_href("ios"), html)
         self.assertIn('data-platform="ios"', html)
         self.assertIn('data-kind="suite_client"', html)
 

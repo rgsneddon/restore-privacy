@@ -24,7 +24,7 @@ class TestSuiteStorefrontOrder(unittest.TestCase):
             DOWNLOADS_SECTION_ID,
             SUITE_SECTION_ID,
             SUITE_PRODUCT_TITLE,
-            SUITE_FREE_DOWNLOAD_PATH,
+            suite_pay_href,
         )
 
         html = render_html({"title": "RESTORE PRIVACY VPN"}).decode("utf-8")
@@ -34,8 +34,10 @@ class TestSuiteStorefrontOrder(unittest.TestCase):
         self.assertGreaterEqual(vpn_at, 0, "downloads section missing")
         self.assertLess(suite_at, vpn_at, "Suite must appear above VPN downloads")
         self.assertIn(SUITE_PRODUCT_TITLE, html)
-        self.assertIn('data-free-download="1"', html)
-        self.assertIn(SUITE_FREE_DOWNLOAD_PATH, html)
+        # Storefront package links are /pay (not ungated free suite/download)
+        self.assertIn('data-pay-packages="1"', html)
+        self.assertIn("/pay?product=suite", html)
+        self.assertIn(suite_pay_href("windows").replace("&", "&amp;"), html)
         self.assertIn("Get KEYGEN", html)
         self.assertIn('name="product" value="suite"', html)
         self.assertIn('name="interval" value="month"', html)
@@ -53,20 +55,22 @@ class TestSuiteStorefrontOrder(unittest.TestCase):
         self.assertIn('id="downloads"', html)
         self.assertIn("Download Suite client", html)
 
-    def test_suite_storefront_helper_emits_free_download_and_keygen(self):
+    def test_suite_storefront_helper_emits_pay_packages_and_keygen(self):
         from downloads import (
             PRICE_LABEL,
             render_suite_storefront_html,
             SUITE_PRODUCT_TITLE,
-            SUITE_FREE_DOWNLOAD_PATH,
+            suite_pay_href,
         )
 
         block = render_suite_storefront_html(default_platform="windows")
         self.assertIn(SUITE_PRODUCT_TITLE, block)
         self.assertIn(PRICE_LABEL, block)
         self.assertIn('data-product="suite"', block)
-        self.assertIn('data-free-download="1"', block)
-        self.assertIn(SUITE_FREE_DOWNLOAD_PATH, block)
+        self.assertIn('data-pay-packages="1"', block)
+        self.assertIn(suite_pay_href("windows").replace("&", "&amp;"), block)
+        self.assertIn('data-pay="1"', block)
+        self.assertNotIn("/suite/download?platform=", block)
         self.assertIn("KEYGEN", block)
         self.assertIn("Evolve", block)
         self.assertNotIn("coming soon", block.lower())

@@ -62,11 +62,25 @@ class TestHomepageTwoHalves(unittest.TestCase):
             j = main.find(marker)
             if j >= 0:
                 self.assertLess(i_dl, j, f"{marker} must follow downloads in main")
-        # Affordances preserved
+        # Affordances: package grid → /pay; free CTA is separate (free_direct when platform set)
         self.assertIn("suite-free-grid", main)
-        self.assertIn("/suite/download?platform=windows", main)
+        self.assertIn("/pay?product=suite", main)
+        self.assertIn("platform=windows", main)  # storefront pay link or option
         self.assertIn("dl-buy-now", main)
         self.assertIn("KEYGEN", main)
+        # With detected platform, free CTA is direct Suite download (not /pay)
+        page_win = render_html(
+            {"title": "RESTORE PRIVACY"}, default_platform="windows"
+        ).decode("utf-8")
+        main_win = _main_html(page_win)
+        self.assertIn("free_direct=1", main_win)
+        self.assertIn("/suite/download?platform=windows", main_win)
+        # Package grid still /pay (HTML-escaped &)
+        self.assertIn("/pay?product=suite&amp;platform=windows", main_win)
+        i_cta = main_win.index('id="free-download-v1-cta"')
+        cta_snip = main_win[i_cta : i_cta + 700]
+        self.assertIn("free_direct=1", cta_snip)
+        self.assertNotIn("/pay", cta_snip)
 
     def test_shop_row_order_after_header_before_bottom_sections(self) -> None:
         from app import render_html

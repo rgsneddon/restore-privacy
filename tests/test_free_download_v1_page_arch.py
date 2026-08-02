@@ -39,6 +39,7 @@ class TestFreeDownloadV1CtaAndPage(unittest.TestCase):
         self.assertIn("KEYGEN", main)
         self.assertIn("FREE DOWNLOAD", main)
         self.assertIn(f'data-face-version="{FREE_DOWNLOAD_FACE_VERSION}"', main)
+        # Default (no UA platform) free CTA falls back to Downloads Map
         self.assertIn(f'href="{DOWNLOADS_MAP_PATH}"', main)
         self.assertIn('data-cta-shape="rectangle"', main)
         from downloads import free_download_cta_css
@@ -70,7 +71,7 @@ class TestFreeDownloadV1CtaAndPage(unittest.TestCase):
             RELEASE_VERSION,
             list_catalog_platform_packages,
             render_free_packages_page_html,
-            suite_free_download_href,
+            suite_pay_href,
         )
 
         raw = render_free_packages_page_html()
@@ -85,10 +86,13 @@ class TestFreeDownloadV1CtaAndPage(unittest.TestCase):
         self.assertEqual(len(pkgs), 5)
         for p in pkgs:
             plat = p["platform"]
-            self.assertIn(suite_free_download_href(plat), html)
-            self.assertIn(p["filename"], html)
+            self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), html)
             self.assertIn(f'data-platform="{plat}"', html)
             self.assertIn(RELEASE_VERSION, p["filename"])
+            self.assertEqual(p["kind"] if "kind" in p else "suite", p.get("kind", "suite") or "suite")
+        # Suite-latest map only (no companion product kinds)
+        self.assertNotIn('data-kind="browser"', html)
+        self.assertIn('data-kind="suite_client"', html)
 
     def test_admin_architecture_free_suite_and_keygen_human_copy(self) -> None:
         from admin_panel import (

@@ -65,14 +65,14 @@ class TestSuiteBoxSubmenu(unittest.TestCase):
         self.assertIsNotNone(m, "submenu must be inside #suite-storefront")
 
     def test_suite_free_downloads_and_keygen_still_present(self) -> None:
-        from downloads import render_suite_storefront_html, suite_free_download_href
+        from downloads import render_suite_storefront_html, suite_pay_href
 
         suite = render_suite_storefront_html()
         for plat in ("windows", "android", "macos", "ios", "linux"):
-            self.assertIn(suite_free_download_href(plat), suite)
+            self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), suite)
         self.assertIn("suite-free-grid", suite)
         self.assertIn("KEYGEN", suite)
-        self.assertIn("/pay/checkout", suite)
+        self.assertIn("/pay", suite)
         self.assertIn("suite-keygen-buy", suite)
 
 

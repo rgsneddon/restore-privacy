@@ -52,13 +52,16 @@ class TestCtaLinkFallback(unittest.TestCase):
             RELEASE_VERSION,
             free_download_cta_href,
             render_free_download_cta_html,
-            suite_free_download_href,
+            suite_free_direct_download_href,
         )
 
+        # Free CTA: direct Suite latest for detected device (free_direct, no /pay)
         href_mac = free_download_cta_href(default_platform="macos")
-        self.assertEqual(href_mac, suite_free_download_href("macos"))
+        self.assertEqual(href_mac, suite_free_direct_download_href("macos"))
         self.assertIn("platform=macos", href_mac)
         self.assertIn("/suite/download", href_mac)
+        self.assertIn("free_direct=1", href_mac)
+        self.assertNotIn("/pay", href_mac)
         # monopin is served by the suite download handler (RELEASE_VERSION pin)
         self.assertTrue(RELEASE_VERSION)
 
@@ -66,55 +69,65 @@ class TestCtaLinkFallback(unittest.TestCase):
         self.assertEqual(href_unk, DOWNLOADS_MAP_PATH)
 
         html_mac = render_free_download_cta_html(default_platform="macos")
-        self.assertIn("KEYGEN", html_mac)
         self.assertIn("DOWNLOAD", html_mac)
         self.assertIn("platform=macos", html_mac)
+        self.assertIn("free_direct=1", html_mac)
+        self.assertIn('data-pay="0"', html_mac)
+        self.assertNotIn('href="/pay', html_mac)
         self.assertNotIn("v1.0.0", html_mac)
         self.assertNotIn("version 1.0.0", html_mac.lower())
 
         html_map = render_free_download_cta_html(default_platform="")
         self.assertIn(DOWNLOADS_MAP_PATH, html_map)
-        self.assertIn("KEYGEN", html_map)
         self.assertIn("DOWNLOAD", html_map)
         self.assertIn('data-href-kind="map"', html_map)
+        self.assertIn('data-pay="0"', html_map)
+        self.assertNotIn('href="/pay', html_map)
 
 
 class TestDownloadsMapPage(unittest.TestCase):
     def test_map_enumerates_brand_products_and_hrefs(self) -> None:
         from downloads import (
-            DOWNLOADS_MAP_PATH,
+            RELEASE_VERSION,
+            available_downloads,
             list_downloads_map_rows,
             render_downloads_map_page_html,
+            suite_pay_href,
         )
 
+        # Map is Suite latest clients only → /pay with platform
         rows = list_downloads_map_rows()
-        self.assertGreaterEqual(len(rows), 10)
+        self.assertEqual(len(rows), len(available_downloads()))
+        self.assertEqual(len(rows), 5)
         products = {r["product"] for r in rows}
-        # Suite + companions
-        self.assertTrue(any("Suite" in p for p in products))
+        self.assertEqual(products, {"Restore Privacy Suite"})
         kinds = {r["kind"] for r in rows}
-        self.assertIn("suite_client", kinds)
-        for need in ("rpos", "rpos_app", "browser"):
-            self.assertTrue(
-                any(need in k for k in kinds) or any(need in p.lower() for p in products),
-                f"missing kind-ish {need} in {kinds} / {products}",
-            )
+        self.assertEqual(kinds, {"suite_client"})
         for r in rows:
-            self.assertTrue(r.get("filename") or r.get("href"))
-            self.assertTrue(str(r.get("href") or "").startswith("/") or str(r.get("href")).startswith("http"))
-            if r.get("kind") == "suite_client":
-                self.assertIn("/suite/download", r["href"])
+            self.assertEqual(r["version"], RELEASE_VERSION)
+            self.assertTrue(r.get("filename"))
+            self.assertTrue(str(r["href"]).startswith("/pay?product=suite"))
+            self.assertIn(f"platform={r['platform']}", r["href"])
+            self.assertEqual(r["href"], suite_pay_href(r["platform"]))
+            self.assertNotIn("/suite/download", r["href"])
+        # No companion product kinds
+        blob = " ".join(r["product"] + r["kind"] + r["filename"] for r in rows).lower()
+        for banned in ("pens", "tables", "slides", "rpos", "browser", "extension", "beam"):
+            self.assertNotIn(banned, blob)
 
         page = render_downloads_map_page_html(default_platform="windows").decode("utf-8")
         self.assertIn("Downloads Map", page)
         self.assertIn("data-downloads-map-page", page)
         self.assertIn("windows", page.lower())
-        # at least one Pens/Tables/Slides
-        self.assertTrue(
-            "Pens" in page or "Tables" in page or "Slides" in page,
-            "expected office pillar on map page",
-        )
+        self.assertIn("/pay?product=suite", page)
+        for plat in ("windows", "android", "macos", "ios", "linux"):
+            self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), page)
+        # Suite-only — no office pillars / companion products
+        self.assertNotIn('data-kind="pens"', page)
+        self.assertNotIn('data-kind="browser"', page)
+        self.assertNotIn("data-map-product=\"Pens\"", page)
         self.assertIn("is-detected", page)  # windows suite link marked
+        self.assertIn(RELEASE_VERSION, page)
 
 
 class TestFooterCopyrightAndMapLink(unittest.TestCase):

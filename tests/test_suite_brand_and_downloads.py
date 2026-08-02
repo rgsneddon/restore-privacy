@@ -99,7 +99,8 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
             list_catalog_platform_packages,
             render_free_packages_page_html,
             render_suite_storefront_html,
-            suite_free_download_href,
+            suite_pay_href,
+            suite_free_direct_download_href,
         )
 
         self.assertEqual(RELEASE_VERSION, SUITE_PIN)
@@ -111,7 +112,6 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
                 a.filename.startswith(f"restore-privacy-client-{SUITE_PIN}-"),
                 msg=a.filename,
             )
-            # No older catalog pins in live filenames
             self.assertNotRegex(a.filename, r"0\.\d+\.\d+")
 
         pkgs = list_catalog_platform_packages(version=SUITE_PIN)
@@ -119,17 +119,18 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         for p in pkgs:
             self.assertEqual(p["version"], SUITE_PIN)
             self.assertIn(SUITE_PIN, p["filename"])
-            href = suite_free_download_href(p["platform"])
+            href = suite_pay_href(p["platform"])
             self.assertIn(f"platform={p['platform']}", href)
+            self.assertTrue(href.startswith("/pay?"))
 
         suite = render_suite_storefront_html()
         for plat in ("windows", "android", "macos", "ios", "linux"):
-            self.assertIn(suite_free_download_href(plat), suite)
-        # Free package filenames on free-packages page
+            self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), suite)
+        # Downloads map / free-packages: Suite latest → /pay only
         free = render_free_packages_page_html(version=SUITE_PIN).decode("utf-8")
         for p in pkgs:
-            self.assertIn(p["filename"], free)
-            self.assertIn(suite_free_download_href(p["platform"]), free)
+            self.assertIn(suite_pay_href(p["platform"]).replace("&", "&amp;"), free)
+            self.assertIn(f'data-platform="{p["platform"]}"', free)
         self.assertNotIn("0.5.", free)
         self.assertNotIn("0.4.", free)
 
@@ -137,13 +138,16 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         from app import render_html
         from downloads import RELEASE_VERSION
 
-        html = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
+        # With detected platform: free CTA free_direct + storefront /pay
+        html = render_html(
+            {"title": "RESTORE PRIVACY"}, default_platform="macos"
+        ).decode("utf-8")
         self.assertEqual(RELEASE_VERSION, SUITE_PIN)
         self.assertIn(f"Download Suite client v{SUITE_PIN}", html)
         self.assertIn(f'data-catalog-version="{SUITE_PIN}"', html)
-        # Free Suite download routes present
-        self.assertIn("/suite/download?platform=", html)
-        # No legacy 0.x installer filenames on the live page
+        # Free CTA direct path + paid /pay package paths present
+        self.assertIn("/pay?product=suite", html)
+        self.assertIn("free_direct=1", html)
         self.assertIsNone(re.search(r"restore-privacy-client-0\.\d+\.\d+-", html))
 
 

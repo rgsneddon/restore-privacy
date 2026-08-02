@@ -37,30 +37,53 @@
 
     <section class="panel" id="suite-storefront" data-free-download="1">
       <h2>FREE DOWNLOAD</h2>
-      <a class="free-cta" id="free-download-v1-cta" href="https://restoreprivacy.online/downloads-map" data-free-download-v1="1"><img src="assets/freebie.jpg" width="1024" height="1024" alt="FREE DOWNLOAD — Restore Privacy Suite"/></a>
-      <p class="muted">Or pick a Suite platform below. Full map of every product:
+      <a class="free-cta" id="free-download-v1-cta" href="https://restoreprivacy.online/downloads-map" data-free-download-v1="1" data-pay="0" data-suite-latest="1" data-href-kind="map"><img src="assets/freebie.jpg" width="1024" height="1024" alt="FREE DOWNLOAD — Restore Privacy Suite"/></a>
+<script id="free-download-ua-detect">
+(function () {
+  var origin = 'https://restoreprivacy.online';
+  var a = document.getElementById("free-download-v1-cta");
+  if (!a) return;
+  var ua = (navigator.userAgent || "").toLowerCase();
+  var plat = "";
+  if (/android/.test(ua)) plat = "android";
+  else if (/iphone|ipad|ipod/.test(ua)) plat = "ios";
+  else if (/mac os x|macintosh/.test(ua) && !/iphone|ipad|ipod/.test(ua)) plat = "macos";
+  else if (/windows/.test(ua)) plat = "windows";
+  else if (/cros|linux/.test(ua)) plat = "linux";
+  if (!plat) return;
+  var href = origin + "/suite/download?platform=" + plat + "&free_direct=1";
+  a.setAttribute("href", href);
+  a.setAttribute("data-platform", plat);
+  a.setAttribute("data-detected-platform", plat);
+  a.setAttribute("data-href-kind", "suite_free_direct");
+  a.setAttribute("data-free-direct", "1");
+  a.setAttribute("data-pay", "0");
+})();
+</script>
+      <p class="muted">FREE DOWNLOAD detects your device and starts the latest Suite
+        installer (no /pay). Platform links below open the /pay cart so you can choose device:
         <a href="downloads-map.html">Downloadables Mapped Here</a>.</p>
-      <div class="free-grid" id="suite-free-grid">
-      <a class="dl" href="https://restoreprivacy.online/suite/download?platform=windows">Download Windows</a>
-      <a class="dl" href="https://restoreprivacy.online/suite/download?platform=android">Download Android</a>
-      <a class="dl" href="https://restoreprivacy.online/suite/download?platform=macos">Download macOS</a>
-      <a class="dl" href="https://restoreprivacy.online/suite/download?platform=ios">Download iOS</a>
-      <a class="dl" href="https://restoreprivacy.online/suite/download?platform=linux">Download Linux</a>
+      <div class="free-grid" id="suite-free-grid" data-pay-packages="1">
+      <a class="dl" href="https://restoreprivacy.online/pay?product=suite&amp;platform=windows" data-pay="1" data-platform="windows">Get Suite Windows — /pay</a>
+      <a class="dl" href="https://restoreprivacy.online/pay?product=suite&amp;platform=android" data-pay="1" data-platform="android">Get Suite Android — /pay</a>
+      <a class="dl" href="https://restoreprivacy.online/pay?product=suite&amp;platform=macos" data-pay="1" data-platform="macos">Get Suite macOS — /pay</a>
+      <a class="dl" href="https://restoreprivacy.online/pay?product=suite&amp;platform=ios" data-pay="1" data-platform="ios">Get Suite iOS — /pay</a>
+      <a class="dl" href="https://restoreprivacy.online/pay?product=suite&amp;platform=linux" data-pay="1" data-platform="linux">Get Suite Linux — /pay</a>
       </div>
       <p class="keygen-note">
         Licence starts at <strong>£3.00 per month</strong>.
         After you pay, enter the KEYGEN from your email in the app — then Connect.
       </p>
       <p class="cta-row">
-        <a class="btn" href="https://restoreprivacy.online/#suite-storefront">Get a KEYGEN</a>
+        <a class="btn" href="https://restoreprivacy.online/pay?product=suite">Get a KEYGEN — /pay</a>
       </p>
     </section>
 
     <section class="panel" id="how-it-works">
       <h2>How it works</h2>
       <ol class="steps">
-        <li>Download and install the Suite for free.</li>
-        <li>Take a monthly licence (from £3.00) when you want residual Connect.</li>
+        <li>Download and install the Suite for free (FREE DOWNLOAD button).</li>
+        <li>Take a monthly licence (from £3.00) via /pay when you want residual Connect.</li>
         <li>Paste the KEYGEN from your fulfilment email and connect.</li>
       </ol>
     </section>
