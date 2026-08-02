@@ -49,6 +49,8 @@ flutter:
     - assets/brand/logo-512.png
     - assets/brand/app_icon.png
     - assets/config/perc_network.json
+    # Full end-user licence for first-run scroll-to-accept (sync with monorepo LICENSE)
+    - assets/legal/LICENSE
     # Host-mirrored assets so bare rootBundle paths in path packages resolve.
     - assets/data/outcome_registry.json
     - assets/banner/evolve.jpg

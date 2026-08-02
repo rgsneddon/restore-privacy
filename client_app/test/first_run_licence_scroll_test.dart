@@ -62,8 +62,14 @@ void main() {
 
       expect(find.text(kFirstRunLicenceStepTitle), findsOneWidget);
       expect(find.byKey(kFirstRunLicenceScrollKey), findsOneWidget);
-      // Full licence body present (summary + payment disclaimer).
-      expect(find.textContaining('proprietary full copyright'), findsOneWidget);
+      // Full product LICENSE (not short summary only) + residual disclaimer.
+      expect(
+        find.textContaining('PROPRIETARY FULL COPYRIGHT LICENCE'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('1. DEFINITIONS'), findsOneWidget);
+      expect(find.textContaining('Client Package'), findsWidgets);
+      expect(find.textContaining('END OF LICENCE'), findsOneWidget);
       expect(find.textContaining('STRONG DISCLAIMER'), findsOneWidget);
 
       // Bounded pane: Expanded licence region must leave room for chrome.
@@ -93,8 +99,13 @@ void main() {
         matching: find.byType(Scrollable),
       );
       final pos = tester.state<ScrollableState>(scrollable).position;
-      expect(pos.maxScrollExtent, greaterThan(0), reason: 'licence must overflow');
-      await tester.drag(find.byKey(kFirstRunLicenceScrollKey), const Offset(0, -2000));
+      expect(
+        pos.maxScrollExtent,
+        greaterThan(500),
+        reason: 'full LICENSE body must require substantial scroll',
+      );
+      // Jump to end — full LICENSE is multi-page (~10k+ px).
+      pos.jumpTo(pos.maxScrollExtent);
       await tester.pumpAndSettle();
       expect(pos.pixels, greaterThanOrEqualTo(pos.maxScrollExtent - 12));
 

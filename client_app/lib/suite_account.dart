@@ -123,14 +123,27 @@ bool suiteEvolveInheritsSuiteLogin({
 }) =>
     suiteAccountRegistered && walletHasAppAccess;
 
-/// Pure: whether Evolve should still show an auth surface.
+/// Pure: whether Evolve should show **any** auth form (login or register).
+///
+/// When [walletHasAppAccess] is true, no auth wall. When Suite is registered
+/// but session is cold, a **login** form may still appear (password re-entry),
+/// but create-account is not required ([suiteEvolvePrefersLoginNotRegister]).
 bool suiteEvolveShowsLoginWall({
   required bool suiteAccountRegistered,
   required bool walletHasAppAccess,
 }) {
   if (walletHasAppAccess) return false;
+  // Unregistered install: full auth (register or login) is honest.
+  // Registered but cold session: still need password form until rehydrate.
   return true;
 }
+
+/// Pure: after Suite step-1 registration, auth UI must prefer sign-in over create.
+bool suiteEvolvePrefersLoginNotRegister({
+  required bool suiteAccountRegistered,
+  required bool hasNonTreasuryAccounts,
+}) =>
+    suiteAccountRegistered || hasNonTreasuryAccounts;
 
 /// Result of the optional post-keygen Suite account sheet.
 enum SuiteAccountPromptOutcome {

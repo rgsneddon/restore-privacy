@@ -219,12 +219,21 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
   Future<void> _reloadLedgers() async {
     try {
       if (_evolveWallet != null) {
+        // Always re-read disk: first-run may have written session after this
+        // wallet was already isReady with an empty in-memory session.
         await evolve_hub.PercLedgerHub.instance.reloadFromStore();
-        // Re-sync provider after first-run Suite account wrote the shared ledger.
         if (!_evolveWallet!.isReady) {
           await _evolveWallet!.initialize();
         }
+        // Hub reload notifies the wallet listener; re-publish hasAppAccess.
         _onEvolveWalletChanged();
+        // If still cold but Suite registered + accounts exist, force another
+        // hub load so a just-persisted sessionUsername is not missed.
+        if (!_evolveWallet!.hasAppAccess &&
+            SuiteAccountBus.instance.hasRegisteredSession) {
+          await evolve_hub.PercLedgerHub.instance.reloadFromStore();
+          _onEvolveWalletChanged();
+        }
       }
       if (_walletOnly != null) {
         await wallet_hub.PercLedgerHub.instance.reloadFromStore();
@@ -234,6 +243,24 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
       }
     } catch (_) {}
     if (mounted) setState(() {});
+  }
+
+  /// After first-run / Suite register: ensure live wallet reflects disk session.
+  ///
+  /// Safe to call when the wallet is already [isReady] — still reloads the hub.
+  Future<bool> rehydrateEvolveSessionFromStore() async {
+    final wallet = _evolveWallet;
+    if (wallet == null) return false;
+    try {
+      await evolve_hub.PercLedgerHub.instance.reloadFromStore();
+      if (!wallet.isReady) {
+        await wallet.initialize();
+      }
+      _onEvolveWalletChanged();
+      return wallet.hasAppAccess;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Timeout that is cancelled on [dispose] (no pending-timer test flakes).
@@ -332,20 +359,22 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
     final fcg = FcgVotingProvider();
 
     // Match prior AppBootstrap path: wallet session must initialize before shell.
-    // Order: hub reload (first-run may have just persisted Suite session) then
-    // wallet.initialize so hasAppAccess inherits step-1 registration.
-    try {
-      await _step(
-        'ledger_reload_pre',
-        evolve_hub.PercLedgerHub.instance.reloadFromStore(),
-      );
-    } catch (_) {}
+    // Order: wallet.initialize loads store, then explicit reload so a Suite
+    // first-run session written moments earlier is always applied to hasAppAccess.
     await _step('wallet_initialize', wallet.initialize());
-    await _step('evolve_initialize', evolve.initialize());
-    await _step('fcg_initialize', fcg.initialize());
     try {
       await _step(
         'ledger_reload',
+        evolve_hub.PercLedgerHub.instance.reloadFromStore(),
+      );
+    } catch (_) {}
+    await _step('evolve_initialize', evolve.initialize());
+    await _step('fcg_initialize', fcg.initialize());
+    // Second reload after full boot — covers race where first-run persist
+    // finished while initialize was in flight.
+    try {
+      await _step(
+        'ledger_reload_post',
         evolve_hub.PercLedgerHub.instance.reloadFromStore(),
       );
     } catch (_) {}

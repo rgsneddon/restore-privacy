@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'first_run_gate.dart';
+import 'full_end_user_licence.dart';
 import 'legal_links.dart';
 import 'licence_gate.dart';
 import 'prefs_backend.dart';
@@ -659,7 +660,9 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
   Widget _buildLicenceStep(BuildContext context) {
     // Bounded licence pane inside Expanded parent so macOS windows stay
     // within app dimensions; accept unlocks only after scroll-to-bottom.
-    const licenceBody = '$kShortLicenceSummary\n\n'
+    // Full product LICENSE (not the short summary) + residual disclaimer.
+    const licenceBody = '$kFullEndUserLicenceText\n\n'
+        '---\n\n'
         '$kPaymentConnectDisclaimerPlain\n\n'
         '$kFirstRunCompleteHint';
     return Column(

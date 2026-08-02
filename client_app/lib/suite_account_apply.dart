@@ -169,6 +169,12 @@ Future<void> applySuiteAccountToWalletAndEvolve({
 
     SuiteAccountBus.instance.notifyRegistered(u);
 
+    // Ensure session is on disk before bus listeners rehydrate Evolve family host.
+    try {
+      await s.persistPercHub();
+      await evolve_hub.PercLedgerHub.instance.persistLocal();
+    } catch (_) {}
+
     // Restore live-node flags, then publish seed envelope (network + inject store).
     perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = prevPercLive;
     evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests =
