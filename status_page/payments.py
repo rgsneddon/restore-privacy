@@ -4757,9 +4757,13 @@ def fulfilment_smtp_config() -> dict[str, Any]:
         port = 587
     user = _env_or_processor_store("RPT_FULFILMENT_SMTP_USER")
     password = _env_or_processor_store("RPT_FULFILMENT_SMTP_PASSWORD")
+    # Default From must be owned by the SMTP auth mailbox (PrivateEmail 553 if not).
+    # Prefer explicit env; else fall back to SMTP user / support inbox — not noreply@.
     from_addr = (
         _env_or_processor_store("RPT_FULFILMENT_FROM_EMAIL", "RPT_FULFILMENT_SMTP_FROM")
-        or "noreply@restoreprivacy.online"
+        or user
+        or SUPPORT_EMAIL
+        or "rus@restoreprivacy.online"
     ).strip()
     tls_raw = (
         _env_or_processor_store("RPT_FULFILMENT_SMTP_TLS") or "1"
@@ -5242,6 +5246,41 @@ def payment_link_matches_trial_subscription(price_obj: dict[str, Any]) -> dict[s
     return {"ok": len(mismatches) == 0, "mismatches": mismatches, "observed": observed}
 
 
+def _bare_email_address(value: str) -> str:
+    """Extract bare addr from ``Name <addr@host>`` or return stripped value."""
+    raw = (value or "").strip()
+    if "<" in raw and ">" in raw:
+        inner = raw.split("<", 1)[1].split(">", 1)[0].strip()
+        return inner
+    return raw
+
+
+def smtp_from_address_for_auth(cfg: dict[str, Any]) -> str:
+    """Choose a From address the SMTP provider will accept for this login.
+
+    PrivateEmail (and similar) return **553** when From is not owned by the
+    authenticated user (e.g. From ``noreply@…`` while logged in as ``rus@…``).
+    Prefer configured ``from_addr`` when it matches the SMTP user; otherwise use
+    the authenticated user email.
+    """
+    user = str((cfg or {}).get("user") or "").strip()
+    from_raw = str((cfg or {}).get("from_addr") or "").strip()
+    user_bare = _bare_email_address(user).lower()
+    from_bare = _bare_email_address(from_raw).lower()
+    if from_bare and user_bare and from_bare == user_bare:
+        return from_raw
+    if user_bare and "@" in user_bare:
+        # Keep display name from from_raw when present, swap address to auth user
+        if from_raw and "<" in from_raw and ">" in from_raw:
+            name = from_raw.split("<", 1)[0].strip().strip('"')
+            if name:
+                return f"{name} <{user_bare}>"
+        return user if "@" in user else user_bare
+    if from_bare and "@" in from_bare:
+        return from_raw
+    return SUPPORT_EMAIL
+
+
 def _fulfilment_from_header(from_addr: str) -> str:
     """RFC-ish From with public business display name when address is bare."""
     raw = (from_addr or "").strip() or SUPPORT_EMAIL
@@ -5314,7 +5353,9 @@ def send_fulfilment_email(
             payload.get("subject")
             or f"Your {PUBLIC_BUSINESS_NAME} Restore Privacy download"
         )
-        msg["From"] = _fulfilment_from_header(str(cfg["from_addr"]))
+        # From must be owned by SMTP auth user (avoid 553 foreign-From rejects)
+        from_for_send = smtp_from_address_for_auth(cfg)
+        msg["From"] = _fulfilment_from_header(from_for_send)
         msg["To"] = to_addr
         msg["Reply-To"] = SUPPORT_EMAIL
         msg.set_content(body)
@@ -5331,6 +5372,7 @@ def send_fulfilment_email(
             "sent": True,
             "skipped": False,
             "has_download_url": bool(dl and "/download?token=" in dl),
+            "from": _bare_email_address(from_for_send),
         }
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "sent": False, "error": str(exc)}

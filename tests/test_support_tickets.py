@@ -15,6 +15,101 @@ sys.path.insert(0, str(ROOT / "status_page"))
 class TestSupportSmtpPath(unittest.TestCase):
     """Support mail reuses fulfilment SMTP config (Render RPT_FULFILMENT_SMTP_*)."""
 
+    def test_from_address_coerced_to_smtp_auth_user(self) -> None:
+        """PrivateEmail 553: From noreply@ while auth is rus@ must not be used."""
+        from payments import smtp_from_address_for_auth, _bare_email_address
+
+        # Mismatch → use authenticated user
+        coerced = smtp_from_address_for_auth(
+            {
+                "user": "rus@restoreprivacy.online",
+                "from_addr": "noreply@restoreprivacy.online",
+            }
+        )
+        self.assertEqual(
+            _bare_email_address(coerced).lower(),
+            "rus@restoreprivacy.online",
+        )
+        # Match → keep configured from
+        same = smtp_from_address_for_auth(
+            {
+                "user": "rus@restoreprivacy.online",
+                "from_addr": "rus@restoreprivacy.online",
+            }
+        )
+        self.assertEqual(
+            _bare_email_address(same).lower(),
+            "rus@restoreprivacy.online",
+        )
+        # Display name preserved when swapping address
+        named = smtp_from_address_for_auth(
+            {
+                "user": "rus@restoreprivacy.online",
+                "from_addr": "Restore Privacy <noreply@restoreprivacy.online>",
+            }
+        )
+        self.assertIn("rus@restoreprivacy.online", named)
+        self.assertIn("Restore Privacy", named)
+
+        # send_support_ticket_email real SMTP path uses coerced From (capture via mock)
+        from support_tickets import build_support_email, send_support_ticket_email
+        from unittest import mock
+        from email.message import EmailMessage
+
+        open_mail = build_support_email(
+            ticket_id="RPS-553",
+            email="customer@example.com",
+            subject="From ownership",
+            message="Ensure From is the SMTP mailbox owner.",
+        )
+        captured: dict = {}
+
+        class _FakeSMTP:
+            def __init__(self, *a, **k):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def ehlo(self):
+                return None
+
+            def starttls(self):
+                return None
+
+            def login(self, user, password):
+                captured["login_user"] = user
+                return None
+
+            def send_message(self, msg: EmailMessage):
+                captured["from"] = str(msg["From"])
+                captured["to"] = str(msg["To"])
+                return {}
+
+        with mock.patch("smtplib.SMTP", _FakeSMTP):
+            result = send_support_ticket_email(
+                open_mail,
+                smtp_config={
+                    "host": "mail.privateemail.com",
+                    "port": 587,
+                    "user": "rus@restoreprivacy.online",
+                    "password": "x",
+                    "from_addr": "noreply@restoreprivacy.online",
+                    "use_tls": True,
+                    "configured": True,
+                },
+            )
+        self.assertTrue(result.get("ok"), result)
+        self.assertIn("rus@restoreprivacy.online", (captured.get("from") or "").lower())
+        self.assertNotIn("noreply@", (captured.get("from") or "").lower())
+        self.assertEqual(
+            (result.get("from") or "").lower(),
+            "rus@restoreprivacy.online",
+        )
+
     def test_send_path_payload_and_config_keys(self) -> None:
         from payments import FULFILMENT_SMTP_ENV_KEYS, fulfilment_smtp_env_keys
         from support_tickets import (

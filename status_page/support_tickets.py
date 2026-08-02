@@ -43,8 +43,8 @@ TICKET_STATUS_CLOSED = "closed"
 TICKET_ID_PREFIX = "RPS"
 TICKET_ID_RE = re.compile(r"^RPS-(\d+)$", re.IGNORECASE)
 
-# Optional public reply address on the ticket email (same as fulfilment from).
-DEFAULT_FROM_FALLBACK = "noreply@restoreprivacy.online"
+# Fallback From when SMTP user/from unset — must be a real mailbox owner (not noreply).
+DEFAULT_FROM_FALLBACK = "rus@restoreprivacy.online"
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -812,14 +812,30 @@ def send_support_ticket_email(
         import smtplib
         from email.message import EmailMessage
 
-        # Match fulfilment From header formatting when available
-        from_raw = str(cfg.get("from_addr") or DEFAULT_FROM_FALLBACK).strip()
+        # From must be owned by SMTP login mailbox (PrivateEmail 553 otherwise).
+        # Prefer cfg from_addr only when it matches auth user; else use user.
         try:
-            from payments import _fulfilment_from_header
+            from payments import (
+                _bare_email_address,
+                _fulfilment_from_header,
+                smtp_from_address_for_auth,
+            )
 
-            from_header = _fulfilment_from_header(from_raw)
+            from_for_send = smtp_from_address_for_auth(cfg)
+            from_header = _fulfilment_from_header(from_for_send)
+            from_bare = _bare_email_address(from_for_send)
         except Exception:  # noqa: BLE001
-            from_header = from_raw or DEFAULT_FROM_FALLBACK
+            user_fb = str(cfg.get("user") or "").strip()
+            from_raw = str(
+                cfg.get("from_addr") or user_fb or DEFAULT_FROM_FALLBACK
+            ).strip()
+            # Prefer auth user over noreply fallback when available
+            if user_fb and "@" in user_fb:
+                from_header = user_fb
+                from_bare = user_fb
+            else:
+                from_header = from_raw or DEFAULT_FROM_FALLBACK
+                from_bare = from_header
 
         msg = EmailMessage()
         msg["Subject"] = payload["subject"]
@@ -846,6 +862,7 @@ def send_support_ticket_email(
             "sent": True,
             "skipped": False,
             "uses_fulfilment_smtp": True,
+            "from": from_bare,
         }
     except Exception as exc:  # noqa: BLE001
         return {

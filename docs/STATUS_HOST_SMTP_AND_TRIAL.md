@@ -32,10 +32,12 @@ From `status_page/payments.py` → `fulfilment_smtp_env_keys()` /
 | `RPT_FULFILMENT_SMTP_PORT` | Port (default **587**) | `render.yaml` value `587` |
 | `RPT_FULFILMENT_SMTP_USER` | SMTP auth user | `sync: false` |
 | `RPT_FULFILMENT_SMTP_PASSWORD` | SMTP auth password | `sync: false` |
-| `RPT_FULFILMENT_FROM_EMAIL` | From address | default `noreply@restoreprivacy.online` |
+| `RPT_FULFILMENT_FROM_EMAIL` | From address | **Must be owned by the SMTP user** (use `rus@restoreprivacy.online` with PrivateEmail). Default falls back to SMTP user / `rus@…` — **not** `noreply@` (providers return **553** if From is foreign). |
 | `RPT_FULFILMENT_SMTP_TLS` | STARTTLS (`1` default) | value `1` |
 
 Also listed on `/admin` Stripe processor variables (`processor_plugins.py`).
+
+**PrivateEmail 553:** login can succeed while `send_message` fails if From is e.g. `noreply@…` but auth user is `rus@…`. Set `RPT_FULFILMENT_FROM_EMAIL=rus@restoreprivacy.online` (same as USER). The send path also coerces From to the authenticated user when they differ.
 
 **Never commit** SMTP passwords or Stripe secrets.
 
