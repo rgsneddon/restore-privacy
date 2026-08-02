@@ -391,7 +391,21 @@ class TestSupportTicketPure(unittest.TestCase):
         self.assertNotIn('name="keygen"', page)
         self.assertNotIn("support-keygen", page)
         self.assertIn("RPS-001", page)
-        self.assertIn("confirmation email", page.lower())
+        # Lead explainer (OBJECTIVE customer-facing copy)
+        self.assertIn('id="support-lead"', page)
+        self.assertIn("class=\"support-lead\"", page)
+        lead_i = page.index('id="support-lead"')
+        lead = page[lead_i : lead_i + 700]
+        self.assertIn("Tell us what went wrong", lead)
+        self.assertIn("We will open a ticket", lead)
+        self.assertIn("rus@restoreprivacy.online", lead)
+        self.assertIn("48hrs", lead)
+        self.assertIn("confirmation email with a copy of your message", lead)
+        self.assertIn("RPS-001", lead)
+        self.assertIn("Ensure to fill in all below fields", lead)
+        self.assertNotIn("same site SMTP as fulfilment", lead)
+        self.assertNotIn("RPT_FULFILMENT_SMTP_", lead)
+        self.assertNotIn("ticket is kept even if mail briefly fails", lead)
 
         ok_page = render_support_page_html(
             success_ticket_id="RPS-042",

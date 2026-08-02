@@ -1053,12 +1053,12 @@ def render_support_page_html(
 {header}
 <main class="support-wrap panel-card" id="support-main" data-chrome="pro">
   <h2>Customer support</h2>
-  <p class="support-lead">
-    Tell us what went wrong. We open a ticket and notify
-    <strong>{html.escape(SUPPORT_INBOX)}</strong> using the same site SMTP
-    as fulfilment (Render <code>RPT_FULFILMENT_SMTP_*</code>). You also receive
-    a confirmation email with a copy of your message and a short reference
-    (e.g. <code>RPS-001</code>) — the ticket is kept even if mail briefly fails.
+  <p class="support-lead" id="support-lead">
+    Tell us what went wrong. We will open a ticket and notify
+    <strong>{html.escape(SUPPORT_INBOX)}</strong> of your issue. Please allow
+    up to 48hrs for responses to your support ticket. You will receive a
+    confirmation email with a copy of your message and a short reference
+    (e.g. <code>RPS-001</code>). Ensure to fill in all below fields…
   </p>
   {ok_html}
   {err_html}
