@@ -174,21 +174,46 @@ void main() {
           reason: 'composite transport must carry sealed meta',
         );
 
-        // Critical: post-export hub re-publish (normal persistLocal/commit path)
-        // must NOT clobber sealed meta. Coordinator now always merge-stages even
-        // when live nodes are disabled (HTTP still gated); call the real method.
+        // Critical post-restart path: clear process-local stage only so hub
+        // re-publish cannot see composite in testSeedRecoveries — it must
+        // fetch durable remote (simulates live rendezvous after app restart).
+        expect(
+          evolve_rendezvous
+              .PercNetworkRendezvous.testDurableRemoteSeedRecoveries[fp],
+          isNotNull,
+          reason: 'suite publish must write durable remote storage',
+        );
+        evolve_rendezvous.PercNetworkRendezvous.clearProcessStageForTest();
+        SuiteSeedEnvelopeStore.clearMemoryForTest();
+        expect(
+          evolve_rendezvous.PercNetworkRendezvous.testSeedRecoveries,
+          isEmpty,
+          reason: 'process stage cleared (app restart sim)',
+        );
+        expect(
+          evolve_rendezvous
+              .PercNetworkRendezvous.testDurableRemoteSeedRecoveries[fp],
+          isNotNull,
+          reason: 'durable remote must survive process-stage clear',
+        );
+
+        // Hub re-publish with only account ledger envelope — must fetch remote
+        // composite and keep meta (this is the post-restart persistLocal path).
         await evolve_hub.PercLedgerHub.instance.network
             .publishSeedRecoveryEnvelopes();
         await perc_hub.PercLedgerHub.instance.network
             .publishSeedRecoveryEnvelopes();
         staged =
-            evolve_rendezvous.PercNetworkRendezvous.testSeedRecoveries[fp];
+            evolve_rendezvous.PercNetworkRendezvous.testSeedRecoveries[fp] ??
+                evolve_rendezvous
+                    .PercNetworkRendezvous.testDurableRemoteSeedRecoveries[fp];
         expect(staged, isNotNull);
         decoded = decodeSuiteSeedTransport(staged!);
         expect(
           decoded.metaBlobB64,
           isNotNull,
-          reason: 'hub re-publish must preserve suite_seed_transport meta',
+          reason:
+              'hub re-publish after cleared process stage must preserve meta via remote fetch',
         );
         expect(
           decoded.metaBlobB64,
@@ -207,16 +232,17 @@ void main() {
           reason: 'pure builder must keep meta when hub supplies ledger-only',
         );
 
-        // New process / clean install: wipe local Suite memory + ledger hubs +
-        // prefs. Hub resetForTest also clears rendezvous test maps — re-stage
-        // the network value after wipe (network survives app reinstall).
+        // Full clean install: wipe process memory + hubs + prefs; keep only
+        // what durable remote still holds (network survives app reinstall).
         final networkHeld = staged;
         SuiteSeedEnvelopeStore.clearMemoryForTest();
         expect(SuiteSeedEnvelopeStore.memory, isEmpty);
         perc_hub.PercLedgerHub.resetForTest();
         evolve_hub.PercLedgerHub.resetForTest();
         sharedJson.clear();
-        evolve_rendezvous.PercNetworkRendezvous.testSeedRecoveries[fp] =
+        // resetForTest cleared durable — re-seed as surviving network state.
+        evolve_rendezvous
+            .PercNetworkRendezvous.testDurableRemoteSeedRecoveries[fp] =
             networkHeld;
 
         final cleanAccount = SuiteAccountStore(MemorySettingsBackend());
