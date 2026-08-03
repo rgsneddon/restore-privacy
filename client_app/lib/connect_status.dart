@@ -12,14 +12,39 @@ import 'theme.dart';
 
 /// True only when native side reports a real successful **full-tunnel** session.
 /// Rejects host-only HELLO maps even if they carry `ok: true` / `vpnIp`.
-/// Also rejects explicit in-progress / connecting maps (`connecting: true`).
+///
+/// When residual capture / full tunnel is already active (or a session VPN IP
+/// is present with residual flags), treat as success even if a stale
+/// `connecting: true` flag races — otherwise the UI loops "waiting for full
+/// tunnel" every few seconds after residual is up.
 bool isConnectSuccess(dynamic result) {
   if (result is! Map) return false;
-  if (result['ok'] != true) return false;
-  // Still handshaking — not residual success (Android may take many seconds).
-  if (result['connecting'] == true) return false;
   // Explicit host-only / no-system-VPN markers from Apple (and shared helpers).
   if (result['hostOnlySession'] == true) return false;
+  if (result['fullTunnelActive'] == false &&
+      result['residualCapture'] != true &&
+      result['systemCapture'] != true &&
+      result['routesApplied'] != true) {
+    // Still handshaking without residual flags — not success.
+    if (result['connecting'] == true) return false;
+  }
+  // Residual already up (Android/iOS status rehydrate).
+  if (result['fullTunnelActive'] == true ||
+      result['residualCapture'] == true ||
+      result['systemCapture'] == true ||
+      result['routesApplied'] == true) {
+    if (result['connected'] == true || result['ok'] == true) return true;
+    // Session IP with residual flags is enough (stale connecting flag ignored).
+    final ip = result['vpnIp']?.toString().trim() ?? '';
+    if (ip.isNotEmpty) return true;
+  }
+  if (result['ok'] != true && result['connected'] != true) return false;
+  // Still handshaking — not residual success (Android may take many seconds).
+  if (result['connecting'] == true &&
+      result['fullTunnelActive'] != true &&
+      result['residualCapture'] != true) {
+    return false;
+  }
   if (result['fullTunnelActive'] == false) return false;
   return true;
 }
@@ -101,8 +126,17 @@ String connectingStatusMessage({
 }
 
 /// True when a channel map means handshake/TUN is still in progress.
+///
+/// Never true once residual full-tunnel success is established — stale
+/// `connecting` / "waiting for full tunnel" strings must not keep the UI looping.
 bool isConnectingInProgress(dynamic result) {
   if (result is! Map) return false;
+  if (isConnectSuccess(result)) return false;
+  if (result['fullTunnelActive'] == true ||
+      result['residualCapture'] == true ||
+      result['connected'] == true) {
+    return false;
+  }
   if (result['connecting'] == true) return true;
   final msg = (result['message']?.toString() ?? '').toLowerCase();
   return msg.contains('already connecting') ||
@@ -168,15 +202,21 @@ String mapConnectStatusMessage(dynamic result) {
   final ok = isConnectSuccess(result);
   if (ok) {
     final ip = result['vpnIp']?.toString().trim() ?? '';
+    final low = message.toLowerCase();
+    // Never keep a stale "waiting for full tunnel" / connecting line once residual is up.
+    final waitNoise = low.contains('waiting for full tunnel') ||
+        low.contains('still connecting') ||
+        low.contains('already connecting') ||
+        (low.startsWith('connecting') && !low.contains('connected'));
     // Prefer explicit native honesty about dual-stack residual when present.
     final v6 = result['ipv6Protected'];
     final v4 = result['ipv4Residual'];
     if (v6 is bool || v4 is bool) {
       final ipv6On = v6 is bool ? v6 : true;
       final ipv4On = v4 is bool ? v4 : true;
-      final low = message.toLowerCase();
       // Keep an already-honest dual-stack message from native.
       if (message.isNotEmpty &&
+          !waitNoise &&
           (low.contains('ipv6') ||
               low.contains('dual-stack') ||
               low.contains('residual off'))) {
@@ -188,10 +228,10 @@ String mapConnectStatusMessage(dynamic result) {
         ipv6Protected: ipv6On,
       );
     }
-    if (message.isNotEmpty && ip.isNotEmpty) {
+    if (message.isNotEmpty && !waitNoise && ip.isNotEmpty) {
       return message.contains(ip) ? message : '$message (VPN IP $ip)';
     }
-    if (message.isNotEmpty) return message;
+    if (message.isNotEmpty && !waitNoise) return message;
     if (ip.isNotEmpty) return 'Connected — tunnel IP $ip';
     return 'Connected';
   }

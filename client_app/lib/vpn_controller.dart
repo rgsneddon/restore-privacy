@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/services.dart';
 
 import 'connect_status.dart';
@@ -189,7 +191,14 @@ class VpnController {
   }) async {
     Timer? progress;
     final started = DateTime.now();
+    var latchedSuccess = false;
+    void stopProgress() {
+      progress?.cancel();
+      progress = null;
+    }
+
     void tickConnecting() {
+      if (latchedSuccess) return;
       final elapsed = DateTime.now().difference(started).inSeconds;
       onStatus(
         connectingStatusMessage(
@@ -201,6 +210,11 @@ class VpnController {
     }
 
     try {
+      // macOS: register Packet Tunnel in System VPN prefs before start so the
+      // OS can show Allow / install the configuration (not a silent no-op).
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+        await preparePacketTunnelSequenced();
+      }
       // Push dual-stack + privacy-scale prefs before native tunnel starts.
       await syncProductSettingsToNative(
         residualIpv4: residualIpv4 ?? true,
@@ -226,17 +240,18 @@ class VpnController {
         'trafficShape': privacyTrafficShape ?? false,
         'outerObfuscation': privacyOuterObfuscation ?? false,
       });
-      progress.cancel();
-      progress = null;
-
       // If native says still connecting (double-tap / race), keep waiting via status.
       if (isConnectingInProgress(result) && !isConnectSuccess(result)) {
         onStatus(mapConnectStatusMessage(result));
         final ok = await _waitForFullTunnel();
+        if (ok) latchedSuccess = true;
+        stopProgress();
         return ok;
       }
 
       final ok = isConnectSuccess(result);
+      if (ok) latchedSuccess = true;
+      stopProgress();
       // Keep residual-honest failure/success as product status — never overwrite
       // with open-settings feedback (that would hide Open VPN settings UI).
       onStatus(mapConnectStatusMessage(result));
@@ -442,14 +457,27 @@ class VpnController {
     try {
       final result = await _channel.invokeMethod<dynamic>('status');
       if (result is Map) {
-        final connecting = result['connecting'] == true ||
-            isConnectingInProgress(result);
-        final ok = !connecting &&
-            (result['connected'] == true || isConnectSuccess(result));
+        // Residual success wins over a stale connecting flag / wait string.
+        final ok = isConnectSuccess(result) ||
+            (result['connected'] == true &&
+                result['fullTunnelActive'] != false &&
+                result['hostOnlySession'] != true);
+        final connecting = !ok &&
+            (result['connecting'] == true || isConnectingInProgress(result));
         final ip = result['vpnIp']?.toString().trim() ?? '';
         final rawMsg = result['message']?.toString().trim() ?? '';
         // Rebuild honesty from flags when present (status rehydrate contract).
-        final msg = ok ? mapConnectStatusMessage(result) : rawMsg;
+        // Never re-surface "waiting for full tunnel" once residual is up.
+        final msg = ok
+            ? mapConnectStatusMessage(result)
+            : (connecting
+                ? (rawMsg.isNotEmpty
+                    ? rawMsg
+                    : connectingStatusMessage(
+                        host: RptConfig.host,
+                        port: RptConfig.port,
+                      ))
+                : rawMsg);
         bool? ipv6;
         if (result['ipv6Protected'] is bool) {
           ipv6 = result['ipv6Protected'] as bool;

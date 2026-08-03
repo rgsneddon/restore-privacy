@@ -1,37 +1,37 @@
 {
-  "monopin": "1.1.5",
+  "monopin": "1.1.6",
   "platforms": {
     "macos": {
       "platform": "macos",
-      "monopin": "1.1.5",
+      "monopin": "1.1.6",
       "package_present": true,
-      "bundle_version": "1.1.5",
+      "bundle_version": "1.1.6",
       "status": "native_monopin",
       "needs_work": false,
-      "notes": "CFBundle/marketing version 1.1.5 matches monopin 1.1.5.",
-      "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.1.5/restore-privacy-client-1.1.5-macos.zip",
-      "size": 27800337,
+      "notes": "CFBundle/marketing version 1.1.6 matches monopin 1.1.6.",
+      "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.1.6/restore-privacy-client-1.1.6-macos.zip",
+      "size": 27789530,
       "plist_paths": [
         "restore_privacy_client.app/Contents/Info.plist"
       ]
     },
     "ios": {
       "platform": "ios",
-      "monopin": "1.1.5",
+      "monopin": "1.1.6",
       "package_present": true,
-      "bundle_version": "1.0.4",
-      "status": "carry_forward_or_lag",
-      "needs_work": true,
-      "notes": "Internal version '1.0.4' != monopin '1.1.5' \u2014 native rebuild/seal needed for honest ios.",
-      "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.1.5/restore-privacy-client-1.1.5-ios.zip",
-      "size": 13127334,
+      "bundle_version": "1.1.6",
+      "status": "native_monopin",
+      "needs_work": false,
+      "notes": "CFBundle/marketing version 1.1.6 matches monopin 1.1.6.",
+      "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.1.6/restore-privacy-client-1.1.6-ios.zip",
+      "size": 13215403,
       "plist_paths": [
         "Runner.app/Info.plist"
       ]
     }
   },
-  "needs_any_apple_work": true,
+  "needs_any_apple_work": false,
   "macbook_actions": [
-    "rebuild_ios_team_sign"
+    "none_apple_up_to_date"
   ]
 }

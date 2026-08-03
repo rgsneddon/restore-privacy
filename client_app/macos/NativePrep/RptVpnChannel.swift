@@ -709,6 +709,8 @@ enum RptVpnChannel {
   }
 
   /// Ensure preferences show enabled, then start tunnel (turns Network VPN on).
+  /// Always save isEnabled=true so System Settings shows Restore Privacy VPN and
+  /// macOS can present the Allow configuration dialog when required.
   private static func ensureEnabledThenStartTunnel(
     manager: NETunnelProviderManager,
     host: String,
@@ -718,15 +720,18 @@ enum RptVpnChannel {
     let start = {
       startTunnel(manager: manager, host: host, port: port, completion: completion)
     }
-    if manager.isEnabled, manager.connection.status != .invalid {
-      start()
-      return
-    }
+    // Always re-apply protocol + isEnabled and save so System Settings lists
+    // Restore Privacy and macOS can prompt Allow when the profile is new.
     applyProductPacketTunnelProtocol(to: manager, host: host, port: port)
     manager.isEnabled = true
     manager.isOnDemandEnabled = false
     manager.saveToPreferences { saveErr in
       if let saveErr {
+        // If already enabled, still attempt startTunnel (profile may already be allowed).
+        if manager.isEnabled, manager.connection.status != .invalid {
+          start()
+          return
+        }
         completion(
           RptFullTunnelResult.productConnectMap(
             packetTunnelActive: false,

@@ -1437,23 +1437,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: TextStyle(fontSize: 12, color: suiteTextMutedOf(context)),
           ),
           const SizedBox(height: 12),
-          SwitchListTile(
-            key: const Key('kill_switch_opt_in_tile'),
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              kKillSwitchSettingsLabel,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: suiteTextOf(context),
-              ),
+          Container(
+            key: const Key(kKillSwitchUiWarningMarker),
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0x22B00020),
+              borderRadius: BorderRadius.circular(kCornerRadius),
+              border: Border.all(color: const Color(0xFFE53935), width: 1.5),
             ),
-            subtitle: Text(
-              kKillSwitchSettingsBody,
-              style: TextStyle(fontSize: 11, color: suiteTextMutedOf(context)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  kKillSwitchWarningTitle,
+                  key: Key('kill_switch_warning_title'),
+                  style: TextStyle(
+                    color: Color(0xFFE53935),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.06,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  kKillSwitchSettingsLabel,
+                  key: Key('kill_switch_label_bold_red'),
+                  style: TextStyle(
+                    color: Color(0xFFE53935),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  kKillSwitchSettingsBody,
+                  key: const Key('kill_switch_warning_body'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: suiteTextOf(context),
+                  ),
+                ),
+                SwitchListTile(
+                  key: const Key('kill_switch_opt_in_tile'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Enable kill switch',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFE53935),
+                    ),
+                  ),
+                  value: _settings.killSwitchOptIn,
+                  activeColor: const Color(0xFFE53935),
+                  onChanged: _busy ? null : (v) => _setKillSwitch(v),
+                ),
+              ],
             ),
-            value: _settings.killSwitchOptIn,
-            onChanged: _busy ? null : (v) => _setKillSwitch(v),
           ),
           const SizedBox(height: 20),
           Text(

@@ -31,7 +31,7 @@ class RptConfig {
   /// Paid catalog pin — must match monorepo ``client/VERSION`` and pubspec.
   /// Suite monopin is Restore Privacy Suite v 1.0.8.
   /// Free builds report [kFreeTierVersion] via [displayProductVersion].
-  static const String productVersion = '1.1.5';
+  static const String productVersion = '1.1.6';
 
   /// UI / about version (free tier always ``3.3.3``).
   static String get displayProductVersion =>

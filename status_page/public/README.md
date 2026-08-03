@@ -1,13 +1,13 @@
 # Restore Privacy
 
-**Version v1.1.5** — a dedicated virtual private network for residual traffic.
+**Version v1.1.6** — a dedicated virtual private network for residual traffic.
 
 Restore Privacy protects residual traffic on your device. Download free, try three
 days with no card, then continue with a KEYGEN.
 
 | | |
 |--|--|
-| **Download** | Free installers on [restoreprivacy.online](https://restoreprivacy.online/) — catalog **v1.1.5** |
+| **Download** | Free installers on [restoreprivacy.online](https://restoreprivacy.online/) — catalog **v1.1.6** |
 | **Connect** | Free 3-day (72-hour) device trial, then KEYGEN from **£3.00/month** (or yearly on `/pay`) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **Licence** | [LICENSE](LICENSE) (proprietary full copyright) |
@@ -26,11 +26,11 @@ days with no card, then continue with a KEYGEN.
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-1.1.5-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-1.1.5-android.apk` |
-| macOS | `restore-privacy-client-1.1.5-macos.zip` |
-| iOS | `restore-privacy-client-1.1.5-ios.zip` |
-| Linux | `restore-privacy-client-1.1.5-linux-x64.tar.gz` |
+| Windows | `restore-privacy-client-1.1.6-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-1.1.6-android.apk` |
+| macOS | `restore-privacy-client-1.1.6-macos.zip` |
+| iOS | `restore-privacy-client-1.1.6-ios.zip` |
+| Linux | `restore-privacy-client-1.1.6-linux-x64.tar.gz` |
 
 ## Install notes
 

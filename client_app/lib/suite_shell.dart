@@ -338,14 +338,14 @@ class SuiteShellState extends State<SuiteShell> {
     final chromeLabel =
         dests.isEmpty ? kSuiteTabVpn : suiteNavLabel(dests[tabIndex]);
 
+    // Dedicated residual VPN: single static surface — no multi-product swipe.
+    // NeverScrollable even if more dests reappear; navigation is bar-only.
     Widget pageView = PageView(
       key: const Key('suite_shell_page_view'),
       reverse: false,
       controller: _pageController,
       onPageChanged: _onPageChanged,
-      physics: const BouncingScrollPhysics(
-        parent: AlwaysScrollableScrollPhysics(),
-      ),
+      physics: const NeverScrollableScrollPhysics(),
       children: [
         for (final child in children) _SuiteKeepAlivePage(child: child),
       ],

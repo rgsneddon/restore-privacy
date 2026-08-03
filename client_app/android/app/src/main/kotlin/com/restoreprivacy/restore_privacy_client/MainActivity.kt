@@ -83,10 +83,14 @@ class MainActivity : FlutterActivity() {
                     }
                     "status" -> {
                         // Rehydrate UI after minimize/resume — does not start/stop tunnel.
-                        val active = RptVpnService.isSessionActive
+                        // If session IP is present, residual is up even if a flag race
+                        // left isSessionActive briefly false (stops "waiting for full
+                        // tunnel" spam every poll).
+                        val ip = RptVpnService.activeVpnIp
+                        val active =
+                            RptVpnService.isSessionActive || ip.isNotEmpty()
                         val connecting =
                             RptVpnService.desiredConnected && !active
-                        val ip = RptVpnService.activeVpnIp
                         val v6 = RptVpnService.activeIpv6Protected
                         val statusMsg = when {
                             connecting ->

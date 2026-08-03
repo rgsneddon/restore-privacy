@@ -45,11 +45,14 @@ const String kPrivateDnsWarningBody =
     'while residual is Connected. Tunnel-gateway-only DNS is required for leak '
     'test PASS.';
 
-const String kKillSwitchSettingsLabel = 'Kill-switch (block ISP if residual drops)';
+const String kKillSwitchSettingsLabel = 'KILL SWITCH';
+const String kKillSwitchWarningTitle = 'WARNING';
 const String kKillSwitchSettingsBody =
     'When ON, the product attempts fail-closed egress if residual dies '
     '(may break captive portals, updates, or local networks). Default OFF — '
     'lean residual uses scoped allows only. Never claimed perfect.';
+/// Marker for tests: kill-switch user chrome is a WARNING block with bold red text.
+const String kKillSwitchUiWarningMarker = 'kill_switch_warning_bold_red';
 
 /// Posture level for UI chrome.
 enum ResidualLeakPostureLevel {

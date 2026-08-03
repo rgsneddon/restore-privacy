@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/main.dart';
 import 'package:restore_privacy_client/settings_screen.dart';
 import 'package:restore_privacy_client/settings_store.dart';
+import 'package:restore_privacy_client/suite_nav.dart';
 import 'package:restore_privacy_client/suite_parts.dart';
 import 'package:restore_privacy_client/suite_shell.dart';
 import 'package:restore_privacy_client/theme.dart';
@@ -283,68 +284,25 @@ void main() {
     );
   });
 
-  group('suite swipe order VPN → % → Evolve → rpAI', () {
-    test('order labels match product copy', () {
-      final ids = visibleSuitePartIds(SuitePartsState.allInstalled);
-      expect(ids.map(suitePartLabel).toList(), ['VPN', '%', 'EVOLVE', 'rpAI']);
-      expect(ids.first, SuitePartId.vpn);
-      expect(ids.last, SuitePartId.rpai);
+  group('static residual VPN shell (no multi-product swipe)', () {
+    test('main-bar destinations are VPN only', () {
+      final dests = suiteNavDestinations(SuitePartsState.allInstalled);
+      expect(dests, [SuiteNavDest.vpn]);
     });
 
-    test('next from VPN walks to rpAI; end block at rpAI', () {
-      const n = 4;
-      expect(suiteSwipeNextIndex(0, n), 1); // %
-      expect(suiteSwipeNextIndex(1, n), 2); // Evolve
-      expect(suiteSwipeNextIndex(2, n), 3); // rpAI
-      expect(suiteSwipeNextIndex(3, n), 3); // end block
-      expect(suiteSwipeNextIndex(99, n), 3);
-    });
-
-    test('prev from rpAI walks back to VPN; end block at VPN', () {
-      const n = 4;
-      expect(suiteSwipePrevIndex(3, n), 2);
-      expect(suiteSwipePrevIndex(2, n), 1);
-      expect(suiteSwipePrevIndex(1, n), 0);
-      expect(suiteSwipePrevIndex(0, n), 0); // end block
-      expect(suiteSwipePrevIndex(-5, n), 0);
-    });
-
-    test('horizontal swipe dx: negative advances, positive retreats (reversed)',
-        () {
-      const n = 4;
-      // Right-to-left finger (dx < 0) → next (natural PageView / reversed product)
+    test('single-destination swipe stays pinned (static main screen)', () {
+      const n = 1;
+      expect(suiteSwipeNextIndex(0, n), 0);
+      expect(suiteSwipePrevIndex(0, n), 0);
       expect(
-        suiteIndexAfterHorizontalSwipe(current: 0, destinationCount: n, dx: -40),
-        1,
-      );
-      expect(
-        suiteIndexAfterHorizontalSwipe(current: 2, destinationCount: n, dx: -12),
-        3,
-      );
-      expect(
-        suiteIndexAfterHorizontalSwipe(current: 3, destinationCount: n, dx: -50),
-        3,
-      );
-      // Left-to-right finger (dx > 0) → prev
-      expect(
-        suiteIndexAfterHorizontalSwipe(current: 3, destinationCount: n, dx: 40),
-        2,
-      );
-      expect(
-        suiteIndexAfterHorizontalSwipe(current: 0, destinationCount: n, dx: 40),
+        suiteIndexAfterHorizontalSwipe(current: 0, destinationCount: 1, dx: -40),
         0,
       );
-    });
-
-    test('clamp and swipe with fewer destinations still end-blocks', () {
-      // e.g. custom count for a future installed-only path
-      expect(suiteSwipeNextIndex(0, 2), 1);
-      expect(suiteSwipeNextIndex(1, 2), 1);
-      expect(suiteSwipePrevIndex(0, 2), 0);
       expect(
-        suiteIndexAfterHorizontalSwipe(current: 0, destinationCount: 1, dx: 20),
+        suiteIndexAfterHorizontalSwipe(current: 0, destinationCount: 1, dx: 40),
         0,
       );
     });
   });
 }
+

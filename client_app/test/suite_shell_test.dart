@@ -76,17 +76,13 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  test('suite version monopin labels for Restore Privacy Suite', () {
+  test('suite version monopin labels for Restore Privacy residual VPN', () {
     // Monopin string is owned by suite_version.dart / catalog pin.
     expect(kSuiteVersion, isNotEmpty);
-    expect(kSuiteProductName, 'Restore Privacy Suite');
-    expect(kSuiteDisplayVersion, contains('Restore Privacy Suite v '));
+    expect(kSuiteVersion, '1.1.6');
+    expect(kSuiteProductName.toLowerCase(), contains('privacy'));
     expect(kSuiteDisplayVersion, contains(kSuiteVersion));
-    expect(kSuiteTabLabels, ['VPN', '%', 'EVOLVE', 'rpAI']);
     expect(kSuiteTabVpn, 'VPN');
-    expect(kSuiteTabWallet, '%');
-    expect(kSuiteTabEvolve, 'EVOLVE');
-    expect(kSuiteTabRpai, 'rpAI');
   });
 
   test('suite network defaults to Helsinki, not paused Render', () {
@@ -110,7 +106,7 @@ void main() {
     expect(u, 'http://example.test:9');
   });
 
-  testWidgets('shell main bar promotes %/Evolve family tabs and switches',
+  testWidgets('shell is VPN-only static residual surface (no multi-product bar)',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -130,63 +126,24 @@ void main() {
     expect(find.text(kSuiteProductName), findsOneWidget);
     expect(find.text(kSuiteDisplayVersion), findsOneWidget);
 
-    // Main bar: VPN, promoted family, rpAI — no dual EVOLVE product slot.
-    expect(find.text('VPN'), findsWidgets);
-    expect(find.text('Wallet'), findsWidgets);
-    expect(find.text('Analysis'), findsWidgets);
-    expect(find.text('Backup'), findsWidgets);
-    expect(find.text('Voting'), findsWidgets);
-    expect(find.text('Credit'), findsWidgets);
-    expect(find.text('rpAI'), findsWidgets);
-    expect(find.text('EVOLVE'), findsNothing);
-
-    // Backup destination uses backup/restore icons (not shield/security).
-    final backupDest = tester
-        .widgetList<NavigationDestination>(find.byType(NavigationDestination))
-        .firstWhere((d) => d.label == 'Backup');
-    expect((backupDest.icon as Icon).icon, Icons.backup_outlined);
-    expect(
-      (backupDest.selectedIcon as Icon).icon,
-      Icons.settings_backup_restore,
-    );
-    expect((backupDest.icon as Icon).icon, isNot(Icons.security));
-    expect((backupDest.icon as Icon).icon, isNot(Icons.security_outlined));
-
-    // Default tab = VPN primary surface.
+    // Dedicated residual VPN: only VPN destination (no % / Evolve swipe tabs).
     expect(find.text('VPN_SURFACE_CONNECT'), findsOneWidget);
+    expect(find.text('Wallet'), findsNothing);
+    expect(find.text('Analysis'), findsNothing);
+    expect(find.text('rpAI'), findsNothing);
 
     final shell = tester.state<SuiteShellState>(find.byType(SuiteShell));
     final dests = shell.destinations;
+    expect(dests, hasLength(1));
     expect(dests.first.name, 'vpn');
 
-    // Select Wallet (shared % surface).
-    final walletIdx = dests.indexWhere((d) => d.name == 'wallet');
-    shell.selectTab(walletIdx);
-    await tester.pump();
-    expect(find.text('WALLET_SURFACE_BOOTSTRAP'), findsOneWidget);
-
-    // Select Analysis (Evolve-only surface).
-    final analysisIdx = dests.indexWhere((d) => d.name == 'analysis');
-    shell.selectTab(analysisIdx);
-    await tester.pump();
-    expect(find.text('EVOLVE_SURFACE_HOME'), findsOneWidget);
-
-    // Select rpAI.
-    final rpaiIdx = dests.indexWhere((d) => d.name == 'rpai');
-    shell.selectTab(rpaiIdx);
-    await tester.pump();
-    expect(find.text('RPAI_SURFACE_NED'), findsOneWidget);
-
-    // Back to VPN without process restart.
-    shell.selectTab(0);
-    await tester.pump();
-    expect(find.text('VPN_SURFACE_CONNECT'), findsOneWidget);
-
-    // Only the Suite main NavigationBar.
-    expect(find.byType(NavigationBar), findsOneWidget);
+    // PageView is non-scrollable (static main screen).
+    final pageView = tester.widget<PageView>(find.byType(PageView));
+    expect(pageView.physics, isA<NeverScrollableScrollPhysics>());
   });
 
-  testWidgets('NavigationBar taps switch flat destinations', (tester) async {
+  testWidgets('VPN-only shell ignores multi-product destination taps',
+      (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: SuiteShell(
@@ -201,17 +158,9 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.text('Wallet').last);
-    await tester.pump();
-    expect(find.text('WALLET_SURFACE_BOOTSTRAP'), findsOneWidget);
-
-    await tester.tap(find.text('Analysis').last);
-    await tester.pump();
-    expect(find.text('EVOLVE_SURFACE_HOME'), findsOneWidget);
-
-    await tester.tap(find.text('rpAI').last);
-    await tester.pump();
-    expect(find.text('RPAI_SURFACE_NED'), findsOneWidget);
+    expect(find.text('VPN_SURFACE_CONNECT'), findsOneWidget);
+    expect(find.text('Wallet'), findsNothing);
+    expect(find.text('Analysis'), findsNothing);
   });
 
   testWidgets('RestorePrivacyApp hosts suite shell with real VPN home',
