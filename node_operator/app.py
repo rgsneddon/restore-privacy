@@ -107,13 +107,10 @@ def try_tk_gui(ctrl: NodeOperatorController) -> bool:
         refresh()
 
     def on_push() -> None:
-        ver = ctrl.catalog_version_default()
-        r = ctrl.push_update(
-            version=ver,
-            url="https://restoreprivacy.online/",
-            message="Operator update push",
+        messagebox.showinfo(
+            APP_TITLE,
+            "Client update push is disabled — users update manually from free Suite download.",
         )
-        messagebox.showinfo(APP_TITLE, f"Push: {r}")
         refresh()
 
     def on_upload() -> None:

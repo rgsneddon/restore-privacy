@@ -1,0 +1,101 @@
+Injecting product secrets into /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app…
+injected node_elgamal.pub -> /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Resources/secrets/node_elgamal.pub (256 bytes)
+injected de_node_elgamal.pub -> /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Resources/secrets/de_node_elgamal.pub (256 bytes)
+injected exit_node_elgamal.pub -> /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Resources/secrets/exit_node_elgamal.pub (256 bytes)
+inject PacketTunnel appex: PacketTunnel.appex
+injected node_elgamal.pub -> /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/PlugIns/PacketTunnel.appex/Contents/Resources/secrets/node_elgamal.pub (256 bytes)
+injected de_node_elgamal.pub -> /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/PlugIns/PacketTunnel.appex/Contents/Resources/secrets/de_node_elgamal.pub (256 bytes)
+injected exit_node_elgamal.pub -> /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/PlugIns/PacketTunnel.appex/Contents/Resources/secrets/exit_node_elgamal.pub (256 bytes)
+Signing /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app with Developer ID Application: Russell Sneddon (SFCBP95595)
+removing development profile: /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/embedded.provisionprofile ('Mac Team Provisioning Profile: com.restoreprivacy.restorePrivacyClient')
+removing development profile: /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/PlugIns/PacketTunnel.appex/Contents/embedded.provisionprofile ('Mac Team Provisioning Profile: com.restoreprivacy.restorePrivacyClient.PacketTunnel')
+stripped 2 embedded.provisionprofile file(s)
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) --entitlements /Users/russellsneddon/restore-privacy/client_app/macos/PacketTunnel/PacketTunnel.entitlements /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/PlugIns/PacketTunnel.appex/Contents/MacOS/PacketTunnel
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/PlugIns/PacketTunnel.appex/Contents/MacOS/PacketTunnel: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) --entitlements /Users/russellsneddon/restore-privacy/client_app/macos/Runner/DeveloperID.entitlements /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/MacOS/restore_privacy_client
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/MacOS/restore_privacy_client: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) --entitlements /Users/russellsneddon/restore-privacy/client_app/macos/PacketTunnel/PacketTunnel.entitlements /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/PlugIns/PacketTunnel.appex
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/PlugIns/PacketTunnel.appex: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/objective_c.framework
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/objective_c.framework: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/FlutterMacOS.framework
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/FlutterMacOS.framework: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/flutter_secure_storage_macos.framework
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/flutter_secure_storage_macos.framework: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/App.framework
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/App.framework: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/objective_c.framework
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/objective_c.framework: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/flutter_secure_storage_macos.framework
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/flutter_secure_storage_macos.framework: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/FlutterMacOS.framework
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/FlutterMacOS.framework: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/App.framework
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/App.framework: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) --entitlements /Users/russellsneddon/restore-privacy/client_app/macos/PacketTunnel/PacketTunnel.entitlements /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/PlugIns/PacketTunnel.appex
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/PlugIns/PacketTunnel.appex: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) --entitlements /Users/russellsneddon/restore-privacy/client_app/macos/Runner/DeveloperID.entitlements /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/MacOS/restore_privacy_client
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/MacOS/restore_privacy_client: replacing existing signature
++ codesign --force --timestamp --options runtime --sign Developer ID Application: Russell Sneddon (SFCBP95595) --entitlements /Users/russellsneddon/restore-privacy/client_app/macos/Runner/DeveloperID.entitlements /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app: replacing existing signature
++ codesign --verify --deep --strict --verbose=2 /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+--prepared:/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/PlugIns/PacketTunnel.appex
+--validated:/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/PlugIns/PacketTunnel.appex
+--prepared:/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/objective_c.framework/Versions/Current/.
+--validated:/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/objective_c.framework/Versions/Current/.
+--prepared:/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/flutter_secure_storage_macos.framework/Versions/Current/.
+--validated:/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/flutter_secure_storage_macos.framework/Versions/Current/.
+--prepared:/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/FlutterMacOS.framework/Versions/Current/.
+--validated:/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/FlutterMacOS.framework/Versions/Current/.
+--prepared:/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/App.framework/Versions/Current/.
+--validated:/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/Frameworks/App.framework/Versions/Current/.
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app: valid on disk
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app: satisfies its Designated Requirement
++ codesign -dv --verbose=2 /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+Executable=/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/MacOS/restore_privacy_client
+Identifier=com.restoreprivacy.restorePrivacyClient
+Format=app bundle with Mach-O universal (x86_64 arm64)
+CodeDirectory v=20500 size=5907 flags=0x10000(runtime) hashes=173+7 location=embedded
+Signature size=8979
+Authority=Developer ID Application: Russell Sneddon (SFCBP95595)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+Timestamp=3 Aug 2026 at 06:45:16
+Notarization Ticket=stapled
+Info.plist entries=24
+TeamIdentifier=SFCBP95595
+Runtime Version=26.5.0
+Sealed Resources version=2 rules=13 files=25
+Internal requirements count=1 size=200
+
++ ditto -c -k --keepParent /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app /var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/tmp0g_goc8k/restore_privacy_client-for-notary.zip
++ xcrun notarytool submit /var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/tmp0g_goc8k/restore_privacy_client-for-notary.zip --key /Users/russellsneddon/Library/Developer/perccent-codesign/AuthKey_L4R8L26JA5.p8 --key-id L4R8L26JA5 --issuer 215f3a52-5651-43e8-952d-b3c1d8de6cef --wait
+Conducting pre-submission checks for restore_privacy_client-for-notary.zip and initiating connection to the Apple notary service...
+Submission ID received
+  id: df35fccb-cf40-4447-9470-07f1d7f0833c
+Successfully uploaded file
+  id: df35fccb-cf40-4447-9470-07f1d7f0833c
+  path: /var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/tmp0g_goc8k/restore_privacy_client-for-notary.zip
+Waiting for processing to complete.
+Current status: In Progress...Current status: In Progress....Current status: In Progress.....Current status: Accepted......Processing complete
+  id: df35fccb-cf40-4447-9470-07f1d7f0833c
+  status: Accepted
+
++ xcrun stapler staple /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+Processing: /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+Processing: /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+The staple and validate action worked!
++ xcrun stapler validate /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+Processing: /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+The validate action worked!
++ spctl --assess --type execute -vv /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: Russell Sneddon (SFCBP95595)
+
++ ditto -c -k --sequesterRsrc --keepParent /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app /Users/russellsneddon/restore-privacy/releases/1.1.1/restore-privacy-client-1.1.1-macos.zip
+Wrote releases/1.1.1/restore-privacy-client-1.1.1-macos.zip
+=== notarized zip sizes ===
+-rw-r--r--  1 russellsneddon  staff  27816961  3 Aug 06:46 releases/1.1.1/restore-privacy-client-1.1.1-macos.zip
+-rw-r--r--  1 russellsneddon  staff  27816961  3 Aug 06:46 status_page/assets/1.1.1/restore-privacy-client-1.1.1-macos.zip
+9588787c5d84338979764f09776948bcb25b2ea4bbf07e22ba884f1cf544e7f4  releases/1.1.1/restore-privacy-client-1.1.1-macos.zip

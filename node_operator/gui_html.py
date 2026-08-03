@@ -237,24 +237,13 @@ code{{font-size:0.8rem}}
   </form>
 </section>
 
-<section class="card" id="op-update-push" data-push-update="1">
-  <h2>Push update to clients</h2>
+<section class="card" id="op-update-push" data-push-update="0" data-client-push-disabled="1">
+  <h2>Client updates (manual only)</h2>
   <p class="muted" id="op-push-blurb">
-    Residual <strong>UPDATE_PUSH</strong> directive (version/url/message) to connected clients.
-    Upload packages above first so the download URL resolves. Clients apply when Settings
-    <strong>CHECK BREADCRUMBS</strong> is on.
+    Residual client update push is <strong>disabled</strong>. Upload packages to Helsinki
+    above; users update manually from free Suite download. Older clients still see a
+    discrete “new version available” notice.
   </p>
-  <form method="post" action="/op/push-update" id="op-push-form">
-    <label for="version">Update directive version</label>
-    <input id="version" name="version" required placeholder="{html.escape(catalog_ver)}" value="{html.escape(catalog_ver)}"/>
-    <label for="url">Download / notes URL (optional)</label>
-    <input id="url" name="url" placeholder="https://restoreprivacy.online/"/>
-    <label for="message">Message (optional)</label>
-    <input id="message" name="message" placeholder="Please upgrade"/>
-    <label for="target_client_id">Target client id (empty = all connected)</label>
-    <input id="target_client_id" name="target_client_id" placeholder=""/>
-    <button type="submit" id="op-push-btn">Push update to clients</button>
-  </form>
 </section>
 
 <section class="card" id="op-delivery-section">
@@ -302,15 +291,10 @@ def handle_operator_post(
             return 400, str(exc)
         return 200, f"Priority {r['client_id'][:16]}… = {r['priority']}"
     if path in ("/op/push-update", "/op/push-update/"):
-        r = ctrl.push_update(
-            version=form.get("version") or "",
-            url=form.get("url") or "",
-            message=form.get("message") or "",
-            target_client_id=form.get("target_client_id") or "",
+        return (
+            410,
+            "Client update push is disabled — users update manually from free Suite download.",
         )
-        if not r.get("ok"):
-            return 400, str(r.get("error") or "push failed")
-        return 200, f"Pushed to {r.get('count')} target(s): {r.get('delivered_to')}"
     if path in ("/op/connect-peer", "/op/connect-peer/"):
         peer = (form.get("peer") or "IS").strip().upper() or "IS"
         r = ctrl.connect_residual_peer(peer=peer, timeout=15.0)

@@ -357,15 +357,23 @@ class NodeOperatorController:
         message: str = "",
         target_client_id: str = "",
     ) -> dict[str, Any]:
-        connected = [r["client_id"] for r in self.list_sessions_admin()]
-        return operator_push_update(
-            version=version,
-            url=url,
-            message=message,
-            target_client_id=target_client_id,
-            connected_client_ids=connected,
-            queue=self.updates,
-        )
+        """Admin residual client UPDATE_PUSH is removed — always fail-closed.
+
+        Operators upload packages to Helsinki only; clients update manually
+        (catalog free download). Old builds still see the discrete upgrade banner.
+        """
+        return {
+            "ok": False,
+            "error": (
+                "Client update push is disabled — upload packages to Helsinki only; "
+                "users update manually from the free Suite download."
+            ),
+            "count": 0,
+            "delivered_to": [],
+            "disabled": True,
+            "force_install": False,
+            "version": (version or "").strip(),
+        }
 
     def client_pull_updates(self, client_id: str) -> list[dict[str, Any]]:
         return client_receive_update_directives(client_id, queue=self.updates)
@@ -473,117 +481,34 @@ class NodeOperatorController:
         helsinki: Mapping[str, Any] | None = None,
         host: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """UPLOADS path: push Suite monopin update directive to residual clients.
-
-        Enqueues via :meth:`push_update` (UPDATE_PUSH queue). Clients apply only
-        when Settings **CHECK BREADCRUMBS** (push-update) is enabled — this never
-        claims force-install for opt-out clients.
-
-        When *require_host_helsinki_match* is True (default), build-host and
-        Helsinki Suite package sizes for the selected basenames must match or
-        the push is rejected with a clear cannot-complete reason.
-
-        *only_filenames*: selected Suite catalog basenames (required when gate
-        is on — empty selection blocks push).
-        """
+        """UPLOADS client-push removed — always fail-closed (manual update only)."""
         ver = (version or "").strip() or self.catalog_version_default()
-        inv = self.list_local_packages(version=ver, brand_wide=False)
-        known = {
-            str(p.get("filename") or ""): p
-            for p in (inv.get("packages") or [])
-            if p.get("filename")
-        }
         sel = [
             str(x).strip()
             for x in (only_filenames or [])
             if str(x).strip()
         ]
-        gate: dict[str, Any] | None = None
-        if require_host_helsinki_match:
-            gate = self.suite_client_push_match_gate(
-                version=ver,
-                only_filenames=sel if sel else [],
-                helsinki=helsinki,
-                host=host,
-            )
-            if not gate.get("can_push"):
-                return {
-                    "ok": False,
-                    "error": str(
-                        gate.get("reason")
-                        or "Host and Helsinki Suite packages do not match — "
-                        "push cannot be completed."
-                    ),
-                    "delivered_to": [],
-                    "suite": self.suite_product_label(ver),
-                    "version": ver,
-                    "only_filenames": list(sel),
-                    "platforms": [],
-                    "unknown_filenames": [f for f in sel if f not in known],
-                    "opt_in_only": True,
-                    "client_gate": "CHECK BREADCRUMBS",
-                    "force_install": False,
-                    "can_push": False,
-                    "match": False,
-                    "match_gate": gate,
-                }
-        unknown = [f for f in sel if f not in known]
-        platforms = [
-            str(known[f].get("platform") or "")
-            for f in sel
-            if f in known
-        ]
-        platforms = [p for p in platforms if p]
-        # Expand linux → Linux / Arch Linux in message
-        plat_labels: list[str] = []
-        try:
-            from suite_client_push import suite_platform_display_label
-        except ImportError:  # pragma: no cover
-            from status_page.suite_client_push import (  # type: ignore
-                suite_platform_display_label,
-            )
-        for p in platforms:
-            lab = suite_platform_display_label(p)
-            if lab not in plat_labels:
-                plat_labels.append(lab)
-        try:
-            from suite_client_push import default_client_update_url
-        except ImportError:  # pragma: no cover
-            from status_page.suite_client_push import (  # type: ignore
-                default_client_update_url,
-            )
-        u = (url or "").strip() or default_client_update_url(ver)
-        if not message.strip():
-            plat_s = ", ".join(plat_labels) if plat_labels else "all Suite platforms"
-            msg = (
-                f"Restore Privacy Suite v{ver} update available ({plat_s}). "
-                "Clients apply only when CHECK BREADCRUMBS is enabled."
-            )
-        else:
-            msg = message.strip()
         r = self.push_update(
             version=ver,
-            url=u,
-            message=msg,
+            url=(url or "").strip(),
+            message=(message or "").strip(),
             target_client_id=(target_client_id or "").strip(),
         )
-        return {
-            **r,
-            "suite": self.suite_product_label(ver),
-            "version": ver,
-            "only_filenames": list(sel),
-            "platforms": platforms,
-            "platform_labels": plat_labels,
-            "unknown_filenames": unknown,
-            "opt_in_only": True,
-            "client_gate": "CHECK BREADCRUMBS",
-            "force_install": False,
-            "url": u,
-            "message": msg,
-            "can_push": True,
-            "match": True if gate is None else bool(gate.get("match")),
-            "match_gate": gate,
-        }
+        _ = require_host_helsinki_match, helsinki, host
+        r.update(
+            {
+                "suite": self.suite_product_label(ver),
+                "version": ver,
+                "only_filenames": list(sel),
+                "platforms": [],
+                "can_push": False,
+                "match": False,
+                "opt_in_only": True,
+                "client_gate": "disabled",
+                "force_install": False,
+            }
+        )
+        return r
 
     # --- residual HELLO to catalog peers (test path) ---------------------
 

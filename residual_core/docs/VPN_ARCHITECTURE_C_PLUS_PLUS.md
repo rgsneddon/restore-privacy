@@ -103,7 +103,7 @@ Flutter UI
   └─ VpnController  MethodChannel 'restore_privacy/vpn'
         ├─ prepareVpn / connect / disconnect / status
         ├─ setResidualStack / setPrivacyScale
-        └─ host→Flutter UPDATE_PUSH
+        └─ (removed) host→Flutter UPDATE_PUSH
               │
               ▼
 Native host (per OS)
@@ -211,7 +211,7 @@ Sources: `client/full_tunnel.py`, `client/privacy_live.py`, `client_app/lib/tran
 ### 6.1 What a node must do
 
 - UDP admit CLIENT_HELLO (ElGamal/Pedersen/device Ed25519 + optional PQ hybrid).
-- Issue SERVER_HELLO, session AEAD, DATA/KEEPALIVE, optional NODE_STATUS / UPDATE_PUSH.
+- Issue SERVER_HELLO, session AEAD, DATA/KEEPALIVE, optional NODE_STATUS (UPDATE_PUSH product path removed — manual client update).
 - Payment/device-trial gates, nolog posture, wipe/rebuild ops, fleet sequencing.
 - Co-joined roles (VPN + other services) on some hosts.
 

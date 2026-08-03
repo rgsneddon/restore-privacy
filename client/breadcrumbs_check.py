@@ -26,7 +26,13 @@ TransportFn = Callable[[str, dict[str, str], float], str]
 
 
 def check_breadcrumbs_enabled(settings: Any) -> bool:
-    """True when Settings allows CHECK BREADCRUMBS opt-in path."""
+    """Always False — residual push-receive removed (manual update only)."""
+    _ = settings
+    return False
+
+
+def _check_breadcrumbs_enabled_legacy(settings: Any) -> bool:
+    """Historical helper body (unreachable product path)."""
     if settings is None:
         return False
     if isinstance(settings, Mapping):

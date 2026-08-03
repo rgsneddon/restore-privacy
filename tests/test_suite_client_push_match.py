@@ -94,50 +94,20 @@ class TestSuiteClientPushMatch(unittest.TestCase):
         self.assertIn("unknown", g3["reason"].lower())
 
     def test_controller_push_respects_match_gate(self) -> None:
+        """Client push is disabled regardless of host/Helsinki match."""
         from node.operator_admin import NodeOperatorController
-        from node.update_push import UpdatePushQueue
-        from suite_client_push import summarize_helsinki_suite_inventory
 
-        ctrl = NodeOperatorController(repo_root=ROOT)
-        ctrl.updates = UpdatePushQueue()
-        ver = ctrl.catalog_version_default()
-        host = ctrl.suite_host_inventory(version=ver)
-        present = list(host.get("present_filenames") or [])
-        if not present:
-            self.skipTest("no local Suite packages present")
-        # Build matching Helsinki from host sizes
-        remote = [
-            {"filename": fn, "bytes": host["present_sizes"][fn], "present": True}
-            for fn in present
-        ]
-        hel = summarize_helsinki_suite_inventory(ver, remote)
-        sel = present[:1]
-        ok = ctrl.push_selected_suite_updates_to_clients(
-            version=ver,
-            only_filenames=sel,
-            require_host_helsinki_match=True,
-            host=host,
-            helsinki=hel,
+        ctrl = NodeOperatorController()
+        r = ctrl.push_update(version="1.1.3", url="https://restoreprivacy.online/")
+        self.assertFalse(r.get("ok"), r)
+        self.assertTrue(r.get("disabled") or "disabled" in str(r.get("error", "")).lower())
+        r2 = ctrl.push_selected_suite_updates_to_clients(
+            version="1.1.3",
+            only_filenames=[],
+            require_host_helsinki_match=False,
         )
-        self.assertTrue(ok.get("ok"), ok)
-        self.assertTrue(ok.get("can_push"))
-        self.assertEqual(ok.get("only_filenames"), sel)
+        self.assertFalse(r2.get("ok"), r2)
 
-        # Mismatch sizes → blocked, no enqueue success
-        bad_remote = [
-            {"filename": sel[0], "bytes": 1, "present": True},
-        ]
-        hel_bad = summarize_helsinki_suite_inventory(ver, bad_remote)
-        blocked = ctrl.push_selected_suite_updates_to_clients(
-            version=ver,
-            only_filenames=sel,
-            require_host_helsinki_match=True,
-            host=host,
-            helsinki=hel_bad,
-        )
-        self.assertFalse(blocked.get("ok"))
-        self.assertFalse(blocked.get("can_push"))
-        self.assertIn("cannot be completed", (blocked.get("error") or "").lower())
 
     def test_linux_arch_label_and_validity(self) -> None:
         from suite_client_push import (
@@ -199,43 +169,11 @@ class TestSuiteClientPushMatch(unittest.TestCase):
     def test_uploads_client_push_ui_prefill_and_checkboxes(self) -> None:
         from admin_panel import render_admin_uploads_page_html
 
-        page = render_admin_uploads_page_html().decode("utf-8")
-        self.assertIn('id="admin-client-push-section"', page)
-        self.assertIn("data-client-push-versions", page)
-        self.assertIn("Build host: Suite v", page)
-        self.assertIn("Helsinki:", page)
-        self.assertIn('data-client-push-match="1"', page)
-        self.assertIn('id="admin-client-packages-table"', page)
-        self.assertIn("client-push-pkg-checkbox", page)
-        self.assertIn("admin-client-select-present", page)
-        self.assertIn("admin-client-select-all", page)
-        self.assertIn("Linux / Arch Linux", page)
-        # Version field prefilled (hidden input)
-        self.assertIn('id="admin-client-push-version"', page)
-        self.assertIn('id="admin-client-push-url"', page)
-        # Either can-push or mismatch marker
-        self.assertTrue(
-            'data-can-push="1"' in page or 'data-can-push="0"' in page,
-            page[page.find("admin-client-push-section") :][:400],
-        )
-        # Critical: checkboxes must associate with client-push form for native POST
-        self.assertIn('form="admin-client-push-form"', page)
-        self.assertIn('id="admin-client-push-form"', page)
-        # Every client-push checkbox must carry form= or sit inside the form
-        import re
+        html = render_admin_uploads_page_html().decode("utf-8", "replace")
+        self.assertIn("admin-client-push-disabled", html)
+        self.assertNotIn('id="admin-client-push-form"', html)
+        self.assertNotIn("Push selected updates to clients", html)
 
-        boxes = re.findall(
-            r'<input[^>]*class="client-push-pkg-checkbox"[^>]*>',
-            page,
-        )
-        self.assertEqual(len(boxes), 5, boxes)
-        for box in boxes:
-            self.assertIn(
-                'form="admin-client-push-form"',
-                box,
-                f"checkbox missing form association: {box[:120]}",
-            )
-            self.assertIn('name="package"', box)
 
     def test_matching_subset_enables_partial_push(self) -> None:
         """Per-package match: partial Helsinki match enables those rows only."""
@@ -285,77 +223,14 @@ class TestSuiteClientPushMatch(unittest.TestCase):
         self.assertNotIn("b-windows.exe", matched)
 
     def test_post_body_package_multi_reaches_handler_logic(self) -> None:
-        """Simulate form POST: parse package= multi-values and push selected only."""
-        import urllib.parse
-
         from node.operator_admin import NodeOperatorController
-        from node.update_push import UpdatePushQueue
-        from suite_client_push import summarize_helsinki_suite_inventory
 
-        ctrl = NodeOperatorController(repo_root=ROOT)
-        ctrl.updates = UpdatePushQueue()
-        ver = ctrl.catalog_version_default()
-        host = ctrl.suite_host_inventory(version=ver)
-        present = list(host.get("present_filenames") or [])
-        if len(present) < 2:
-            self.skipTest("need ≥2 local Suite packages")
-        # Build matching Helsinki for two packages
-        sel = present[:2]
-        hel = summarize_helsinki_suite_inventory(
-            ver,
-            [
-                {
-                    "filename": fn,
-                    "bytes": host["present_sizes"][fn],
-                    "present": True,
-                }
-                for fn in sel
-            ],
-        )
-        # Emulate browser POST with form-associated package checkboxes
-        body = urllib.parse.urlencode(
-            [
-                ("version", ver),
-                ("url", "https://restoreprivacy.online/#downloads"),
-                ("message", ""),
-                ("target_client_id", ""),
-                ("package", sel[0]),
-                ("package", sel[1]),
-            ]
-        )
-        multi = urllib.parse.parse_qs(body)
-        only = [
-            str(x).strip()
-            for x in (multi.get("package") or multi.get("package[]") or [])
-            if str(x).strip()
-        ]
-        self.assertEqual(only, sel)
-        # Same path as app.py push-clients handler
+        ctrl = NodeOperatorController()
         r = ctrl.push_selected_suite_updates_to_clients(
-            version=(multi.get("version") or [ver])[0],
-            only_filenames=only,
-            url=(multi.get("url") or [""])[0],
-            message=(multi.get("message") or [""])[0],
-            target_client_id=(multi.get("target_client_id") or [""])[0],
-            require_host_helsinki_match=True,
-            host=host,
-            helsinki=hel,
+            version="1.1.3",
+            only_filenames=["restore-privacy-client-1.1.3-macos.zip"],
+            require_host_helsinki_match=False,
         )
-        self.assertTrue(r.get("ok"), r)
-        self.assertEqual(r.get("only_filenames"), sel)
+        self.assertFalse(r.get("ok"), r)
+        self.assertTrue(r.get("disabled") or "disabled" in str(r.get("error", "")).lower())
 
-        # Empty package= must not push (handler 400 path)
-        body_empty = urllib.parse.urlencode(
-            [("version", ver), ("url", "https://restoreprivacy.online/#downloads")]
-        )
-        multi_empty = urllib.parse.parse_qs(body_empty)
-        only_empty = [
-            str(x).strip()
-            for x in (multi_empty.get("package") or [])
-            if str(x).strip()
-        ]
-        self.assertEqual(only_empty, [])
-
-
-if __name__ == "__main__":
-    unittest.main()

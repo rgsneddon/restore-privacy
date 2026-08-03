@@ -52,7 +52,7 @@ Client Suite (this PE / Flutter / native)
   ├── Residual Connect: 72h KEYGEN-free trial (device_pub + install_id) then paid KEYGEN
   ├── Fresh shell main bar: **VPN · rpAI** only (wallet/Evolve install later in Settings)
   ├── After install optionals: Wallet (%) · Backup · Evolve Analysis/Voting · Credit · rpAI·Ned
-  └── Settings: Suite parts install/uninstall; CHECK BREADCRUMBS (opt-in push) — never force-install
+  └── Settings: Suite parts install/uninstall; updates are manual (catalog free download)
 
 Residual fleet (IS + DE only; US/RO retired)
   ├── Default entry DE; catalog peer IS; multihop residual-via-exit (optional)
@@ -149,7 +149,7 @@ rpAI/Ned appears when installed.
 2. With wallet/Evolve installed: **Wallet**, **Backup**, **Credit**, and when
    Evolve access is on: **Analysis**, **Voting**.  
 3. With rpAI installed: **rpAI** tab (Ned guide content).  
-4. Settings self-update / **CHECK BREADCRUMBS** remains opt-in for push updates.  
+4. Suite updates are **manual** (free Suite download). Discrete “new version available” notice only.  
 5. Residual **IS + DE** peers only in product catalog (see §4).
 
 ---
@@ -229,13 +229,13 @@ not residual scratch.
 | **Link Generation** | `/admin/link-generation` | Failsafe links & KEYGENs (see §6.2) |
 | **Active Licences** | `/admin/licences` | Licence DB + paid download grants |
 | **Fleet** | `/admin/fleet` | Fleet bandwidth / node usage probes |
-| **Node Operator** | `/admin/node-operator` | Residual node control (IS/DE tabs): co-join, capacity, package deploy, **UPDATE_PUSH** to clients |
+| **Node Operator** | `/admin/node-operator` | Residual node control (IS/DE tabs): co-join, capacity, package deploy to Helsinki |
 | **rpOS** | `/admin/rpos` | Desktop RESTORE OS brand admin surface |
 | **rpS** | `/admin/rps` | **Ned / admin rpS** readiness + growth (oracle absorb) |
 | **Perc** | `/admin/perc` | Perccent chain / % admin surface |
 | **Support tickets** | `/admin/support-tickets` | Operator support inbox |
 | **Accounting** | `/admin/accounting` | RASKUL LTD accounting |
-| **UPLOADS** | `/admin/uploads` | Suite monopin packages → Helsinki + client-push (see §6.3) |
+| **UPLOADS** | `/admin/uploads` | Suite monopin packages → Helsinki paid_assets only (no client push) |
 | **Processors** | `/admin/processors` | Processor plugins / connection variables |
 | **Logout** | `/admin/logout` | End admin session |
 
@@ -259,11 +259,11 @@ Path: **`/admin/uploads`**. Inventory = **Suite client only** at current monopin
 | Action | Behaviour |
 |--------|-----------|
 | **Push selected packages to Helsinki** | Stage + upload checked files to `paid_assets/{monopin}/` (async progress). Dry-run available. |
-| **Push selected updates to clients** | Residual **UPDATE_PUSH** for monopin; packages that **size-match** build host and Helsinki are selectable; mismatch rows disabled; POST requires `package=` checkboxes. Clients apply only if Settings **CHECK BREADCRUMBS** is on. |
+| **Client updates** | Residual client update push **disabled** — users update manually from free Suite download; older clients see discrete upgrade notice |
 | **Browse / path upload** | Single local installer path → stage/upload Helsinki |
 
 After you seal a native Windows PE: upload Windows file, confirm host sha/size
-equals Helsinki, then client-push can include Windows.
+equals Helsinki (for honest catalog hosting).
 
 ### 6.4 Node Operator (residual control)
 
@@ -273,7 +273,6 @@ Path: **`/admin/node-operator`**.
 - Co-join readiness (vpn / rpai / perccent).  
 - Capacity live/capacity.  
 - Package inventory + Helsinki deploy (can still be brand-aware on that page).  
-- **Push update to clients** (version + URL + message + optional target client).  
 - SSH key missing for package host → forced browser redirect to app-testers (product rule).
 
 ### 6.5 Fleet · Perc · rpOS · Support · Accounting · Processors
@@ -336,7 +335,7 @@ Large-drive mirror: `RPT_WINDOWS_DRIVE` + `python scripts/windows_brand_mirror.p
 6. Authenticode-sign.  
 7. Stage → `status_page/assets/1.1.1/` and `releases/1.1.1/`.  
 8. Helsinki: admin **UPLOADS** or `host_paid_assets_vps` (Windows file).  
-9. Confirm host size == Helsinki size for Windows (client-push gate).  
+9. Confirm host size == Helsinki size for Windows package honesty.  
 10. Breadcrumbs: `python3 scripts/breadcrumbs_vault.py stage --version 1.1.1` (+ publish).  
 11. Smoke client: first-run → trial → Suite bar (VPN · % · Evolve · Backup · Credit · rpAI/Ned).  
 12. Smoke residual: IS/DE only; no US live peer.  
@@ -350,7 +349,7 @@ Large-drive mirror: `RPT_WINDOWS_DRIVE` + `python scripts/windows_brand_mirror.p
 - Suite bar: VPN, %, Evolve (Analysis/Voting), Backup, Credit, rpAI/Ned when installed.  
 - Residual catalog: IS + DE only.  
 - Stripe: no Checkout trial days.  
-- CHECK BREADCRUMBS off by default for push updates.
+- Suite updates are manual (no admin client push).
 
 ---
 
@@ -359,8 +358,7 @@ Large-drive mirror: `RPT_WINDOWS_DRIVE` + `python scripts/windows_brand_mirror.p
 - Code: `CATALOG_TRIAL_PERIOD_DAYS = 0`; Checkout omits subscription trial days.  
 - Residual free trial remains host **device_trial** only (in-app).  
 - Paid installers: Helsinki `paid_assets/1.1.1/` (token-gated).  
-- Admin UPLOADS: Suite-only inventory; client-push only for packages that
-  **size-match** build host and Helsinki.  
+- Admin UPLOADS: Suite-only inventory to Helsinki (no residual client push).  
 - Licence/grant DB: durable payment disk — survives residual wipe / redeploy.
 
 ---
@@ -375,8 +373,8 @@ Large-drive mirror: `RPT_WINDOWS_DRIVE` + `python scripts/windows_brand_mirror.p
 | Residual peers | `client/multihop.py` |
 | Co-join roles | `node/cojoined_roles.py` |
 | Oracle + Ned absorb | `node/oracle_master.py`, `status_page/admin_rps.py` |
-| UPDATE_PUSH | `node/update_push.py`, admin Node Operator + UPLOADS client-push |
-| Client-push match gate | `status_page/suite_client_push.py` |
+| Updates | Manual free Suite download; upgrade banner for old monopin |
+| Helsinki package host | `scripts/host_paid_assets_vps.py` |
 | Admin shell | `status_page/admin_panel.py` (sidebar + all pages) |
 | Node Operator UI | `status_page/admin_node_operator.py` |
 | Apple inject (parity) | `scripts/inject_apple_secrets.py` |

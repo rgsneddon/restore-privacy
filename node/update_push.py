@@ -100,46 +100,17 @@ class UpdatePushQueue:
         *,
         connected_client_ids: Sequence[str] | None = None,
     ) -> dict[str, Any]:
-        """Enqueue *directive* for target or all *connected_client_ids*."""
-        d = directive if isinstance(directive, UpdateDirective) else UpdateDirective.from_dict(directive)
-        payload = d.to_dict()
-        if not payload["version"]:
-            return {"ok": False, "error": "version required", "delivered_to": []}
-        targets: list[str] = []
-        with self._lock:
-            tid = payload["target_client_id"]
-            if tid:
-                targets = [tid]
-                self._pending.setdefault(tid, []).append(dict(payload))
-            else:
-                ids = [
-                    str(c or "").strip()
-                    for c in (connected_client_ids or [])
-                    if str(c or "").strip()
-                ]
-                if not ids:
-                    # No live sessions — keep as broadcast for later joiners
-                    self._broadcast.append(dict(payload))
-                    targets = ["*broadcast*"]
-                else:
-                    for cid in ids:
-                        self._pending.setdefault(cid, []).append(dict(payload))
-                    targets = list(ids)
-            for cid in targets:
-                self._delivered.append(
-                    {
-                        "client_id": cid,
-                        "version": payload["version"],
-                        "url": payload["url"],
-                        "at": payload["created_at"],
-                    }
-                )
+        """Product UPDATE_PUSH enqueue is disabled (manual client update only)."""
+        _ = directive, connected_client_ids
         return {
-            "ok": True,
-            "error": "",
-            "delivered_to": targets,
-            "directive": payload,
-            "count": len(targets),
+            "ok": False,
+            "error": (
+                "Client update push is disabled — users update manually from "
+                "the free Suite download / catalog."
+            ),
+            "delivered_to": [],
+            "count": 0,
+            "disabled": True,
         }
 
     def pending_for(self, client_id: str) -> list[dict[str, Any]]:
@@ -221,23 +192,19 @@ def client_receive_update_directives(
 
 
 def apply_client_update_directive(payload: dict[str, Any] | None) -> dict[str, Any]:
-    """Pure client handler: validate and normalize a received update payload.
+    """Client push-apply removed — residual UPDATE_PUSH is not product-applied.
 
-    Product UI may show an upgrade banner from the returned ``store`` dict.
+    Catalog upgrade notice (manual download) remains a separate UI path.
     """
-    if not payload or not isinstance(payload, dict):
-        return {"ok": False, "error": "empty", "store": None}
-    d = UpdateDirective.from_dict(payload)
-    if not d.version:
-        return {"ok": False, "error": "version required", "store": None}
-    store = {
-        "pending_update_version": d.version,
-        "pending_update_url": d.url,
-        "pending_update_message": d.message,
-        "pending_update_at": d.created_at,
-        "kind": "rpt_client_update",
+    _ = payload
+    return {
+        "ok": True,
+        "skipped": True,
+        "error": "",
+        "store": None,
+        "reason": "client update push disabled — update manually",
+        "disabled": True,
     }
-    return {"ok": True, "error": "", "store": store, "directive": d.to_dict()}
 
 
 def pack_update_push_json(directive: UpdateDirective | dict[str, Any]) -> bytes:

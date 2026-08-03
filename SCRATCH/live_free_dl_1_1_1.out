@@ -1,0 +1,30 @@
+=== free suite 302 probe 2026-08-03T06:02:23Z ===
+windows: HTTP 404 hit_1.1.1=False loc=None
+android: HTTP 404 hit_1.1.1=False loc=None
+macos: HTTP 404 hit_1.1.1=False loc=None
+ios: HTTP 404 hit_1.1.1=False loc=None
+linux: HTTP 404 hit_1.1.1=False loc=None
+api/status b'{"title": "RESTORE PRIVACY SUITE"}'
+hit_count=0/5 attempt=1
+windows: HTTP 502 hit_1.1.1=False loc=None
+android: HTTP 502 hit_1.1.1=False loc=None
+macos: HTTP 502 hit_1.1.1=False loc=None
+ios: HTTP 502 hit_1.1.1=False loc=None
+linux: HTTP 502 hit_1.1.1=False loc=None
+api/status ERR HTTP Error 502: Bad Gateway
+hit_count=0/5 attempt=2
+windows: HTTP 502 hit_1.1.1=False loc=None
+android: HTTP 502 hit_1.1.1=False loc=None
+macos: HTTP 502 hit_1.1.1=False loc=None
+ios: HTTP 502 hit_1.1.1=False loc=None
+linux: HTTP 502 hit_1.1.1=False loc=None
+api/status ERR HTTP Error 502: Bad Gateway
+hit_count=0/5 attempt=3
+windows: status=200 hit_1.1.1=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.1/restore-privacy-client-1.1.1-windows-x64-setup.exe?exp=1785737917&n=ed8ba49a69c8cdbd&sig=92db8209da54fa2f809939e7e5d3ff8a1369f4497
+android: status=200 hit_1.1.1=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.1/restore-privacy-client-1.1.1-android.apk?exp=1785737919&n=5a427eb54ef10810&sig=f91565f2ef4f95742b1b27072c3b89bf00389580d3d6f15223f
+macos: status=200 hit_1.1.1=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.1/restore-privacy-client-1.1.1-macos.zip?exp=1785737920&n=fc0925f9bb2b47ec&sig=830137dbaf77fabb7be7f7024187167691855820ba63e19b137dc
+ios: status=200 hit_1.1.1=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.1/restore-privacy-client-1.1.1-ios.zip?exp=1785737921&n=f464523ec095fdca&sig=65a3450fd7ce37d53989c60ca8113d00f2577df1282ddd9126b465e
+linux: status=200 hit_1.1.1=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.1/restore-privacy-client-1.1.1-linux-x64.tar.gz?exp=1785737923&n=6f4debf715478c2e&sig=9ac1a450939dbe8dcd97dec964364f84ee67e342e5bc82
+api/status b'{"title": "RESTORE PRIVACY SUITE"}'
+hit_count=5/5 attempt=4
+PROBE_OK free suite 1.1.1 live 5/5 basenames + Helsinki signed delivery

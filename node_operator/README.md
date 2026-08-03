@@ -19,7 +19,7 @@ python3 -m node_operator --no-browser --port 18765
 
 | Mode | Behaviour |
 |------|-----------|
-| **lab** | In-memory sessions + priority / update-push admin. **Honest on macOS** (no Linux TUN). |
+| **lab** | In-memory sessions + priority admin. **Honest on macOS** (no Linux TUN). |
 | **full** | Spawns `python -m node` (needs Linux `/dev/net/tun`). May error on Mac. |
 
 ## Admin features
@@ -30,7 +30,8 @@ python3 -m node_operator --no-browser --port 18765
 - **Upload packages to host** — manual **stage + upload** of catalog installers to the
   Helsinki paid store (`scripts/host_paid_assets_vps.py`), with dry-run / force /
   allow-missing / install-serve options. Primary path after you build monopin packages.
-- **Push update** — version/url/message directive to connected clients (`UPDATE_PUSH` wire type + client receive path)
+- **Client updates** — residual push-to-clients is **disabled**; users update manually
+  from free Suite download (discrete in-app “new version available” notice only).
 
 ### Upload packages (GUI)
 
@@ -43,6 +44,5 @@ python3 -m node_operator --no-browser --port 18765
 ## Related code
 
 - `node/client_priority.py` — priority store + honour order
-- `node/update_push.py` — operator push + client apply
+- `node/update_push.py` — UPDATE_PUSH enqueue fail-closed (manual update only)
 - `node/operator_admin.py` — controller the GUI drives
-- `client/update_receive.py` — residual frame receive helper

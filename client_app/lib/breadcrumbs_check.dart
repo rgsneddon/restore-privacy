@@ -32,8 +32,8 @@ typedef BreadcrumbsTransport = Future<String> Function(
 
 /// True when Settings allows the CHECK BREADCRUMBS path.
 bool checkBreadcrumbsEnabled(ProductSettings? settings) {
-  if (settings == null) return false;
-  return settings.checkBreadcrumbs;
+  // Product push-receive removed — always off
+  return false;
 }
 
 String monopinFromManifest(Map<String, dynamic>? manifest) {

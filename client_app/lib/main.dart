@@ -25,7 +25,6 @@ import 'suite_account_prompt.dart';
 import 'suite_parts.dart';
 import 'suite_parts_store.dart';
 import 'suite_shell.dart';
-import 'suite_update.dart';
 
 import 'suite_version.dart';
 import 'theme.dart';
@@ -265,9 +264,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _vpn = widget.vpnController ?? VpnController(onStatus: _onStatus);
-    // Residual "Push update to clients" → Suite pending package (Settings-gated).
-    _vpn.onUpdatePush = _onResidualUpdatePush;
-    _vpn.installUpdatePushHandler();
+    // Residual admin UPDATE_PUSH receive removed — manual catalog update only.
     // macOS menu bar tray → Flutter Disconnect / Show
     _macWindow.setHandlers(
       onTrayDisconnect: () {
@@ -939,7 +936,6 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       if (!mounted) return;
       if (ok) {
         // Residual push may have delivered a Suite package while HELLO ran.
-        await _pollSuiteUpdatePush();
       }
       if (!mounted) return;
       setState(() {
@@ -1044,7 +1040,6 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     }
     if (snap.connected) {
       // Pull any residual operator push that arrived while backgrounded.
-      unawaited(_pollSuiteUpdatePush());
       _startResidualWatchdog();
     } else {
       _stopResidualWatchdog();
@@ -1146,47 +1141,6 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       }
     });
     _scrollLogToEnd();
-  }
-
-  /// Residual UPDATE_PUSH / operator poll result → gated Suite pending store.
-  Future<void> _onResidualUpdatePush(dynamic raw) async {
-    final r = await handleProductionUpdatePush(
-      settings: _settings,
-      rawPayload: raw,
-    );
-    if (!mounted) return;
-    if (r['store'] is Map) {
-      final store = Map<String, dynamic>.from(r['store'] as Map);
-      final ver = store[kPendingUpdateVersionKey] ?? store['version'] ?? '';
-      _append(
-        'Suite update pending v$ver — click “$kSuiteUpdateUnpackButtonLabel” '
-        'when you are ready (Settings self-update is on).',
-      );
-      setState(() => _suiteUpdateReloadToken++);
-    } else if (r['skipped'] == true) {
-      _append(
-        'Update push ignored — ${r['reason'] ?? 'Suite self-update off'}. '
-        'Enable “$kSuiteUpdateSettingsTitle” in Settings to receive packages.',
-      );
-    } else if (r['ok'] != true) {
-      _append('Update push not applied: ${r['error'] ?? 'unknown'}');
-    }
-  }
-
-  /// After Connect / rehydrate: poll native queue for Suite package directive.
-  Future<void> _pollSuiteUpdatePush() async {
-    _vpn.settingsForUpdatePush = _settings;
-    final r = await _vpn.pollAndApplyUpdatePush(settings: _settings);
-    if (!mounted) return;
-    if (r['store'] is Map) {
-      final store = Map<String, dynamic>.from(r['store'] as Map);
-      final ver = store[kPendingUpdateVersionKey] ?? '';
-      _append(
-        'Received Suite update v$ver from residual push — '
-        'use “$kSuiteUpdateUnpackButtonLabel”.',
-      );
-      setState(() => _suiteUpdateReloadToken++);
-    }
   }
 
   void _append(String msg) {
@@ -1455,8 +1409,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
               // Suite self-update honesty + unpack lives under Settings
               // ("Allow Suite self-update"), not on VPN home.
               // Catalog monopin banner only when Suite self-update opt-in is on.
-              if (!tight && _settings.checkBreadcrumbs)
-                UpgradeBanner(runningVersion: kSuiteVersion),
+              // Discrete old-version notice (manual download) — not push-receive.
+              if (!tight) UpgradeBanner(runningVersion: kSuiteVersion),
               Container(
                 decoration: BoxDecoration(
                   color: suitePanelBgOf(context),

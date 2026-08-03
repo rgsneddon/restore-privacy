@@ -15,12 +15,9 @@ import 'node_ping.dart';
 import 'node_wipe_timer_panel.dart';
 import 'registration_copy.dart';
 import 'rpt_config.dart';
-import 'breadcrumbs_check.dart';
 import 'settings_store.dart';
 import 'suite_parts.dart';
 import 'suite_parts_store.dart';
-import 'suite_update.dart';
-import 'suite_update_panel.dart';
 import 'suite_usage.dart';
 import 'theme.dart';
 import 'transparency_copy.dart';
@@ -504,50 +501,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
+  /// Residual push-receive / CHECK BREADCRUMBS removed — no-op (always off).
   Future<void> _setCheckBreadcrumbs(bool value) async {
     setState(() {
       _busy = true;
-      _settings = _settings.copyWith(checkBreadcrumbs: value);
+      _settings = _settings.copyWith(checkBreadcrumbs: false);
     });
     await widget.store.save(_settings);
-    if (value) {
-      // Live path: enabled → fetch Helsinki breadcrumbs + apply pending update.
-      try {
-        final crumbsR = await onCheckBreadcrumbsSettingChanged(
-          enabled: true,
-          settings: _settings,
-          productVersion: RptConfig.productVersion,
-        );
-        if (crumbsR['skipped'] == true) {
-          _note =
-              '$kSuiteUpdateSettingsTitle on — ${crumbsR['reason'] ?? 'ok'}.';
-        } else if (crumbsR['ok'] == true && crumbsR['store'] != null) {
-          final store = crumbsR['store'] as Map?;
-          final ver = store?['pending_update_version'] ?? crumbsR['monopin'];
-          _note =
-              '$kSuiteUpdateSettingsTitle on — pending update v$ver '
-              '(${store?['pending_update_url'] ?? ''}). '
-              'Use “$kSuiteUpdateUnpackButtonLabel” below in this Settings section.';
-        } else {
-          _note =
-              '$kSuiteUpdateSettingsTitle on — fetch/apply: '
-              '${crumbsR['error'] ?? 'check failed'}';
-        }
-        // Best-effort native notify (platforms may no-op).
-        try {
-          await _channel.invokeMethod<dynamic>('checkBreadcrumbs', {
-            'enabled': true,
-          });
-        } on MissingPluginException {
-          // Dart path above is authoritative when native is absent.
-        } catch (_) {}
-      } catch (e) {
-        _note = '$kSuiteUpdateSettingsTitle on — saved; check path error: $e';
-      }
-    } else {
-      _note =
-          '$kSuiteUpdateSettingsTitle off — no push-update receive or unpack.';
-    }
+    _note =
+        'Suite self-update receive is disabled — update manually from free Suite download.';
     widget.onChanged?.call(_settings);
     if (mounted) setState(() => _busy = false);
   }
@@ -923,27 +885,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
-                  key: const Key(kSuiteUpdateSettingsSwitchMarker),
-                  title: Text(
-                    kSuiteUpdateSettingsTitle,
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(kSuiteUpdateSettingsSubtitle),
-                  value: _settings.checkBreadcrumbs,
-                  activeThumbColor: suiteOnPrimaryOf(context),
-                  activeTrackColor: suitePrimaryOf(context),
-                  onChanged: _busy ? null : _setCheckBreadcrumbs,
-                ),
-                // Honesty explainer + unpack/relaunch under self-update opt-in.
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                  child: SuiteUpdateHonestyPanel(
-                    settings: _settings,
-                    reloadToken: widget.suiteUpdateReloadToken,
-                  ),
-                ),
-                const Divider(height: 1),
-                SwitchListTile(
                   key: const Key('suite_appearance_light_switch'),
                   title: Text(
                     'Light appearance',
@@ -966,9 +907,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Startup and autoconnect default off. Seamless power-up needs both on '
             '(startup launches the app; autoconnect starts the VPN). '
             'OS VPN permission / Administrator may still be required. '
-            '$kSuiteUpdateSettingsTitle defaults off — no push-update receive or '
-            'unpack until you allow it. Unpacking still requires your click on '
-            '$kSuiteUpdateUnpackButtonLabel in this Settings self-update section. '
+            'Suite updates are manual — download the latest free Suite package when '
+            'the in-app “new version available” notice appears. '
             'Appearance (dark/light) is only changed in this Settings panel.',
             style: TextStyle(color: suiteTextMutedOf(context), fontSize: 12),
           ),

@@ -313,19 +313,11 @@ def render_admin_node_operator_page_html(
     try:
         from node_operator.client_visuals import render_connected_clients_visual_html
 
+        # Per-client residual UPDATE_PUSH forms removed (manual client update).
         clients_visual = render_connected_clients_visual_html(
             sessions,
             id_prefix="admin-node-op-client",
-            update_push={
-                "form_action": ADMIN_NODE_OPERATOR_POST_PATH,
-                "version": catalog_ver,
-                "url": "https://restoreprivacy.online/",
-                "message": "",
-                "hidden_fields": {
-                    "node": node["id"],
-                    "action": "push_update",
-                },
-            },
+            update_push=None,
         )
     except Exception as exc:  # noqa: BLE001
         clients_visual = (
@@ -536,25 +528,13 @@ def render_admin_node_operator_page_html(
     </form>
   </section>
 
-  <section class="card nested" id="admin-node-op-push" data-push-update="1">
-    <h3>Push update to clients</h3>
+  <section class="card nested" id="admin-node-op-push" data-push-update="0" data-client-push-disabled="1">
+    <h3>Client updates (manual only)</h3>
     <p class="muted" id="admin-node-op-push-blurb">
-      Residual <strong>UPDATE_PUSH</strong> directive after packages are on the host.
-      Clients apply when Settings has <strong>CHECK BREADCRUMBS</strong> enabled.
+      Residual client update push is <strong>disabled</strong>. Upload packages to
+      Helsinki; users update manually from free Suite download. Older clients still
+      see a discrete “new version available” notice in-app.
     </p>
-    <form method="post" action="{action}" id="admin-node-op-push-form">
-      <input type="hidden" name="node" value="{node_q}"/>
-      <input type="hidden" name="action" value="push_update"/>
-      <label for="admin-node-op-push-version">Update directive version</label>
-      <input id="admin-node-op-push-version" name="version" required value="{_escape(catalog_ver)}"/>
-      <label for="admin-node-op-push-url">URL</label>
-      <input id="admin-node-op-push-url" name="url" placeholder="https://restoreprivacy.online/"/>
-      <label for="admin-node-op-push-message">Message</label>
-      <input id="admin-node-op-push-message" name="message"/>
-      <label for="admin-node-op-push-target">Target client (empty = all lab sessions)</label>
-      <input id="admin-node-op-push-target" name="target_client_id"/>
-      <button type="submit" id="admin-node-op-push-btn">Push update to clients</button>
-    </form>
   </section>
 
   <section class="card nested" id="admin-node-op-delivery">
@@ -667,15 +647,11 @@ def handle_admin_node_operator_action(
             return False, str(exc), node["id"]
         return True, f"Priority set → {r['priority']}", node["id"]
     if action == "push_update":
-        r = ctrl.push_update(
-            version=form.get("version") or "",
-            url=form.get("url") or "",
-            message=form.get("message") or "",
-            target_client_id=form.get("target_client_id") or "",
+        return (
+            False,
+            "Client update push is disabled — users update manually from free Suite download.",
+            node["id"],
         )
-        if not r.get("ok"):
-            return False, str(r.get("error") or "push failed"), node["id"]
-        return True, f"Pushed to {r.get('count')} target(s)", node["id"]
     if action in ("upload_packages", "push_suite_packages"):
         ver = (form.get("version") or "").strip() or ctrl.catalog_version_default()
         if action == "push_suite_packages":

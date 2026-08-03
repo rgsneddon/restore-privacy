@@ -1,0 +1,39 @@
+=== free suite 302 probe attempt=1 2026-08-03T16:04:59Z ===
+windows: status=302 hit_1.1.3=False loc=https://135.181.152.10.sslip.io/paid-assets/1.1.2/restore-privacy-client-1.1.2-windows-x64-setup.exe?exp=1785773999&n=e67c65a973409e39&sig=508d4be3740ab648183f9592cc163ea7f87e787a2cf7187d21988b14993d04e9
+android: status=302 hit_1.1.3=False loc=https://135.181.152.10.sslip.io/paid-assets/1.1.2/restore-privacy-client-1.1.2-android.apk?exp=1785774001&n=118970525fbf2799&sig=10bfb168a0f20e25369e52347824dc5bd8b85f1b9cdb54cd5d1f5064652c01e8
+macos: status=302 hit_1.1.3=False loc=https://135.181.152.10.sslip.io/paid-assets/1.1.2/restore-privacy-client-1.1.2-macos.zip?exp=1785774002&n=e4b7ba916b28ab46&sig=93205fe4e273dfbc3b0ea1329fbf33e6d85db3d65c36d3b1be4dc1817211a5d5
+ios: status=302 hit_1.1.3=False loc=https://135.181.152.10.sslip.io/paid-assets/1.1.2/restore-privacy-client-1.1.2-ios.zip?exp=1785774004&n=9d809f1de6f9043e&sig=15133e4d096528755e428c44578207224ceefcfeb32781155691f821b1d72dc2
+linux: status=302 hit_1.1.3=False loc=https://135.181.152.10.sslip.io/paid-assets/1.1.2/restore-privacy-client-1.1.2-linux-x64.tar.gz?exp=1785774005&n=abe5ddd09a23f92e&sig=03a92e848ea46a0e039599b5a2e418d6afb878d5cc9c9056c7937f5fc0312762
+api/status 200 b'{"title": "RESTORE PRIVACY SUITE"}'
+hit_count=0/5
+=== free suite 302 probe attempt=2 2026-08-03T16:05:22Z ===
+windows: status=502 hit_1.1.3=False loc=None
+android: status=502 hit_1.1.3=False loc=None
+macos: status=502 hit_1.1.3=False loc=None
+ios: status=502 hit_1.1.3=False loc=None
+linux: status=502 hit_1.1.3=False loc=None
+api/status ERR HTTP Error 502: Bad Gateway
+hit_count=0/5
+=== free suite 302 probe attempt=3 2026-08-03T16:05:43Z ===
+windows: status=502 hit_1.1.3=False loc=None
+android: status=502 hit_1.1.3=False loc=None
+macos: status=502 hit_1.1.3=False loc=None
+ios: status=502 hit_1.1.3=False loc=None
+linux: status=502 hit_1.1.3=False loc=None
+api/status ERR HTTP Error 502: Bad Gateway
+hit_count=0/5
+=== free suite 302 probe attempt=4 2026-08-03T16:06:00Z ===
+windows: status=302 hit_1.1.3=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.3/restore-privacy-client-1.1.3-windows-x64-setup.exe?exp=1785774061&n=ec7442084ba2d4e2&sig=77d3242de5cc02c4dca2b910a5f02033b139ca76c85af3f10cb4d083c535232f
+android: status=302 hit_1.1.3=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.3/restore-privacy-client-1.1.3-android.apk?exp=1785774062&n=4d9589111f0f5519&sig=b051980409f83be4b68fb56f8f77ce6c692a4526a4ecc0a281d86f3ab039127b
+macos: status=302 hit_1.1.3=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.3/restore-privacy-client-1.1.3-macos.zip?exp=1785774063&n=8cffb20aaf89fa55&sig=ede1a628a7ea071aff022b3421cbde88555aab88bf5193499d3997b3db8aa77f
+ios: status=302 hit_1.1.3=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.3/restore-privacy-client-1.1.3-ios.zip?exp=1785774064&n=a5462d68c20ea93e&sig=7d9f66049d7b7c15645a448aa46404620f42f5bb446aee28c5eaea1b9f3960a7
+linux: status=302 hit_1.1.3=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.3/restore-privacy-client-1.1.3-linux-x64.tar.gz?exp=1785774065&n=ba5460ece2af4e89&sig=2dec624c11fb5980a828bb66bc2589b378bedd7ecb2b505b8dfee122b95645b9
+api/status 200 b'{"title": "RESTORE PRIVACY SUITE"}'
+hit_count=5/5
+=== signed URL range GET 2026-08-03T16:06:06Z ===
+windows: range_status=200 cl=38631642 body0=b'MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff\x00\x00'
+android: range_status=200 cl=85388314 body0=b'PK\x03\x04\x00\x00\x00\x00\x08\x00!\x08!\x02\x9b\xce'
+macos: range_status=200 cl=27846194 body0=b'PK\x03\x04\n\x00\x00\x00\x00\x00vM\x02]\x00\x00'
+ios: range_status=200 cl=13241240 body0=b'PK\x03\x04\x14\x00\x00\x00\x08\x00Zz\x02]\xd2\xa0'
+linux: range_status=200 cl=14636754 body0=b'\x1f\x8b\x08\x08#8lj\x02\xffrestor'
+PROBE_OK free suite 1.1.3 live 5/5 basenames + Helsinki signed delivery

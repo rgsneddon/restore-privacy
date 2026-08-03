@@ -1,0 +1,5 @@
+00:00 +0: loading /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart
+00:00 +0: generateSuiteSeedWords is real BIP39 not wordNN stub
+00:00 +1: attachAndPublishSuiteSeedForUser writes restorable envelope
+00:09 +2: FirstRunPortal seed step uses real generate + attach (not wordNN)
+00:16 +3: All tests passed!

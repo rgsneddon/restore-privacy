@@ -3660,72 +3660,20 @@ class Handler(BaseHTTPRequestHandler):
             if not is_authenticated(self.headers):
                 self._send(200, "text/html; charset=utf-8", render_login_html())
                 return
-            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
-            multi = urllib.parse.parse_qs(body.decode("utf-8", "replace"))
-            from admin_node_operator import get_operator_controller
             from admin_panel import render_admin_uploads_page_html
 
-            ctrl = get_operator_controller()
-            ver = (form.get("version") or "").strip() or ctrl.catalog_version_default()
-            only = [
-                str(x).strip()
-                for x in (multi.get("package") or multi.get("package[]") or [])
-                if str(x).strip()
-            ]
-            if not only:
-                self._send(
-                    400,
-                    "text/html; charset=utf-8",
-                    render_admin_uploads_page_html(
-                        error=(
-                            "Select at least one Suite package checkbox for "
-                            "client push."
-                        )
-                    ),
-                )
-                return
-            r = ctrl.push_selected_suite_updates_to_clients(
-                version=ver,
-                only_filenames=only,
-                url=(form.get("url") or "").strip(),
-                message=(form.get("message") or "").strip(),
-                target_client_id=(form.get("target_client_id") or "").strip(),
-                require_host_helsinki_match=True,
+            # Product: residual client UPDATE_PUSH removed (manual update only).
+            self._send(
+                410,
+                "text/html; charset=utf-8",
+                render_admin_uploads_page_html(
+                    error=(
+                        "Client update push is disabled. Upload packages to "
+                        "Helsinki only; users update manually from free Suite "
+                        "download."
+                    )
+                ),
             )
-            if r.get("ok"):
-                self._admin_chronoflux_ok(
-                    "push_suite_client_updates",
-                    label="Admin: Push Suite Client Updates",
-                    memo=(
-                        f"v={r.get('version')} platforms={r.get('platforms')} "
-                        f"count={r.get('count')} opt_in={r.get('client_gate')}"
-                    )[:200],
-                    path="/admin/uploads/push-clients",
-                )
-                msg = (
-                    f"Client update directive enqueued for {r.get('suite')} "
-                    f"v{r.get('version')} platforms="
-                    f"{r.get('platform_labels') or r.get('platforms') or 'all'} "
-                    f"delivered_to={r.get('delivered_to')} "
-                    f"(opt-in only: {r.get('client_gate')}; force_install=False; "
-                    f"host/Helsinki match=True)"
-                )
-                self._send(
-                    200,
-                    "text/html; charset=utf-8",
-                    render_admin_uploads_page_html(message=msg),
-                )
-            else:
-                err = str(
-                    r.get("error")
-                    or "Client push cannot be completed (host/Helsinki mismatch "
-                    "or invalid selection)."
-                )
-                self._send(
-                    400,
-                    "text/html; charset=utf-8",
-                    render_admin_uploads_page_html(error=err),
-                )
             return
 
         if path in ("/admin/reissue-download", "/admin/reissue-download/"):

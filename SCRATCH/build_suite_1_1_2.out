@@ -1,0 +1,167 @@
++ flutter build apk --release --build-name=1.1.2 --build-number=1
+Resolving dependencies...
+Downloading packages...
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.2 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+! flutter_secure_storage_windows 3.1.2+stub1 from path ../../git/stubs/flutter_secure_storage_windows (overridden)
+  google_fonts 6.3.3 (8.2.0 available)
+  hooks 2.0.2 (2.1.0 available)
+  intl 0.20.2 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  lints 5.1.1 (6.1.0 available)
+  local_auth 2.3.0 (3.0.2 available)
+  local_auth_android 1.0.56 (2.0.9 available)
+  local_auth_darwin 1.6.1 (2.0.3 available)
+  local_auth_windows 1.0.11 (2.0.1 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+! path_provider_android 2.2.19 (overridden) (2.3.1 available)
+  permission_handler 12.0.3 (13.0.0 available)
+  permission_handler_android 13.0.1 (14.0.0 available)
+  permission_handler_html 0.1.4+0 (0.1.4+1 available)
+  pointycastle 3.9.1 (4.0.0 available)
+  qr 3.0.2 (4.0.0 available)
+  record_use 0.6.0 (1.0.0 available)
+  test_api 0.7.11 (0.7.13 available)
+  vector_math 2.2.0 (2.4.2 available)
+  win32 5.15.0 (6.3.0 available)
+  window_to_front 0.0.4 (1.0.0 available)
+Got dependencies!
+28 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Running Gradle task 'assembleRelease'...                        
+WARNING: Your Android app project: app located at: /Users/russellsneddon/restore-privacy/client_app/android/app/build.gradle.kts
+applies the Kotlin Gradle Plugin, which will cause build failures in future versions of Flutter. 
+Please migrate your app to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers
+
+WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): flutter_web_auth_2, mobile_scanner
+Future versions of Flutter will fail to build if your app uses plugins that apply KGP.
+
+Please check the changelogs of these plugins and upgrade to a version that supports Built-in Kotlin.
+If no such version exists, report the issue to the plugin. If necessary, here is a guide on filing 
+an issue against a plugin: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers#report-incompatible-kotlin-gradle-plugin-usage-to-plugin-authors
+
+If you are a plugin author, please migrate your plugin to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 12456 bytes (99.2% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Running Gradle task 'assembleRelease'...                          133.3s
+✓ Built build/app/outputs/flutter-apk/app-release.apk (85.4MB)
+staged restore-privacy-client-1.1.2-android.apk from /Users/russellsneddon/restore-privacy/client_app/build/app/outputs/flutter-apk/app-release.apk (flutter apk) sha256=fdfc019e3a5f89fe…
++ flutter build macos --release --build-name=1.1.2
+Resolving dependencies...
+Downloading packages...
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.2 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+! flutter_secure_storage_windows 3.1.2+stub1 from path ../../git/stubs/flutter_secure_storage_windows (overridden)
+  google_fonts 6.3.3 (8.2.0 available)
+  hooks 2.0.2 (2.1.0 available)
+  intl 0.20.2 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  lints 5.1.1 (6.1.0 available)
+  local_auth 2.3.0 (3.0.2 available)
+  local_auth_android 1.0.56 (2.0.9 available)
+  local_auth_darwin 1.6.1 (2.0.3 available)
+  local_auth_windows 1.0.11 (2.0.1 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+! path_provider_android 2.2.19 (overridden) (2.3.1 available)
+  permission_handler 12.0.3 (13.0.0 available)
+  permission_handler_android 13.0.1 (14.0.0 available)
+  permission_handler_html 0.1.4+0 (0.1.4+1 available)
+  pointycastle 3.9.1 (4.0.0 available)
+  qr 3.0.2 (4.0.0 available)
+  record_use 0.6.0 (1.0.0 available)
+  test_api 0.7.11 (0.7.13 available)
+  vector_math 2.2.0 (2.4.2 available)
+  win32 5.15.0 (6.3.0 available)
+  window_to_front 0.0.4 (1.0.0 available)
+Got dependencies!
+28 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+The following plugins do not support Swift Package Manager for macos:
+  - flutter_secure_storage_macos
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Building macOS application...                                   
+warning: Code asset "package:objective_c/objective_c.dylib" has different framework names for different architectures. Picking "objective_c.framework" and ignoring "objective_c1.framework". This is likely an issue in the package providing the asset. Please report this to the package maintainers and ensure the "build.dart" hook produces consistent filenames.
+Project /Users/russellsneddon/restore-privacy/client_app built and packaged successfully.
+warning: Run script build phase 'Ad-hoc sign PacketTunnel' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'PacketTunnel' from project 'Runner')
+✓ Built build/macos/Build/Products/Release/restore_privacy_client.app (66.0MB)
+staged restore-privacy-client-1.1.2-macos.zip flutter macos zip sha256=50c343addc48d269…
++ flutter build ios --release --no-codesign --build-name=1.1.2
+Resolving dependencies...
+Downloading packages...
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.2 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+! flutter_secure_storage_windows 3.1.2+stub1 from path ../../git/stubs/flutter_secure_storage_windows (overridden)
+  google_fonts 6.3.3 (8.2.0 available)
+  hooks 2.0.2 (2.1.0 available)
+  intl 0.20.2 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  lints 5.1.1 (6.1.0 available)
+  local_auth 2.3.0 (3.0.2 available)
+  local_auth_android 1.0.56 (2.0.9 available)
+  local_auth_darwin 1.6.1 (2.0.3 available)
+  local_auth_windows 1.0.11 (2.0.1 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+! path_provider_android 2.2.19 (overridden) (2.3.1 available)
+  permission_handler 12.0.3 (13.0.0 available)
+  permission_handler_android 13.0.1 (14.0.0 available)
+  permission_handler_html 0.1.4+0 (0.1.4+1 available)
+  pointycastle 3.9.1 (4.0.0 available)
+  qr 3.0.2 (4.0.0 available)
+  record_use 0.6.0 (1.0.0 available)
+  test_api 0.7.11 (0.7.13 available)
+  vector_math 2.2.0 (2.4.2 available)
+  win32 5.15.0 (6.3.0 available)
+  window_to_front 0.0.4 (1.0.0 available)
+Got dependencies!
+28 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Warning: Building for device with codesigning disabled. You will have to manually codesign before deploying to device.
+Building com.restoreprivacy.restorePrivacyClient for device (ios-release)...
+The following plugins do not support Swift Package Manager for ios:
+  - flutter_secure_storage
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           38.5s
+✓ Built build/ios/iphoneos/Runner.app (29.0MB)
+/Users/russellsneddon/restore-privacy/client_app/build/ios/iphoneos/Runner.app/Frameworks/App.framework: replacing existing signature
+/Users/russellsneddon/restore-privacy/client_app/build/ios/iphoneos/Runner.app/Frameworks/Flutter.framework: replacing existing signature
+/Users/russellsneddon/restore-privacy/client_app/build/ios/iphoneos/Runner.app/Frameworks/objective_c.framework: replacing existing signature
+/Users/russellsneddon/restore-privacy/client_app/build/ios/iphoneos/Runner.app/PlugIns/PacketTunnel.appex: replacing existing signature
+injected node_elgamal.pub -> /Users/russellsneddon/restore-privacy/client_app/build/ios/iphoneos/Runner.app/secrets/node_elgamal.pub (256 bytes)
+injected de_node_elgamal.pub -> /Users/russellsneddon/restore-privacy/client_app/build/ios/iphoneos/Runner.app/secrets/de_node_elgamal.pub (256 bytes)
+injected exit_node_elgamal.pub -> /Users/russellsneddon/restore-privacy/client_app/build/ios/iphoneos/Runner.app/secrets/exit_node_elgamal.pub (256 bytes)
+inject PacketTunnel appex: PacketTunnel.appex
+injected node_elgamal.pub -> /Users/russellsneddon/restore-privacy/client_app/build/ios/iphoneos/Runner.app/PlugIns/PacketTunnel.appex/secrets/node_elgamal.pub (256 bytes)
+injected de_node_elgamal.pub -> /Users/russellsneddon/restore-privacy/client_app/build/ios/iphoneos/Runner.app/PlugIns/PacketTunnel.appex/secrets/de_node_elgamal.pub (256 bytes)
+injected exit_node_elgamal.pub -> /Users/russellsneddon/restore-privacy/client_app/build/ios/iphoneos/Runner.app/PlugIns/PacketTunnel.appex/secrets/exit_node_elgamal.pub (256 bytes)
+ios residual pins injected -> /Users/russellsneddon/restore-privacy/client_app/build/ios/iphoneos/Runner.app/secrets (node_elgamal.pub=256B)
+ios Distribution codesign OK identity='Apple Distribution: Russell Sneddon (SFCBP95595)'
+staged restore-privacy-client-1.1.2-ios.zip flutter ios zip sha256=d140e9b20baa4d43…
+staged restore-privacy-client-1.1.2-windows-x64-setup.exe from /Users/russellsneddon/restore-privacy/releases/1.1.1/restore-privacy-client-1.1.1-windows-x64-setup.exe (carry-forward from 1.1.1) sha256=3634e9751cb66669…
+staged restore-privacy-client-1.1.2-linux-x64.tar.gz from /Users/russellsneddon/restore-privacy/releases/1.1.1/restore-privacy-client-1.1.1-linux-x64.tar.gz (carry-forward from 1.1.1) sha256=d66e4b2c1facf4ca…
+manifest=/Users/russellsneddon/restore-privacy/releases/1.1.2/manifest.json
+status_assets /Users/russellsneddon/restore-privacy/status_page/assets/1.1.2/restore-privacy-client-1.1.2-android.apk
+status_assets /Users/russellsneddon/restore-privacy/status_page/assets/1.1.2/restore-privacy-client-1.1.2-macos.zip
+status_assets /Users/russellsneddon/restore-privacy/status_page/assets/1.1.2/restore-privacy-client-1.1.2-ios.zip
+status_assets /Users/russellsneddon/restore-privacy/status_page/assets/1.1.2/restore-privacy-client-1.1.2-windows-x64-setup.exe
+status_assets /Users/russellsneddon/restore-privacy/status_page/assets/1.1.2/restore-privacy-client-1.1.2-linux-x64.tar.gz
+alias restore-privacy-suite-1.1.2-android.apk
+alias restore-privacy-suite-1.1.2-macos.zip
+alias restore-privacy-suite-1.1.2-ios.zip
+alias restore-privacy-suite-1.1.2-windows-x64-setup.exe
+alias restore-privacy-suite-1.1.2-linux-x64.tar.gz
+OK suite 1.1.2 packages=5 dir=/Users/russellsneddon/restore-privacy/releases/1.1.2

@@ -20,11 +20,7 @@ const String kKeyResidualIpv4 = 'residual_ipv4';
 /// Residual IPv6 ISP-leak protection while residual is up. Default ON when unset.
 const String kKeyResidualIpv6 = 'residual_ipv6';
 const String kKeyEntryCountry = 'entry_country';
-/// Opt-in: Suite self-update / push-receive / CHECK BREADCRUMBS (unified gate).
-///
-/// Default **off**. When on, residual "Push update to clients" and Helsinki
-/// breadcrumbs may store a pending Suite package; the user still clicks
-/// unpack-and-relaunch under Settings (Allow Suite self-update).
+/// Legacy prefs key (push-receive removed). Always treated as off.
 const String kKeyCheckBreadcrumbs = 'check_breadcrumbs';
 /// Suite appearance: `dark` (default, Evolve look) or `light` — Settings only.
 const String kKeySuiteAppearance = 'suite_appearance';

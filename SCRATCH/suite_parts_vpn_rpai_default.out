@@ -1,0 +1,65 @@
+Resolving dependencies...
+Downloading packages...
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.2 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+! flutter_secure_storage_windows 3.1.2+stub1 from path ../../git/stubs/flutter_secure_storage_windows (overridden)
+  google_fonts 6.3.3 (8.2.0 available)
+  hooks 2.0.2 (2.1.0 available)
+  intl 0.20.2 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  lints 5.1.1 (6.1.0 available)
+  local_auth 2.3.0 (3.0.2 available)
+  local_auth_android 1.0.56 (2.0.9 available)
+  local_auth_darwin 1.6.1 (2.0.3 available)
+  local_auth_windows 1.0.11 (2.0.1 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+! path_provider_android 2.2.19 (overridden) (2.3.1 available)
+  permission_handler 12.0.3 (13.0.0 available)
+  permission_handler_android 13.0.1 (14.0.0 available)
+  permission_handler_html 0.1.4+0 (0.1.4+1 available)
+  pointycastle 3.9.1 (4.0.0 available)
+  qr 3.0.2 (4.0.0 available)
+  record_use 0.6.0 (1.0.0 available)
+  test_api 0.7.11 (0.7.13 available)
+  vector_math 2.2.0 (2.4.2 available)
+  win32 5.15.0 (6.3.0 available)
+  window_to_front 0.0.4 (1.0.0 available)
+Got dependencies!
+28 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart
+00:00 +0: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: suite parts pure policy fresh default: VPN + rpAI; wallet/Evolve off; VPN non-removable
+00:00 +1: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: suite parts pure policy fresh main-bar destinations are VPN then rpAI only
+00:00 +2: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: suite parts pure policy install wallet expands main-bar destinations from VPN+rpAI
+00:00 +3: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: suite parts pure policy fromJson and store load: fresh is VPN+rpAI; explicit false wins
+00:00 +4: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: suite parts pure policy uninstall confirm gate requires exact part name (rpOS-style)
+00:00 +5: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: suite parts pure policy store persists uninstall only with valid confirm phrase
+00:00 +6: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: suite parts pure policy store setInstalled from fresh installs optional without KEYGEN wall
+00:00 +7: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: usage formatters and reporter path formatSuiteDiskUsage and formatSuiteProcessPercent
+00:00 +8: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: usage formatters and reporter path SuiteUsageReporter drives injected probes
+00:00 +9: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: SuiteShell flat family + reinstall wallet off + evolve on: family still on main bar via Evolve surfaces
+00:00 +10: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: SuiteShell flat family + reinstall wallet off + evolve on: family still on main bar via Evolve surfaces
+00:00 +11: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: SuiteShell flat family + reinstall wallet off + evolve on: family still on main bar via Evolve surfaces
+00:00 +12: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: SuiteShell flat family + reinstall wallet off + evolve on: family still on main bar via Evolve surfaces
+00:00 +13: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: SuiteShell flat family + reinstall wallet off + evolve on: family still on main bar via Evolve surfaces
+00:00 +14: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: SuiteShell flat family + reinstall wallet off + evolve on: family still on main bar via Evolve surfaces
+00:00 +15: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: SuiteShell flat family + reinstall wallet off + evolve on: family still on main bar via Evolve surfaces
+00:00 +16: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: SuiteShell flat family + reinstall wallet off + evolve on: family still on main bar via Evolve surfaces
+00:00 +17: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: SuiteShell flat family + reinstall wallet off + evolve on: family still on main bar via Evolve surfaces
+00:00 +18: /Users/russellsneddon/restore-privacy/client_app/test/suite_flat_nav_test.dart: main bar lists promoted tabs; no nested wallet/evolve bars
+00:00 +19: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: SuiteShell flat family + reinstall fresh shell: VPN+rpAI bar until wallet install expands destinations
+00:00 +20: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: SuiteShell flat family + reinstall fresh shell: VPN+rpAI bar until wallet install expands destinations
+00:00 +21: /Users/russellsneddon/restore-privacy/client_app/test/suite_parts_usage_test.dart: SuiteShell flat family + reinstall fresh shell: VPN+rpAI bar until wallet install expands destinations
+00:00 +22: /Users/russellsneddon/restore-privacy/client_app/test/suite_flat_nav_test.dart: production SuiteFamilyHost path: single host, embed shells, no nested bar
+00:00 +23: /Users/russellsneddon/restore-privacy/client_app/test/suite_flat_nav_test.dart: production SuiteFamilyHost path: single host, embed shells, no nested bar
+00:01 +24: /Users/russellsneddon/restore-privacy/client_app/test/suite_flat_nav_test.dart: production SuiteFamilyHost path: single host, embed shells, no nested bar
+00:01 +25: /Users/russellsneddon/restore-privacy/client_app/test/suite_flat_nav_test.dart: production SuiteFamilyHost path: single host, embed shells, no nested bar
+00:01 +26: /Users/russellsneddon/restore-privacy/client_app/test/suite_flat_nav_test.dart: production SuiteFamilyHost path: single host, embed shells, no nested bar
+00:01 +27: /Users/russellsneddon/restore-privacy/client_app/test/suite_flat_nav_test.dart: production SuiteFamilyHost path: single host, embed shells, no nested bar
+00:01 +28: /Users/russellsneddon/restore-privacy/client_app/test/suite_flat_nav_test.dart: SuiteFamilyHost source: timeouts, boot seam, Theme only on body
+00:01 +29: All tests passed!

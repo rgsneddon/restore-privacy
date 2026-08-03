@@ -1,9 +1,8 @@
-/// Suite self-update honesty path: push-receive, Settings opt-in, unpack + relaunch.
+/// Suite update helpers (legacy store + fail-closed push-receive).
 ///
-/// After KEYGEN unlock, Settings (under “Allow Suite self-update”) explains that
-/// the Suite can update itself when required, that the user must click to unpack
-/// and relaunch, that this is the one privacy breach in the Suite, and that it
-/// can be switched off in VPN Settings. Never call the entry unlock a "paywall".
+/// Product residual UPDATE_PUSH / Settings self-update opt-in is **removed**.
+/// Users see the discrete catalog upgrade banner and download manually.
+/// Pending-store helpers remain for tests clearing leftover prefs only.
 library;
 
 import 'dart:convert';
@@ -50,15 +49,17 @@ const String kSuiteUpdateSettingsSubtitle =
     'update. You still click “Unpack update and relaunch” yourself. That path is '
     'the one privacy breach in the Suite — leave off if you prefer no self-update.';
 
-/// Same preference as CHECK BREADCRUMBS / residual update receive (unified gate).
+/// Product residual push-receive is permanently off (manual update only).
+///
+/// [settings] is ignored — admin client UPDATE_PUSH and Settings self-update
+/// opt-in were removed. Catalog upgrade banner remains for old monopin notice.
 bool suiteSelfUpdateEnabled(ProductSettings? settings) {
-  if (settings == null) return false;
-  return settings.checkBreadcrumbs;
+  // settings ignored — product push-receive permanently disabled
+  return false;
 }
 
-/// Default is off (opt-in).
-bool suiteSelfUpdateDefaultIsOff() =>
-    ProductSettings.defaults.checkBreadcrumbs == false;
+/// Self-update receive is always off (no product opt-in).
+bool suiteSelfUpdateDefaultIsOff() => true;
 
 /// True when product copy is complete and never says "paywall".
 bool suiteUpdateCopyIsValid({

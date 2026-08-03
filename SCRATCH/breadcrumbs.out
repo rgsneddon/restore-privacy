@@ -1,0 +1,50 @@
+=== breadcrumbs 1.1.3 2026-08-03T16:03:55Z ===
+staged_vault monopin=1.1.3 dir=/Users/russellsneddon/restore-privacy/dist/breadcrumbs/1.1.3
+needs_any_apple_work=False
+actions=['none_apple_up_to_date']
+staged_vault monopin=1.1.3 dir=/Users/russellsneddon/restore-privacy/dist/breadcrumbs/1.1.3
+needs_any_apple_work=False
+actions=['none_apple_up_to_date']
+publish plan: /Users/russellsneddon/restore-privacy/dist/breadcrumbs/{current,1.1.3} -> /opt/restore-privacy/breadcrumbs/
+$ ssh root@135.181.152.10 sudo -n bash -lc 'mkdir -p /opt/restore-privacy/breadcrumbs/1.1.3 /opt/restore-privacy/breadcrumbs/current'
+$ scp manifest.json -> root@135.181.152.10:/root/bc_manifest.json
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_manifest.json /opt/restore-privacy/breadcrumbs/1.1.3/manifest.json && chmod 644 /opt/re…
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_manifest.json /opt/restore-privacy/breadcrumbs/current/manifest.json && chmod 644 /opt/…
+$ scp honesty.json -> root@135.181.152.10:/root/bc_honesty.json
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_honesty.json /opt/restore-privacy/breadcrumbs/1.1.3/honesty.json && chmod 644 /opt/rest…
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_honesty.json /opt/restore-privacy/breadcrumbs/current/honesty.json && chmod 644 /opt/re…
+$ scp checklist.md -> root@135.181.152.10:/root/bc_checklist.md
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_checklist.md /opt/restore-privacy/breadcrumbs/1.1.3/checklist.md && chmod 644 /opt/rest…
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_checklist.md /opt/restore-privacy/breadcrumbs/current/checklist.md && chmod 644 /opt/re…
+$ scp APPLE_HANDOFF.md -> root@135.181.152.10:/root/bc_APPLE_HANDOFF.md
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_APPLE_HANDOFF.md /opt/restore-privacy/breadcrumbs/1.1.3/APPLE_HANDOFF.md && chmod 644 /…
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_APPLE_HANDOFF.md /opt/restore-privacy/breadcrumbs/current/APPLE_HANDOFF.md && chmod 644…
+$ scp WINDOWS_HANDOFF.md -> root@135.181.152.10:/root/bc_WINDOWS_HANDOFF.md
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_WINDOWS_HANDOFF.md /opt/restore-privacy/breadcrumbs/1.1.3/WINDOWS_HANDOFF.md && chmod 6…
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_WINDOWS_HANDOFF.md /opt/restore-privacy/breadcrumbs/current/WINDOWS_HANDOFF.md && chmod…
+$ scp WINDOWS_BRAND_CHECKLIST.md -> root@135.181.152.10:/root/bc_WINDOWS_BRAND_CHECKLIST.md
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_WINDOWS_BRAND_CHECKLIST.md /opt/restore-privacy/breadcrumbs/1.1.3/WINDOWS_BRAND_CHECKLI…
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_WINDOWS_BRAND_CHECKLIST.md /opt/restore-privacy/breadcrumbs/current/WINDOWS_BRAND_CHECK…
+$ scp windows_brand_mirror.json -> root@135.181.152.10:/root/bc_windows_brand_mirror.json
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_windows_brand_mirror.json /opt/restore-privacy/breadcrumbs/1.1.3/windows_brand_mirror.j…
+$ ssh root@135.181.152.10 sudo -n bash -lc 'cp -f /root/bc_windows_brand_mirror.json /opt/restore-privacy/breadcrumbs/current/windows_brand_mirror…
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; for d in /opt/restore-privacy/breadcrumbs/*; do [ -d "$d" ] || continue; bn=$(basename "$d"); …
+tidy_removed=1.1.2
+tidy_removed=1.1.2
+
+publish_ok host=135.181.152.10 monopin=1.1.3 root=/opt/restore-privacy/breadcrumbs
+fetch: https://135.181.152.10.sslip.io/breadcrumbs/current/manifest.json
+ERROR fetch: Set RPT_ASSET_FETCH_TOKEN (or RPT_BREADCRUMB_TOKEN) to fetch vault
+{
+  "monopin": "1.1.3",
+  "macos_needs_work": false,
+  "ios_needs_work": false,
+  "needs_any_apple_work": false,
+  "macbook_actions": [
+    "none_apple_up_to_date"
+  ],
+  "up_to_date": true,
+  "source_of_truth": "helsinki_breadcrumbs_vault",
+  "github_breadcrumb_flow": "deprecated"
+}
+STATUS: Apple packages up to date for monopin

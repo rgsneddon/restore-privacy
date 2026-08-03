@@ -1,0 +1,48 @@
+catalog=1.1.0 packages=5 probe_at=2026-08-02T22:37:05Z
+GET https://restoreprivacy.online/downloads ERR HTTP Error 404: Not Found
+GET https://restoreprivacy.online/download ERR HTTP Error 403: Forbidden
+
+GET https://restoreprivacy.online/ -> 200 len=7996 final=https://restoreprivacy.online/
+
+GET https://restoreprivacy.online/api/status -> 200 len=34 final=https://restoreprivacy.online/api/status
+GET https://status.restoreprivacy.online/downloads ERR <urlopen error [Errno 8] nodename nor servname provided, or not known>
+GET https://status.restoreprivacy.online/download ERR <urlopen error [Errno 8] nodename nor servname provided, or not known>
+GET https://status.restoreprivacy.online/ ERR <urlopen error [Errno 8] nodename nor servname provided, or not known>
+GET https://status.restoreprivacy.online/api/status ERR <urlopen error [Errno 8] nodename nor servname provided, or not known>
+
+=== package probe via /download/<filename> ===
+HEAD https://restoreprivacy.online/download/restore-privacy-client-1.1.0-windows-x64-setup.exe status=None cl=None loc=None final=None err=HTTP Error 404: Not Found
+HEAD https://restoreprivacy.online/downloads/restore-privacy-client-1.1.0-windows-x64-setup.exe status=None cl=None loc=None final=None err=HTTP Error 404: Not Found
+HEAD https://restoreprivacy.online/assets/1.1.0/restore-privacy-client-1.1.0-windows-x64-setup.exe status=200 cl=None loc=None final=https://restoreprivacy.online/pay?next=%2Fassets%2F1.1.0%2Frestore-privacy-client-1.1.0-windows-x64-setup.exe&product=suite err=None
+HEAD https://restoreprivacy.online/download/restore-privacy-client-1.1.0-android.apk status=None cl=None loc=None final=None err=HTTP Error 404: Not Found
+HEAD https://restoreprivacy.online/downloads/restore-privacy-client-1.1.0-android.apk status=None cl=None loc=None final=None err=HTTP Error 404: Not Found
+HEAD https://restoreprivacy.online/assets/1.1.0/restore-privacy-client-1.1.0-android.apk status=200 cl=None loc=None final=https://restoreprivacy.online/pay?next=%2Fassets%2F1.1.0%2Frestore-privacy-client-1.1.0-android.apk&product=suite err=None
+HEAD https://restoreprivacy.online/download/restore-privacy-client-1.1.0-macos.zip status=None cl=None loc=None final=None err=HTTP Error 404: Not Found
+HEAD https://restoreprivacy.online/downloads/restore-privacy-client-1.1.0-macos.zip status=None cl=None loc=None final=None err=HTTP Error 404: Not Found
+HEAD https://restoreprivacy.online/assets/1.1.0/restore-privacy-client-1.1.0-macos.zip status=200 cl=None loc=None final=https://restoreprivacy.online/pay?next=%2Fassets%2F1.1.0%2Frestore-privacy-client-1.1.0-macos.zip&product=suite err=None
+HEAD https://restoreprivacy.online/download/restore-privacy-client-1.1.0-ios.zip status=None cl=None loc=None final=None err=HTTP Error 404: Not Found
+HEAD https://restoreprivacy.online/downloads/restore-privacy-client-1.1.0-ios.zip status=None cl=None loc=None final=None err=HTTP Error 404: Not Found
+HEAD https://restoreprivacy.online/assets/1.1.0/restore-privacy-client-1.1.0-ios.zip status=200 cl=None loc=None final=https://restoreprivacy.online/pay?next=%2Fassets%2F1.1.0%2Frestore-privacy-client-1.1.0-ios.zip&product=suite err=None
+HEAD https://restoreprivacy.online/download/restore-privacy-client-1.1.0-linux-x64.tar.gz status=None cl=None loc=None final=None err=HTTP Error 404: Not Found
+HEAD https://restoreprivacy.online/downloads/restore-privacy-client-1.1.0-linux-x64.tar.gz status=None cl=None loc=None final=None err=HTTP Error 404: Not Found
+HEAD https://restoreprivacy.online/assets/1.1.0/restore-privacy-client-1.1.0-linux-x64.tar.gz status=200 cl=None loc=None final=https://restoreprivacy.online/pay?next=%2Fassets%2F1.1.0%2Frestore-privacy-client-1.1.0-linux-x64.tar.gz&product=suite err=None
+HEAD https://status.restoreprivacy.online/download/restore-privacy-client-1.1.0-windows-x64-setup.exe status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/downloads/restore-privacy-client-1.1.0-windows-x64-setup.exe status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/assets/1.1.0/restore-privacy-client-1.1.0-windows-x64-setup.exe status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+GET-range https://status.restoreprivacy.online/download/restore-privacy-client-1.1.0-windows-x64-setup.exe status=None cl=None final=None body0=b'' err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/download/restore-privacy-client-1.1.0-android.apk status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/downloads/restore-privacy-client-1.1.0-android.apk status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/assets/1.1.0/restore-privacy-client-1.1.0-android.apk status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+GET-range https://status.restoreprivacy.online/download/restore-privacy-client-1.1.0-android.apk status=None cl=None final=None body0=b'' err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/download/restore-privacy-client-1.1.0-macos.zip status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/downloads/restore-privacy-client-1.1.0-macos.zip status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/assets/1.1.0/restore-privacy-client-1.1.0-macos.zip status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+GET-range https://status.restoreprivacy.online/download/restore-privacy-client-1.1.0-macos.zip status=None cl=None final=None body0=b'' err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/download/restore-privacy-client-1.1.0-ios.zip status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/downloads/restore-privacy-client-1.1.0-ios.zip status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/assets/1.1.0/restore-privacy-client-1.1.0-ios.zip status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+GET-range https://status.restoreprivacy.online/download/restore-privacy-client-1.1.0-ios.zip status=None cl=None final=None body0=b'' err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/download/restore-privacy-client-1.1.0-linux-x64.tar.gz status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/downloads/restore-privacy-client-1.1.0-linux-x64.tar.gz status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+HEAD https://status.restoreprivacy.online/assets/1.1.0/restore-privacy-client-1.1.0-linux-x64.tar.gz status=None cl=None loc=None final=None err=<urlopen error [Errno 8] nodename nor servname provided, or not known>
+GET-range https://status.restoreprivacy.online/download/restore-privacy-client-1.1.0-linux-x64.tar.gz status=None cl=None final=None body0=b'' err=<urlopen error [Errno 8] nodename nor servname provided, or not known>

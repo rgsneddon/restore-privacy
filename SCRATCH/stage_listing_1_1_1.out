@@ -1,0 +1,25 @@
+releases/1.1.1/:
+total 788552
+drwxr-xr-x  13 russellsneddon  staff       416  3 Aug 06:44 .
+drwxr-xr-x  18 russellsneddon  staff       576  3 Aug 06:40 ..
+-rw-r--r--   1 russellsneddon  staff      2056  3 Aug 06:44 manifest.json
+-rw-r--r--   1 russellsneddon  staff  85355546  3 Aug 06:42 restore-privacy-client-1.1.1-android.apk
+-rw-r--r--   1 russellsneddon  staff  13225928  3 Aug 06:44 restore-privacy-client-1.1.1-ios.zip
+-rw-r--r--   1 russellsneddon  staff  14636754  1 Aug 16:50 restore-privacy-client-1.1.1-linux-x64.tar.gz
+-rw-r--r--   1 russellsneddon  staff  49426733  3 Aug 06:43 restore-privacy-client-1.1.1-macos.zip
+-rw-r--r--   1 russellsneddon  staff  38631642  1 Aug 01:51 restore-privacy-client-1.1.1-windows-x64-setup.exe
+-rw-r--r--   1 russellsneddon  staff  85355546  3 Aug 06:42 restore-privacy-suite-1.1.1-android.apk
+-rw-r--r--   1 russellsneddon  staff  13225928  3 Aug 06:44 restore-privacy-suite-1.1.1-ios.zip
+-rw-r--r--   1 russellsneddon  staff  14636754  1 Aug 16:50 restore-privacy-suite-1.1.1-linux-x64.tar.gz
+-rw-r--r--   1 russellsneddon  staff  49426733  3 Aug 06:43 restore-privacy-suite-1.1.1-macos.zip
+-rw-r--r--   1 russellsneddon  staff  38631642  1 Aug 01:51 restore-privacy-suite-1.1.1-windows-x64-setup.exe
+
+status_page/assets/1.1.1/:
+total 393136
+drwxr-xr-x  7 russellsneddon  staff       224  3 Aug 06:44 .
+drwxr-xr-x  6 russellsneddon  staff       192  3 Aug 06:44 ..
+-rw-r--r--  1 russellsneddon  staff  85355546  3 Aug 06:42 restore-privacy-client-1.1.1-android.apk
+-rw-r--r--  1 russellsneddon  staff  13225928  3 Aug 06:44 restore-privacy-client-1.1.1-ios.zip
+-rw-r--r--  1 russellsneddon  staff  14636754  1 Aug 16:50 restore-privacy-client-1.1.1-linux-x64.tar.gz
+-rw-r--r--  1 russellsneddon  staff  49426733  3 Aug 06:43 restore-privacy-client-1.1.1-macos.zip
+-rw-r--r--  1 russellsneddon  staff  38631642  1 Aug 01:51 restore-privacy-client-1.1.1-windows-x64-setup.exe

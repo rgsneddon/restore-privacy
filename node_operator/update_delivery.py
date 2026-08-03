@@ -133,7 +133,7 @@ def render_update_delivery_matrix_html(
          data-catalog-version="{ver}">
   <h3 id="{_esc(prefix)}-matrix-heading">Clients · packages · multihop nodes</h3>
   <p class="muted" id="{_esc(prefix)}-matrix-blurb">
-    Connected clients receive residual <strong>UPDATE_PUSH</strong> (version/url/mechanical
+    Residual client UPDATE_PUSH is <strong>disabled</strong>; packages host on Helsinki only. Historical note: (version/url/mechanical
     directive). Packages are monopin <code>{ver}</code> installers. Clients may dial
     multihop-capable residual peers below to stay residual-connected while checking
     breadcrumbs / applying updates.

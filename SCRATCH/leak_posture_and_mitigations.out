@@ -1,0 +1,62 @@
+=== leak_posture + live path tests 2026-08-03T15:50:15Z ===
+Resolving dependencies...
+Downloading packages...
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.2 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+! flutter_secure_storage_windows 3.1.2+stub1 from path ../../git/stubs/flutter_secure_storage_windows (overridden)
+  google_fonts 6.3.3 (8.2.0 available)
+  hooks 2.0.2 (2.1.0 available)
+  intl 0.20.2 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  lints 5.1.1 (6.1.0 available)
+  local_auth 2.3.0 (3.0.2 available)
+  local_auth_android 1.0.56 (2.0.9 available)
+  local_auth_darwin 1.6.1 (2.0.3 available)
+  local_auth_windows 1.0.11 (2.0.1 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+! path_provider_android 2.2.19 (overridden) (2.3.1 available)
+  permission_handler 12.0.3 (13.0.0 available)
+  permission_handler_android 13.0.1 (14.0.0 available)
+  permission_handler_html 0.1.4+0 (0.1.4+1 available)
+  pointycastle 3.9.1 (4.0.0 available)
+  qr 3.0.2 (4.0.0 available)
+  record_use 0.6.0 (1.0.0 available)
+  test_api 0.7.11 (0.7.13 available)
+  vector_math 2.2.0 (2.4.2 available)
+  win32 5.15.0 (6.3.0 available)
+  window_to_front 0.0.4 (1.0.0 available)
+Got dependencies!
+28 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /Users/russellsneddon/restore-privacy/client_app/test/leak_posture_test.dart
+00:00 +0: evaluateResidualLeakPosture unprotected when residual capture off
+00:00 +1: evaluateResidualLeakPosture minimal only with capture + ipv6 + dns + fresh PASS
+00:00 +2: evaluateResidualLeakPosture stale PASS is not minimal
+00:00 +3: evaluateResidualLeakPosture partial when capture up but ipv6 missing
+00:00 +4: watchdog + private DNS + kill-switch watchdog fails when capture drops while Connected
+00:00 +5: watchdog + private DNS + kill-switch watchdog ok when residual session holds
+00:00 +6: watchdog + private DNS + kill-switch private DNS warning when public resolvers present
+00:00 +7: watchdog + private DNS + kill-switch kill-switch product default off unless opt-in
+00:00 +8: last leak-test persistence SettingsStore saves and loads last leak test
+00:00 +9: copy honesty structural posture strings avoid forbidden absolute-zero phrases
+00:00 +10: live status parse + DNS resolve (no hardcoded true) parseNativeResidualStatus reads residualCapture and dns flags
+00:00 +11: live status parse + DNS resolve (no hardcoded true) dnsTunnelOnly false when native reports false
+00:00 +12: live status parse + DNS resolve (no hardcoded true) dnsTunnelOnly false when residual capture inactive
+00:00 +13: live status parse + DNS resolve (no hardcoded true) public DNS servers fail product DNS plan
+00:00 +14: live status parse + DNS resolve (no hardcoded true) collectProductLeakTestInputs does not invent PASS match
+00:00 +15: live status parse + DNS resolve (no hardcoded true) collectProductLeakTestInputs PASS only with peer IP match
+00:00 +16: live status parse + DNS resolve (no hardcoded true) watchdog fails when dns tunnel posture lost
+00:00 +17: All tests passed!
+=== grep product path (no hardcoded dns/pass invent) ===
+778:    final inputs = await collectProductLeakTestInputs(
+1059:      (_) => unawaited(_tickResidualWatchdog()),
+1061:    unawaited(_tickResidualWatchdog());
+1076:  Future<void> _tickResidualWatchdog() async {
+1093:    final wd = evaluateResidualWatchdog(
+1583:                  key: const Key('home_residual_leak_posture_panel'),
+1610:                        key: const Key('home_residual_leak_posture_headline'),

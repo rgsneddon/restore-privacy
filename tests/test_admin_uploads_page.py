@@ -32,17 +32,13 @@ class TestAdminUploadsPage(unittest.TestCase):
         self.assertIn('id="admin-nav-uploads"', page)
         self.assertIn('href="/admin/uploads"', page)
         self.assertIn('class="sb-btn active" id="admin-nav-uploads"', page)
-        # Dual push actions
+        # Helsinki package upload retained; client residual push removed
         self.assertIn("Push selected packages to Helsinki", page)
-        self.assertIn('id="admin-client-push-form"', page)
-        self.assertIn("/admin/uploads/push-clients", page)
-        self.assertIn("Push selected updates to clients", page)
-        self.assertIn("CHECK BREADCRUMBS", page)
         self.assertIn('id="admin-client-push-section"', page)
-        self.assertIn("client-push-pkg-checkbox", page)
-        self.assertIn("Build host:", page)
-        self.assertIn("Helsinki:", page)
-        self.assertIn("Linux / Arch Linux", page)
+        self.assertIn("admin-client-push-disabled", page)
+        self.assertNotIn('id="admin-client-push-form"', page)
+        self.assertNotIn("Push selected updates to clients", page)
+        self.assertNotIn("CHECK BREADCRUMBS", page)
         # Path browse retained
         self.assertIn('data-path-upload="1"', page)
         self.assertIn("/admin/uploads/upload-path", page)
@@ -168,81 +164,13 @@ class TestAdminUploadsPage(unittest.TestCase):
             self.assertNotIn(u, opts.get("only_filenames") or [])
 
     def test_client_push_opt_in_only(self) -> None:
-        from node.operator_admin import NodeOperatorController
-        from node.update_push import (
-            UpdatePushQueue,
-            apply_client_update_directive,
-            reset_global_update_queue_for_tests,
-        )
-        from suite_client_push import summarize_helsinki_suite_inventory
+        from admin_panel import render_admin_uploads_page_html
 
-        reset_global_update_queue_for_tests()
-        ctrl = NodeOperatorController(repo_root=ROOT)
-        ctrl.updates = UpdatePushQueue()
-        ver = ctrl.catalog_version_default()
-        host = ctrl.suite_host_inventory(version=ver)
-        present = list(host.get("present_filenames") or [])
-        if not present:
-            self.skipTest("no local Suite packages")
-        selected = present[:2]
-        # Matching Helsinki sizes so gate allows push
-        hel = summarize_helsinki_suite_inventory(
-            ver,
-            [
-                {
-                    "filename": fn,
-                    "bytes": host["present_sizes"][fn],
-                    "present": True,
-                }
-                for fn in selected
-            ],
-        )
-        r = ctrl.push_selected_suite_updates_to_clients(
-            version=ver,
-            only_filenames=selected,
-            url="https://restoreprivacy.online/#downloads",
-            message="",
-            require_host_helsinki_match=True,
-            host=host,
-            helsinki=hel,
-        )
-        self.assertTrue(r.get("ok"), r)
-        self.assertTrue(r.get("opt_in_only"))
-        self.assertFalse(r.get("force_install"))
-        self.assertEqual(r.get("client_gate"), "CHECK BREADCRUMBS")
-        self.assertEqual(r.get("version"), ver)
-        self.assertEqual(r.get("only_filenames"), selected)
-        directive = r.get("directive") or {}
-        self.assertEqual(directive.get("version"), ver)
-        self.assertIn("CHECK BREADCRUMBS", r.get("message") or "")
-        self.assertNotIn("force-install", (r.get("message") or "").lower())
+        html = render_admin_uploads_page_html().decode("utf-8", "replace")
+        self.assertIn("disabled", html.lower())
+        self.assertNotIn("Push selected updates to clients", html)
+        self.assertNotIn("CHECK BREADCRUMBS", html)
 
-        pulled = ctrl.client_pull_updates("test-client-1")
-        self.assertGreaterEqual(len(pulled), 1)
-        applied = apply_client_update_directive(pulled[0])
-        self.assertTrue(applied.get("ok"))
-        store = applied.get("store") or {}
-        self.assertEqual(store.get("pending_update_version"), ver)
-        self.assertIn("restoreprivacy.online", store.get("pending_update_url") or "")
-
-        from client.breadcrumbs_check import (
-            KEY_CHECK_BREADCRUMBS,
-            apply_breadcrumbs_update,
-        )
-
-        man = {
-            "schema": "rpt.breadcrumbs.v1",
-            "monopin": ver,
-            "update": directive,
-        }
-        skipped = apply_breadcrumbs_update(
-            settings={KEY_CHECK_BREADCRUMBS: False},
-            product_version="0.0.1",
-            manifest=man,
-        )
-        self.assertTrue(skipped.get("skipped") or skipped.get("ok"))
-        if skipped.get("skipped"):
-            self.assertIn("off", (skipped.get("reason") or "").lower())
 
     def test_path_browse_form_and_dry_run_handler(self) -> None:
         from admin_panel import render_admin_uploads_page_html
@@ -284,7 +212,8 @@ class TestAdminUploadsPage(unittest.TestCase):
         self.assertIn("/admin/uploads/upload-path", app_src)
         self.assertIn("/admin/uploads/push-clients", app_src)
         self.assertIn("render_admin_uploads_page_html", app_src)
-        self.assertIn("push_selected_suite_updates_to_clients", app_src)
+        # Client push path remains registered only to return 410 disabled
+        self.assertIn("Client update push is disabled", app_src)
         self.assertIn("brand_wide=False", app_src)
 
 

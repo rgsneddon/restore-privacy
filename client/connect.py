@@ -854,7 +854,8 @@ class RptClient:
             return ConnectResult(ok=False, state=self.state, message=msg)
 
     def _maybe_check_breadcrumbs_after_connect(self) -> None:
-        """If Settings CHECK BREADCRUMBS is on, run shipped breadcrumbs→update path."""
+        """Residual push-receive removed — no auto breadcrumbs update after Connect."""
+        return
         try:
             from client.breadcrumbs_check import run_check_breadcrumbs_for_product
 

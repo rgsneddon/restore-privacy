@@ -1,0 +1,85 @@
+=== helsinki upload 1.1.3 2026-08-03T15:59:29Z ===
+staged platform=windows /Users/russellsneddon/restore-privacy/status_page/assets/1.1.3/restore-privacy-client-1.1.3-windows-x64-setup.exe (38631642 bytes)
+staged platform=android /Users/russellsneddon/restore-privacy/status_page/assets/1.1.3/restore-privacy-client-1.1.3-android.apk (85388314 bytes)
+macos CFBundleShortVersionString=1.1.3 matches monopin 1.1.3
+staged platform=macos /Users/russellsneddon/restore-privacy/status_page/assets/1.1.3/restore-privacy-client-1.1.3-macos.zip (27846194 bytes)
+staged platform=ios /Users/russellsneddon/restore-privacy/status_page/assets/1.1.3/restore-privacy-client-1.1.3-ios.zip (13241240 bytes)
+staged platform=linux /Users/russellsneddon/restore-privacy/status_page/assets/1.1.3/restore-privacy-client-1.1.3-linux-x64.tar.gz (14636754 bytes)
+tidy_stage_removed /Users/russellsneddon/restore-privacy/status_page/assets/1.1.2
+upload plan: 5/5 files -> 135.181.152.10:/opt/restore-privacy/paid_assets/1.1.3/
+  windows: restore-privacy-client-1.1.3-windows-x64-setup.exe
+  android: restore-privacy-client-1.1.3-android.apk
+  macos: restore-privacy-client-1.1.3-macos.zip
+  ios: restore-privacy-client-1.1.3-ios.zip
+  linux: restore-privacy-client-1.1.3-linux-x64.tar.gz
+macos CFBundleShortVersionString=1.1.3 matches monopin 1.1.3
+transport=openssh key=/Users/russellsneddon/.ssh/id_ed25519_restore_privacy_eu
+$ ssh root@135.181.152.10 sudo -n bash -lc 'mkdir -p /opt/restore-privacy/paid_assets/1.1.3 && chown -R root:root /opt/restore-privacy/paid_assets…
+upload platform=windows file=restore-privacy-client-1.1.3-windows-x64-setup.exe (38631642 bytes)
+  scp attempt 1: restore-privacy-client-1.1.3-windows-x64-setup.exe (38631642 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.3-windows-x64-setup.exe
+$ scp restore-privacy-client-1.1.3-windows-x64-setup.exe -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.3-windows-x64-setup.exe
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-client-1.1.3-windows-x64-setup.exe; SZ=$(stat -c%s /root…
+size_ok=38631642
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.1.3/restore-privacy-client-1.1.3-windows…
+38631642
+  remote_ok restore-privacy-client-1.1.3-windows-x64-setup.exe bytes=38631642
+upload platform=android file=restore-privacy-client-1.1.3-android.apk (85388314 bytes)
+  scp attempt 1: restore-privacy-client-1.1.3-android.apk (85388314 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.3-android.apk
+$ scp restore-privacy-client-1.1.3-android.apk -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.3-android.apk
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-client-1.1.3-android.apk; SZ=$(stat -c%s /root/rpt-paid-…
+size_ok=85388314
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.1.3/restore-privacy-client-1.1.3-android…
+85388314
+  remote_ok restore-privacy-client-1.1.3-android.apk bytes=85388314
+upload platform=macos file=restore-privacy-client-1.1.3-macos.zip (27846194 bytes)
+  scp attempt 1: restore-privacy-client-1.1.3-macos.zip (27846194 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.3-macos.zip
+$ scp restore-privacy-client-1.1.3-macos.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.3-macos.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-client-1.1.3-macos.zip; SZ=$(stat -c%s /root/rpt-paid-up…
+size_ok=27846194
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.1.3/restore-privacy-client-1.1.3-macos.z…
+27846194
+  remote_ok restore-privacy-client-1.1.3-macos.zip bytes=27846194
+upload platform=ios file=restore-privacy-client-1.1.3-ios.zip (13241240 bytes)
+  scp attempt 1: restore-privacy-client-1.1.3-ios.zip (13241240 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.3-ios.zip
+$ scp restore-privacy-client-1.1.3-ios.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.3-ios.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-client-1.1.3-ios.zip; SZ=$(stat -c%s /root/rpt-paid-uplo…
+size_ok=13241240
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.1.3/restore-privacy-client-1.1.3-ios.zip…
+13241240
+  remote_ok restore-privacy-client-1.1.3-ios.zip bytes=13241240
+upload platform=linux file=restore-privacy-client-1.1.3-linux-x64.tar.gz (14636754 bytes)
+  scp attempt 1: restore-privacy-client-1.1.3-linux-x64.tar.gz (14636754 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.3-linux-x64.tar.gz
+$ scp restore-privacy-client-1.1.3-linux-x64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.3-linux-x64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-client-1.1.3-linux-x64.tar.gz; SZ=$(stat -c%s /root/rpt-…
+size_ok=14636754
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.1.3/restore-privacy-client-1.1.3-linux-x…
+14636754
+  remote_ok restore-privacy-client-1.1.3-linux-x64.tar.gz bytes=14636754
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; for d in /opt/restore-privacy/paid_assets/*; do [ -d "$d" ] || continue; bn=$(basename "$d"); …
+tidy_removed=1.1.2
+tidy_removed=1.1.2
+
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; U=/etc/systemd/system/rpt-paid-assets.service; test -f "$U" || { echo no_unit; exit 0; }; if g…
+active
+catalog_pin=1.1.3
+active
+catalog_pin=1.1.3
+upload complete host=135.181.152.10 version=1.1.3
+=== assure monopin ===
+catalog_version=1.1.3
+product_pin=1.1.3
+platforms=5
+  platform=windows  file=restore-privacy-client-1.1.3-windows-x64-setup.exe rel=1.1.3/restore-privacy-client-1.1.3-windows-x64-setup.exe
+  platform=android  file=restore-privacy-client-1.1.3-android.apk rel=1.1.3/restore-privacy-client-1.1.3-android.apk
+  platform=macos    file=restore-privacy-client-1.1.3-macos.zip rel=1.1.3/restore-privacy-client-1.1.3-macos.zip
+  platform=ios      file=restore-privacy-client-1.1.3-ios.zip rel=1.1.3/restore-privacy-client-1.1.3-ios.zip
+  platform=linux    file=restore-privacy-client-1.1.3-linux-x64.tar.gz rel=1.1.3/restore-privacy-client-1.1.3-linux-x64.tar.gz
+ASSURE_OK: current per-device packages are consistent
+catalog_version=1.1.3
+product_pin=1.1.3
+platforms=5
+  platform=windows  file=restore-privacy-client-1.1.3-windows-x64-setup.exe rel=1.1.3/restore-privacy-client-1.1.3-windows-x64-setup.exe
+  platform=android  file=restore-privacy-client-1.1.3-android.apk rel=1.1.3/restore-privacy-client-1.1.3-android.apk
+  platform=macos    file=restore-privacy-client-1.1.3-macos.zip rel=1.1.3/restore-privacy-client-1.1.3-macos.zip
+  platform=ios      file=restore-privacy-client-1.1.3-ios.zip rel=1.1.3/restore-privacy-client-1.1.3-ios.zip
+  platform=linux    file=restore-privacy-client-1.1.3-linux-x64.tar.gz rel=1.1.3/restore-privacy-client-1.1.3-linux-x64.tar.gz
