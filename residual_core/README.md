@@ -27,8 +27,17 @@ cmake -S residual_core -B residual_core/build && cmake --build residual_core/bui
 
 No sockets, no Flutter, no geo gate — unit-testable offline.
 
-## Future
+## Architecture direction
 
-- X25519 exchange (link OpenSSL / BoringSSL) for full eph DH
-- ChaCha20-Poly1305 seal path
-- FFI into Flutter residual channel when ready
+See **[docs/VPN_ARCHITECTURE_C_PLUS_PLUS.md](docs/VPN_ARCHITECTURE_C_PLUS_PLUS.md)** for:
+
+- X25519 + ChaCha20-Poly1305 roadmap vs product Python/Swift residual
+- Flutter residual channel / FFI boundaries (no packet-through-Dart)
+- Leak mitigation vs low-ping profiles
+- Recommendation: **do not** full-rewrite nodes in C++ yet; share crypto core first
+
+## Future (engineering)
+
+- X25519 exchange (OpenSSL/libsodium) for full eph DH
+- ChaCha20-Poly1305 seal/open path
+- Host-side link from native residual process; optional Flutter FFI later
