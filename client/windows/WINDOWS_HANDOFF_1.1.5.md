@@ -1,6 +1,6 @@
 # Windows + Linux/Arch handoff — monopin 1.1.5
 
-**Audience:** Windows build machine operator (and Arch/Linux rebuild agent).
+**Audience:** Windows x64 build machine operator (and Arch/Linux rebuild agent).
 
 **Catalog monopin:** `1.1.5` (`client/VERSION` must match).
 
@@ -8,15 +8,71 @@
 
 | Topic | Product |
 |-------|---------|
-| Shell | **Residual VPN only** — no Evolve / % wallet / rpAI / Backup chrome |
-| First-use | Licence (scroll-to-bottom, justified) → KEYGEN **or** continue 72h trial → main VPN |
-| Return visit | Trial remaining **or** valid KEYGEN required |
-| Username/password | **Never** offered on product path |
-| Quit | Main screen **lower-left**; disconnect residual tunnel **then** full process exit |
-| System tray text | Always **`Privacy, Restored`** (comma + capital R; durable across monopin ships) |
-| Self-update push | Removed / fail-closed (manual free-DL only) |
+| Shell | **Residual VPN only** — no Evolve / % / rpAI / Backup chrome |
+| First-use | Licence (scroll-to-bottom) → KEYGEN **or** continue 72h trial → main VPN |
+| Return | Trial remaining or KEYGEN required; **no** username/password |
+| Quit | **Lower-left**; disconnect residual **then** full process exit |
+| System tray | Exactly **`Privacy, Restored`** (comma + capital R) — durable forward monopin string |
+| Self-update push | Fail-closed / removed |
 
-## Target package basenames
+## CRITICAL — Windows PE must be native-rebuilt on Windows
+
+Mac agents **cannot** cross-build Windows PE (PyInstaller). Catalog basenames must **not** ship ancient PE payloads (e.g. `RestorePrivacy-0.5.8.exe` / pre-1.1.5 tray `rpT0`).
+
+### Rebuild command (Windows x64 only)
+
+```bat
+git pull
+type client\VERSION
+rem must print 1.1.5
+
+python scripts\build_windows_multihop.py --version 1.1.5
+rem or: scripts\build_windows_multihop.bat
+
+rem Authenticode-sign the produced setup EXE
+rem Output:
+rem   releases\1.1.5\restore-privacy-client-1.1.5-windows-x64-setup.exe
+```
+
+Readiness without build:
+
+```bat
+python scripts\build_windows_multihop.py --check-only --version 1.1.5
+```
+
+### Verify before upload
+
+1. `TRAY_DISPLAY_NAME` in frozen tree / strings search shows **`Privacy, Restored`** (not `rpT0`, not uncomma'd `Privacy Restored`).
+2. Quit is lower-left; disconnect then exit.
+3. SHA-256 of signed setup differs from prior monopin carry-forward PE.
+4. Upload via `python scripts/host_paid_assets_vps.py --stage --upload --version 1.1.5 --force`.
+
+## Linux / Arch (done on Mac agent when packaging Python residual)
+
+```bash
+# pin
+cat client/VERSION   # 1.1.5
+
+python3 scripts/package_linux.py
+# -> releases/1.1.5/restore-privacy-client-1.1.5-linux-x64.tar.gz
+
+# install.sh desktop entry Name= must be exactly:
+#   Privacy, Restored
+```
+
+Arch: use staged tree under `releases/1.1.5/arch` or `scripts/package_arch_linux.py` after Name= fix.
+
+## macOS / iOS / Android
+
+```bash
+python3 scripts/build_suite_1.1.5.py
+# or Flutter:
+cd client_app && flutter build apk --release --build-name=1.1.5
+cd client_app && flutter build macos --release --build-name=1.1.5
+# codesign Developer ID; notarytool when credentials present
+```
+
+## Target basenames
 
 ```text
 releases/1.1.5/restore-privacy-client-1.1.5-windows-x64-setup.exe
@@ -26,42 +82,8 @@ releases/1.1.5/restore-privacy-client-1.1.5-ios.zip
 releases/1.1.5/restore-privacy-client-1.1.5-linux-x64.tar.gz
 ```
 
-Stage also into `status_page/assets/1.1.5/` and Helsinki `paid_assets/1.1.5/`.
+Also: `status_page/assets/1.1.5/` and Helsinki `paid_assets/1.1.5/`.
 
-## Windows rebuild
+## Residual fleet
 
-1. Pull `main` at the 1.1.5 release commit.
-2. Confirm pin: `type client\VERSION` → `1.1.5`
-3. Build PE (Flutter Windows packaging if configured, else project PE script).
-4. Authenticode-sign setup EXE.
-5. Output: `releases\1.1.5\restore-privacy-client-1.1.5-windows-x64-setup.exe`
-6. Tray constant: `client/windows/tray_win.py` → `TRAY_DISPLAY_NAME = "Privacy, Restored"`
-7. Quit: lower-left; `run_quit_residual_teardown` then process exit.
-
-## Linux / Arch rebuild
-
-```bash
-cd client_app && flutter build linux --release --build-name=1.1.5
-# package into restore-privacy-client-1.1.5-linux-x64.tar.gz
-```
-
-Quit is lower-left; disconnect then exit.
-
-## macOS / iOS / Android (Mac agent)
-
-```bash
-python3 scripts/build_suite_1.1.5.py
-# optional: --host-paid after local stage is honest
-```
-
-- macOS: Developer ID Application + notary when credentials present.
-- iOS: Team/Distribution sign + residual pub inject before catalog zip.
-- Android: `flutter build apk --release --build-name=1.1.5`.
-
-## Honesty
-
-If this host only carry-forwards a prior PE renamed to 1.1.5, record that in breadcrumbs. Replace with native rebuild before claiming platform seal.
-
-## Residual fleet (unchanged)
-
-IS + DE residual peers; US retired. KEYGEN / 72h device trial entitlement unchanged.
+IS + DE residual peers; US retired. KEYGEN / 72h device trial unchanged.

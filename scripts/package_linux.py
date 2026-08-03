@@ -312,7 +312,7 @@ mkdir -p "$APPS"
 cat > "$APPS/privacy-restored.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Privacy Restored
+Name=Privacy, Restored
 Comment=Restore Privacy VPN (Linux installer package)
 Exec=pkexec env DISPLAY=\$DISPLAY XAUTHORITY=\$XAUTHORITY $ROOT/bin/privacy-restored
 Path=$ROOT

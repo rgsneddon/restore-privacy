@@ -1,5 +1,5 @@
 // macOS menu bar (system tray) status item for residual VPN.
-// Durable tray text is always "rpT0" (forward monopin identity).
+// Durable tray text is always "Privacy, Restored" (forward monopin identity).
 // Hide main window after product full-tunnel Connect; restore via tray menu.
 // Closing the last window does not quit while tray mode is active; Packet Tunnel
 // is never stopped by hide/window-close (Disconnect remains explicit).

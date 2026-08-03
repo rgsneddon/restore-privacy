@@ -127,7 +127,7 @@ mkdir -p "$APPS"
 cat > "$APPS/privacy-restored.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Privacy Restored
+Name=Privacy, Restored
 Comment=Restore Privacy VPN (Ubuntu / Linux)
 Exec=env PYTHONPATH=$ROOT pkexec env DISPLAY=\$DISPLAY XAUTHORITY=\$XAUTHORITY PYTHONPATH=$ROOT python3 -m client.linux
 Path=$ROOT
