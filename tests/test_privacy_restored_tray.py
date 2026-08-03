@@ -37,6 +37,12 @@ from client.windows.installer import (  # noqa: E402
 class TestTrayBranding(unittest.TestCase):
     def test_tray_display_name_is_privacy_restored(self):
         self.assertEqual(TRAY_DISPLAY_NAME, "Privacy, Restored")
+        self.assertIn(",", TRAY_DISPLAY_NAME)
+        # No legacy live constants
+        src = (ROOT / "client" / "windows" / "tray_win.py").read_text(encoding="utf-8")
+        self.assertRegex(src, r'TRAY_DISPLAY_NAME\s*=\s*"Privacy, Restored"')
+        self.assertNotRegex(src, r'TRAY_DISPLAY_NAME\s*=\s*"rpT0"')
+        self.assertNotRegex(src, r'TRAY_DISPLAY_NAME\s*=\s*"Privacy Restored"')
 
     def test_tray_tooltip_uses_product_name(self):
         tip = tray_tooltip_for_state(connected=True, residual=True)
@@ -78,6 +84,12 @@ class TestTrayBranding(unittest.TestCase):
 
         self.assertEqual(_tray, "Privacy, Restored")
 
+
+
+    def test_linux_desktop_entry_tray_name(self):
+        src = (ROOT / "client" / "linux" / "settings_store.py").read_text(encoding="utf-8")
+        self.assertIn("Name=Privacy, Restored", src)
+        self.assertNotIn("Name=rpT0", src)
 
 class TestTrayStatusUpdate(unittest.TestCase):
     """Tray tip+icon must flip with Connect/Disconnect (not stuck on disconnected)."""

@@ -1,4 +1,4 @@
-"""Windows system tray for rpT0 (product tray identity).
+"""Windows system tray for Privacy, Restored (product tray identity).
 
 Uses Shell_NotifyIcon via ctypes - no extra pip deps (safe for frozen onedir).
 Tray shows the product logo ICO; connected vs disconnected differ by tooltip and
@@ -19,7 +19,7 @@ from typing import Callable, Optional
 # Product tray identity (durable across monopin ships — do not rename casually)
 TRAY_DISPLAY_NAME = "Privacy, Restored"
 
-# Fixed product GUID (do not change — sole rpT0 tray across elevate).
+# Fixed product GUID (do not change — sole Privacy, Restored tray across elevate).
 PRODUCT_TRAY_ICON_GUID = uuid.UUID("a7c3e91f-2b4d-4e8a-9f01-6d5c8b3a1e72")
 
 # Shell_NotifyIcon flags / commands
@@ -51,7 +51,7 @@ def _fill_guid_item(guid_field, u: uuid.UUID | None = None) -> None:
 
 
 def purge_product_tray_icon() -> bool:
-    """Remove any rpT0 tray icon under :data:`PRODUCT_TRAY_ICON_GUID`.
+    """Remove any Privacy, Restored tray icon under :data:`PRODUCT_TRAY_ICON_GUID`.
 
     Clears orphan icons left by crashed processes or elevate handoff where the
     parent died without NIM_DELETE. Safe before ADD or after stop.

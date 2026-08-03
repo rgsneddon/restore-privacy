@@ -788,7 +788,7 @@ class TunnelClientApp:
 
 
     def _start_system_tray(self) -> None:
-        """Tray identity: rpT0 + product logo (one system-wide icon)."""
+        """Tray identity: Privacy, Restored + product logo (one system-wide icon)."""
         try:
             # Drop any orphan / other-process product icon (fixed GUID).
             try:
@@ -2662,7 +2662,7 @@ class TunnelClientApp:
         _row(
             card,
             "Run at device startup",
-            "Start Privacy Restored when you sign in to Windows",
+            "Start Privacy, Restored when you sign in to Windows",
             run_var,
             _save_run,
         )
