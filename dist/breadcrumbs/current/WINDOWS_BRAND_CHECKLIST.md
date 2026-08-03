@@ -1,14 +1,14 @@
-# Windows brand breadcrumbs checklist — monopin 1.1.3
+# Windows brand breadcrumbs checklist — monopin 1.1.5
 
-Generated: 2026-08-03T16:25:10Z
+Generated: 2026-08-03T18:49:40Z
 Large-drive dest: `{RPT_WINDOWS_DRIVE}` (configured=False, reachable=False)
 Monorepo mirror path: `{RPT_WINDOWS_DRIVE}/restore-privacy`
 
 ## Operator mandate
 
 - Duplicate the **full monorepo** and **every brand installer slot** onto the Windows larger drive (`RPT_WINDOWS_DRIVE` / `--dest`).
-- **Native PE seal** for monopin **1.1.3** on this Windows machine (`scripts\\build_windows_multihop.py`).
-- Upload sealed PE (+ brand packages as needed) to Helsinki `paid_assets/1.1.3/`.
+- **Native PE seal** for monopin **1.1.5** on this Windows machine (`scripts\\build_windows_multihop.py`).
+- Upload sealed PE (+ brand packages as needed) to Helsinki `paid_assets/1.1.5/`.
 
 ## Large-drive mirror
 
@@ -26,20 +26,20 @@ Present on source host: **5** / 35  ·  Missing source: **30**  ·  Already on d
 
 | Kind | Product | Platform | Filename | Source | Dest |
 |------|---------|----------|----------|--------|------|
-| suite_client | Restore Privacy Suite | windows | `restore-privacy-client-1.1.3-windows-x64-setup.exe` | yes | — |
-| suite_client | Restore Privacy Suite | android | `restore-privacy-client-1.1.3-android.apk` | yes | — |
-| suite_client | Restore Privacy Suite | macos | `restore-privacy-client-1.1.3-macos.zip` | yes | — |
-| suite_client | Restore Privacy Suite | ios | `restore-privacy-client-1.1.3-ios.zip` | yes | — |
-| suite_client | Restore Privacy Suite | linux | `restore-privacy-client-1.1.3-linux-x64.tar.gz` | yes | — |
-| browser | Browser Extension (MV3) | chromium | `restore-privacy-browser-extension-1.1.3.zip` | MISSING | — |
-| browser | Rx Privacy Browser | default | `restore-privacy-rx-browser-1.1.3.zip` | MISSING | — |
-| browser | Rx Privacy Browser | macos | `restore-privacy-rx-browser-1.1.3-macos.zip` | MISSING | — |
-| browser | Rx Privacy Browser | windows | `restore-privacy-rx-browser-1.1.3-windows.zip` | MISSING | — |
-| browser | Rx Privacy Browser | linux-x86_64 | `restore-privacy-rx-browser-1.1.3-linux-x86_64.tar.gz` | MISSING | — |
-| browser | Rx Privacy Browser | linux-aarch64 | `restore-privacy-rx-browser-1.1.3-linux-aarch64.tar.gz` | MISSING | — |
-| browser | Rx Privacy Browser | linux-x86_64-zip | `restore-privacy-rx-browser-1.1.3-linux-x86_64.zip` | MISSING | — |
-| browser | Rx Privacy Browser | ios | `restore-privacy-rx-browser-1.1.3-ios.zip` | MISSING | — |
-| browser | Rx Privacy Browser | android | `restore-privacy-rx-browser-1.1.3-android.zip` | MISSING | — |
+| suite_client | Restore Privacy Suite | windows | `restore-privacy-client-1.1.5-windows-x64-setup.exe` | yes | — |
+| suite_client | Restore Privacy Suite | android | `restore-privacy-client-1.1.5-android.apk` | yes | — |
+| suite_client | Restore Privacy Suite | macos | `restore-privacy-client-1.1.5-macos.zip` | yes | — |
+| suite_client | Restore Privacy Suite | ios | `restore-privacy-client-1.1.5-ios.zip` | yes | — |
+| suite_client | Restore Privacy Suite | linux | `restore-privacy-client-1.1.5-linux-x64.tar.gz` | yes | — |
+| browser | Browser Extension (MV3) | chromium | `restore-privacy-browser-extension-1.1.5.zip` | MISSING | — |
+| browser | Rx Privacy Browser | default | `restore-privacy-rx-browser-1.1.5.zip` | MISSING | — |
+| browser | Rx Privacy Browser | macos | `restore-privacy-rx-browser-1.1.5-macos.zip` | MISSING | — |
+| browser | Rx Privacy Browser | windows | `restore-privacy-rx-browser-1.1.5-windows.zip` | MISSING | — |
+| browser | Rx Privacy Browser | linux-x86_64 | `restore-privacy-rx-browser-1.1.5-linux-x86_64.tar.gz` | MISSING | — |
+| browser | Rx Privacy Browser | linux-aarch64 | `restore-privacy-rx-browser-1.1.5-linux-aarch64.tar.gz` | MISSING | — |
+| browser | Rx Privacy Browser | linux-x86_64-zip | `restore-privacy-rx-browser-1.1.5-linux-x86_64.zip` | MISSING | — |
+| browser | Rx Privacy Browser | ios | `restore-privacy-rx-browser-1.1.5-ios.zip` | MISSING | — |
+| browser | Rx Privacy Browser | android | `restore-privacy-rx-browser-1.1.5-android.zip` | MISSING | — |
 | rpos | rpOS | windows | `rpos-0.2.1-windows-x64.zip` | MISSING | — |
 | rpos | rpOS | macos | `rpos-0.2.1-macos.zip` | MISSING | — |
 | rpos | rpOS | linux-x86_64 | `rpos-0.2.1-linux-x86_64.tar.gz` | MISSING | — |
@@ -65,8 +65,8 @@ Present on source host: **5** / 35  ·  Missing source: **30**  ·  Already on d
 ## Native Windows PE seal
 
 - Script: `scripts/build_windows_multihop.py`
-- Output: `releases/1.1.3/restore-privacy-client-1.1.3-windows-x64-setup.exe`
-- Upload target: `paid_assets/1.1.3/`
+- Output: `releases/1.1.5/restore-privacy-client-1.1.5-windows-x64-setup.exe`
+- Upload target: `paid_assets/1.1.5/`
 
 ```powershell
 cd {RPT_WINDOWS_DRIVE}/restore-privacy
@@ -75,7 +75,7 @@ python scripts\build_windows_multihop.py
 $env:RPT_SSH_HOST="135.181.152.10"
 $env:RPT_SSH_USER="root"
 $env:RPT_SSH_KEY="$HOME\.ssh\id_ed25519_restore_privacy_eu"
-python scripts\host_paid_assets_vps.py --stage --upload --version 1.1.3 --force --install-serve
+python scripts\host_paid_assets_vps.py --stage --upload --version 1.1.5 --force --install-serve
 ```
 
 ## Steps
@@ -92,4 +92,4 @@ python scripts\host_paid_assets_vps.py --stage --upload --version 1.1.3 --force 
 - Mirror monorepo + all brand installers before native PE rebuild.
 - Native PE seal must run on Windows; replace carry-forward PE before final ship.
 - After PE build, re-run brand mirror apply so the large drive holds the seal.
-- Helsinki breadcrumbs: dist/breadcrumbs/current/WINDOWS_HANDOFF.md (monopin 1.1.3).
+- Helsinki breadcrumbs: dist/breadcrumbs/current/WINDOWS_HANDOFF.md (monopin 1.1.5).

@@ -205,11 +205,12 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
         "mirror_monorepo_and_brand_assets_to_large_drive",
         "rebuild_windows_native_pe_seal",
         f"upload_paid_assets_{pin}",
-        # Architecture observe (first-run, trial, Suite shell) — see WINDOWS_HANDOFF
-        "observe_first_run_account_seed_licence_before_vpn",
+        # Architecture observe (VPN-only product truth) — see WINDOWS_HANDOFF
+        "observe_first_run_licence_keygen_or_trial_before_vpn",
         "observe_72h_keygen_free_trial_then_pay",
-        "observe_suite_shell_vpn_percent_evolve_backup_rpai",
-        "observe_ned_oracle_admin_rps_and_full_admin_map",
+        "observe_vpn_only_shell_no_evolve_wallet_rpai_chrome",
+        "observe_quit_lower_left_disconnect_then_exit",
+        "observe_tray_text_privacy_comma_restored",
     ]
 
     return {
@@ -256,12 +257,12 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
             f"installer slots ({windows_mirror.get('brand_slot_count') or 'N'} packages); "
             "then native PE seal + upload",
             f"7. Windows machine: open client/windows/WINDOWS_HANDOFF_{pin}.md — "
-            "full product map: first-run account→seed→licence before VPN; "
-            "72h KEYGEN-free trial then KEYGEN (Stripe trial_period_days=0); "
-            "Suite VPN · % · Evolve · Backup · Credit · rpAI/Ned; residual IS+DE; "
-            "Ned/oracle/co-join; every /admin surface (UPLOADS, Node Operator, "
-            "rpS, Link Generation, Licences, Fleet, Perc, Support, Accounting, "
-            "Processors); brand companions rpOS/browser",
+            "full product map: first-run licence (scroll-to-bottom) → KEYGEN or "
+            "continue 72h trial (no username/password/seed); residual VPN-only "
+            "shell (no Evolve/%/rpAI/Backup chrome); Quit lower-left disconnect-"
+            "then-exit; tray text exactly Privacy, Restored; residual IS+DE; "
+            "manual free-DL updates only (no UPDATE_PUSH); then native PE seal + "
+            f"upload paid_assets/{pin}/",
         ],
     }
 
