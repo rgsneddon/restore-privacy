@@ -2029,13 +2029,39 @@ def publish_audit_artifacts(
     out["steps"].append({"action": "check_paths", "ok": True})
 
     # Optional SSH/rsync publish when RPT_AUDIT_STATUS_SSH is set (scp pair).
+    # Residual timer uses this to push ONLY audit JSON + AUDIT.md to Helsinki
+    # public-audit (status host prefers that upstream for last-run).
     ssh_spec = (os.environ.get("RPT_AUDIT_STATUS_SSH") or "").strip()
     remote_root = (
         os.environ.get("RPT_AUDIT_STATUS_REMOTE_ROOT") or ""
     ).strip() or "/opt/restore-privacy"
     if ssh_spec:
         key = (os.environ.get("RPT_SSH_KEY") or "").strip()
-        scp = ["scp", "-o", "BatchMode=yes", "-o", "ConnectTimeout=30"]
+        # rpt-audit user has home /nonexistent — pin known_hosts under install var.
+        install_root = Path(
+            os.environ.get("RPT_INSTALL_ROOT") or remote_root or "/opt/restore-privacy"
+        )
+        known_hosts = install_root / "var" / "audit_status_known_hosts"
+        try:
+            known_hosts.parent.mkdir(parents=True, exist_ok=True)
+            if not known_hosts.is_file():
+                known_hosts.write_text("", encoding="utf-8")
+            known_hosts.chmod(0o644)
+        except OSError:
+            pass
+        scp = [
+            "scp",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=30",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            f"UserKnownHostsFile={known_hosts}",
+            "-o",
+            "GlobalKnownHostsFile=/dev/null",
+        ]
         if key:
             scp.extend(["-i", key])
         else:
@@ -2047,10 +2073,52 @@ def publish_audit_artifacts(
                 if cand.is_file():
                     scp.extend(["-i", str(cand)])
                     break
-        remote_json = f"{ssh_spec}:{remote_root}/status_page/static/security_audit_latest.json"
-        remote_audit = f"{ssh_spec}:{remote_root}/status_page/public/AUDIT.md"
+        # Default remote layout: public-audit/ (nginx /public-audit/)
+        remote_json_rel = (
+            os.environ.get("RPT_AUDIT_STATUS_REMOTE_JSON") or ""
+        ).strip() or f"{remote_root}/public-audit/security_audit_latest.json"
+        remote_audit_rel = (
+            os.environ.get("RPT_AUDIT_STATUS_REMOTE_AUDIT") or ""
+        ).strip() or f"{remote_root}/public-audit/AUDIT.md"
+        remote_json = f"{ssh_spec}:{remote_json_rel}"
+        remote_audit = f"{ssh_spec}:{remote_audit_rel}"
         json_path = ROOT / "status_page" / "static" / "security_audit_latest.json"
+        if not json_path.is_file():
+            # Install-root layout on residual node
+            alt = install_root / "status_page/static/security_audit_latest.json"
+            if alt.is_file():
+                json_path = alt
         pub_audit = ROOT / "status_page" / "public" / "AUDIT.md"
+        if not pub_audit.is_file():
+            alt_a = Path(os.environ.get("RPT_AUDIT_PATH", ""))
+            if not alt_a.is_file():
+                alt_a = install_root / "AUDIT.md"
+            if alt_a.is_file():
+                pub_audit = alt_a
+        # Ensure remote dir exists (best-effort ssh mkdir)
+        user_host = ssh_spec
+        ssh_base = [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=30",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            f"UserKnownHostsFile={known_hosts}",
+            "-o",
+            "GlobalKnownHostsFile=/dev/null",
+        ]
+        if key:
+            ssh_base.extend(["-i", key])
+        remote_dir = str(Path(remote_json_rel).parent)
+        subprocess.run(
+            ssh_base + [user_host, f"mkdir -p {remote_dir}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
         r1 = subprocess.run(
             scp + [str(json_path), remote_json],
             capture_output=True,
@@ -2062,10 +2130,11 @@ def publish_audit_artifacts(
             text=True,
         )
         step = {
-            "action": "scp_status_host",
+            "action": "scp_public_audit",
             "ok": r1.returncode == 0 and r2.returncode == 0,
             "remote": ssh_spec,
-            "stderr": (r1.stderr or "") + (r2.stderr or ""),
+            "remote_json": remote_json,
+            "stderr": ((r1.stderr or "") + (r2.stderr or ""))[:500],
         }
         out["steps"].append(step)
         if step["ok"]:

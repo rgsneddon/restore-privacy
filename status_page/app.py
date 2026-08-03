@@ -239,6 +239,22 @@ def is_admin_static_path(url_path: str) -> bool:
 
 def read_static_bytes(url_path: str) -> tuple[bytes, str] | None:
     path = static_file_path(url_path)
+    # Prefer residual-timer Helsinki upstream for audit JSON so public last-run
+    # advances on timer expiry without a laptop git publish.
+    if url_path in (
+        "/static/security_audit_latest.json",
+        "security_audit_latest.json",
+    ) or (path is not None and path.name == "security_audit_latest.json"):
+        try:
+            from audit_countdown import load_security_audit_json_prefer_upstream
+            import json as _json
+
+            live = load_security_audit_json_prefer_upstream(path)
+            if live is not None:
+                body = (_json.dumps(live, indent=2) + "\n").encode("utf-8")
+                return body, "application/json; charset=utf-8"
+        except Exception:
+            pass
     if path is None:
         return None
     data = path.read_bytes()
@@ -301,7 +317,27 @@ GITHUB_BLOB_MAIN = "https://github.com/rgsneddon/restore-privacy/blob/main"
 
 
 def audit_document_bytes() -> bytes | None:
-    """Load AUDIT.md (status public pack, status_page, repo root, install root)."""
+    """Load AUDIT.md (status public pack, status_page, repo root, install root).
+
+    Prefer residual-timer Helsinki upstream when that document is present so
+    /AUDIT.md tracks timer writes without a laptop publish.
+    """
+    try:
+        from audit_countdown import audit_upstream_audit_url, fetch_url_text
+
+        up = audit_upstream_audit_url()
+        if up:
+            text = fetch_url_text(up, timeout=5.0)
+            if text and len(text) > 200:
+                try:
+                    from public_docs import _redact_public_doc_text
+
+                    text = _redact_public_doc_text(text)
+                except Exception:
+                    pass
+                return text.encode("utf-8")
+    except Exception:
+        pass
     data = load_public_document_bytes("AUDIT.md", min_size=200)
     if data is not None:
         return data

@@ -152,5 +152,53 @@ class TestHomepageIntroReword(unittest.TestCase):
         )
 
 
+class TestUpstreamPreferForPublicLastRun(unittest.TestCase):
+    def test_prefer_newer_and_default_helsinki_upstream(self) -> None:
+        from audit_countdown import (
+            DEFAULT_AUDIT_UPSTREAM_JSON_URL,
+            load_security_audit_json_prefer_upstream,
+            parse_audit_generated_at,
+            prefer_newer_generated_at,
+        )
+        from datetime import datetime, timezone
+
+        older = datetime(2026, 8, 2, 15, 42, 27, tzinfo=timezone.utc)
+        newer = datetime(2026, 8, 3, 23, 27, 13, tzinfo=timezone.utc)
+        self.assertEqual(prefer_newer_generated_at(older, newer), newer)
+        self.assertEqual(prefer_newer_generated_at(newer, older), newer)
+        self.assertIn("135.181.152.10.sslip.io/public-audit/", DEFAULT_AUDIT_UPSTREAM_JSON_URL)
+        # Local-only load still works when upstream disabled via empty override
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "security_audit_latest.json"
+            p.write_text(
+                json.dumps({"generated_at": "2026-08-01T00:00:00Z", "ok": True}) + "\n",
+                encoding="utf-8",
+            )
+            data = load_security_audit_json_prefer_upstream(
+                p, upstream_url=""  # empty string = no fetch
+            )
+            self.assertIsNotNone(data)
+            self.assertEqual(
+                parse_audit_generated_at(str(data.get("generated_at"))),
+                datetime(2026, 8, 1, 0, 0, 0, tzinfo=timezone.utc),
+            )
+
+    def test_oneshot_always_attempts_scp_when_key_present(self) -> None:
+        text = (ROOT / "scripts" / "install_security_audit_timer.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("rpt_audit_status_key", text)
+        self.assertIn("publish_audit_artifacts", text)
+        self.assertIn("publish_scp", text)
+        self.assertIn("135.181.152.10", text)
+        self.assertIn("public-audit", (ROOT / "scripts" / "run_security_audit.py").read_text(encoding="utf-8"))
+
+    def test_app_read_static_prefers_upstream_audit_json(self) -> None:
+        app = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("load_security_audit_json_prefer_upstream", app)
+        self.assertIn("security_audit_latest.json", app)
+        self.assertIn("audit_upstream_audit_url", app)
+
+
 if __name__ == "__main__":
     unittest.main()

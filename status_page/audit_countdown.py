@@ -33,6 +33,130 @@ TIME_TIL_NEXT_AUDIT_BLURB = (
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _DEFAULT_JSON = _STATIC_DIR / "security_audit_latest.json"
 
+# Residual timer publishes audit JSON here (scp) so public last-run advances
+# without a laptop ``sync --publish``. Status host prefers newer stamp.
+DEFAULT_AUDIT_UPSTREAM_JSON_URL = (
+    "https://135.181.152.10.sslip.io/public-audit/security_audit_latest.json"
+)
+DEFAULT_AUDIT_UPSTREAM_AUDIT_URL = (
+    "https://135.181.152.10.sslip.io/public-audit/AUDIT.md"
+)
+
+
+def audit_upstream_enabled() -> bool:
+    """False when RPT_AUDIT_UPSTREAM=0 / off / false."""
+    import os
+
+    raw = os.environ.get("RPT_AUDIT_UPSTREAM", "1").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def audit_upstream_json_url() -> str | None:
+    """URL residual timer scp-publishes to (Helsinki public-audit)."""
+    import os
+
+    if not audit_upstream_enabled():
+        return None
+    u = (os.environ.get("RPT_AUDIT_UPSTREAM_JSON_URL") or "").strip()
+    return u or DEFAULT_AUDIT_UPSTREAM_JSON_URL
+
+
+def audit_upstream_audit_url() -> str | None:
+    import os
+
+    if not audit_upstream_enabled():
+        return None
+    u = (os.environ.get("RPT_AUDIT_UPSTREAM_AUDIT_URL") or "").strip()
+    return u or DEFAULT_AUDIT_UPSTREAM_AUDIT_URL
+
+
+def fetch_url_text(url: str, *, timeout: float = 4.0) -> str | None:
+    """GET text body from *url* (short timeout; None on failure)."""
+    import urllib.error
+    import urllib.request
+
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"Accept": "application/json, text/plain, */*", "User-Agent": "rpt-audit-countdown/1"},
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read()
+        return raw.decode("utf-8", errors="replace")
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return None
+
+
+def parse_generated_at_from_json_text(text: str | None) -> datetime | None:
+    """Extract generated_at from JSON document text."""
+    if not text:
+        return None
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return parse_audit_generated_at(str(data.get("generated_at") or ""))
+
+
+def prefer_newer_generated_at(
+    a: datetime | None,
+    b: datetime | None,
+) -> datetime | None:
+    """Return the later of two UTC timestamps (None loses)."""
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return a if a >= b else b
+
+
+def load_security_audit_json_prefer_upstream(
+    path: Path | None = None,
+    *,
+    upstream_url: str | None = None,
+    timeout: float = 4.0,
+) -> dict[str, Any] | None:
+    """Load audit JSON preferring the newer of local file vs residual-timer upstream.
+
+    Residual ``rpt-security-audit`` scp-publishes to Helsinki public-audit after
+    each successful write. Status host (Render) must prefer that stamp so
+    homepage last-run advances without a laptop git publish.
+    """
+    local_data: dict[str, Any] | None = None
+    p = path if path is not None else _DEFAULT_JSON
+    try:
+        if p.is_file():
+            raw = json.loads(p.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                local_data = raw
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        local_data = None
+
+    up_url = upstream_url if upstream_url is not None else audit_upstream_json_url()
+    remote_data: dict[str, Any] | None = None
+    if up_url:
+        text = fetch_url_text(up_url, timeout=timeout)
+        if text:
+            try:
+                raw = json.loads(text)
+                if isinstance(raw, dict):
+                    remote_data = raw
+            except (json.JSONDecodeError, TypeError, ValueError):
+                remote_data = None
+
+    local_at = parse_audit_generated_at(
+        str((local_data or {}).get("generated_at") or "")
+    )
+    remote_at = parse_audit_generated_at(
+        str((remote_data or {}).get("generated_at") or "")
+    )
+    if remote_data is not None and prefer_newer_generated_at(remote_at, local_at) == remote_at:
+        return remote_data
+    return local_data
+
 
 def parse_audit_generated_at(value: str | None) -> datetime | None:
     """Parse ISO-8601 audit timestamps (``...Z`` or offset) to UTC datetime."""
@@ -137,15 +261,9 @@ def format_countdown(seconds: int) -> str:
 def load_last_audit_generated_at(
     path: Path | None = None,
 ) -> datetime | None:
-    """Read ``generated_at`` from security_audit_latest.json when present."""
-    p = path if path is not None else _DEFAULT_JSON
-    try:
-        if not p.is_file():
-            return None
-        data = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, TypeError, ValueError):
-        return None
-    if not isinstance(data, dict):
+    """Read ``generated_at`` preferring residual-timer upstream over stale local."""
+    data = load_security_audit_json_prefer_upstream(path)
+    if not data:
         return None
     return parse_audit_generated_at(str(data.get("generated_at") or ""))
 
@@ -201,16 +319,13 @@ def load_security_audit_latest(
 ) -> dict[str, Any] | None:
     """Load ``security_audit_latest.json`` when present (dict or None).
 
+    Prefers residual-timer Helsinki upstream when that stamp is newer than the
+    git-deployed local file (so public last-run tracks timer expiry).
+
     When *public* is True (default), residual monopin IPv4s are redacted for
     any public consumer. Pass ``public=False`` for operator/admin tooling.
     """
-    p = path if path is not None else _DEFAULT_JSON
-    try:
-        if not p.is_file():
-            return None
-        data = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, TypeError, ValueError):
-        return None
+    data = load_security_audit_json_prefer_upstream(path)
     if not isinstance(data, dict):
         return None
     if public:

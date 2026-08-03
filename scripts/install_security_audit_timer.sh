@@ -215,13 +215,19 @@ export RPT_VPS_ASSET_BASE="\${RPT_VPS_ASSET_BASE:-https://135.181.152.10.sslip.i
 if [[ -z "\${RPT_ASSET_FETCH_TOKEN:-}" && -r "${INSTALL_ROOT}/var/rpt_asset_fetch_token" ]]; then
   export RPT_ASSET_FETCH_TOKEN="\$(tr -d ' \\t\\r\\n' <"${INSTALL_ROOT}/var/rpt_asset_fetch_token")"
 fi
-# Optional narrow status scp (audit JSON + AUDIT.md only) — set on node if used
+# Constrained public publish: residual → Helsinki public-audit (scp only).
+# Credentials: var/rpt_audit_status_key (0600) + optional var/rpt_audit_status_ssh
+# Default SSH target: root@135.181.152.10 (Helsinki paid/status store).
 if [[ -z "\${RPT_AUDIT_STATUS_SSH:-}" && -r "${INSTALL_ROOT}/var/rpt_audit_status_ssh" ]]; then
   export RPT_AUDIT_STATUS_SSH="\$(tr -d ' \\t\\r\\n' <"${INSTALL_ROOT}/var/rpt_audit_status_ssh")"
+fi
+if [[ -z "\${RPT_AUDIT_STATUS_SSH:-}" && -r "${INSTALL_ROOT}/var/rpt_audit_status_key" ]]; then
+  export RPT_AUDIT_STATUS_SSH="root@135.181.152.10"
 fi
 if [[ -z "\${RPT_SSH_KEY:-}" && -r "${INSTALL_ROOT}/var/rpt_audit_status_key" ]]; then
   export RPT_SSH_KEY="${INSTALL_ROOT}/var/rpt_audit_status_key"
 fi
+export RPT_AUDIT_STATUS_REMOTE_ROOT="\${RPT_AUDIT_STATUS_REMOTE_ROOT:-/opt/restore-privacy}"
 export TMPDIR="${INSTALL_ROOT}/var/audit-scratch"
 mkdir -p "\${TMPDIR}"
 # Never git push AUDIT.md from residual probes path
@@ -236,20 +242,29 @@ GEN=""
 if [[ -f "\${JSON_PATH}" ]]; then
   GEN="\$("${PY}" -c "import json;print(json.load(open('\${JSON_PATH}')).get('generated_at') or '')" 2>/dev/null || true)"
 fi
+pub_ok=0
 if [[ -n "\${GEN}" && -f "${INSTALL_ROOT}/AUDIT.md" ]]; then
   write_ok=1
   mkdir -p "${INSTALL_ROOT}/var"
   touch "${INSTALL_ROOT}/var/last_audit_write.ok" 2>/dev/null || true
   echo "generated_at=\${GEN}" >"${INSTALL_ROOT}/var/last_audit_write.stamp" 2>/dev/null || true
-  # Constrained status publish: scp audit JSON+md when RPT_AUDIT_STATUS_SSH is set.
-  if [[ -n "\${RPT_AUDIT_STATUS_SSH:-}" && -f "${INSTALL_ROOT}/scripts/run_security_audit.py" ]]; then
-    "${PY}" -c "
+  # ALWAYS attempt constrained scp when key present (timer → public last-run).
+  if [[ -n "\${RPT_AUDIT_STATUS_SSH:-}" && -n "\${RPT_SSH_KEY:-}" && -f "\${RPT_SSH_KEY}" ]]; then
+    PUB_OUT="\$("${PY}" -c "
 import os, sys
 sys.path.insert(0, '${INSTALL_ROOT}/scripts')
 os.chdir('${INSTALL_ROOT}')
+# ROOT inside run_security_audit is scripts/.. — align INSTALL_ROOT layout
 import run_security_audit as rsa
-print(rsa.publish_audit_artifacts(commit=False, push=False))
-" >>"\${TMPDIR}/audit.pub" 2>&1 || true
+# Point module ROOT at install root so artifact paths resolve
+rsa.ROOT = __import__('pathlib').Path('${INSTALL_ROOT}')
+r = rsa.publish_audit_artifacts(commit=False, push=False)
+print(r)
+" 2>>"\${TMPDIR}/audit.err" || true)"
+    echo "\$PUB_OUT" >>"${INSTALL_ROOT}/var/last_audit_publish.log" 2>/dev/null || true
+    if echo "\$PUB_OUT" | grep -q "'published': True\|\"published\": true\|published.: True"; then
+      pub_ok=1
+    fi
   fi
 else
   write_ok=0
@@ -258,7 +273,7 @@ fi
 rm -f "\${TMPDIR}/audit.err" 2>/dev/null || true
 find "\${TMPDIR}" -mindepth 1 -delete 2>/dev/null || true
 if [[ "\${write_ok}" -eq 1 ]]; then
-  echo "rpt-security-audit: OK wrote ${INSTALL_ROOT}/AUDIT.md generated_at=\${GEN} (pull agent --publish advances public last-run)"
+  echo "rpt-security-audit: OK wrote ${INSTALL_ROOT}/AUDIT.md generated_at=\${GEN} publish_scp=\${pub_ok}"
   exit 0
 fi
 echo "rpt-security-audit: FAIL rc=\${rc} (no generated_at artifact; see AUDIT.md)"
