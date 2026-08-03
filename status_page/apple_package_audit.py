@@ -266,6 +266,173 @@ def require_macos_zip_developer_id_distribution(path: Path | str) -> dict[str, A
     return report
 
 
+def host_app_has_packet_tunnel_provider(app: Path | str) -> bool:
+    """True when the host app embeds packet-tunnel-provider (residual NE)."""
+    p = Path(app)
+    if not p.is_dir():
+        return False
+    proc = subprocess.run(
+        ["codesign", "-d", "--entitlements", ":-", str(p)],
+        capture_output=True,
+    )
+    blob = (proc.stdout or b"") + (proc.stderr or b"")
+    return b"packet-tunnel-provider" in blob
+
+
+def launch_probe_app_alive(app: Path | str, *, settle_s: float = 2.5) -> dict[str, Any]:
+    """Prove *app* launches and stays alive (not AMFI SIGKILL 137).
+
+    Same contract as ``scripts/sign_and_notarize_macos.launch_probe_alive`` —
+    kept here so residual catalog audit does not require importing ship scripts.
+    """
+    import time
+
+    p = Path(app)
+    main_bin = p / "Contents" / "MacOS" / "restore_privacy_client"
+    if not main_bin.is_file():
+        # Alternate product binary name inside Contents/MacOS
+        mac = p / "Contents" / "MacOS"
+        bins = [x for x in mac.iterdir() if x.is_file()] if mac.is_dir() else []
+        if not bins:
+            return {"ok": False, "error": f"missing main binary under {mac}", "rc": None}
+        main_bin = bins[0]
+    proc = subprocess.Popen(
+        [str(main_bin)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    time.sleep(settle_s)
+    rc = proc.poll()
+    if rc is None:
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except Exception:  # noqa: BLE001
+            try:
+                proc.kill()
+            except Exception:  # noqa: BLE001
+                pass
+        return {"ok": True, "rc": None, "alive": True, "error": None}
+    return {
+        "ok": False,
+        "rc": rc,
+        "alive": False,
+        "error": f"app exited immediately rc={rc} (137=AMFI SIGKILL often host NE)",
+    }
+
+
+def assess_macos_zip_residual_capable(path: Path | str) -> dict[str, Any]:
+    """Catalog residual seal: host packet-tunnel-provider + codesign valid + launch alive.
+
+    Residual monopin ships Team residual (Apple Development + NE profiles) so
+    Packet Tunnel can register. That is **not** Notarized Developer ID — and
+    must not be confused with DevID+host-NE which AMFI kills (rc=137).
+    """
+    p = Path(path)
+    out: dict[str, Any] = {
+        "path": str(p),
+        "exists": p.is_file(),
+        "ok": False,
+        "reason": "unknown",
+        "host_packet_tunnel_provider": False,
+        "launch_alive": False,
+    }
+    if not p.is_file():
+        out["reason"] = "missing_zip"
+        return out
+    import sys
+
+    if sys.platform != "darwin":
+        out["reason"] = "not_darwin"
+        return out
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            dig = subprocess.run(
+                ["ditto", "-x", "-k", str(p), td],
+                capture_output=True,
+                text=True,
+            )
+            if dig.returncode != 0:
+                dig2 = subprocess.run(
+                    ["unzip", "-q", str(p), "-d", td],
+                    capture_output=True,
+                    text=True,
+                )
+                if dig2.returncode != 0:
+                    out["reason"] = "extract_failed"
+                    out["error"] = ((dig.stderr or "") + (dig2.stderr or ""))[:200]
+                    return out
+            apps = list(Path(td).rglob("restore_privacy_client.app"))
+            if not apps:
+                apps = [a for a in Path(td).rglob("*.app") if a.is_dir()]
+            if not apps:
+                out["reason"] = "no_app_in_zip"
+                return out
+            app = apps[0]
+            out["app_path"] = str(app)
+            # Prefer host app (not nested appex)
+            for cand in apps:
+                if cand.name == "restore_privacy_client.app" or (
+                    "PacketTunnel" not in cand.name and cand.suffix == ".app"
+                ):
+                    app = cand
+                    out["app_path"] = str(app)
+                    break
+            deep = subprocess.run(
+                ["codesign", "--verify", "--deep", "--strict", str(app)],
+                capture_output=True,
+                text=True,
+            )
+            out["codesign_deep_exit"] = deep.returncode
+            out["codesign_deep_ok"] = deep.returncode == 0
+            if deep.returncode != 0:
+                out["reason"] = "codesign_deep_verify_failed"
+                out["error"] = ((deep.stderr or "") + (deep.stdout or ""))[:300]
+                return out
+            dv = subprocess.run(
+                ["codesign", "-dv", "--verbose=2", str(app)],
+                capture_output=True,
+                text=True,
+            )
+            text = (dv.stderr or "") + (dv.stdout or "")
+            parsed = parse_codesign_dv_output(text)
+            out.update({k: parsed[k] for k in parsed})
+            has_ne = host_app_has_packet_tunnel_provider(app)
+            out["host_packet_tunnel_provider"] = has_ne
+            if not has_ne:
+                out["reason"] = "host_missing_packet_tunnel_provider"
+                return out
+            probe = launch_probe_app_alive(app)
+            out["launch_probe"] = probe
+            out["launch_alive"] = bool(probe.get("ok"))
+            if not probe.get("ok"):
+                out["reason"] = "launch_probe_failed"
+                out["error"] = probe.get("error")
+                return out
+            out["ok"] = True
+            out["reason"] = "residual_capable_host_ne_launch_alive"
+            return out
+    except Exception as exc:  # noqa: BLE001
+        out["reason"] = "assess_error"
+        out["error"] = str(exc)[:200]
+        return out
+
+
+def require_macos_zip_residual_capable(path: Path | str) -> dict[str, Any]:
+    """Fail closed when catalog residual monopin lacks host NE or dies on launch."""
+    report = assess_macos_zip_residual_capable(path)
+    if not report.get("ok"):
+        raise RuntimeError(
+            f"macOS residual monopin seal failed: reason={report.get('reason')!r} "
+            f"host_ne={report.get('host_packet_tunnel_provider')} "
+            f"launch_alive={report.get('launch_alive')} path={path}. "
+            f"Package residual-team.app (Team residual NE + launch probe), "
+            f"not DevID+host-NE without a DevID NE profile (AMFI 137)."
+        )
+    return report
+
+
 def require_macos_zip_matches_monopin(path: Path | str, monopin: str) -> str:
     """Fail closed when paid macOS zip CFBundle lags (or leads) the catalog monopin.
 

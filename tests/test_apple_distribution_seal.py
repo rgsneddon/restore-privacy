@@ -76,9 +76,10 @@ class TestSignScriptFailClosed(unittest.TestCase):
 
 
 class TestLiveMonopinZipDistribution(unittest.TestCase):
-    def test_monopin_macos_zip_is_developer_id_when_present(self) -> None:
+    def test_monopin_macos_zip_is_residual_capable_when_present(self) -> None:
+        """Catalog monopin is Team residual (host NE + launch alive), not dead DevID+NE."""
         from apple_package_audit import (
-            assess_macos_catalog_zip_codesign,
+            assess_macos_zip_residual_capable,
             require_macos_zip_matches_monopin,
         )
         from downloads import RELEASE_VERSION
@@ -94,21 +95,29 @@ class TestLiveMonopinZipDistribution(unittest.TestCase):
         require_macos_zip_matches_monopin(path, pin)
         if sys.platform != "darwin":
             self.skipTest("codesign assess requires Darwin")
-        report = assess_macos_catalog_zip_codesign(path)
+        report = assess_macos_zip_residual_capable(path)
         self.assertTrue(
             report.get("ok"),
-            msg=f"catalog zip must be Notarized Developer ID: {report}",
+            msg=f"catalog residual monopin must have host NE + launch alive: {report}",
         )
-        self.assertTrue(report.get("is_developer_id_application"), report)
-        self.assertFalse(report.get("is_apple_development"), report)
-        self.assertTrue(
-            report.get("codesign_deep_ok"),
-            msg=f"nested frameworks must deep-verify: {report.get('codesign_deep_text')}",
+        self.assertTrue(report.get("host_packet_tunnel_provider"))
+        self.assertTrue(report.get("launch_alive"))
+
+    def test_residual_seal_helpers_pure_and_exported(self) -> None:
+        from apple_package_audit import (
+            assess_macos_zip_residual_capable,
+            host_app_has_packet_tunnel_provider,
+            launch_probe_app_alive,
+            require_macos_zip_residual_capable,
         )
-        self.assertTrue(
-            report.get("spctl_notarized_developer_id"),
-            msg=report.get("spctl_text"),
-        )
+
+        self.assertTrue(callable(host_app_has_packet_tunnel_provider))
+        self.assertTrue(callable(launch_probe_app_alive))
+        self.assertTrue(callable(assess_macos_zip_residual_capable))
+        self.assertTrue(callable(require_macos_zip_residual_capable))
+        missing = assess_macos_zip_residual_capable("/no/such/macos.zip")
+        self.assertFalse(missing.get("ok"))
+        self.assertEqual(missing.get("reason"), "missing_zip")
 
 
 if __name__ == "__main__":

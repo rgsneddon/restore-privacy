@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Fail-closed gates for Apple monopin ships (Team residual NE + catalog seal).
 
-Product dual path (do not conflate):
-  (A) **Public catalog macOS zip** — Developer ID + notarize; host **must not**
-      embed residual packet-tunnel-provider (AMFI).
-  (B) **Residual-capable local app** — Team residual NE re-sign of a **copy** of
-      the Flutter-built app (host + appex with NE profiles). Required for residual
-      Connect on this Mac; separate from (A).
+Product residual monopin path (do not conflate with openable DevID):
+  (A) **Catalog residual monopin zip** — Team residual NE re-sign of a **copy**
+      of the Flutter-built app (host + appex with NE profiles, host
+      packet-tunnel-provider). This is the monopin basename shipped to Helsinki
+      so residual Connect / VPN config registration works and launch stays alive.
+  (B) **Optional openable DevID zip** — Developer ID + notarize with host NE
+      **omitted** (AMFI kills DevID+host-NE without a matching DevID NE profile).
+      Not the residual monopin; opt-in via RPT_MACOS_ALSO_DEVID=1.
 
-Builds going forward must run both: residual Team re-sign (B) then DevID seal (A).
+Never ship DevID + host packet-tunnel-provider without a DevID NE profile
+(AMFI SIGKILL 137 → Settings/VPN unreachable).
 """
 
 from __future__ import annotations

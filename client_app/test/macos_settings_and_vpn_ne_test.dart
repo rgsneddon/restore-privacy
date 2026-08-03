@@ -104,16 +104,17 @@ void main() {
     final script = File('../scripts/sign_and_notarize_macos.py');
     expect(script.existsSync(), isTrue);
     final src = script.readAsStringSync();
-    // Default RPT_MACOS_HOST_NE is off — public zip must launch (not AMFI 137).
+    // Default RPT_MACOS_HOST_NE is off — DevID side path must launch (not AMFI 137).
     expect(src.contains('RPT_MACOS_HOST_NE", "0"'), isTrue);
     expect(src.contains('DeveloperID.entitlements'), isTrue);
     expect(src.contains('launch_probe_alive'), isTrue);
     expect(src.contains('return 4'), isTrue); // fail closed on dead launch
-    // Residual host NE remains opt-in only.
+    // Residual host NE on DevID remains opt-in only (AMFI without DevID NE profile).
     expect(src.contains('DeveloperIDResidual.entitlements'), isTrue);
   });
 
-  test('build_suite_1.1.6 invokes residual team resign every macOS ship', () {
+  test('build_suite_1.1.6 packages residual-team as monopin (host NE + launch)',
+      () {
     final root = Directory.current.path;
     // flutter test cwd is client_app/
     final script = File('../scripts/build_suite_1.1.6.py');
@@ -121,5 +122,16 @@ void main() {
     final src = script.readAsStringSync();
     expect(src.contains('run_residual_team_resign'), isTrue);
     expect(src.contains('apple_ship_gates'), isTrue);
+    // Catalog monopin is residual-capable, not unopenable DevID+host-NE.
+    expect(src.contains('require_macos_zip_residual_capable'), isTrue);
+    expect(src.contains('require=True'), isTrue);
+    expect(src.contains('host_app_has_packet_tunnel_provider'), isTrue);
+    expect(src.contains('launch_probe_app_alive'), isTrue);
+    // Must not require Notarized DevID for residual monopin seal.
+    expect(
+      src.contains('require_macos_zip_developer_id_distribution(dest)'),
+      isFalse,
+      reason: 'residual monopin uses residual seal, not DevID-only audit',
+    );
   });
 }
