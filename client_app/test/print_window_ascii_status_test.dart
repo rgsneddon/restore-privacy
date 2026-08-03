@@ -37,6 +37,30 @@ void main() {
     expect(ellipsis, 'Please wait...');
   });
 
+  test('sanitizeStatusForPrint preserves ASCII compound hyphens and URLs', () {
+    // Real path: autoconnect append mentions end-user licence.
+    const compound = 'Settings: autoconnect skipped - accept the end-user licence first.';
+    expect(sanitizeStatusForPrint(compound), compound);
+    expect(sanitizeStatusForPrint(compound), contains('end-user'));
+    expect(sanitizeStatusForPrint(compound), isNot(contains('end - user')));
+
+    const url =
+        'Could not open browser. Visit: https://restoreprivacy.online/pay?product=suite';
+    expect(sanitizeStatusForPrint(url), url);
+    expect(sanitizeStatusForPrint(url), contains('https://restoreprivacy.online/pay'));
+    expect(sanitizeStatusForPrint(url), isNot(contains('restoreprivacy.online/pay - ')));
+
+    // Em dash still becomes spaced ASCII separator; ASCII hyphens nearby stay put.
+    final mixed = sanitizeStatusForPrint(
+      'end-user licence \u2014 then visit https://a-b.example/path-name',
+    );
+    expect(mixed, contains('end-user'));
+    expect(mixed, isNot(contains('end - user')));
+    expect(mixed, contains('https://a-b.example/path-name'));
+    expect(mixed, contains(' - ')); // only from the em dash
+    expect(mixed, isNot(contains('\u2014')));
+  });
+
   test('Quit shows on every residual TargetPlatform including Android', () {
     for (final p in [
       TargetPlatform.android,

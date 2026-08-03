@@ -752,28 +752,33 @@ const String kDisconnectedResidualIpMessage =
 
 /// Normalize punctuation for the main-screen print/status window.
 ///
-/// Strips em/en dashes and ellipsis (and common Latin-1 misreads of UTF-8 em
-/// dash) so Android never shows garbage like `å€` in disconnect lines.
+/// Replaces em/en dashes and common UTF-8-as-Latin-1 mojibake of those dashes
+/// so Android never shows garbage like `å€` in disconnect lines.
+///
+/// **Does not** rewrite ordinary ASCII hyphens (compound words like `end-user`,
+/// hostnames, URLs). Only the dash/mojibake forms listed below are substituted.
 String sanitizeStatusForPrint(String message) {
   var s = message;
-  // Real Unicode punctuation.
-  s = s.replaceAll('\u2014', '-'); // em dash
-  s = s.replaceAll('\u2013', '-'); // en dash
-  s = s.replaceAll('\u2026', '...'); // ellipsis
-  // UTF-8 em dash (E2 80 94) mis-decoded as Windows-1252 → "â€"" (U+00E2 U+20AC U+201D).
-  s = s.replaceAll('\u00e2\u20ac\u201d', '-');
-  s = s.replaceAll('\u00e2\u20ac\u201c', '-');
-  s = s.replaceAll('\u00e2\u20ac\u2013', '-');
-  s = s.replaceAll('\u00e2\u20ac\u2014', '-');
-  // Same bytes misread as Latin-1 then re-encoded (â + C2 80 + C2 94).
-  s = s.replaceAll('\u00e2\u0080\u0094', '-');
-  s = s.replaceAll('\u00e2\u0080\u0093', '-');
-  // Font/device-specific garbage reported as "å€" between words.
-  s = s.replaceAll('\u00e5\u20ac', '-');
-  // Any leftover â€ / å€ fragments glued to spaces.
-  s = s.replaceAll(RegExp(r'[\u00e2\u00e5]\u20ac[\u201c\u201d\u2013\u2014]?'), '-');
-  // Normalize spaces around hyphen separators: " - " form.
-  s = s.replaceAll(RegExp(r'[ \t]*-[ \t]*'), ' - ');
+  // Ellipsis only (not hyphen-related).
+  s = s.replaceAll('\u2026', '...');
+
+  // Match only em/en dash and known mojibake of UTF-8 em dash (E2 80 94):
+  //   real: U+2014 / U+2013
+  //   cp1252 misread: â€" / â€" (U+00E2 U+20AC U+201D/U+201C)
+  //   latin-1 misread re-encoded: â\u0080\u0094
+  //   device font garbage: å€ (U+00E5 U+20AC)
+  // Optional surrounding whitespace collapses to a single " - " separator.
+  final dashLike = RegExp(
+    r'[ \t]*('
+    r'\u2014|\u2013' // em / en dash
+    r'|\u00e2\u20ac[\u201c\u201d\u2013\u2014]?' // â€" family
+    r'|\u00e2\u0080[\u0093\u0094]' // latin-1 re-encode of E2 80 93/94
+    r'|\u00e5\u20ac' // å€
+    r'|[\u00e2\u00e5]\u20ac' // bare â€ / å€ fragment
+    r')[ \t]*',
+  );
+  s = s.replaceAll(dashLike, ' - ');
+  // Collapse runs of spaces introduced by substitution only.
   s = s.replaceAll(RegExp(r' {2,}'), ' ');
   return s.trim();
 }
