@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 
 import 'connect_status.dart';
+import 'leak_test.dart';
 import 'macos_vpn_permission_sequence.dart';
 import 'rpt_config.dart';
 import 'settings_store.dart';
@@ -499,6 +500,8 @@ class VpnController {
         if (result['ipv4Residual'] is bool) {
           ipv4 = result['ipv4Residual'] as bool;
         }
+        final flags = parseNativeResidualStatus(result);
+        final dnsOnly = resolveDnsTunnelOnly(flags: flags);
         return VpnSessionSnapshot(
           connected: ok,
           connecting: connecting,
@@ -506,6 +509,12 @@ class VpnController {
           message: msg.isEmpty ? null : msg,
           ipv6Protected: ipv6,
           ipv4Residual: ipv4,
+          residualCaptureActive: flags.residualCaptureActive,
+          dnsTunnelOnly: dnsOnly,
+          fullTunnelActive: flags.fullTunnelActive,
+          rawStatus: Map<String, dynamic>.from(
+            result.map((k, v) => MapEntry(k.toString(), v)),
+          ),
         );
       }
     } on MissingPluginException {
@@ -524,6 +533,17 @@ class VpnSessionSnapshot {
   final bool? ipv6Protected;
   final bool? ipv4Residual;
 
+  /// Residual public-IP capture active (from native status parse).
+  final bool residualCaptureActive;
+
+  /// Live tunnel-DNS-only posture (native flag or product DNS plan).
+  final bool dnsTunnelOnly;
+
+  final bool fullTunnelActive;
+
+  /// Raw status map when available (watchdog / leak-test).
+  final Map<String, dynamic>? rawStatus;
+
   const VpnSessionSnapshot({
     required this.connected,
     this.connecting = false,
@@ -531,5 +551,9 @@ class VpnSessionSnapshot {
     this.message,
     this.ipv6Protected,
     this.ipv4Residual,
+    this.residualCaptureActive = false,
+    this.dnsTunnelOnly = false,
+    this.fullTunnelActive = false,
+    this.rawStatus,
   });
 }

@@ -12,6 +12,7 @@ import 'country_select.dart';
 import 'easter_egg_server.dart';
 import 'entry_access.dart';
 import 'keygen_field.dart';
+import 'leak_posture.dart';
 import 'licence_gate.dart';
 import 'macos_window.dart';
 import 'prefs_backend.dart';
@@ -247,6 +248,17 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
 
   /// Bumps when residual push stores a pending package (Settings panel reloads).
   int _suiteUpdateReloadToken = 0;
+
+  /// Connected residual leak posture (Home surface; same pure evaluator as Settings).
+  ResidualLeakPosture? _homePosture;
+
+  /// Last residual watchdog snapshot while Connected.
+  ResidualWatchdogSnapshot? _watchdog;
+
+  /// Periodic residual integrity re-check while Connected.
+  Timer? _residualWatchdogTimer;
+
+  static const Duration _residualWatchdogInterval = Duration(seconds: 12);
 
   @override
   void initState() {
@@ -957,6 +969,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       if (ok) {
         _append(_status);
         await _connLog(kLogKindConnect, 'Connected — residual path active');
+        _startResidualWatchdog();
         // Keep main window open after Connect (no auto hide-to-tray / minimize).
         // Tray icon may still update for status; user can hide manually via close→tray.
         if (MacWindowController.isSupported) {
@@ -1032,6 +1045,88 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     if (snap.connected) {
       // Pull any residual operator push that arrived while backgrounded.
       unawaited(_pollSuiteUpdatePush());
+      _startResidualWatchdog();
+    } else {
+      _stopResidualWatchdog();
+    }
+  }
+
+  void _startResidualWatchdog() {
+    _residualWatchdogTimer?.cancel();
+    _residualWatchdogTimer = Timer.periodic(
+      _residualWatchdogInterval,
+      (_) => unawaited(_tickResidualWatchdog()),
+    );
+    unawaited(_tickResidualWatchdog());
+  }
+
+  void _stopResidualWatchdog() {
+    _residualWatchdogTimer?.cancel();
+    _residualWatchdogTimer = null;
+    if (mounted) {
+      setState(() {
+        _watchdog = null;
+        if (!_connected) _homePosture = null;
+      });
+    }
+  }
+
+  /// Re-check residual capture / IPv6 / tunnel DNS while Connected; surface drops.
+  Future<void> _tickResidualWatchdog() async {
+    if (!mounted) return;
+    final snap = await _vpn.querySession();
+    if (!mounted) return;
+    // Live flags from native status parse — do not invent residual capture.
+    final residualCapture = snap.residualCaptureActive;
+    final bool ipv6;
+    if (snap.ipv6Protected != null) {
+      ipv6 = snap.ipv6Protected!;
+    } else {
+      ipv6 = residualCapture &&
+          _settings.residualIpv6 &&
+          !_status.toLowerCase().contains('ipv6 not protected');
+    }
+    // querySession already resolves DNS via native flag / product DNS plan.
+    final dnsOnly = snap.dnsTunnelOnly;
+    final expectUp = _connected || snap.connected;
+    final wd = evaluateResidualWatchdog(
+      expectResidualConnected: expectUp,
+      residualCaptureActive: residualCapture,
+      ipv6Protected: ipv6,
+      dnsTunnelOnly: dnsOnly,
+      residualIpv6SettingOn: _settings.residualIpv6,
+    );
+    final ({String? verdict, int? atMs}) last =
+        await _store?.loadLastLeakTest() ?? (verdict: null, atMs: null);
+    final posture = evaluateResidualLeakPosture(
+      residualCaptureActive: residualCapture,
+      ipv6Protected: ipv6,
+      dnsTunnelOnly: dnsOnly,
+      lastLeakVerdict: last.verdict,
+      lastLeakAtMs: last.atMs,
+    );
+    if (!mounted) return;
+    final prevOk = _watchdog?.ok;
+    setState(() {
+      _watchdog = wd;
+      _homePosture = posture;
+      if (snap.connected != _connected && !snap.connecting) {
+        _connected = snap.connected;
+        if (!snap.connected) {
+          _vpnIp = null;
+        } else {
+          _vpnIp = snap.vpnIp ?? _vpnIp;
+        }
+      }
+      if (!wd.ok && expectUp) {
+        // Surface residual drop honestly on the status card.
+        _status = 'Residual warning: ${wd.reason}';
+      }
+    });
+    // Log only on transition to !ok (avoid spam every tick).
+    if (!wd.ok && expectUp && prevOk != false) {
+      _append('Watchdog: ${wd.reason}');
+      await _connLog(kLogKindError, 'Residual watchdog: ${wd.reason}');
     }
   }
 
@@ -1129,9 +1224,12 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           await _connLog(kLogKindDisconnect, 'System VPN still active after disconnect');
           await _macWindow.setTrayConnected(true);
         } else {
+          _stopResidualWatchdog();
           setState(() {
             _connected = false;
             _vpnIp = null;
+            _homePosture = null;
+            _watchdog = null;
             _status =
                 'Disconnected — system VPN stopped. Press Connect when you want protection.';
           });
@@ -1245,6 +1343,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _residualWatchdogTimer?.cancel();
     _logScroll.dispose();
     super.dispose();
   }
@@ -1476,6 +1575,78 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   ],
                 ),
               ),
+              // Residual leak posture while Connected (same pure evaluator as Settings).
+              if (_connected && _homePosture != null) ...[
+                SizedBox(height: tight ? 6 : 10),
+                Container(
+                  key: const Key('home_residual_leak_posture_panel'),
+                  decoration: BoxDecoration(
+                    color: suitePanelBgOf(context),
+                    borderRadius: BorderRadius.circular(kCornerRadius),
+                    border: Border.all(
+                      color: (_watchdog != null && !_watchdog!.ok)
+                          ? kStatusError
+                          : suiteBorderOf(context),
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        kLeakPostureSectionTitle,
+                        style: TextStyle(
+                          color: suiteTextMutedOf(context),
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _homePosture!.headline,
+                        key: const Key('home_residual_leak_posture_headline'),
+                        style: TextStyle(
+                          color: suiteTextOf(context),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _homePosture!.detail,
+                        style: TextStyle(
+                          color: suiteTextMutedOf(context),
+                          fontSize: 11,
+                        ),
+                      ),
+                      if (_watchdog != null && !_watchdog!.ok) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Watchdog: ${_watchdog!.reason}',
+                          key: const Key('home_residual_watchdog_banner'),
+                          style: const TextStyle(
+                            color: kStatusError,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Text(
+                        'Capture: ${_homePosture!.residualCaptureActive ? "active" : "off"} · '
+                        'IPv6: ${_homePosture!.ipv6Protected ? "protected" : "not confirmed"} · '
+                        'DNS: ${_homePosture!.dnsTunnelOnly ? "tunnel only" : "not tunnel-only"}',
+                        style: TextStyle(
+                          color: suiteTextMutedOf(context),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               SizedBox(height: tight ? 6 : 12),
               Container(
                 height: tight ? 96 : 140,

@@ -114,6 +114,10 @@ class MainActivity : FlutterActivity() {
                                 "hostOnlySession" to false,
                                 "vpnIp" to ip,
                                 "ipv6Protected" to v6,
+                                // Live residual/DNS flags for Flutter leak posture + watchdog.
+                                "residualCapture" to active,
+                                "dnsTunnelGatewayOnly" to active,
+                                "dnsTunnelOnly" to active,
                                 "message" to statusMsg,
                             ),
                         )

@@ -63,6 +63,8 @@ class SettingsScreen extends StatefulWidget {
     this.usageReporter,
     this.initialUsage,
     this.suiteUpdateReloadToken = 0,
+    this.publicIpLookup,
+    this.statusInvoker,
   });
 
   final SettingsStore store;
@@ -80,6 +82,12 @@ class SettingsScreen extends StatefulWidget {
 
   /// True when residual tunnel is active (for multihop reconnect messaging).
   final bool residualConnected;
+
+  /// Injectable public-IP lookup for leak test (tests / offline).
+  final Future<String?> Function()? publicIpLookup;
+
+  /// Injectable native `status` invoker (tests); default uses method channel.
+  final Future<dynamic> Function()? statusInvoker;
 
   /// Optional Suite parts install store (remove/retain % · EVOLVE · rpAI).
   final SuitePartsStore? partsStore;
@@ -749,32 +757,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> runLeakTest() async {
-    // Prefer live residual flags from parent; fall back to native status.
-    var residual = widget.residualCaptureActive;
-    var ipv6 = widget.ipv6Protected;
-    if (!residual) {
-      try {
-        final result = await _channel.invokeMethod<dynamic>('status');
-        if (result is Map) {
-          residual = result['connected'] == true &&
-              (result['residualCapture'] == true ||
-                  result['systemCapture'] == true ||
-                  result['routesApplied'] == true);
-          ipv6 = result['ipv6Protected'] == true;
-        }
-      } catch (_) {
-        // Offline / no plugin — evaluate with residual=false.
-      }
+  Future<dynamic> _invokeStatus() async {
+    final inv = widget.statusInvoker;
+    if (inv != null) return inv();
+    try {
+      return await _channel.invokeMethod<dynamic>('status');
+    } catch (_) {
+      return null;
     }
-    // When native residual capture is active, treat session residual path as
-    // confirmed (no separate HTTP egress probe required in Settings).
+  }
+
+  Future<void> runLeakTest() async {
+    // Live native status + product DNS plan + public egress probe (no invented PASS).
+    dynamic statusMap;
+    try {
+      statusMap = await _invokeStatus();
+    } catch (_) {
+      statusMap = null;
+    }
+    final inputs = await collectProductLeakTestInputs(
+      nativeStatus: statusMap,
+      parentResidualCapture: widget.residualCaptureActive,
+      parentIpv6Protected: widget.ipv6Protected,
+      runPublicIpProbe: true,
+      publicIpLookup: widget.publicIpLookup,
+    );
     final result = runProductLeakTest(
-      residualCaptureActive: residual,
-      ipv6Protected: ipv6,
-      publicIpProbeRan: residual,
-      publicIpMatchesExpectedNode: residual ? true : null,
-      dnsTunnelGatewayOnly: true,
+      residualCaptureActive: inputs.residualCaptureActive,
+      ipv6Protected: inputs.ipv6Protected,
+      dnsTunnelGatewayOnly: inputs.dnsTunnelGatewayOnly,
+      publicDnsViolations: inputs.publicDnsViolations,
+      publicIpProbeRan: inputs.publicIpProbeRan,
+      publicIpMatchesExpectedNode: inputs.publicIpMatchesExpectedNode,
     );
     await widget.store.saveLastLeakTest(verdict: result.verdict);
     await _log?.appendEvent(
@@ -783,8 +797,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (!mounted) return;
     await _refreshPosture(
-      residual: residual,
-      ipv6: ipv6,
+      residual: inputs.residualCaptureActive,
+      ipv6: inputs.ipv6Protected,
+      dnsTunnelOnly: inputs.dnsTunnelGatewayOnly,
       forceVerdict: result.verdict,
     );
     setState(() {
@@ -797,15 +812,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _refreshPosture({
     bool? residual,
     bool? ipv6,
+    bool? dnsTunnelOnly,
     String? forceVerdict,
   }) async {
     final last = await widget.store.loadLastLeakTest();
-    final cap = residual ?? widget.residualCaptureActive;
-    final v6 = ipv6 ?? widget.ipv6Protected;
+    var cap = residual ?? widget.residualCaptureActive;
+    var v6 = ipv6 ?? widget.ipv6Protected;
+    bool dnsOnly;
+    if (dnsTunnelOnly != null) {
+      dnsOnly = dnsTunnelOnly;
+    } else {
+      // Live status — never hardcode tunnel DNS true.
+      dynamic statusMap;
+      try {
+        statusMap = await _invokeStatus();
+      } catch (_) {
+        statusMap = null;
+      }
+      final flags = parseNativeResidualStatus(statusMap);
+      if (residual == null && flags.residualCaptureActive) {
+        cap = flags.residualCaptureActive;
+      }
+      if (ipv6 == null && statusMap != null) {
+        v6 = flags.ipv6Protected;
+      }
+      dnsOnly = resolveDnsTunnelOnly(
+        flags: NativeResidualStatusFlags(
+          connected: flags.connected || cap,
+          residualCaptureActive: cap,
+          ipv6Protected: v6,
+          fullTunnelActive: flags.fullTunnelActive || cap,
+          dnsTunnelOnly: flags.dnsTunnelOnly,
+          dnsServers: flags.dnsServers,
+          vpnIp: flags.vpnIp,
+          rawMessage: flags.rawMessage,
+        ),
+      );
+    }
     final posture = evaluateResidualLeakPosture(
       residualCaptureActive: cap,
       ipv6Protected: v6,
-      dnsTunnelOnly: true,
+      dnsTunnelOnly: dnsOnly,
       lastLeakVerdict: forceVerdict ?? last.verdict,
       lastLeakAtMs: last.atMs,
     );
@@ -1367,7 +1414,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 Text(
                   '• Tunnel DNS: '
-                  '${(_posture?.dnsTunnelOnly ?? true) ? "tunnel only" : "not tunnel-only"}',
+                  '${(_posture?.dnsTunnelOnly ?? false) ? "tunnel only" : "not tunnel-only"}',
                   style: TextStyle(fontSize: 12, color: suiteTextOf(context)),
                 ),
                 Text(

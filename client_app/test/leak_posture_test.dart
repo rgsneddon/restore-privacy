@@ -145,4 +145,107 @@ void main() {
       );
     });
   });
+
+  group('live status parse + DNS resolve (no hardcoded true)', () {
+    test('parseNativeResidualStatus reads residualCapture and dns flags', () {
+      final f = parseNativeResidualStatus({
+        'connected': true,
+        'fullTunnelActive': true,
+        'residualCapture': true,
+        'ipv6Protected': true,
+        'dnsTunnelOnly': true,
+        'dnsServers': ['10.88.0.1'],
+      });
+      expect(f.residualCaptureActive, isTrue);
+      expect(f.ipv6Protected, isTrue);
+      expect(f.dnsTunnelOnly, isTrue);
+      expect(resolveDnsTunnelOnly(flags: f), isTrue);
+    });
+
+    test('dnsTunnelOnly false when native reports false', () {
+      final f = parseNativeResidualStatus({
+        'connected': true,
+        'fullTunnelActive': true,
+        'residualCapture': true,
+        'dnsTunnelOnly': false,
+      });
+      expect(resolveDnsTunnelOnly(flags: f), isFalse);
+    });
+
+    test('dnsTunnelOnly false when residual capture inactive', () {
+      final f = parseNativeResidualStatus({
+        'connected': false,
+        'fullTunnelActive': false,
+      });
+      expect(f.residualCaptureActive, isFalse);
+      expect(resolveDnsTunnelOnly(flags: f), isFalse);
+    });
+
+    test('public DNS servers fail product DNS plan', () {
+      final plan = productDnsLeakPlan(observedServers: ['8.8.8.8']);
+      expect(plan.ok, isFalse);
+      expect(plan.publicFallbackViolations, isNotEmpty);
+    });
+
+    test('collectProductLeakTestInputs does not invent PASS match', () async {
+      final inputs = await collectProductLeakTestInputs(
+        nativeStatus: {
+          'connected': true,
+          'fullTunnelActive': true,
+          'residualCapture': true,
+          'ipv6Protected': true,
+          'dnsTunnelOnly': true,
+        },
+        runPublicIpProbe: true,
+        publicIpLookup: () async => '203.0.113.9', // not a residual peer
+      );
+      expect(inputs.publicIpProbeRan, isTrue);
+      expect(inputs.publicIpMatchesExpectedNode, isFalse);
+      final r = runProductLeakTest(
+        residualCaptureActive: inputs.residualCaptureActive,
+        ipv6Protected: inputs.ipv6Protected,
+        dnsTunnelGatewayOnly: inputs.dnsTunnelGatewayOnly,
+        publicDnsViolations: inputs.publicDnsViolations,
+        publicIpProbeRan: inputs.publicIpProbeRan,
+        publicIpMatchesExpectedNode: inputs.publicIpMatchesExpectedNode,
+      );
+      expect(r.verdict, isNot(kVerdictPass));
+    });
+
+    test('collectProductLeakTestInputs PASS only with peer IP match', () async {
+      final peer = productResidualPeerPublicIps().first;
+      final inputs = await collectProductLeakTestInputs(
+        nativeStatus: {
+          'connected': true,
+          'fullTunnelActive': true,
+          'residualCapture': true,
+          'ipv6Protected': true,
+          'dnsTunnelOnly': true,
+        },
+        runPublicIpProbe: true,
+        publicIpLookup: () async => peer,
+      );
+      expect(inputs.publicIpMatchesExpectedNode, isTrue);
+      final r = runProductLeakTest(
+        residualCaptureActive: inputs.residualCaptureActive,
+        ipv6Protected: inputs.ipv6Protected,
+        dnsTunnelGatewayOnly: inputs.dnsTunnelGatewayOnly,
+        publicDnsViolations: inputs.publicDnsViolations,
+        publicIpProbeRan: inputs.publicIpProbeRan,
+        publicIpMatchesExpectedNode: inputs.publicIpMatchesExpectedNode,
+      );
+      expect(r.verdict, kVerdictPass);
+    });
+
+    test('watchdog fails when dns tunnel posture lost', () {
+      final s = evaluateResidualWatchdog(
+        expectResidualConnected: true,
+        residualCaptureActive: true,
+        ipv6Protected: true,
+        dnsTunnelOnly: false,
+      );
+      expect(s.ok, isFalse);
+      expect(s.reason, contains('tunnel DNS'));
+    });
+  });
 }

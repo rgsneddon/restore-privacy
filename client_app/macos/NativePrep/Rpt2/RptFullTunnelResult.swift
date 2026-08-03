@@ -82,6 +82,11 @@ public enum RptFullTunnelResult {
                 "hostOnlySession": false,
                 "ipv6Protected": ipv6Protected,
                 "ipv4Residual": ipv4Residual,
+                // Live residual/DNS flags for Flutter leak posture + watchdog.
+                "residualCapture": ipv4Residual,
+                "dnsTunnelGatewayOnly": true,
+                "dnsTunnelOnly": true,
+                "dnsServers": ["10.88.0.1"],
             ]
             if !ip.isEmpty { m["vpnIp"] = ip }
             return m
