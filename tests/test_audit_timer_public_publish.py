@@ -110,7 +110,11 @@ class TestPublishTimerHelpers(unittest.TestCase):
             self.assertEqual(ready["generated_at"], stamp)
 
     def test_live_repo_json_has_generated_at_parser_roundtrip(self) -> None:
-        from audit_countdown import load_last_audit_generated_at, parse_audit_generated_at
+        from audit_countdown import (
+            load_last_audit_generated_at,
+            load_security_audit_json_prefer_upstream,
+            parse_audit_generated_at,
+        )
         from publish_timer_audit_to_status import generated_at_from_json_file
 
         path = ROOT / "status_page" / "static" / "security_audit_latest.json"
@@ -120,11 +124,17 @@ class TestPublishTimerHelpers(unittest.TestCase):
         self.assertTrue(raw)
         dt = parse_audit_generated_at(raw)
         self.assertIsNotNone(dt)
+        # Prefer-upstream may return a newer Helsinki stamp than git-local file —
+        # both must parse; last-run is never None when either is present.
         last = load_last_audit_generated_at(path)
         self.assertIsNotNone(last)
+        preferred = load_security_audit_json_prefer_upstream(path)
+        self.assertIsNotNone(preferred)
+        pref_at = parse_audit_generated_at(str(preferred.get("generated_at") or ""))
+        self.assertIsNotNone(pref_at)
         self.assertEqual(
             last.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            pref_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
 
 
