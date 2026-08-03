@@ -229,17 +229,24 @@ def format_connect_failure(
     host: str,
     port: int,
     timeout_s: float,
+    preferred_host: str | None = None,
+    tried_hosts: list[str] | None = None,
 ) -> str:
     """User-facing connect error — never bare 'timed out' without endpoint context.
 
     UDP HELLO timeouts usually mean the node is down, firewalled, or blocked;
     the message names host:port so the user can act.
 
+    When Connect tried multiple residual peers (entry + failover), report the
+    **preferred entry** first so support logs match the UI entry country rather
+    than only the last failover host (common confusion: entry DE, last try IS).
+
     WinError 10054 / connection reset on residual HELLO often means the node
     dropped the session (payment admission, wrong keys, or host closed the
     path) — surface that instead of only the raw socket code.
     """
-    target = f"{host}:{int(port)}"
+    report_host = (preferred_host or host or "").strip() or host
+    target = f"{report_host}:{int(port)}"
     name = type(exc).__name__
     raw = str(exc).strip() or name
     low = raw.lower()
@@ -252,8 +259,24 @@ def format_connect_failure(
     )
     if is_timeout:
         secs = int(timeout_s) if timeout_s == int(timeout_s) else timeout_s
+        tried = [h.strip() for h in (tried_hosts or []) if (h or "").strip()]
+        seen: set[str] = set()
+        tried_u: list[str] = []
+        for h in tried:
+            if h not in seen:
+                seen.add(h)
+                tried_u.append(h)
+        multi = ""
+        if len(tried_u) > 1:
+            alts = [h for h in tried_u if h != report_host]
+            if alts:
+                multi = (
+                    " Also tried failover peer(s): "
+                    + ", ".join(f"{h}:{int(port)}" for h in alts)
+                    + "."
+                )
         return (
-            f"No reply from VPN node {target} within {secs}s. "
+            f"No reply from VPN node {target} within {secs}s.{multi} "
             "If you just paid: enter the keygen from your fulfilment email "
             "(Settings → Payment entitlement / keygen, or the unlock dialog), "
             "then Connect again so this device is bound. "
@@ -844,11 +867,27 @@ class RptClient:
             raise last_exc
         except Exception as exc:
             self.state = ConnectState.ERROR
+            try:
+                preferred = entry_endpoint(self.multihop).host
+            except Exception:  # noqa: BLE001
+                preferred = getattr(self.endpoint, "host", "") or ""
+            tried: list[str] = []
+            try:
+                for t in targets:  # type: ignore[name-defined]
+                    th = (getattr(t, "host", None) or "").strip()
+                    if th:
+                        tried.append(th)
+            except Exception:  # noqa: BLE001
+                tried = []
+            if not tried and getattr(self.endpoint, "host", None):
+                tried = [str(self.endpoint.host)]
             msg = format_connect_failure(
                 exc,
                 host=self.endpoint.host,
                 port=self.endpoint.port,
                 timeout_s=timeout,
+                preferred_host=preferred,
+                tried_hosts=tried,
             )
             self._status(f"Connect failed: {msg}")
             return ConnectResult(ok=False, state=self.state, message=msg)

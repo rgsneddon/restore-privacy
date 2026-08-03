@@ -14,7 +14,9 @@ if errorlevel 1 (
   exit /b %ERRORLEVEL%
 )
 
-set "NODE=82.221.101.241"
+REM Live residual catalog peers (IS + DE) — must match client.multihop PRODUCT_COUNTRY_CATALOG
+set "NODE_IS=82.221.101.241"
+set "NODE_DE=178.105.187.178"
 set "PORT=44044"
 set "EXE="
 if exist "%~dp0RestorePrivacy.exe" set "EXE=%~dp0RestorePrivacy.exe"
@@ -22,10 +24,10 @@ if exist "%~dp0RestorePrivacy.exe" set "EXE=%~dp0RestorePrivacy.exe"
 echo Adding scoped Windows Defender Firewall allows for Restore Privacy...
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ErrorActionPreference='Stop'; $pfx='RPT-FW'; $node='%NODE%'; $port=%PORT%; $exe='%EXE%';" ^
+  "$ErrorActionPreference='Stop'; $pfx='RPT-FW'; $nodes=@('%NODE_IS%','%NODE_DE%'); $port=%PORT%; $exe='%EXE%';" ^
   "Get-NetFirewallRule -EA SilentlyContinue | Where-Object { $_.DisplayName -like ($pfx+'-*') } | Remove-NetFirewallRule -EA SilentlyContinue;" ^
-  "New-NetFirewallRule -DisplayName ($pfx+'-allow-node-udp') -Direction Outbound -Action Allow -Protocol UDP -RemoteAddress $node -RemotePort $port -Enabled True -Profile Any | Out-Null;" ^
-  "New-NetFirewallRule -DisplayName ($pfx+'-allow-node-any') -Direction Outbound -Action Allow -RemoteAddress $node -Enabled True -Profile Any -EA SilentlyContinue | Out-Null;" ^
+  "New-NetFirewallRule -DisplayName ($pfx+'-allow-node-udp') -Direction Outbound -Action Allow -Protocol UDP -RemoteAddress $nodes -RemotePort $port -Enabled True -Profile Any | Out-Null;" ^
+  "New-NetFirewallRule -DisplayName ($pfx+'-allow-node-any') -Direction Outbound -Action Allow -RemoteAddress $nodes -Enabled True -Profile Any -EA SilentlyContinue | Out-Null;" ^
   "if ($exe -and (Test-Path -LiteralPath $exe)) { New-NetFirewallRule -DisplayName ($pfx+'-allow-program') -Direction Outbound -Action Allow -Program $exe -Enabled True -Profile Any -EA SilentlyContinue | Out-Null; New-NetFirewallRule -DisplayName ($pfx+'-allow-program-in') -Direction Inbound -Action Allow -Program $exe -Enabled True -Profile Any -EA SilentlyContinue | Out-Null };" ^
   "if (-not (Get-NetFirewallRule -DisplayName ($pfx+'-allow-node-udp') -EA SilentlyContinue)) { throw 'missing RPT-FW-allow-node-udp' };" ^
   "Write-Output RPT_FW_ALLOW_OK"

@@ -38,6 +38,33 @@ def _ps_escape_single(s: str) -> str:
     return s.replace("'", "''")
 
 
+def residual_firewall_hosts(server_host: str | None = None) -> list[str]:
+    """Hosts that must be allowed for residual HELLO (catalog peers + dial target).
+
+    Product catalog is Iceland + Germany. AllowFirewall / Connect path must cover
+    **every** live residual peer so DE entry (and IS failover) is not blocked when
+    the installer only baked the historical Iceland monopin address.
+    """
+    hosts: list[str] = []
+    primary = (server_host or "").strip()
+    if primary:
+        hosts.append(primary)
+    try:
+        from client.multihop import product_country_catalog
+
+        for n in product_country_catalog():
+            h = (getattr(n, "host", None) or "").strip()
+            if h and h not in hosts:
+                hosts.append(h)
+    except Exception:  # noqa: BLE001
+        pass
+    if PRODUCT_NODE_HOST.strip() and PRODUCT_NODE_HOST.strip() not in hosts:
+        hosts.append(PRODUCT_NODE_HOST.strip())
+    if not hosts:
+        hosts = [PRODUCT_NODE_HOST.strip() or "82.221.101.241"]
+    return hosts
+
+
 def resolve_product_exe_path(explicit: Optional[str] = None) -> str:
     """Best-effort path to the product GUI exe for -Program scoped rules."""
     if explicit and explicit.strip():
@@ -64,8 +91,13 @@ def windows_fw_allow_script(
     for UDP to the product node port (default **44044**) and the product exe when
     known. Never sets DefaultOutboundAction Block and never creates Action=Block.
     Rule names use ``RPT-FW-*`` so kill-switch rollback (``RPT-KS-*``) never removes them.
+
+    RemoteAddress covers **all live catalog residual peers** (IS + DE) plus any
+    explicit *server_host*, so entry DE / failover IS both clear Windows Firewall.
     """
-    host = _ps_escape_single((server_host or PRODUCT_NODE_HOST).strip())
+    hosts = residual_firewall_hosts(server_host)
+    # PowerShell multi-value RemoteAddress: 'h1','h2'
+    node_ps = ",".join(f"'{_ps_escape_single(h)}'" for h in hosts)
     port = int(server_port if server_port is not None else PRODUCT_NODE_PORT)
     prog = (program_path if program_path is not None else resolve_product_exe_path()).strip()
     prog_esc = _ps_escape_single(prog) if prog else ""
@@ -73,28 +105,28 @@ def windows_fw_allow_script(
     lines = [
         "$ErrorActionPreference = 'Continue'",
         f"$pfx = '{WIN_FW_PREFIX}'",
-        f"$node = '{host}'",
+        f"$nodes = @({node_ps})",
         f"$port = {port}",
         # Remove prior product allows only (never touch RPT-KS or unrelated rules)
         "Get-NetFirewallRule -ErrorAction SilentlyContinue |",
         "  Where-Object { $_.DisplayName -like ($pfx + '-*') } |",
         "  Remove-NetFirewallRule -ErrorAction SilentlyContinue",
-        # Outbound UDP to product node (HELLO + residual DATA) — all profiles
+        # Outbound UDP to all catalog residual peers (HELLO + residual DATA)
         (
             f"New-NetFirewallRule -DisplayName '{WIN_FW_ALLOW_NODE}' -Direction Outbound "
-            f"-Action Allow -Protocol UDP -RemoteAddress $node -RemotePort $port "
+            f"-Action Allow -Protocol UDP -RemoteAddress $nodes -RemotePort $port "
             f"-Enabled True -Profile Any -ErrorAction Stop | Out-Null"
         ),
-        # Also allow any outbound to the node host for residual diagnostics (scoped)
+        # Also allow any outbound to residual peers for diagnostics (scoped)
         (
             f"New-NetFirewallRule -DisplayName '{WIN_FW_PREFIX}-allow-node-any' -Direction Outbound "
-            f"-Action Allow -RemoteAddress $node -Enabled True -Profile Any "
+            f"-Action Allow -RemoteAddress $nodes -Enabled True -Profile Any "
             f"-ErrorAction SilentlyContinue | Out-Null"
         ),
-        # Inbound from node (responses / residual path) — scoped RemoteAddress only
+        # Inbound from residual peers (responses / residual path)
         (
             f"New-NetFirewallRule -DisplayName '{WIN_FW_PREFIX}-allow-node-udp-in' "
-            f"-Direction Inbound -Action Allow -Protocol UDP -RemoteAddress $node "
+            f"-Direction Inbound -Action Allow -Protocol UDP -RemoteAddress $nodes "
             f"-LocalPort $port -Enabled True -Profile Any "
             f"-ErrorAction SilentlyContinue | Out-Null"
         ),

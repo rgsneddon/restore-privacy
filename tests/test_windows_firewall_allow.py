@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from client.endpoint import PRODUCT_NODE_HOST, PRODUCT_NODE_PORT  # noqa: E402
+from client.multihop import PRODUCT_DE_HOST  # noqa: E402
 from client.kill_switch import (  # noqa: E402
     product_kill_switch_enabled,
     windows_ks_apply_script,
@@ -23,6 +24,7 @@ from client.windows.firewall_allow import (  # noqa: E402
     assert_windows_fw_allow_commands_safe,
     assert_windows_fw_allow_script_safe,
     apply_windows_fw_allows,
+    residual_firewall_hosts,
     windows_firewall_connect_hint,
     windows_fw_allow_commands,
     windows_fw_allow_script,
@@ -145,6 +147,24 @@ class TestWindowsFwWiring(unittest.TestCase):
         self.assertIn(WIN_FW_ALLOW_PROGRAM, body)
         # Product allows never change profile DefaultOutboundAction
         self.assertNotIn("Set-NetFirewallProfile", body)
+
+    def test_catalog_peers_is_and_de_both_allowed(self):
+        """DE residual must not be blocked when installer historically only allowed IS."""
+        hosts = residual_firewall_hosts()
+        self.assertIn(PRODUCT_NODE_HOST, hosts)
+        self.assertIn(PRODUCT_DE_HOST, hosts)
+        body = windows_fw_allow_script()
+        self.assertIn(PRODUCT_NODE_HOST, body)
+        self.assertIn(PRODUCT_DE_HOST, body)
+        self.assertEqual(assert_windows_fw_allow_script_safe(body), [])
+        # Explicit DE dial still keeps IS (failover) in the allow set
+        body_de = windows_fw_allow_script(server_host=PRODUCT_DE_HOST)
+        self.assertIn(PRODUCT_DE_HOST, body_de)
+        self.assertIn(PRODUCT_NODE_HOST, body_de)
+        bat = ROOT / "client" / "windows" / "AllowFirewall.bat"
+        bat_text = bat.read_text(encoding="utf-8", errors="replace")
+        self.assertIn(PRODUCT_NODE_HOST, bat_text)
+        self.assertIn(PRODUCT_DE_HOST, bat_text)
 
 
 class TestNoInternetBlackholeOnFailedResidual(unittest.TestCase):
