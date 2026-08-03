@@ -52,6 +52,29 @@ void main() {
     expect(r.verdict, kVerdictPass);
     expect(r.formatUserMessage().toLowerCase(), contains('pass'));
     expect(r.formatUserMessage().toLowerCase(), isNot(contains('fail')));
+    // Old FAIL copy must stay gone (Settings always probes egress).
+    expect(
+      r.formatUserMessage().toLowerCase(),
+      isNot(contains('dns or egress check failed')),
+    );
+    expect(
+      r.formatUserMessage().toLowerCase(),
+      isNot(contains('possible residual leak')),
+    );
+
+    // After a successful PASS is stored, posture leaves pure Unverified.
+    final now = 1700000000000;
+    final posture = evaluateResidualLeakPosture(
+      residualCaptureActive: true,
+      ipv6Protected: true,
+      dnsTunnelOnly: true,
+      lastLeakVerdict: r.verdict,
+      lastLeakAtMs: now,
+      nowMs: now,
+    );
+    expect(posture.level, ResidualLeakPostureLevel.minimal);
+    expect(posture.headline, contains(kLeakPostureLabelMinimal));
+    expect(posture.headline, isNot(contains(kLeakPostureLabelUnverified)));
   });
 
   test('leak test still FAIL on public DNS when residual is up', () {
