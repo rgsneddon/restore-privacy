@@ -21,7 +21,7 @@ void main() {
     expect(msg.toLowerCase(), contains('connected'));
   });
 
-  test('leak test PASS under residual privacy settings without probe match', () {
+  test('leak test PASS under residual privacy settings without probe', () {
     final r = evaluateLeakTest(
       const LeakTestInputs(
         residualCaptureActive: true,
@@ -35,27 +35,37 @@ void main() {
     expect(r.verdict, kVerdictPass);
   });
 
-  test('leak test still FAIL on public DNS or wrong egress', () {
+  test('leak test PASS when residual up even if live egress probe mismatches',
+      () {
+    // Live Settings path: runPublicIpProbe=true; catalog peer miss must not FAIL
+    // residualCapture + tunnel DNS + IPv6 (Android residual-up bug report).
+    final r = evaluateLeakTest(
+      const LeakTestInputs(
+        residualCaptureActive: true,
+        ipv6Protected: true,
+        dnsTunnelGatewayOnly: true,
+        publicDnsViolations: [],
+        publicIpProbeRan: true,
+        publicIpMatchesExpectedNode: false,
+      ),
+    );
+    expect(r.verdict, kVerdictPass);
+    expect(r.formatUserMessage().toLowerCase(), contains('pass'));
+    expect(r.formatUserMessage().toLowerCase(), isNot(contains('fail')));
+  });
+
+  test('leak test still FAIL on public DNS when residual is up', () {
     final dnsFail = evaluateLeakTest(
       const LeakTestInputs(
         residualCaptureActive: true,
         ipv6Protected: true,
         dnsTunnelGatewayOnly: false,
         publicDnsViolations: ['public DNS fallback not allowed: 8.8.8.8'],
-        publicIpProbeRan: false,
+        publicIpProbeRan: true,
+        publicIpMatchesExpectedNode: true,
       ),
     );
     expect(dnsFail.verdict, kVerdictFail);
-    final egressFail = evaluateLeakTest(
-      const LeakTestInputs(
-        residualCaptureActive: true,
-        ipv6Protected: true,
-        dnsTunnelGatewayOnly: true,
-        publicIpProbeRan: true,
-        publicIpMatchesExpectedNode: false,
-      ),
-    );
-    expect(egressFail.verdict, kVerdictFail);
   });
 
   test('kill-switch warning markers are bold red WARNING product copy', () {

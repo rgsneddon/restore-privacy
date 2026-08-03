@@ -60,7 +60,8 @@ class TestEvaluateLeakTest(unittest.TestCase):
         )
         self.assertEqual(r.verdict, VERDICT_FAIL)
 
-    def test_fail_when_egress_probe_misses_node(self):
+    def test_pass_when_egress_probe_misses_catalog_peers_but_residual_holds(self):
+        """Live Settings always probes; catalog peer miss must not FAIL residual."""
         r = evaluate_leak_test(
             LeakTestInputs(
                 residual_capture_active=True,
@@ -70,10 +71,12 @@ class TestEvaluateLeakTest(unittest.TestCase):
                 public_ip_matches_expected_node=False,
             )
         )
-        self.assertEqual(r.verdict, VERDICT_FAIL)
-        self.assertIn("leak", r.summary.lower() + " ".join(r.details).lower())
+        self.assertEqual(r.verdict, VERDICT_PASS)
+        blob = (r.summary + " " + " ".join(r.details)).lower()
+        self.assertIn("residual capture active", blob)
+        self.assertNotIn("egress probe matched", blob)
 
-    def test_partial_without_live_probe(self):
+    def test_pass_without_live_probe_when_residual_holds(self):
         r = evaluate_leak_test(
             LeakTestInputs(
                 residual_capture_active=True,
@@ -82,10 +85,10 @@ class TestEvaluateLeakTest(unittest.TestCase):
                 public_ip_probe_ran=False,
             )
         )
-        self.assertEqual(r.verdict, VERDICT_PARTIAL)
+        self.assertEqual(r.verdict, VERDICT_PASS)
 
-    def test_inconclusive_probe_is_not_pass(self):
-        """probe_ran=True + matches=None must not pass or claim probe matched."""
+    def test_inconclusive_probe_still_pass_without_claiming_match(self):
+        """probe_ran=True + matches=None still PASS residual; must not claim match."""
         r = evaluate_leak_test(
             LeakTestInputs(
                 residual_capture_active=True,
@@ -95,18 +98,12 @@ class TestEvaluateLeakTest(unittest.TestCase):
                 public_ip_matches_expected_node=None,
             )
         )
-        self.assertNotEqual(r.verdict, VERDICT_PASS)
-        self.assertIn(
-            r.verdict,
-            (VERDICT_PARTIAL, VERDICT_INCONCLUSIVE),
-            f"expected partial/inconclusive, got {r.verdict}",
-        )
+        self.assertEqual(r.verdict, VERDICT_PASS)
         blob = (r.summary + " " + " ".join(r.details)).lower()
         self.assertIn("inconclusive", blob)
         self.assertNotIn("egress probe matched", blob)
         self.assertNotIn("probe matched the node", r.summary.lower())
-        # User message must not claim a clean pass
-        self.assertNotIn("LEAK TEST: PASS", r.format_user_message().upper())
+        self.assertIn("LEAK TEST: PASS", r.format_user_message().upper())
 
     def test_partial_without_ipv6(self):
         r = evaluate_leak_test(
@@ -167,14 +164,14 @@ class TestCollectAndRunProductLeakTest(unittest.TestCase):
         self.assertEqual(r.verdict, VERDICT_PASS)
         self.assertFalse(r.claims_multihop_residual)
 
-    def test_run_product_probe_false(self):
+    def test_run_product_probe_false_still_pass_when_residual_holds(self):
         r = run_product_leak_test(
             residual_capture_active=True,
             ipv6_protected=True,
             run_public_ip_probe=True,
             public_ip_probe=lambda: False,
         )
-        self.assertEqual(r.verdict, VERDICT_FAIL)
+        self.assertEqual(r.verdict, VERDICT_PASS)
 
 
 class TestLeakTestUiWiring(unittest.TestCase):

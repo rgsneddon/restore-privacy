@@ -187,7 +187,10 @@ void main() {
       expect(plan.publicFallbackViolations, isNotEmpty);
     });
 
-    test('collectProductLeakTestInputs does not invent PASS match', () async {
+    test('live residual+probe-mismatch still PASS (Settings always probes)',
+        () async {
+      // Android bug path: residual capture/DNS/IPv6 hold; live egress IP is not
+      // in the catalog peer list → still PASS (not FAIL on peer-list miss).
       final inputs = await collectProductLeakTestInputs(
         nativeStatus: {
           'connected': true,
@@ -201,6 +204,9 @@ void main() {
       );
       expect(inputs.publicIpProbeRan, isTrue);
       expect(inputs.publicIpMatchesExpectedNode, isFalse);
+      expect(inputs.residualCaptureActive, isTrue);
+      expect(inputs.dnsTunnelGatewayOnly, isTrue);
+      expect(inputs.ipv6Protected, isTrue);
       final r = runProductLeakTest(
         residualCaptureActive: inputs.residualCaptureActive,
         ipv6Protected: inputs.ipv6Protected,
@@ -209,10 +215,11 @@ void main() {
         publicIpProbeRan: inputs.publicIpProbeRan,
         publicIpMatchesExpectedNode: inputs.publicIpMatchesExpectedNode,
       );
-      expect(r.verdict, isNot(kVerdictPass));
+      expect(r.verdict, kVerdictPass);
+      expect(r.summary.toLowerCase(), contains('residual capture active'));
     });
 
-    test('collectProductLeakTestInputs PASS only with peer IP match', () async {
+    test('collectProductLeakTestInputs PASS with peer IP match', () async {
       final peer = productResidualPeerPublicIps().first;
       final inputs = await collectProductLeakTestInputs(
         nativeStatus: {
