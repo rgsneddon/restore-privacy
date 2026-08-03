@@ -30,6 +30,7 @@ import 'package:restore_privacy_client/suite_account.dart';
 import 'package:restore_privacy_client/suite_account_apply.dart';
 import 'package:restore_privacy_client/suite_family_host.dart';
 import 'package:restore_privacy_client/suite_parts.dart';
+import 'package:restore_privacy_client/suite_session_rehydrate.dart';
 
 /// Shared in-memory ledger JSON (Suite identity pattern: one file, two hubs).
 class _SharedStorePerc implements perc_store.PercWalletStore {
@@ -137,13 +138,21 @@ void main() {
     );
   });
 
-  test('Suite registered without live session prefers login not register', () {
+  test('Suite registered: no secondary login wall even if session cold', () {
     expect(
       suiteEvolveShowsLoginWall(
         suiteAccountRegistered: true,
         walletHasAppAccess: false,
       ),
-      isTrue,
+      isFalse,
+      reason: 'splash account is the only identity gate — no second form',
+    );
+    expect(
+      suiteFamilySecondaryAuthRequired(
+        suiteAccountRegistered: true,
+        walletHasAppAccess: false,
+      ),
+      isFalse,
     );
     expect(
       suiteEvolvePrefersLoginNotRegister(
@@ -152,12 +161,30 @@ void main() {
       ),
       isTrue,
     );
+    // Inherit banner needs live access after rehydrate.
     expect(
       suiteEvolveInheritsSuiteLogin(
         suiteAccountRegistered: true,
         walletHasAppAccess: false,
       ),
       isFalse,
+    );
+  });
+
+  test('cold unregistered still requires auth wall on family surfaces', () {
+    expect(
+      suiteEvolveShowsLoginWall(
+        suiteAccountRegistered: false,
+        walletHasAppAccess: false,
+      ),
+      isTrue,
+    );
+    expect(
+      suiteFamilySecondaryAuthRequired(
+        suiteAccountRegistered: false,
+        walletHasAppAccess: false,
+      ),
+      isTrue,
     );
   });
 
@@ -221,13 +248,65 @@ void main() {
         ),
         isFalse,
       );
-      // Accounts exist → WalletScreen would prefer login not create if cold.
+      expect(
+        suiteFamilySecondaryAuthRequired(
+          suiteAccountRegistered: true,
+          walletHasAppAccess: familyWallet.hasAppAccess,
+        ),
+        isFalse,
+      );
+      expect(familyWallet.suppressSecondaryAuthWall, isTrue);
+      // Accounts exist → standalone would prefer login not create if cold.
       expect(
         suiteEvolvePrefersLoginNotRegister(
           suiteAccountRegistered: true,
           hasNonTreasuryAccounts: familyWallet.hasNonTreasuryAccounts,
         ),
         isTrue,
+      );
+    },
+  );
+
+  test(
+    'rehydrate after cold session sets suiteSplashIdentityActive (no wall)',
+    () async {
+      const user = 'suite_splash_only';
+      const pass = 'password12345';
+      await applySuiteAccountToWalletAndEvolve(
+        username: user,
+        password: pass,
+        register: true,
+        surfaces: surfaces,
+        skipSeedOffer: true,
+      );
+
+      final raw = Map<String, dynamic>.from(sharedJson);
+      raw['sessionUsername'] = null;
+      raw.remove('sessionStartedAt');
+      raw.remove('sessionLastActivityAt');
+      sharedJson
+        ..clear()
+        ..addAll(raw);
+
+      evolve_hub.PercLedgerHub.resetForTest();
+      final family = evolve_wallet.PercWalletProvider(
+        store: _SharedStoreEvolve(sharedJson),
+      );
+      await family.initialize();
+      expect(family.hasAppAccess, isFalse);
+
+      SuiteAccountBus.instance.notifyRegistered(user);
+      final ok = await rehydrateSuiteFamilyWalletSession(wallet: family);
+      expect(ok, isTrue);
+      expect(family.hasAppAccess, isTrue);
+      expect(family.suiteSplashIdentityActive, isTrue);
+      expect(family.suppressSecondaryAuthWall, isTrue);
+      expect(
+        suiteEvolveShowsLoginWall(
+          suiteAccountRegistered: true,
+          walletHasAppAccess: family.hasAppAccess,
+        ),
+        isFalse,
       );
     },
   );

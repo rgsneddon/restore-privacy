@@ -215,6 +215,14 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
     if (next == _hasAppAccess) return;
     setState(() => _hasAppAccess = next);
     widget.onHasAppAccessChanged?.call(next);
+    // Splash identity already done — restore session without a second login form.
+    if (!next && SuiteAccountBus.instance.hasRegisteredSession) {
+      unawaited(() async {
+        final ok = await rehydrateSuiteFamilyWalletSession(wallet: w);
+        if (!mounted) return;
+        if (ok) _onEvolveWalletChanged();
+      }());
+    }
   }
 
   Future<void> _reloadLedgers() async {
@@ -227,10 +235,10 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
         _onEvolveWalletChanged();
       }
       if (_walletOnly != null) {
-        await wallet_hub.PercLedgerHub.instance.reloadFromStore();
         if (!_walletOnly!.isReady) {
           await _walletOnly!.initialize();
         }
+        await rehydrateSuitePercWalletSession(wallet: _walletOnly!);
       }
     } catch (_) {}
     if (mounted) setState(() {});
@@ -369,6 +377,9 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
     // Order: wallet.initialize loads store, then explicit reload so a Suite
     // first-run session written moments earlier is always applied to hasAppAccess.
     await _step('wallet_initialize', wallet.initialize());
+    if (SuiteAccountBus.instance.hasRegisteredSession) {
+      wallet.suiteSplashIdentityActive = true;
+    }
     // Rehydrate Suite first-run session before publishing hasAppAccess to nav.
     await _step(
       'suite_session_rehydrate',
@@ -439,6 +450,11 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
         wallet_hub.PercLedgerHub.instance.reloadFromStore(),
       );
     } catch (_) {}
+    // Splash Suite identity → no secondary % login form.
+    await _step(
+      'suite_perc_session_rehydrate',
+      rehydrateSuitePercWalletSession(wallet: wallet),
+    );
 
     return SuiteFamilyBootReady.walletOnly(
       walletOnly: wallet,
@@ -604,27 +620,29 @@ class SuiteFamilyBody extends StatelessWidget {
       );
       // Registration / seed host (same gate as AppBootstrap path).
       shell = evolve_reg.RegistrationSeedSetupDialogHost(child: shell);
-      // Suite first-run identity banner (inherit step-1 account).
+      // Suite first-run identity: no secondary login — banner only when access live.
       final suiteUser = (SuiteAccountBus.instance.lastUsername ?? '').trim();
+      final suiteRegistered =
+          SuiteAccountBus.instance.hasRegisteredSession || suiteUser.isNotEmpty;
       final inherits = suiteEvolveInheritsSuiteLogin(
-        suiteAccountRegistered:
-            SuiteAccountBus.instance.hasRegisteredSession || suiteUser.isNotEmpty,
+        suiteAccountRegistered: suiteRegistered,
         walletHasAppAccess: access,
       );
-      if (inherits || SuiteAccountBus.instance.hasRegisteredSession) {
-        final label = inherits
-            ? 'Suite account${suiteUser.isEmpty ? '' : ' ($suiteUser)'} — '
-                'same login from setup (no new register).'
-            : 'Sign in with your Suite username'
-                '${suiteUser.isEmpty ? '' : ' ($suiteUser)'} — '
-                'account already created in setup.';
+      // Splash identity scope so WalletScreen skips secondary create/login forms.
+      shell = SuiteSplashIdentityScope(
+        suiteAccountRegistered: suiteRegistered,
+        username: suiteUser.isEmpty ? null : suiteUser,
+        child: shell,
+      );
+      if (inherits) {
+        final label =
+            'Suite account${suiteUser.isEmpty ? '' : ' ($suiteUser)'} — '
+            'same identity from setup (no second sign-in).';
         shell = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Material(
-              color: inherits
-                  ? const Color(0xFF1A3A5C)
-                  : const Color(0xFF3A2A10),
+              color: const Color(0xFF1A3A5C),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Text(
@@ -680,6 +698,14 @@ class SuiteFamilyBody extends StatelessWidget {
         tabIndex: idx,
       );
       shell = wallet_reg.RegistrationSeedSetupDialogHost(child: shell);
+      final suiteUser = (SuiteAccountBus.instance.lastUsername ?? '').trim();
+      final suiteRegistered =
+          SuiteAccountBus.instance.hasRegisteredSession || suiteUser.isNotEmpty;
+      shell = SuiteSplashIdentityScope(
+        suiteAccountRegistered: suiteRegistered,
+        username: suiteUser.isEmpty ? null : suiteUser,
+        child: shell,
+      );
       if (locale != null) {
         return Theme(
           data: wallet_theme.AppTheme.dark(),

@@ -16,6 +16,7 @@ import 'settings_store.dart';
 import 'suite_account.dart';
 import 'suite_account_apply.dart';
 import 'suite_account_seed.dart';
+import 'suite_session_rehydrate.dart';
 import 'suite_version.dart';
 import 'theme.dart';
 
@@ -171,6 +172,7 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
             ),
           );
       final accounts = widget.accountStore ?? SuiteAccountStore(backend);
+      await seedSuiteAccountBusFromStore(accounts);
       final first = widget.firstRunStore ??
           FirstRunStore(
             backend: backend,

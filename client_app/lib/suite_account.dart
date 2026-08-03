@@ -6,6 +6,8 @@
 /// register wall during VPN setup.
 library;
 
+import 'package:flutter/widgets.dart';
+
 import 'settings_store.dart';
 
 const String kKeySuiteAccountDeferred = 'suite_account_prompt_deferred';
@@ -115,35 +117,75 @@ class SuiteAccountBus {
   }
 }
 
-/// Pure: Evolve/% must not force a full create-account wall when Suite already
-/// registered **and** the shared wallet session is live on this install.
+/// Pure: Suite splash identity is live for family surfaces (banner / inherit).
+///
+/// After first-run account create/login, secondary Evolve/% walls are not
+/// required — [walletHasAppAccess] is restored via rehydrate, not a second form.
 bool suiteEvolveInheritsSuiteLogin({
   required bool suiteAccountRegistered,
   required bool walletHasAppAccess,
 }) =>
     suiteAccountRegistered && walletHasAppAccess;
 
-/// Pure: whether Evolve should show **any** auth form (login or register).
+/// Pure: whether Evolve/% may show a **secondary** create-account or login form.
 ///
-/// When [walletHasAppAccess] is true, no auth wall. When Suite is registered
-/// but session is cold, a **login** form may still appear (password re-entry),
-/// but create-account is not required ([suiteEvolvePrefersLoginNotRegister]).
+/// Splash / first-run is the only identity gate. Once Suite is registered (or
+/// the wallet session is already live), family surfaces must not present a
+/// second auth wall.
 bool suiteEvolveShowsLoginWall({
   required bool suiteAccountRegistered,
   required bool walletHasAppAccess,
 }) {
   if (walletHasAppAccess) return false;
-  // Unregistered install: full auth (register or login) is honest.
-  // Registered but cold session: still need password form until rehydrate.
+  if (suiteAccountRegistered) return false;
   return true;
 }
 
-/// Pure: after Suite step-1 registration, auth UI must prefer sign-in over create.
+/// Pure: secondary family auth is required only when splash Suite identity is
+/// absent and the wallet session is cold.
+bool suiteFamilySecondaryAuthRequired({
+  required bool suiteAccountRegistered,
+  required bool walletHasAppAccess,
+}) =>
+    suiteEvolveShowsLoginWall(
+      suiteAccountRegistered: suiteAccountRegistered,
+      walletHasAppAccess: walletHasAppAccess,
+    );
+
+/// Pure: after Suite step-1 registration, auth UI must prefer sign-in over create
+/// (standalone Evolve only — Suite embed suppresses the wall entirely).
 bool suiteEvolvePrefersLoginNotRegister({
   required bool suiteAccountRegistered,
   required bool hasNonTreasuryAccounts,
 }) =>
     suiteAccountRegistered || hasNonTreasuryAccounts;
+
+/// Suite embed identity: first-run/splash account already done on this install.
+///
+/// When [suiteAccountRegistered] is true, Evolve/% [WalletScreen] / loading
+/// auth panels must not force a second create/login form.
+class SuiteSplashIdentityScope extends InheritedWidget {
+  const SuiteSplashIdentityScope({
+    super.key,
+    required this.suiteAccountRegistered,
+    this.username,
+    required super.child,
+  });
+
+  final bool suiteAccountRegistered;
+  final String? username;
+
+  static SuiteSplashIdentityScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SuiteSplashIdentityScope>();
+
+  /// True when secondary Evolve/% auth wall must not be shown.
+  bool get suppressSecondaryAuthWall => suiteAccountRegistered;
+
+  @override
+  bool updateShouldNotify(covariant SuiteSplashIdentityScope oldWidget) =>
+      suiteAccountRegistered != oldWidget.suiteAccountRegistered ||
+      username != oldWidget.username;
+}
 
 /// Result of the optional post-keygen Suite account sheet.
 enum SuiteAccountPromptOutcome {

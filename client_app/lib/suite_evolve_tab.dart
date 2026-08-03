@@ -23,6 +23,7 @@ import 'package:evolve/screens/app_bootstrap_screen.dart';
 import 'package:evolve/theme/app_theme.dart';
 
 import 'suite_account.dart';
+import 'suite_session_rehydrate.dart';
 import 'theme.dart';
 
 // suiteEvolveInheritsSuiteLogin / suiteEvolveShowsLoginWall live in suite_account.dart
@@ -128,14 +129,19 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
     if (wallet == null) return;
     try {
       await evolve_hub.PercLedgerHub.instance.reloadFromStore();
-      // Re-init if session appeared on disk after first-run (shared ledger).
       if (!wallet.isReady) {
         await wallet.initialize();
-      } else if (!wallet.hasAppAccess) {
-        // Hub may have sessionUsername after first-run persist — re-read store.
-        try {
-          await evolve_hub.PercLedgerHub.instance.reloadFromStore();
-        } catch (_) {}
+      }
+      if (_suiteRegistered ||
+          SuiteAccountBus.instance.hasRegisteredSession) {
+        wallet.suiteSplashIdentityActive = true;
+      }
+      // Splash identity → restore session without a second form.
+      if (!wallet.hasAppAccess) {
+        await rehydrateSuiteFamilyWalletSession(
+          wallet: wallet,
+          preferredUsername: _suiteUsername,
+        );
       }
     } catch (_) {}
     if (mounted) setState(() {});
@@ -325,8 +331,13 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
           child: Builder(
             builder: (context) {
               AppLocalizations.of(_locale!.config);
-              // Banner when Suite first-run registered the same identity.
-              if (inherits) {
+              // Banner when Suite first-run identity is live — no secondary sign-in.
+              if (inherits ||
+                  (_suiteRegistered && wallet.suiteSplashIdentityActive)) {
+                final user = (_suiteUsername ??
+                        SuiteAccountBus.instance.lastUsername ??
+                        '')
+                    .trim();
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -339,36 +350,8 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
                         ),
                         child: Text(
                           'Suite account'
-                          '${(_suiteUsername ?? SuiteAccountBus.instance.lastUsername ?? '').trim().isEmpty ? '' : ' (${_suiteUsername ?? SuiteAccountBus.instance.lastUsername})'}'
-                          ' — Evolve uses the same login from setup.',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFFFF9800),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(child: body),
-                  ],
-                );
-              }
-              if (_suiteRegistered && !wallet.hasAppAccess) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Material(
-                      color: const Color(0xFF3A2A10),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        child: Text(
-                          'Sign in with your Suite username'
-                          '${(_suiteUsername ?? '').isEmpty ? '' : ' (${_suiteUsername!})'}'
-                          ' — account already created in setup (not a new register).',
+                          '${user.isEmpty ? '' : ' ($user)'}'
+                          ' — same identity from setup (no second sign-in).',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Color(0xFFFF9800),

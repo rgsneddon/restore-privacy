@@ -217,6 +217,15 @@ void main() {
       expect(ok, isTrue);
       expect(family.hasAppAccess, isTrue);
       expect(family.loggedInUsername, user);
+      expect(family.suiteSplashIdentityActive, isTrue);
+      expect(family.suppressSecondaryAuthWall, isTrue);
+      expect(
+        suiteEvolveShowsLoginWall(
+          suiteAccountRegistered: true,
+          walletHasAppAccess: family.hasAppAccess,
+        ),
+        isFalse,
+      );
 
       final dests = suiteNavDestinations(
         const SuitePartsState(evolveInstalled: true, walletInstalled: true),

@@ -16,6 +16,7 @@ import 'licence_gate.dart';
 import 'prefs_backend.dart';
 import 'settings_store.dart';
 import 'suite_account.dart';
+import 'suite_session_rehydrate.dart';
 import 'suite_version.dart';
 import 'theme.dart';
 
@@ -190,6 +191,8 @@ class AppEntryRootState extends State<AppEntryRoot> {
         );
       }
       final accounts = widget.accountStore ?? SuiteAccountStore(backend);
+      // Cold start: restore in-process Suite identity so %/Evolve rehydrate.
+      await seedSuiteAccountBusFromStore(accounts);
       final first = widget.firstRunStore ??
           FirstRunStore(
             backend: backend,

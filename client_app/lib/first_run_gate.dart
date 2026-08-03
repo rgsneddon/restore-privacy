@@ -12,9 +12,10 @@ const String kKeyFirstRunSeedDone = 'first_run_seed_done';
 /// User-facing portal titles (Evolve-style Suite account).
 const String kFirstRunAccountTitle = 'Create your Restore Privacy Suite account';
 const String kFirstRunAccountBody =
-    'Set a username and password for one Suite identity. This unlocks Perccent '
-    'wallet (%) and Evolve analyser on this device. Credentials stay on your '
-    'device — they are not uploaded to residual nodes.';
+    'Set a username and password once for your Suite identity. This is the only '
+    'sign-in — Perccent wallet (%) and Evolve use the same account on this '
+    'device with no second login. Credentials stay on your device — they are '
+    'not uploaded to residual nodes.';
 const String kFirstRunSeedTitle = 'Backup: 12-word recovery phrase';
 const String kFirstRunSeedBody =
     'Write these 12 words offline (paper). They restore your Suite account, '
