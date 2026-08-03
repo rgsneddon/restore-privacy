@@ -24,16 +24,19 @@ const String kSuiteAccountLoginLabel = 'Sign in';
 const String kSuiteAccountUsernameLabel = 'Username';
 const String kSuiteAccountPasswordLabel = 'Password';
 
-/// Pure: whether the post-keygen Suite account prompt should appear.
+/// Pure: whether a Suite account (username/password) prompt should appear.
+///
+/// **Product path (dedicated residual VPN):** always `false`. Username/password
+/// and Suite identity prompts are not offered after KEYGEN/trial unlock.
+/// Args are retained so call sites compile; they are intentionally ignored.
 bool shouldOfferSuiteAccountPrompt({
   required bool vpnUnlocked,
   required bool deferred,
   required bool registered,
 }) {
-  if (!vpnUnlocked) return false;
-  if (registered) return false;
-  if (deferred) return false;
-  return true;
+  // Dedicated VPN product — never offer Suite account register/sign-in.
+  final _ = (vpnUnlocked, deferred, registered);
+  return false;
 }
 
 /// Pure: VPN Connect eligibility is never gated on Suite account state.

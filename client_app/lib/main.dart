@@ -21,7 +21,6 @@ import 'rpt_config.dart';
 import 'settings_screen.dart';
 import 'settings_store.dart';
 import 'suite_account.dart';
-import 'suite_account_prompt.dart';
 import 'suite_parts.dart';
 import 'suite_parts_store.dart';
 import 'suite_shell.dart';
@@ -442,7 +441,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       if (!canConnect) {
         _status = licOk
             ? 'Trial ended or KEYGEN required — enter KEYGEN (unlock dialog) or Get keygen at /pay, then Connect.'
-            : 'Complete first-run setup (account, seed, licence) before Connect.';
+            : 'Accept the end-user licence, then enter a KEYGEN or continue the free trial before Connect.';
       } else {
         _status =
             'Ready. Press Connect when you want residual protection (3-day trial or KEYGEN).';
@@ -799,62 +798,25 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _append('Keygen unlocked.');
       // Sheet is fully closed — safe to register Packet Tunnel / open Settings.
       await _prepareMacosPacketTunnelBeforeConnect();
-      // Optional: one Suite account for % wallet + Evolve (VPN already unlocked).
-      await _maybeShowSuiteAccountPrompt();
+      // Dedicated residual VPN: never show Suite username/password after KEYGEN.
+      // (shouldOfferSuiteAccountPrompt is hard-false; prompt path removed.)
     }
   }
 
-  /// Post-KEYGEN optional register/login for Perccent + Evolve (single prompt).
+  /// Former Suite account prompt after KEYGEN — **product disabled**.
   ///
-  /// Dismissible; never required for [LicenceGate.mayConnect] / residual VPN.
+  /// Residual VPN does not offer username/password register or seed write-down.
+  /// Kept as a no-op so any residual call sites compile and fail closed.
   Future<void> _maybeShowSuiteAccountPrompt() async {
-    final store = _store;
-    final gate = _licence;
-    if (store == null || gate == null || !mounted) return;
-    final may = await gate.mayConnect();
-    final account = SuiteAccountStore(store.backend);
-    final deferred = await account.isDeferred();
-    final registered = await account.isRegistered();
+    // Product lock: never offer Suite identity on residual VPN path.
     if (!shouldOfferSuiteAccountPrompt(
-      vpnUnlocked: may,
-      deferred: deferred,
-      registered: registered,
+      vpnUnlocked: true,
+      deferred: false,
+      registered: false,
     )) {
       return;
     }
-    if (!mounted) return;
-    // Share Settings prefs for suite seed seal + licence/KEYGEN rehydrate.
-    final outcome = await showSuiteAccountPrompt(
-      context,
-      store: account,
-      suitePrefsBackend: store.backend,
-      licenceBackend: store.backend,
-    );
-    if (!mounted) return;
-    switch (outcome) {
-      case SuiteAccountPromptOutcome.deferred:
-        _append('Suite account deferred — VPN remains available.');
-        setState(() {
-          _status =
-              'Keygen verified. Press Connect anytime. Register for % / Evolve later from those tabs.';
-        });
-      case SuiteAccountPromptOutcome.registered:
-        _append('Suite account created for % wallet and Evolve.');
-        setState(() {
-          _status =
-              'Keygen verified and Suite account ready for % and Evolve. Press Connect for residual VPN.';
-        });
-      case SuiteAccountPromptOutcome.signedIn:
-        _append('Suite account signed in for % wallet and Evolve.');
-        setState(() {
-          _status =
-              'Keygen verified and Suite account signed in. Press Connect for residual VPN.';
-        });
-      case SuiteAccountPromptOutcome.dismissed:
-        // Treated like defer so we do not re-prompt every Connect.
-        await account.markDeferred();
-        _append('Suite account prompt dismissed — VPN remains available.');
-    }
+    // Unreachable while shouldOfferSuiteAccountPrompt is hard-false.
   }
 
   Future<bool> assertMayConnect() async {

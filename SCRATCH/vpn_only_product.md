@@ -1,38 +1,29 @@
 # VPN-only dedicated residual product — evidence
 
 Date: 2026-08-03  
-Commits: `3f8ae8c` (product), follow-up EULA + PASS captures
+Commits: `3f8ae8c` (product), `177ff0c` (EULA), follow-up (no Suite account prompt)
 
 ## Goal
-Strip multi-product Suite chrome (Evolve / % wallet / rpAI / Backup) and
-username/password first-use. Ship residual VPN only:
+Dedicated residual VPN: no Evolve/%/rpAI/Backup chrome; no username/password
+first-use or post-KEYGEN Suite account prompt.
 
-1. First use: licence (scroll-to-bottom, justified full text) → KEYGEN paste
-   or continue 72h device trial → main VPN.
-2. Return: entitlement (trial remaining or KEYGEN) required; if trial expired
-   KEYGEN is mandatory → main VPN.
-3. No Suite account / seed first-use path.
+## First-use / return
+1. Licence (justified, scroll-to-bottom) → KEYGEN or continue 72h trial → VPN
+2. Return: entitlement required (trial or KEYGEN); expired trial → KEYGEN must
 
-## Verification plan captures (implementer SCRATCH)
+## Skeptic fix (account prompt)
+- `shouldOfferSuiteAccountPrompt` hard-returns `false`
+- `main.dart` no longer calls `showSuiteAccountPrompt` after KEYGEN unlock
+- Connect-blocked copy is licence + KEYGEN/trial only (no account/seed)
 
-Directory:
-`/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-90d777e1b612/implementer/`
+## Verification plan captures
 
-| Capture | Tests / audit | Observation |
-|---------|----------------|-------------|
-| `vpn_only_entry_flow.out` | first_run_gate, entry_access, portal, seed hang retirement | **All tests passed!** (+21) |
-| `vpn_only_shell.out` | suite_parts_usage, suite_flat_nav, vpn_only_product | **All tests passed!** (+31) |
-| `licence_vpn_only.out` | first_run_licence_scroll (justify, scroll-to-bottom, VPN EULA) | **All tests passed!** (+3) |
-| `no_suite_family_entry.out` | structural grep + vpn_only_product + portal | **RESULT: PASS** + **All tests passed!** (+6) |
+Implementer: `/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-90d777e1b612/implementer/`
+Repo: `SCRATCH/vpn_only_captures/`
 
-## Product locks
-- `suiteNavDestinations` always `[vpn]`
-- `SuitePartsState.fromJson` / `SuitePartsStore.load` → `vpnOnly`
-- Settings product panel shows VPN tile only
-- `FirstRunStep`: licence → keygenOrTrial → complete
-- `isAppEntryUnlocked`: licence accepted + trial/KEYGEN entitlement
-- Full EULA: residual VPN only (no `USE OF RESTORE PRIVACY SUITE` / `Suite installers`)
-
-## Desktop
-`client/first_run_flow.py` already sequences licence → keygen → settings → main
-(no username/password identity gate).
+| Capture | Observation |
+|---------|-------------|
+| vpn_only_entry_flow.out | All tests passed! (+25) |
+| vpn_only_shell.out | All tests passed! (+31) |
+| licence_vpn_only.out | All tests passed! (+3) |
+| no_suite_family_entry.out | RESULT: PASS + All tests passed! (+17) |

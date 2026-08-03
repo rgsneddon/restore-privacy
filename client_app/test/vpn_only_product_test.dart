@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/first_run_gate.dart';
+import 'package:restore_privacy_client/suite_account.dart';
 import 'package:restore_privacy_client/suite_nav.dart';
 import 'package:restore_privacy_client/suite_parts.dart';
 
@@ -52,6 +53,8 @@ void main() {
     final gate = read('lib/first_run_gate.dart');
     final entry = read('lib/entry_access.dart');
     final nav = read('lib/suite_nav.dart');
+    final main = read('lib/main.dart');
+    final account = read('lib/suite_account.dart');
 
     expect(portal.contains('FirstRunStep.account'), isFalse);
     expect(portal.contains('_buildAccountStep'), isFalse);
@@ -62,5 +65,20 @@ void main() {
     expect(gate.contains('mayEnterVpnShellOnReturn'), isTrue);
     expect(entry.contains('paymentAllowsConnect'), isTrue);
     expect(nav.contains('[SuiteNavDest.vpn]'), isTrue);
+
+    // Post-KEYGEN unlock never mounts Suite username/password sheet.
+    expect(main.contains('showSuiteAccountPrompt('), isFalse);
+    expect(main.contains('account, seed, licence'), isFalse);
+    expect(main.contains('Accept the end-user licence'), isTrue);
+    // Product hard-disable of Suite account offer.
+    expect(
+      shouldOfferSuiteAccountPrompt(
+        vpnUnlocked: true,
+        deferred: false,
+        registered: false,
+      ),
+      isFalse,
+    );
+    expect(account.contains('Dedicated VPN product'), isTrue);
   });
 }

@@ -30,14 +30,15 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('shouldOfferSuiteAccountPrompt (pure)', () {
-    test('offers only when VPN unlocked and not deferred/registered', () {
+    test('product path never offers Suite username/password prompt', () {
+      // Dedicated residual VPN: always false regardless of flags.
       expect(
         shouldOfferSuiteAccountPrompt(
           vpnUnlocked: true,
           deferred: false,
           registered: false,
         ),
-        isTrue,
+        isFalse,
       );
       expect(
         shouldOfferSuiteAccountPrompt(
@@ -347,31 +348,32 @@ void main() {
     });
   });
 
-  group('source structure (singular post-keygen prompt)', () {
-    test('main wires one suite account prompt after keygen unlock', () {
+  group('source structure (VPN product: no post-keygen account prompt)', () {
+    test('suite account copy remains optional-only if ever surfaced', () {
       expect(kSuiteAccountPromptTitle.toLowerCase(), contains('wallet'));
-      expect(kSuiteAccountPromptTitle.toLowerCase(), contains('evolve'));
       expect(kSuiteAccountDeferLabel.toLowerCase(), contains('vpn'));
       expect(kSuiteAccountPromptBody.toLowerCase(), contains('not required'));
     });
 
-    test('shipped suite files mount singular optional account (not dual walls)',
-        () {
+    test('main never calls showSuiteAccountPrompt after KEYGEN unlock', () {
       final mainSrc = _readSuiteSource('lib/main.dart');
       final walletSrc = _readSuiteSource('lib/suite_wallet_tab.dart');
       final evolveSrc = _readSuiteSource('lib/suite_evolve_tab.dart');
+      final accountSrc = _readSuiteSource('lib/suite_account.dart');
 
-      expect(mainSrc.contains('_maybeShowSuiteAccountPrompt'), isTrue);
-      expect(mainSrc.contains('showSuiteAccountPrompt'), isTrue);
+      // Product lock: no live showSuiteAccountPrompt on TunnelHome unlock path.
+      expect(mainSrc.contains('showSuiteAccountPrompt('), isFalse);
+      expect(mainSrc.contains('import \'suite_account_prompt.dart\''), isFalse);
+      // Fail-closed helper still present (no-op / hard-false).
       expect(mainSrc.contains('shouldOfferSuiteAccountPrompt'), isTrue);
+      expect(accountSrc.contains('return false;'), isTrue);
+      // No residual account/seed first-run status copy.
+      expect(mainSrc.contains('account, seed, licence'), isFalse);
       expect(
-        '_maybeShowSuiteAccountPrompt'.allMatches(mainSrc).length,
-        greaterThanOrEqualTo(1),
+        mainSrc.contains('Accept the end-user licence'),
+        isTrue,
       );
 
-      expect(walletSrc.contains('SuiteAccountBus'), isTrue);
-      expect(evolveSrc.contains('SuiteAccountBus'), isTrue);
-      // Tabs reload shared ledger; they do not each open a suite register sheet
       expect(walletSrc.contains('showSuiteAccountPrompt'), isFalse);
       expect(evolveSrc.contains('showSuiteAccountPrompt'), isFalse);
     });

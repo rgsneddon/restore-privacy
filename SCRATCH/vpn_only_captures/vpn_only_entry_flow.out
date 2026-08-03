@@ -46,13 +46,16 @@ Try `flutter pub outdated` for more information.
 00:00 +10: /Users/russellsneddon/restore-privacy/client_app/test/entry_access_test.dart: source files gate entry and omit paywall wording
 00:00 +11: /Users/russellsneddon/restore-privacy/client_app/test/entry_access_test.dart: locked entry shows first-run portal before shell
 00:00 +12: /Users/russellsneddon/restore-privacy/client_app/test/entry_access_test.dart: locked entry shows first-run portal before shell
-00:01 +13: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: portal has no username/password or seed surfaces
-00:01 +14: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: portal has no username/password or seed surfaces
-00:01 +15: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: portal has no username/password or seed surfaces
-00:01 +16: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: portal has no username/password or seed surfaces
-00:01 +17: /Users/russellsneddon/restore-privacy/client_app/test/entry_access_test.dart: RestorePrivacyApp shows suite when entry unlocked
-00:01 +18: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: after licence, KEYGEN/trial step — no account continue
-00:01 +19: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: after licence, KEYGEN/trial step — no account continue
-00:01 +20: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: after licence, KEYGEN/trial step — no account continue
-00:01 +21: All tests passed!
-EXIT:
+00:00 +13: /Users/russellsneddon/restore-privacy/client_app/test/entry_access_test.dart: locked entry shows first-run portal before shell
+00:00 +14: /Users/russellsneddon/restore-privacy/client_app/test/entry_access_test.dart: locked entry shows first-run portal before shell
+00:00 +15: /Users/russellsneddon/restore-privacy/client_app/test/entry_access_test.dart: locked entry shows first-run portal before shell
+00:00 +16: /Users/russellsneddon/restore-privacy/client_app/test/entry_access_test.dart: locked entry shows first-run portal before shell
+00:01 +17: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: portal has no username/password or seed surfaces
+00:01 +18: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: portal has no username/password or seed surfaces
+00:01 +19: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: portal has no username/password or seed surfaces
+00:01 +20: /Users/russellsneddon/restore-privacy/client_app/test/entry_access_test.dart: RestorePrivacyApp mounts first-run gate ahead of suite shell
+00:01 +21: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: after licence, KEYGEN/trial step — no account continue
+00:01 +22: /Users/russellsneddon/restore-privacy/client_app/test/entry_access_test.dart: RestorePrivacyApp shows suite when entry unlocked
+00:01 +23: /Users/russellsneddon/restore-privacy/client_app/test/entry_access_test.dart: isAppEntryUnlocked requires licence + entitlement not KEYGEN alone
+00:01 +24: /Users/russellsneddon/restore-privacy/client_app/test/entry_access_test.dart: return visit blocks when trial/KEYGEN not active
+00:01 +25: All tests passed!
