@@ -16,6 +16,26 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 
 class TestAdminClientPushRemoved(unittest.TestCase):
+    def test_node_operator_gui_passes_update_push_none(self) -> None:
+        gui = (ROOT / "node_operator" / "gui_html.py").read_text(encoding="utf-8")
+        self.assertIn("update_push=None", gui)
+        self.assertNotIn('form_action": "/op/push-update"', gui)
+        self.assertNotIn("Push update to clients", gui)
+        app = (ROOT / "node_operator" / "app.py").read_text(encoding="utf-8")
+        self.assertNotIn('text="Push update"', app)
+        self.assertNotIn("def on_push", app)
+
+    def test_settings_explainer_manual_update_only(self) -> None:
+        from settings_explainer import catalog_ids, render_settings_explainer_html
+
+        ids = catalog_ids()
+        self.assertIn("suite-manual-update", ids)
+        self.assertNotIn("suite-self-update", ids)
+        html = render_settings_explainer_html().decode("utf-8", "replace").lower()
+        self.assertIn("suite updates (manual only)", html)
+        self.assertNotIn("allow suite self-update", html)
+        self.assertNotIn("push update to clients", html)
+
     def test_operator_push_update_fail_closed(self) -> None:
         from node.update_push import operator_push_update, UpdatePushQueue
 

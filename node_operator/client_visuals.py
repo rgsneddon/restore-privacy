@@ -2,8 +2,7 @@
 
 ChronofluxAtlas-style **pyramid of animated blob tiles** driven by
 ``list_sessions_admin`` rows. Does not invent clients; empty list → empty-state
-only. When *update_push* is provided, each blob is a CSP-safe form POST that
-targets the shipped per-client residual UPDATE_PUSH path.
+only. Per-client residual UPDATE_PUSH forms are product-disabled (update_push=None).
 """
 
 from __future__ import annotations
@@ -109,7 +108,7 @@ def render_connected_clients_visual_html(
     *id_prefix* scopes element ids for standalone (``op-client``) vs admin
     (``admin-node-op-client``) so both pages can embed the fragment.
 
-    *update_push* optional mapping enables per-blob residual update POST:
+    *update_push* is ignored/removed for product; leave None:
       form_action (required), version (directive monopin), url, message,
       hidden_fields (dict of extra form fields, e.g. admin action/node).
     """
@@ -349,7 +348,8 @@ def render_connected_clients_visual_html(
                     f"{body}"
                     f'<button type="submit" class="{p}-tile-update {p}-blob-update" '
                     f'id="{_esc(tid)}-update" data-client-tile-update="1" '
-                    f'title="Push residual UPDATE_PUSH to this client only">Update</button>'
+                    f'title="Client update push disabled — manual Suite download only">'
+                    f"Update</button>"
                     f"</form>"
                 )
             else:

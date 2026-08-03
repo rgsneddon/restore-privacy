@@ -52,7 +52,7 @@ class TestSettingsExplainerPage(unittest.TestCase):
         for need in (
             "run-at-startup",
             "autoconnect-on-launch",
-            "suite-self-update",
+            "suite-manual-update",
             "traffic-shaping",
             "outer-obfuscation",
             "multihop",
@@ -76,7 +76,9 @@ class TestSettingsExplainerPage(unittest.TestCase):
         self.assertIn("ping statistics", low)
         self.assertIn("keygen", low)
         self.assertIn("licence", low)
-        self.assertIn("allow suite self-update", low)
+        self.assertIn("suite updates (manual only)", low)
+        self.assertNotIn("allow suite self-update", low)
+        self.assertNotIn("push update to clients", low)
         self.assertNotIn("paywall", low)
         # Install how-to after explainers (free Suite + KEYGEN)
         self.assertIn('id="install-run-howto-box"', html)

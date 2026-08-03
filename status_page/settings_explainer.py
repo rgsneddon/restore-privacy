@@ -86,7 +86,8 @@ def suite_howto_parts_catalog() -> list[dict[str, str]]:
             "what": (
                 "The VPN tab is where you start and stop residual protection. "
                 "It shows connection status, a short local log, entry country, "
-                "and the honesty note about Suite self-update."
+                "and a discrete notice when a newer Suite monopin is available "
+                "(manual free download)."
             ),
             "how": (
                 "Choose an entry country if you like (Germany is the product default), "
@@ -129,12 +130,13 @@ def suite_howto_parts_catalog() -> list[dict[str, str]]:
             "title": "VPN Settings (gear on the VPN tab)",
             "what": (
                 "Settings under the VPN gear cover power-up, residual privacy scale, "
-                "KEYGEN fallback, local log, leak test, legal links, and Suite self-update."
+                "KEYGEN fallback, local log, leak test, and legal links."
             ),
             "how": (
                 "Tap the gear on the VPN tab. Defaults are lean: startup and autoconnect "
-                "off, traffic shaping / outer obfuscation / multi-hop off, self-update off. "
-                "Turn on only what you understand. Each control is listed below."
+                "off, traffic shaping / outer obfuscation / multi-hop off. "
+                "Turn on only what you understand. Each control is listed below. "
+                "Suite updates are always manual (free download) when a new monopin ships."
             ),
             "default": "Lean off until you opt in",
         },
@@ -200,16 +202,15 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             ),
         },
         {
-            "id": "suite-self-update",
-            "title": "Allow Suite self-update",
-            "default": "Off",
+            "id": "suite-manual-update",
+            "title": "Suite updates (manual only)",
+            "default": "Manual free download",
             "body": (
-                "When ON, this device may receive a pushed Suite package (operator "
-                "“Push update to clients” or breadcrumbs) and store it as pending. "
-                "You still must click “Unpack update and relaunch” under this "
-                "Allow Suite self-update section in Settings. That path is the one "
-                "privacy breach in the Suite — leave OFF if you prefer no self-update. "
-                "Silent unpack never runs."
+                "Operators do not remote-install Suite packages onto your device. "
+                "When a newer Suite monopin is available, the app shows a discrete "
+                "“new version available” notice. Download the free Suite package for "
+                "your platform from the public shop and install it yourself — "
+                "nothing is auto-applied over residual."
             ),
         },
         {
@@ -515,8 +516,8 @@ def render_install_howto_box_html() -> str:
           so residual public IP uses the product path. Wait until status is honestly connected.</li>
         <li><strong>Optional Settings.</strong> Traffic shaping / outer obfuscation OFF feels
           snappier (weaker traffic-analysis resistance). Multi-hop ON uses the exit path
-          (higher latency). Leave <strong>Allow Suite self-update</strong> OFF unless you want
-          pushed packages — you still click unpack and relaunch yourself.</li>
+          (higher latency). Suite updates are always <strong>manual</strong> — when a new
+          monopin is available, download free from the shop (no operator push packages).</li>
         <li><strong>Use % and EVOLVE</strong> from the bottom tabs when you need wallet or analysis.
           They share the same unlock story; residual traffic still starts on VPN → Connect.</li>
         <li><strong>Disconnect</strong> when finished. Residual routing stops on Disconnect

@@ -26,16 +26,11 @@ def render_operator_page(ctrl: "NodeOperatorController", *, flash: str = "") -> 
     flash_html = (
         f'<p class="flash" id="op-flash">{html.escape(flash)}</p>' if flash else ""
     )
+    # Per-client residual UPDATE_PUSH forms removed (manual client update only).
     clients_visual = render_connected_clients_visual_html(
         sessions,
         id_prefix="op-client",
-        update_push={
-            "form_action": "/op/push-update",
-            "version": catalog_ver,
-            "url": "https://restoreprivacy.online/",
-            "message": "",
-            "hidden_fields": {},
-        },
+        update_push=None,
     )
     matrix = build_update_delivery_matrix(
         sessions=sessions,

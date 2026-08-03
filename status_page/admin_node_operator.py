@@ -450,7 +450,8 @@ def render_admin_node_operator_page_html(
     <h3>Connected clients (graphic)</h3>
     <p class="muted">Chronoflux-style pyramid of animated blob tiles from the real lab
       session list (apex = higher priority). Each blob shows product version (or unknown)
-      and can push residual UPDATE_PUSH to that client only. Not public.</p>
+      (display only). Client residual update push is disabled — users update
+      manually from free Suite download. Not public.</p>
     {clients_visual}
     <details id="admin-node-op-sessions-table-details" class="muted">
       <summary>Table detail</summary>

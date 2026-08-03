@@ -106,13 +106,6 @@ def try_tk_gui(ctrl: NodeOperatorController) -> bool:
         messagebox.showinfo(APP_TITLE, f"Service order (high→low):\n" + "\n".join(order[:8]))
         refresh()
 
-    def on_push() -> None:
-        messagebox.showinfo(
-            APP_TITLE,
-            "Client update push is disabled — users update manually from free Suite download.",
-        )
-        refresh()
-
     def on_upload() -> None:
         ver = ctrl.catalog_version_default()
         inv = ctrl.list_local_packages(version=ver)
@@ -139,7 +132,7 @@ def try_tk_gui(ctrl: NodeOperatorController) -> bool:
     ttk.Button(bf, text="Add lab session", command=on_lab_sess).pack(side=tk.LEFT, padx=2)
     ttk.Button(bf, text="Prioritise clients", command=on_priority).pack(side=tk.LEFT, padx=2)
     ttk.Button(bf, text="Upload packages", command=on_upload).pack(side=tk.LEFT, padx=2)
-    ttk.Button(bf, text="Push update", command=on_push).pack(side=tk.LEFT, padx=2)
+    # Client residual update-push control removed — users update manually.
 
     refresh()
     root.after(1500, lambda: None)  # keep event loop alive marker
