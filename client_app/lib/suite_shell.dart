@@ -148,8 +148,8 @@ class SuiteShellState extends State<SuiteShell> {
   @override
   void initState() {
     super.initState();
-    // Fresh default is VPN-only until store load or explicit initialParts.
-    _parts = widget.initialParts ?? SuitePartsState.vpnOnly;
+    // Fresh default is VPN + rpAI until store load or explicit initialParts.
+    _parts = widget.initialParts ?? SuitePartsState.vpnAndRpai;
     _index = clampSuiteNavIndex(
       widget.initialTabIndex,
       _parts,

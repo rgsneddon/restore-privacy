@@ -113,7 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _entryPing = '…';
   String _exitPing = '…';
   bool _pingBusy = false;
-  SuitePartsState _parts = SuitePartsState.vpnOnly;
+  SuitePartsState _parts = SuitePartsState.vpnAndRpai;
   SuitePartsStore? _partsStore;
   String _diskUsageText = '…';
   String _processUsageText = '…';
@@ -124,7 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _settings = widget.initial;
     _log = widget.connectionLog;
-    _parts = widget.initialParts ?? SuitePartsState.vpnOnly;
+    _parts = widget.initialParts ?? SuitePartsState.vpnAndRpai;
     _partsStore = widget.partsStore;
     final seed = widget.initialUsage;
     if (seed != null) {

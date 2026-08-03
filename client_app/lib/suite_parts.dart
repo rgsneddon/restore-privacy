@@ -74,13 +74,14 @@ bool suitePartIsRemovable(SuitePartId id) {
 
 /// Durable install flags for optional parts. VPN is always installed.
 ///
-/// Fresh / missing prefs: optional parts are **not** installed (VPN-only main
-/// bar). Only an explicit stored `true` marks an optional part installed.
+/// Fresh / missing prefs: **VPN + rpAI** on the main bar; % wallet and EVOLVE
+/// off until the user installs them. Explicit stored `true`/`false` wins on
+/// upgrade (honest saved flags).
 class SuitePartsState {
   const SuitePartsState({
     this.walletInstalled = false,
     this.evolveInstalled = false,
-    this.rpaiInstalled = false,
+    this.rpaiInstalled = true,
   });
 
   final bool walletInstalled;
@@ -94,8 +95,19 @@ class SuitePartsState {
     rpaiInstalled: true,
   );
 
-  /// Fresh install default: residual VPN only; optionals off until user installs.
-  static const SuitePartsState vpnOnly = SuitePartsState();
+  /// Fresh install default: residual VPN + rpAI; wallet/Evolve off until install.
+  static const SuitePartsState vpnAndRpai = SuitePartsState(
+    walletInstalled: false,
+    evolveInstalled: false,
+    rpaiInstalled: true,
+  );
+
+  /// VPN only (no optional surfaces) — tests / explicit wipe of optionals.
+  static const SuitePartsState vpnOnly = SuitePartsState(
+    walletInstalled: false,
+    evolveInstalled: false,
+    rpaiInstalled: false,
+  );
 
   /// VPN is always true — never stored as removable.
   bool get vpnInstalled => true;
@@ -131,14 +143,20 @@ class SuitePartsState {
         kKeySuitePartRpai: rpaiInstalled,
       };
 
-  /// Parse durable map. Null / missing / non-true → not installed (fresh default).
+  /// Parse durable map.
+  ///
+  /// Null map → [vpnAndRpai]. Wallet/Evolve: only explicit `true` installs.
+  /// rpAI: missing key → installed (fresh default); explicit `false` stays off.
   factory SuitePartsState.fromJson(Map<String, dynamic>? data) {
-    if (data == null) return vpnOnly;
-    bool on(Object? v) => v == true;
+    if (data == null) return vpnAndRpai;
+    bool walletOn(Object? v) => v == true;
+    bool evolveOn(Object? v) => v == true;
+    // Missing rpAI key defaults on; only explicit false uninstalls.
+    bool rpaiOn(Object? v) => v != false;
     return SuitePartsState(
-      walletInstalled: on(data[kKeySuitePartWallet]),
-      evolveInstalled: on(data[kKeySuitePartEvolve]),
-      rpaiInstalled: on(data[kKeySuitePartRpai]),
+      walletInstalled: walletOn(data[kKeySuitePartWallet]),
+      evolveInstalled: evolveOn(data[kKeySuitePartEvolve]),
+      rpaiInstalled: rpaiOn(data[kKeySuitePartRpai]),
     );
   }
 
@@ -160,9 +178,10 @@ const String kKeySuitePartRpai = 'suite_part_rpai_installed';
 
 const String kSuitePartsSettingsTitle = 'Suite parts';
 const String kSuitePartsSettingsSubtitle =
-    'Optional surfaces (% wallet, EVOLVE, rpAI) start uninstalled. Install the '
-    'ones you want — they appear on the main bar only after install. Residual '
-    'VPN always stays installed. Type the part name to confirm uninstall.';
+    'Fresh install includes residual VPN and rpAI. Install % wallet and/or '
+    'EVOLVE when you want them — they appear on the main bar only after '
+    'install. Residual VPN always stays installed. Type the part name to '
+    'confirm uninstall.';
 const String kSuitePartVpnRequiredLabel = 'Required — always installed';
 const String kSuitePartInstalledLabel = 'Installed';
 const String kSuitePartRemovedLabel = 'Not installed — use Install to add to the main bar';

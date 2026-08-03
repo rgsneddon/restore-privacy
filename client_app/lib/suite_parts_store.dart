@@ -10,9 +10,9 @@ class SuitePartsStore {
 
   final SettingsBackend backend;
 
-  /// Fresh / missing keys → optional parts **not** installed (VPN-only default).
-  /// Explicit stored `true` keeps a part installed (honest upgrade when flags
-  /// were already saved).
+  /// Fresh / missing keys → [SuitePartsState.vpnAndRpai] (VPN + rpAI).
+  /// Wallet/Evolve need explicit `true`. rpAI missing → on; explicit `false`
+  /// stays off (honest uninstall). Explicit stored flags win on upgrade.
   Future<SuitePartsState> load() async {
     final w = await backend.getBool(kKeySuitePartWallet);
     final e = await backend.getBool(kKeySuitePartEvolve);
@@ -20,7 +20,8 @@ class SuitePartsStore {
     return SuitePartsState(
       walletInstalled: w == true,
       evolveInstalled: e == true,
-      rpaiInstalled: r == true,
+      // null (missing) or true → installed; only false is uninstalled.
+      rpaiInstalled: r != false,
     );
   }
 
