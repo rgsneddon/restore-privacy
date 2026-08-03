@@ -38,8 +38,16 @@ void main() {
   });
 
   test('sanitizeStatusForPrint preserves ASCII compound hyphens and URLs', () {
+    // Skeptic bar: bare compound and hyphenated host must be unchanged.
+    expect(sanitizeStatusForPrint('end-user'), 'end-user');
+    expect(
+      sanitizeStatusForPrint('https://a-b.example/path-name'),
+      'https://a-b.example/path-name',
+    );
+
     // Real path: autoconnect append mentions end-user licence.
-    const compound = 'Settings: autoconnect skipped - accept the end-user licence first.';
+    const compound =
+        'Settings: autoconnect skipped - accept the end-user licence first.';
     expect(sanitizeStatusForPrint(compound), compound);
     expect(sanitizeStatusForPrint(compound), contains('end-user'));
     expect(sanitizeStatusForPrint(compound), isNot(contains('end - user')));
@@ -47,8 +55,14 @@ void main() {
     const url =
         'Could not open browser. Visit: https://restoreprivacy.online/pay?product=suite';
     expect(sanitizeStatusForPrint(url), url);
-    expect(sanitizeStatusForPrint(url), contains('https://restoreprivacy.online/pay'));
-    expect(sanitizeStatusForPrint(url), isNot(contains('restoreprivacy.online/pay - ')));
+    expect(
+      sanitizeStatusForPrint(url),
+      contains('https://restoreprivacy.online/pay'),
+    );
+    expect(
+      sanitizeStatusForPrint(url),
+      isNot(contains('restoreprivacy.online/pay - ')),
+    );
 
     // Em dash still becomes spaced ASCII separator; ASCII hyphens nearby stay put.
     final mixed = sanitizeStatusForPrint(
@@ -59,6 +73,26 @@ void main() {
     expect(mixed, contains('https://a-b.example/path-name'));
     expect(mixed, contains(' - ')); // only from the em dash
     expect(mixed, isNot(contains('\u2014')));
+  });
+
+  test('sanitizeStatusForPrint source has no global ASCII-hyphen re-space', () {
+    final f = File('lib/connect_status.dart');
+    final src = f.readAsStringSync();
+    final start = src.indexOf('String sanitizeStatusForPrint');
+    expect(start, greaterThanOrEqualTo(0));
+    final end = src.indexOf('\n}\n', start);
+    final body = src.substring(start, end > start ? end : src.length);
+    // Forbidden: rewrite every hyphen with surrounding whitespace.
+    expect(body.contains(r'[ \t]*-[ \t]*'), isFalse);
+    // Must still target em dash / mojibake forms (not plain ASCII '-').
+    expect(body.contains(r'\u2014'), isTrue);
+    expect(body.contains(r'\u2013'), isTrue);
+    // Doc above the function states the end-user / URL preservation rule.
+    final docStart = src.lastIndexOf('/// Normalize punctuation', start);
+    expect(docStart, greaterThanOrEqualTo(0));
+    final doc = src.substring(docStart, start);
+    expect(doc.contains('end-user'), isTrue);
+    expect(doc.toLowerCase(), contains('does not'));
   });
 
   test('Quit shows on every residual TargetPlatform including Android', () {
