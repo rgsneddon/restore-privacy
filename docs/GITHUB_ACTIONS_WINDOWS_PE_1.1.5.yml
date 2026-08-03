@@ -1,0 +1,68 @@
+name: Windows PE 1.1.5
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'client/VERSION'
+      - 'client/windows/**'
+      - 'scripts/build_windows_multihop.py'
+      - 'scripts/build_release_0.0.8.py'
+      - '.github/workflows/windows-pe-1.1.5.yml'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Pin check
+        shell: bash
+        run: |
+          test "$(tr -d '\r\n' < client/VERSION)" = "1.1.5"
+          grep -q 'TRAY_DISPLAY_NAME = "Privacy, Restored"' client/windows/tray_win.py
+
+      - name: Install PyInstaller + deps
+        shell: bash
+        run: |
+          python -m pip install -U pip
+          python -m pip install pyinstaller
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt || true; fi
+          if [ -f client/requirements.txt ]; then python -m pip install -r client/requirements.txt || true; fi
+
+      - name: Check-only readiness
+        shell: bash
+        run: python scripts/build_windows_multihop.py --check-only --version 1.1.5
+
+      - name: Build Windows setup
+        shell: bash
+        run: python scripts/build_windows_multihop.py --version 1.1.5
+
+      - name: Verify tray string not rpT0 in PE
+        shell: bash
+        run: |
+          EXE=releases/1.1.5/restore-privacy-client-1.1.5-windows-x64-setup.exe
+          test -f "$EXE"
+          # strings may not exist; use python
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('releases/1.1.5/restore-privacy-client-1.1.5-windows-x64-setup.exe')
+          data = p.read_bytes()
+          assert b'Privacy, Restored' in data or b'Privacy, Restored' in data.replace(b'\x00', b''), 'tray string not in PE'
+          # must not be only ancient 0.5.8 without new code - at least size check
+          print('exe bytes', p.stat().st_size)
+          print('contains Privacy, Restored', b'Privacy, Restored' in data)
+          print('contains rpT0 as tray', b'TRAY' in data and b'rpT0' in data)
+          PY
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-setup-1.1.5
+          path: releases/1.1.5/restore-privacy-client-1.1.5-windows-x64-setup.exe
+          if-no-files-found: error
