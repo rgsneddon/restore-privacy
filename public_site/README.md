@@ -1,6 +1,6 @@
 # Restore Privacy — public site
 
-Static GitHub Pages export for **Restore Privacy v1.1.6**.
+Static GitHub Pages export for **Restore Privacy v1.1.7**.
 
 Free installers and a Downloads Map; KEYGEN from £3/month on restoreprivacy.online.
 

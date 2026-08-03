@@ -1,6 +1,6 @@
 # Restore Privacy
 
-**Version v1.1.6** — a dedicated virtual private network for residual traffic.
+**Version v1.1.7** — a dedicated virtual private network for residual traffic.
 
 Restore Privacy protects residual traffic on your device. Download free, try three
 days with no card, then continue with a KEYGEN.
@@ -21,11 +21,11 @@ Catalog packages (free download; Connect still needs trial or KEYGEN):
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-1.1.6-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-1.1.6-android.apk` |
-| macOS | `restore-privacy-client-1.1.6-macos.zip` (Developer ID / notarized when sealed) |
-| iOS | `restore-privacy-client-1.1.6-ios.zip` (Team-signed sideload) |
-| Linux | `restore-privacy-client-1.1.6-linux-x64.tar.gz` |
+| Windows | `restore-privacy-client-1.1.7-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-1.1.7-android.apk` |
+| macOS | `restore-privacy-client-1.1.7-macos.zip` (Developer ID / notarized when sealed) |
+| iOS | `restore-privacy-client-1.1.7-ios.zip` (Team-signed sideload) |
+| Linux | `restore-privacy-client-1.1.7-linux-x64.tar.gz` |
 
 Public storefront: [restoreprivacy.online](https://restoreprivacy.online).
 
@@ -39,10 +39,10 @@ Defaults: run at startup off, autoconnect off, traffic shaping / outer obfuscati
 
 ## Build (operators)
 
-- Pin: `client/VERSION` → `1.1.6`
+- Pin: `client/VERSION` → `1.1.7`
 - Flutter client: `client_app/`
-- Five-platform stage script: `scripts/build_suite_1.1.6.py`
-- Windows / Linux handoff: `client/windows/WINDOWS_HANDOFF_1.1.6.md`
+- Five-platform stage script: `scripts/build_suite_1.1.7.py`
+- Windows / Linux handoff: `client/windows/WINDOWS_HANDOFF_1.1.7.md`
 
 ## Licence
 

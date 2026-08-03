@@ -7,6 +7,7 @@ import 'connection_log.dart';
 import 'easter_egg_server.dart';
 import 'free_tier.dart';
 import 'keygen_field.dart';
+import 'kill_switch_confirm.dart';
 import 'leak_posture.dart';
 import 'leak_test.dart';
 import 'legal_links.dart';
@@ -823,12 +824,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _setKillSwitch(bool on) async {
-    final next = _settings.copyWith(killSwitchOptIn: on);
+    // OFF: no confirmation — switch alone disengages.
+    if (!on) {
+      final decision = evaluateKillSwitchConfirm(desiredOn: false);
+      if (!decision.allowPersist) return;
+      final next = _settings.copyWith(killSwitchOptIn: false);
+      setState(() {
+        _settings = next;
+        _note = 'Kill-switch OFF (product default — scoped allows only).';
+      });
+      await widget.store.save(next);
+      widget.onChanged?.call(next);
+      return;
+    }
+    // ON: require ARE YOU SURE dialog + typed KILLSWITCH.
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const _KillSwitchEnableConfirmDialog(),
+    );
+    if (!mounted) return;
+    final decision = evaluateKillSwitchConfirm(
+      desiredOn: true,
+      confirmText: confirmed == true ? kKillSwitchConfirmToken : null,
+      cancelled: confirmed != true,
+    );
+    if (!decision.allowPersist || !decision.nextOptIn) {
+      setState(() {
+        _note = 'Kill-switch stayed OFF (enable cancelled or not confirmed).';
+      });
+      return;
+    }
+    final next = _settings.copyWith(killSwitchOptIn: true);
     setState(() {
       _settings = next;
-      _note = on
-          ? 'Kill-switch opt-in ON (fail-closed if residual drops).'
-          : 'Kill-switch OFF (product default — scoped allows only).';
+      _note = 'Kill-switch opt-in ON (fail-closed if residual drops).';
     });
     await widget.store.save(next);
     widget.onChanged?.call(next);
@@ -1603,5 +1634,102 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() => _note = 'Open $kEasterEggUrlLoopback in a browser (app must stay running).');
       }
     }
+  }
+}
+
+/// Modal confirm when enabling kill-switch: ARE YOU SURE? + type KILLSWITCH.
+class _KillSwitchEnableConfirmDialog extends StatefulWidget {
+  const _KillSwitchEnableConfirmDialog();
+
+  @override
+  State<_KillSwitchEnableConfirmDialog> createState() =>
+      _KillSwitchEnableConfirmDialogState();
+}
+
+class _KillSwitchEnableConfirmDialogState
+    extends State<_KillSwitchEnableConfirmDialog> {
+  final _controller = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _tryConfirm() {
+    final decision = evaluateKillSwitchConfirm(
+      desiredOn: true,
+      confirmText: _controller.text,
+    );
+    if (!decision.allowPersist) {
+      setState(() {
+        _error = 'Type exactly $kKillSwitchConfirmToken to enable.';
+      });
+      return;
+    }
+    Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      key: const Key(kKillSwitchConfirmDialogKey),
+      title: const Text(
+        kKillSwitchConfirmTitle,
+        key: Key('kill_switch_confirm_title'),
+        style: TextStyle(
+          color: Color(0xFFE53935),
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.04,
+        ),
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              kKillSwitchConfirmRiskBody,
+              key: Key('kill_switch_confirm_risk_body'),
+              style: TextStyle(fontSize: 13, height: 1.35),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              key: const Key(kKillSwitchConfirmFieldKey),
+              controller: _controller,
+              autofocus: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText: kKillSwitchConfirmFieldHint,
+                border: const OutlineInputBorder(),
+                errorText: _error,
+              ),
+              onSubmitted: (_) => _tryConfirm(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('kill_switch_confirm_cancel'),
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text(kKillSwitchConfirmCancelLabel),
+        ),
+        TextButton(
+          key: const Key('kill_switch_confirm_enable'),
+          onPressed: _tryConfirm,
+          child: const Text(
+            kKillSwitchConfirmActionLabel,
+            style: TextStyle(
+              color: Color(0xFFE53935),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

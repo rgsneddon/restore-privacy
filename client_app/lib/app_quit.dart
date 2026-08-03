@@ -9,7 +9,7 @@ import 'dart:io' show Platform, exit;
 
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
-import 'package:flutter/services.dart' show SystemNavigator;
+import 'package:flutter/services.dart' show MethodChannel, SystemNavigator;
 
 /// Button label on the main connection screen.
 const String kQuitButtonLabel = 'Quit';
@@ -71,16 +71,40 @@ Future<void> performQuitSequence({
   exitApp();
 }
 
+/// Method channel for platform full-process exit (Android finishAndRemoveTask).
+const MethodChannel kAppQuitChannel = MethodChannel('restore_privacy/vpn');
+
+/// Android channel method: finish activity + remove task + kill process.
+const String kAndroidFullExitMethod = 'fullExit';
+
 /// Fully terminate the host process (not hide-to-tray / minimize).
 ///
 /// Call only after [performQuitSequence]'s tunnel stop has completed.
+///
+/// On Android, [SystemNavigator.pop] alone only finishes the activity and can
+/// leave the process idle in the background. We call native [kAndroidFullExitMethod]
+/// (`finishAndRemoveTask` + `Process.killProcess`) then hard [exit] as backup.
 void exitAppProcess() {
-  // Android: finish the activity via SystemNavigator first so Quit feels like
-  // a normal exit (not only a raw process kill). Still call exit as backup.
-  // iOS/macOS: SystemNavigator alone is not enough for full process death.
-  try {
-    SystemNavigator.pop();
-  } catch (_) {}
-  // dart:io exit - required so Packet Tunnel host + UI both leave.
+  if (!kIsWeb && Platform.isAndroid) {
+    // Fire-and-forget native full exit; still fall through to dart:io exit.
+    try {
+      kAppQuitChannel.invokeMethod<void>(kAndroidFullExitMethod);
+    } catch (_) {}
+  } else {
+    try {
+      SystemNavigator.pop();
+    } catch (_) {}
+  }
+  // dart:io exit — required so UI + host process leave (not idle).
   exit(0);
+}
+
+/// Testable Android exit path planner (pure): which steps the platform must run.
+///
+/// Production Android native implements the same order in MainActivity.fullExit.
+List<String> androidFullExitSteps() {
+  return const [
+    'finishAndRemoveTask',
+    'process_killProcess',
+  ];
 }

@@ -113,11 +113,11 @@ void main() {
     expect(src.contains('DeveloperIDResidual.entitlements'), isTrue);
   });
 
-  test('build_suite_1.1.6 packages residual-team as monopin (host NE + launch)',
+  test('build_suite_1.1.7 packages residual-team as monopin (host NE + launch)',
       () {
     final root = Directory.current.path;
     // flutter test cwd is client_app/
-    final script = File('../scripts/build_suite_1.1.6.py');
+    final script = File('../scripts/build_suite_1.1.7.py');
     expect(script.existsSync(), isTrue, reason: 'from $root');
     final src = script.readAsStringSync();
     expect(src.contains('run_residual_team_resign'), isTrue);

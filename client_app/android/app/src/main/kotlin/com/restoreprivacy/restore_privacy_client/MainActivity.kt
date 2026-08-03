@@ -157,9 +157,49 @@ class MainActivity : FlutterActivity() {
                             ),
                         )
                     }
+                    "fullExit" -> {
+                        // Quit: stop residual already done in Dart; fully kill process.
+                        // SystemNavigator.pop alone leaves an idle process — not product Quit.
+                        result.success(mapOf("ok" to true, "message" to "full_exit"))
+                        fullProcessExit()
+                    }
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /**
+     * Full process takedown for main-screen Quit.
+     * Order: finishAndRemoveTask (API 21+) then killProcess so the app does not
+     * remain idle/backgrounded after the activity finishes.
+     */
+    private fun fullProcessExit() {
+        try {
+            sendDisconnect()
+        } catch (_: Exception) {
+            // Best-effort; tunnel may already be stopped by Flutter.
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                finishAndRemoveTask()
+            } else {
+                finish()
+            }
+        } catch (_: Exception) {
+            try {
+                finish()
+            } catch (_: Exception) {
+            }
+        }
+        // Ensure the process does not idle after activity teardown.
+        try {
+            android.os.Process.killProcess(android.os.Process.myPid())
+        } catch (_: Exception) {
+        }
+        try {
+            System.exit(0)
+        } catch (_: Exception) {
+        }
     }
 
     /** True when node public key is available (device Ed25519 is generated on connect). */

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/app_quit.dart';
@@ -111,5 +113,42 @@ void main() {
     expect(kQuitButtonPlacement, 'bottomLeft');
     expect(kQuitButtonTooltip.toLowerCase(), contains('quit'));
     expect(kQuitButtonTooltip.toLowerCase(), contains('stop residual'));
+  });
+
+  group('Android full process exit', () {
+    test('exit planner requires finishAndRemoveTask then process kill', () {
+      final steps = androidFullExitSteps();
+      expect(steps, contains('finishAndRemoveTask'));
+      expect(steps, contains('process_killProcess'));
+      expect(steps.indexOf('finishAndRemoveTask'), lessThan(steps.indexOf('process_killProcess')));
+    });
+
+    test('app_quit.dart Android path uses fullExit channel not pop alone', () {
+      final src = File('lib/app_quit.dart').readAsStringSync();
+      expect(src.contains('kAndroidFullExitMethod'), isTrue);
+      expect(src.contains("'fullExit'"), isTrue);
+      expect(src.contains('Platform.isAndroid'), isTrue);
+      // Android branch invokes fullExit; SystemNavigator.pop is only in the else.
+      final androidStart = src.indexOf('if (!kIsWeb && Platform.isAndroid)');
+      expect(androidStart, greaterThanOrEqualTo(0));
+      final elseStart = src.indexOf('} else {', androidStart);
+      expect(elseStart, greaterThan(androidStart));
+      final androidOnly = src.substring(androidStart, elseStart);
+      expect(androidOnly.contains('kAndroidFullExitMethod'), isTrue);
+      expect(androidOnly.contains('SystemNavigator.pop'), isFalse);
+      final elseBlock = src.substring(elseStart, elseStart + 120);
+      expect(elseBlock.contains('SystemNavigator.pop'), isTrue);
+    });
+
+    test('MainActivity implements fullExit with finishAndRemoveTask + killProcess', () {
+      final kt = File(
+        'android/app/src/main/kotlin/com/restoreprivacy/restore_privacy_client/MainActivity.kt',
+      ).readAsStringSync();
+      expect(kt.contains('"fullExit"'), isTrue);
+      expect(kt.contains('fullProcessExit'), isTrue);
+      expect(kt.contains('finishAndRemoveTask'), isTrue);
+      expect(kt.contains('killProcess'), isTrue);
+      expect(kt.contains('System.exit'), isTrue);
+    });
   });
 }

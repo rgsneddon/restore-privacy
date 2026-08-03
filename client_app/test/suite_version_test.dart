@@ -5,38 +5,33 @@ import 'package:restore_privacy_client/rpt_config.dart';
 import 'package:restore_privacy_client/suite_version.dart';
 
 void main() {
-  test('RptConfig product monopin matches suite 1.0.1', () {
+  test('RptConfig product monopin matches residual catalog pin', () {
     expect(RptConfig.productVersion, kSuiteVersion);
-    expect(RptConfig.displayProductVersion, '1.0.1');
+    expect(kSuiteVersion, '1.1.7');
     expect(kSuiteDisplayVersion.contains(kSuiteVersion), isTrue);
-    expect(kSuiteDisplayVersion.startsWith('Restore Privacy Suite'), isTrue);
+    expect(kSuiteDisplayVersion.toLowerCase(), contains('privacy'));
+    // Residual VPN product — not multi-product Suite chrome.
+    expect(kSuiteDisplayVersion.toLowerCase().contains('suite'), isFalse);
   });
 
-  test('pubspec and client/VERSION pin suite 1.0.1', () {
+  test('pubspec and client/VERSION pin monopin 1.1.7', () {
     final pubspec = File('pubspec.yaml').readAsStringSync();
-    expect(pubspec.contains('version: 1.0.1'), isTrue);
-    expect(pubspec.contains('Restore Privacy Suite'), isTrue);
+    expect(pubspec.contains('version: 1.1.7'), isTrue);
 
     final versionFile = File('../client/VERSION').readAsStringSync().trim();
-    expect(versionFile, '1.0.1');
+    expect(versionFile, '1.1.7');
+    expect(versionFile, kSuiteVersion);
   });
 
-  test('source declares four suite tab labels exactly including rpAI', () {
-    final shell = File('lib/suite_shell.dart').readAsStringSync();
+  test('suite_version still declares legacy tab constants for companions', () {
     final version = File('lib/suite_version.dart').readAsStringSync();
     expect(version.contains("kSuiteTabVpn = 'VPN'"), isTrue);
     expect(version.contains("kSuiteTabWallet = '%'"), isTrue);
     expect(version.contains("kSuiteTabEvolve = 'EVOLVE'"), isTrue);
     expect(version.contains("kSuiteTabRpai = 'rpAI'"), isTrue);
-    expect(shell.contains('kSuiteTabVpn'), isTrue);
-    expect(shell.contains('kSuiteTabWallet'), isTrue);
-    expect(shell.contains('kSuiteTabEvolve'), isTrue);
-    expect(shell.contains('kSuiteTabRpai'), isTrue);
-    // Real tab bodies — not stub-only placeholders.
-    expect(shell.contains('SuiteWalletTab'), isTrue);
-    expect(shell.contains('SuiteEvolveTab'), isTrue);
-    expect(shell.contains('SuiteRpaiTab'), isTrue);
-    expect(shell.contains('vpnTab'), isTrue);
+    // Live shell is VPN-only residual; constants may remain for tests/companions.
+    final shell = File('lib/suite_shell.dart').readAsStringSync();
+    expect(shell.contains('vpnTab') || shell.contains('VPN'), isTrue);
   });
 
   test('wallet and evolve tabs wire shipped package surfaces', () {
