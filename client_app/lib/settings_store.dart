@@ -29,6 +29,14 @@ const String kKeyCheckBreadcrumbs = 'check_breadcrumbs';
 /// Suite appearance: `dark` (default, Evolve look) or `light` — Settings only.
 const String kKeySuiteAppearance = 'suite_appearance';
 
+/// Opt-in kill-switch (fail-closed if residual drops). Product default **off**.
+const String kKeyKillSwitchOptIn = 'kill_switch_opt_in';
+
+/// Last product leak-test verdict: pass | fail | partial | inconclusive.
+const String kKeyLastLeakTestVerdict = 'last_leak_test_verdict';
+/// Epoch ms of last leak-test completion.
+const String kKeyLastLeakTestAtMs = 'last_leak_test_at_ms';
+
 /// Legacy / operator label (still grepped); Settings UI uses human Suite title.
 const String kCheckBreadcrumbsLabel = 'CHECK BREADCRUMBS';
 
@@ -51,6 +59,8 @@ class ProductSettings {
   final bool checkBreadcrumbs;
   /// `dark` (default Evolve chrome) or `light` — set only from Settings.
   final String appearance;
+  /// User opt-in kill-switch; product default false.
+  final bool killSwitchOptIn;
 
   const ProductSettings({
     this.runAtStartup = false,
@@ -64,6 +74,7 @@ class ProductSettings {
     this.entryCountry = kDefaultEntryCountry,
     this.checkBreadcrumbs = false,
     this.appearance = 'dark',
+    this.killSwitchOptIn = false,
   }) : residualIpv4 = kResidualIpv4AlwaysOn;
 
   static const ProductSettings defaults = ProductSettings();
@@ -83,6 +94,7 @@ class ProductSettings {
     String? entryCountry,
     bool? checkBreadcrumbs,
     String? appearance,
+    bool? killSwitchOptIn,
   }) {
     return ProductSettings(
       runAtStartup: runAtStartup ?? this.runAtStartup,
@@ -99,6 +111,7 @@ class ProductSettings {
           : this.entryCountry,
       checkBreadcrumbs: checkBreadcrumbs ?? this.checkBreadcrumbs,
       appearance: appearance ?? this.appearance,
+      killSwitchOptIn: killSwitchOptIn ?? this.killSwitchOptIn,
     );
   }
 
@@ -113,6 +126,7 @@ class ProductSettings {
         kKeyEntryCountry: normalizeEntryCountry(entryCountry),
         kKeyCheckBreadcrumbs: checkBreadcrumbs,
         kKeySuiteAppearance: appearance,
+        kKeyKillSwitchOptIn: killSwitchOptIn,
       };
 
   factory ProductSettings.fromJson(Map<String, dynamic>? data) {
@@ -136,6 +150,7 @@ class ProductSettings {
       appearance: (rawAppearance ?? 'dark').trim().isEmpty
           ? 'dark'
           : rawAppearance!.trim().toLowerCase(),
+      killSwitchOptIn: data[kKeyKillSwitchOptIn] == true,
     );
   }
 }
@@ -195,6 +210,7 @@ class SettingsStore {
     final entry = await backend.getString(kKeyEntryCountry);
     final crumbs = await backend.getBool(kKeyCheckBreadcrumbs);
     final appearance = await backend.getString(kKeySuiteAppearance);
+    final ks = await backend.getBool(kKeyKillSwitchOptIn);
     return ProductSettings(
       runAtStartup: run == true,
       autoconnectOnLaunch: auto == true,
@@ -209,6 +225,7 @@ class SettingsStore {
       appearance: (appearance == null || appearance.trim().isEmpty)
           ? 'dark'
           : appearance.trim().toLowerCase(),
+      killSwitchOptIn: ks == true,
     );
   }
 
@@ -234,6 +251,29 @@ class SettingsStore {
       kKeySuiteAppearance,
       app == 'light' ? 'light' : 'dark',
     );
+    await backend.setBool(kKeyKillSwitchOptIn, settings.killSwitchOptIn);
+  }
+
+  /// Persist last leak-test result for residual leak posture (Settings/Home).
+  Future<void> saveLastLeakTest({
+    required String verdict,
+    int? atMs,
+  }) async {
+    await backend.setString(kKeyLastLeakTestVerdict, verdict.trim().toLowerCase());
+    await backend.setString(
+      kKeyLastLeakTestAtMs,
+      '${atMs ?? DateTime.now().millisecondsSinceEpoch}',
+    );
+  }
+
+  Future<({String? verdict, int? atMs})> loadLastLeakTest() async {
+    final v = await backend.getString(kKeyLastLeakTestVerdict);
+    final raw = await backend.getString(kKeyLastLeakTestAtMs);
+    int? at;
+    if (raw != null && raw.trim().isNotEmpty) {
+      at = int.tryParse(raw.trim());
+    }
+    return (verdict: v, atMs: at);
   }
 
   bool shouldAutoconnectOnLaunch(ProductSettings s) => s.autoconnectOnLaunch;

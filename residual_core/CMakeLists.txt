@@ -10,17 +10,27 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# OpenSSL 3 (Homebrew on Apple Silicon: /opt/homebrew/opt/openssl@3)
+if(APPLE AND EXISTS "/opt/homebrew/opt/openssl@3")
+  set(OPENSSL_ROOT_DIR "/opt/homebrew/opt/openssl@3")
+endif()
+find_package(OpenSSL REQUIRED)
+
 add_library(residual_core STATIC
   src/protocol.cpp
   src/pfs.cpp
   src/c_api.cpp
+  src/x25519.cpp
+  src/aead.cpp
 )
 target_include_directories(residual_core
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${OPENSSL_INCLUDE_DIR}
 )
+target_link_libraries(residual_core PUBLIC OpenSSL::Crypto)
 
 # Warnings on Clang/AppleClang
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang|GNU")

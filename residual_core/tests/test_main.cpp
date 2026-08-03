@@ -1,8 +1,10 @@
 // Unit tests for residual_core — call shipped functions with golden vectors
 // aligned to node/pfs.py + node/crypto_session.py + node/protocol.py.
+#include "residual_core/aead.hpp"
 #include "residual_core/pfs.hpp"
 #include "residual_core/protocol.hpp"
 #include "residual_core/residual_core.h"
+#include "residual_core/x25519.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -130,6 +132,70 @@ void test_keepalive_frame() {
               "pack_keepalive rejects bad session_id length");
 }
 
+void test_x25519_rfc7748() {
+  // RFC 7748 §6.1
+  const auto alice_sk = hex_to_bytes(
+      "77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a");
+  const auto bob_pk = hex_to_bytes(
+      "de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f");
+  const auto expect_shared = hex_to_bytes(
+      "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742");
+  auto shared = residual_core::x25519_shared_secret(alice_sk, bob_pk);
+  expect_true(shared == expect_shared,
+              "X25519 shared secret matches RFC 7748 golden");
+
+  const auto alice_pk_expect = hex_to_bytes(
+      "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a");
+  auto alice_pk = residual_core::x25519_public_from_private(alice_sk);
+  expect_true(alice_pk == alice_pk_expect,
+              "X25519 public-from-private matches RFC 7748");
+
+  // Pipe into product PFS IKM (non-trivial: shared is real DH output).
+  std::vector<std::uint8_t> client_nonce(32, 0x01);
+  std::vector<std::uint8_t> server_nonce(32, 0x02);
+  const std::uint8_t session_id[8] = {9, 8, 7, 6, 5, 4, 3, 2};
+  std::vector<std::uint8_t> client_pub(32, 0x11);
+  auto pfs = residual_core::derive_pfs_session_shared(
+      client_nonce, server_nonce, session_id, client_pub, shared);
+  expect_true(pfs.size() == 32, "PFS IKM from real X25519 shared is 32 bytes");
+  auto key = residual_core::derive_session_key(
+      pfs, std::span<const std::uint8_t>(client_nonce).subspan(0, 16));
+  expect_true(key.size() == 32, "session key from X25519+PFS is 32 bytes");
+}
+
+void test_chacha20_poly1305_roundtrip() {
+  std::vector<std::uint8_t> key(32);
+  for (int i = 0; i < 32; ++i) key[static_cast<std::size_t>(i)] =
+      static_cast<std::uint8_t>(i);
+  std::vector<std::uint8_t> nonce(12);
+  for (int i = 0; i < 12; ++i) nonce[static_cast<std::size_t>(i)] =
+      static_cast<std::uint8_t>(i);
+  // Product-style AAD prefix used on SERVER_HELLO path.
+  std::vector<std::uint8_t> aad = {'R', 'P', 'T', '2', '-', 'S', 'E', 'R',
+                                   'V', 'E', 'R', '-', 'H', 'E', 'L', 'L',
+                                   'O', 1,   2,   3,   4,   5,   6,   7,  8};
+  const std::vector<std::uint8_t> pt = {'h', 'e', 'l', 'l', 'o', ' ',
+                                        'r', 'e', 's', 'i', 'd', 'u', 'a', 'l'};
+  auto sealed = residual_core::chacha20_poly1305_seal(key, nonce, pt, aad);
+  expect_true(sealed.size() == pt.size() + 16,
+              "ChaCha20-Poly1305 seal length = pt + tag");
+  auto opened = residual_core::chacha20_poly1305_open(key, nonce, sealed, aad);
+  expect_true(opened == pt, "ChaCha20-Poly1305 open round-trips plaintext");
+
+  // Tamper tag → open fails
+  auto bad = sealed;
+  bad.back() ^= 0xff;
+  auto fail = residual_core::chacha20_poly1305_open(key, nonce, bad, aad);
+  expect_true(fail.empty(), "ChaCha20-Poly1305 rejects tampered tag");
+
+  // Wrong AAD fails
+  auto wrong_aad = aad;
+  wrong_aad[0] ^= 1;
+  auto fail2 =
+      residual_core::chacha20_poly1305_open(key, nonce, sealed, wrong_aad);
+  expect_true(fail2.empty(), "ChaCha20-Poly1305 rejects wrong AAD");
+}
+
 void test_c_abi() {
   std::vector<std::uint8_t> client_nonce(32);
   std::vector<std::uint8_t> server_nonce(32);
@@ -169,6 +235,8 @@ int main() {
   std::printf("residual_core unit tests (product residual primitives)\n");
   test_pfs_session_shared_golden();
   test_keepalive_frame();
+  test_x25519_rfc7748();
+  test_chacha20_poly1305_roundtrip();
   test_c_abi();
   if (g_fails != 0) {
     std::fprintf(stderr, "FAILED: %d assertion(s)\n", g_fails);

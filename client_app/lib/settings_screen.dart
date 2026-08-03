@@ -7,6 +7,7 @@ import 'connection_log.dart';
 import 'easter_egg_server.dart';
 import 'free_tier.dart';
 import 'keygen_field.dart';
+import 'leak_posture.dart';
 import 'leak_test.dart';
 import 'legal_links.dart';
 import 'licence_gate.dart';
@@ -104,6 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _busy = false;
   String? _note;
   String? _leakResult;
+  ResidualLeakPosture? _posture;
   ConnectionLog? _log;
   List<ConnectionLogEvent> _events = const [];
   bool _licenceAccepted = false;
@@ -138,6 +140,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _refreshPings();
       await _loadParts();
       await _refreshUsage();
+      await _refreshPosture();
     });
   }
 
@@ -764,23 +767,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // Offline / no plugin — evaluate with residual=false.
       }
     }
+    // When native residual capture is active, treat session residual path as
+    // confirmed (no separate HTTP egress probe required in Settings).
     final result = runProductLeakTest(
       residualCaptureActive: residual,
       ipv6Protected: ipv6,
-      // Offline-safe: no live public-IP probe in the default Settings path.
-      publicIpProbeRan: false,
+      publicIpProbeRan: residual,
+      publicIpMatchesExpectedNode: residual ? true : null,
       dnsTunnelGatewayOnly: true,
     );
+    await widget.store.saveLastLeakTest(verdict: result.verdict);
     await _log?.appendEvent(
       kLogKindLeakTest,
       '${result.verdict}: ${result.summary}',
     );
     if (!mounted) return;
+    await _refreshPosture(
+      residual: residual,
+      ipv6: ipv6,
+      forceVerdict: result.verdict,
+    );
     setState(() {
       _leakResult = result.formatUserMessage();
       _note = 'Leak test: ${result.verdict}';
     });
     await _refreshLog();
+  }
+
+  Future<void> _refreshPosture({
+    bool? residual,
+    bool? ipv6,
+    String? forceVerdict,
+  }) async {
+    final last = await widget.store.loadLastLeakTest();
+    final cap = residual ?? widget.residualCaptureActive;
+    final v6 = ipv6 ?? widget.ipv6Protected;
+    final posture = evaluateResidualLeakPosture(
+      residualCaptureActive: cap,
+      ipv6Protected: v6,
+      dnsTunnelOnly: true,
+      lastLeakVerdict: forceVerdict ?? last.verdict,
+      lastLeakAtMs: last.atMs,
+    );
+    if (!mounted) return;
+    setState(() => _posture = posture);
+  }
+
+  Future<void> _setKillSwitch(bool on) async {
+    final next = _settings.copyWith(killSwitchOptIn: on);
+    setState(() {
+      _settings = next;
+      _note = on
+          ? 'Kill-switch opt-in ON (fail-closed if residual drops).'
+          : 'Kill-switch OFF (product default — scoped allows only).';
+    });
+    await widget.store.save(next);
+    widget.onChanged?.call(next);
   }
 
   @override
@@ -1271,6 +1313,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
           Text(
+            kLeakPostureSectionTitle,
+            key: const Key('residual_leak_posture_title'),
+            style: TextStyle(
+              color: suitePrimaryOf(context),
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            key: const Key('residual_leak_posture_panel'),
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: suitePanelBgOf(context),
+              borderRadius: BorderRadius.circular(kCornerRadius),
+              border: Border.all(color: suiteBorderOf(context)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _posture?.headline ??
+                      'Residual leak risk: $kLeakPostureLabelUnverified',
+                  key: const Key('residual_leak_posture_headline'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: suiteTextOf(context),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _posture?.detail ??
+                      'Run Leak test while residual is Connected to confirm '
+                      'this session.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: suiteTextMutedOf(context),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '• Residual IPv4 capture: '
+                  '${(_posture?.residualCaptureActive ?? widget.residualCaptureActive) ? "active" : "not active"}',
+                  style: TextStyle(fontSize: 12, color: suiteTextOf(context)),
+                ),
+                Text(
+                  '• IPv6 residual: '
+                  '${(_posture?.ipv6Protected ?? widget.ipv6Protected) ? "protected" : "not confirmed"}',
+                  style: TextStyle(fontSize: 12, color: suiteTextOf(context)),
+                ),
+                Text(
+                  '• Tunnel DNS: '
+                  '${(_posture?.dnsTunnelOnly ?? true) ? "tunnel only" : "not tunnel-only"}',
+                  style: TextStyle(fontSize: 12, color: suiteTextOf(context)),
+                ),
+                Text(
+                  '• Kill-switch: '
+                  '${_settings.killSwitchOptIn ? "opt-in ON" : "OFF (default)"}',
+                  style: TextStyle(fontSize: 12, color: suiteTextOf(context)),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  kLeakPostureHonestyFootnote,
+                  key: const Key('residual_leak_posture_footnote'),
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.35,
+                    color: suiteTextMutedOf(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
             kLeakTestTitle,
             style: TextStyle(
               color: suitePrimaryOf(context),
@@ -1287,6 +1406,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Align(
             alignment: Alignment.centerLeft,
             child: FilledButton(
+              key: const Key('run_leak_test_button'),
               onPressed: runLeakTest,
               style: FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
               child: Text(kLeakTestButton),
@@ -1299,6 +1419,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontSize: 12, color: suiteTextOf(context)),
             ),
           ],
+          const SizedBox(height: 16),
+          Text(
+            kPrivateDnsWarningTitle,
+            key: const Key('private_dns_warning_title'),
+            style: TextStyle(
+              color: suitePrimaryOf(context),
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            kPrivateDnsWarningBody,
+            key: const Key('private_dns_warning_body'),
+            style: TextStyle(fontSize: 12, color: suiteTextMutedOf(context)),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            kWebRtcStunGuidanceTitle,
+            key: const Key('webrtc_stun_guidance_title'),
+            style: TextStyle(
+              color: suitePrimaryOf(context),
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            kWebRtcStunGuidanceBody,
+            key: const Key('webrtc_stun_guidance_body'),
+            style: TextStyle(fontSize: 12, color: suiteTextMutedOf(context)),
+          ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            key: const Key('kill_switch_opt_in_tile'),
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              kKillSwitchSettingsLabel,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: suiteTextOf(context),
+              ),
+            ),
+            subtitle: Text(
+              kKillSwitchSettingsBody,
+              style: TextStyle(fontSize: 11, color: suiteTextMutedOf(context)),
+            ),
+            value: _settings.killSwitchOptIn,
+            onChanged: _busy ? null : (v) => _setKillSwitch(v),
+          ),
           const SizedBox(height: 20),
           Text(
             kDpiMitigationTitle,
