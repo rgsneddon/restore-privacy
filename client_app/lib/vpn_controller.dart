@@ -387,7 +387,7 @@ class VpnController {
       final still = await querySession();
       if (still.connected || still.connecting) {
         onStatus(
-          'Disconnect issued but system VPN may still be active — '
+          'Disconnect issued but system VPN may still be active - '
           'toggle off Restore Privacy in System Settings → Network → VPN & Filters, '
           'or press Disconnect again.',
         );

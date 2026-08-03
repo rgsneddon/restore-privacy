@@ -1106,7 +1106,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   }
 
   void _append(String msg) {
-    setState(() => _log.add(msg));
+    final clean = sanitizeStatusForPrint(msg);
+    setState(() => _log.add(clean));
     _scrollLogToEnd();
   }
 
@@ -1123,7 +1124,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     if (_connected) {
       setState(() => _busy = true);
       try {
-        _append('Disconnect — tearing down system Packet Tunnel…');
+        _append('Disconnect - tearing down system Packet Tunnel...');
         await _connLog(kLogKindDisconnect, 'Disconnect started');
         await _vpn.disconnect();
         if (!mounted) return;
@@ -1134,7 +1135,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           setState(() {
             _connected = true;
             _status = snap.message ??
-                'Disconnect issued but system VPN still active — try Disconnect again.';
+                'Disconnect issued but system VPN still active - try Disconnect again.';
           });
           _append(_status);
           await _connLog(kLogKindDisconnect, 'System VPN still active after disconnect');
@@ -1147,9 +1148,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
             _homePosture = null;
             _watchdog = null;
             _status =
-                'Disconnected — system VPN stopped. Press Connect when you want protection.';
+                'Disconnected - system VPN stopped. Press Connect when you want protection.';
           });
-          _append('Disconnected — system Network VPN off.');
+          _append('Disconnected - system Network VPN off.');
           await _connLog(kLogKindDisconnect, 'Disconnected system VPN stopped');
           await _macWindow.setTrayConnected(false);
         }
@@ -1169,7 +1170,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   Future<void> _onQuit() async {
     if (_busy) return;
     setState(() => _busy = true);
-    _append('Quit — stopping residual tunnel, then closing the app…');
+    _append('Quit - stopping residual tunnel, then closing the app...');
     try {
       await performQuitSequence(
         stopTunnel: () async {
@@ -1282,13 +1283,13 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       residual: true,
     );
 
-    // Nested under SuiteShell chrome + bottom nav: avoid SafeArea double-padding
-    // and allow the body to shrink/scroll when height is tight.
+    // Nested under SuiteShell chrome + bottom nav: keep bottom SafeArea so Quit
+    // is not hidden under Android system gesture/nav bar (user-reported miss).
     return Scaffold(
       backgroundColor: suiteChromeBgOf(context),
       body: SafeArea(
         top: false,
-        bottom: false,
+        bottom: true,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: LayoutBuilder(
@@ -1668,29 +1669,36 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
               ),
               // Discrete Quit — lower-left of main connection screen (all platforms).
               // Placement marker: kQuitButtonPlacement == bottomLeft
+              // Always show on residual platforms; larger hit target on phones.
               if (showsMainScreenQuitOnThisDevice()) ...[
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerLeft, // bottomLeft of column
-                  child: TextButton(
+                  child: TextButton.icon(
                     key: const Key('main_quit_button'),
                     onPressed: _busy ? null : _onQuit,
+                    icon: Icon(
+                      Icons.power_settings_new,
+                      size: 18,
+                      color: suiteTextMutedOf(context),
+                    ),
+                    label: Text(
+                      kQuitButtonLabel,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: suiteTextMutedOf(context),
+                      ),
+                    ),
                     style: TextButton.styleFrom(
                       foregroundColor: suiteTextMutedOf(context),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                        horizontal: 12,
+                        vertical: 10,
                       ),
-                      minimumSize: const Size(0, 28),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    child: const Text(
-                      kQuitButtonLabel,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      minimumSize: const Size(88, 40),
+                      tapTargetSize: MaterialTapTargetSize.padded,
+                      alignment: Alignment.centerLeft,
                     ),
                   ),
                 ),

@@ -41,7 +41,7 @@ class MainActivity : FlutterActivity() {
                                 mapOf(
                                     "ok" to false,
                                     "message" to (
-                                        "Missing node_elgamal.pub â€” packages ship the public node key; " +
+                                        "Missing node_elgamal.pub - packages ship the public node key; " +
                                             "a unique device Ed25519 key is generated on first run"
                                         ),
                                 ),
@@ -70,19 +70,19 @@ class MainActivity : FlutterActivity() {
                     "disconnect" -> {
                         // ACTION_DISCONNECT runs stopTunnel (close TUN + stopSelf)
                         // rather than only stopService, so OS VPN routes clear fully.
-                        // Only explicit Disconnect from UI â€” never on Activity destroy.
+                        // Only explicit Disconnect from UI - never on Activity destroy.
                         sendDisconnect()
                         result.success(
                             mapOf(
                                 "ok" to true,
-                                "message" to "Disconnected â€” system VPN stopped; residual public IP restored",
+                                "message" to "Disconnected - system VPN stopped; residual public IP restored",
                                 "connected" to false,
                                 "fullTunnelActive" to false,
                             ),
                         )
                     }
                     "status" -> {
-                        // Rehydrate UI after minimize/resume — does not start/stop tunnel.
+                        // Rehydrate UI after minimize/resume - does not start/stop tunnel.
                         // If session IP is present, residual is up even if a flag race
                         // left isSessionActive briefly false (stops "waiting for full
                         // tunnel" spam every poll).
@@ -94,20 +94,20 @@ class MainActivity : FlutterActivity() {
                         val v6 = RptVpnService.activeIpv6Protected
                         val statusMsg = when {
                             connecting ->
-                                "Connecting — waiting for full tunnel (RPT2 + system VPN)…"
+                                "Connecting - waiting for full tunnel (RPT2 + system VPN)..."
                             !active -> "Disconnected"
                             v6 == false && ip.isNotEmpty() ->
-                                "Connected — IPv4 via VPN; IPv6 not protected ($ip)"
+                                "Connected - IPv4 via VPN; IPv6 not protected ($ip)"
                             v6 == false ->
-                                "Connected — IPv4 via VPN; IPv6 not protected"
+                                "Connected - IPv4 via VPN; IPv6 not protected"
                             v6 == true && ip.isNotEmpty() ->
-                                "Connected — VPN active; IPv6 ISP path blocked ($ip)"
+                                "Connected - VPN active; IPv6 ISP path blocked ($ip)"
                             v6 == true ->
-                                "Connected — VPN active; IPv6 ISP path blocked"
+                                "Connected - VPN active; IPv6 ISP path blocked"
                             ip.isNotEmpty() ->
-                                "Connected — your traffic uses the VPN ($ip)"
+                                "Connected - your traffic uses the VPN ($ip)"
                             else ->
-                                "Connected — protected"
+                                "Connected - protected"
                         }
                         result.success(
                             mapOf(
@@ -280,7 +280,7 @@ class MainActivity : FlutterActivity() {
                 res?.success(
                     mapOf(
                         "ok" to false,
-                        "message" to "VPN permission denied â€” grant once for full tunnel",
+                        "message" to "VPN permission denied - grant once for full tunnel",
                     ),
                 )
             }
@@ -304,7 +304,7 @@ class MainActivity : FlutterActivity() {
                 val ok = resultCode == RptVpnService.RESULT_OK && !connecting
                 val message = resultData?.getString(RptVpnService.EXTRA_MESSAGE)
                     ?: when {
-                        connecting -> "Connecting — waiting for full tunnel…"
+                        connecting -> "Connecting - waiting for full tunnel..."
                         ok -> "Connected"
                         else -> "Connect failed"
                     }

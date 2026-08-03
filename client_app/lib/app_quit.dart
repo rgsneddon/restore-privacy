@@ -9,6 +9,7 @@ import 'dart:io' show Platform, exit;
 
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
+import 'package:flutter/services.dart' show SystemNavigator;
 
 /// Button label on the main connection screen.
 const String kQuitButtonLabel = 'Quit';
@@ -74,7 +75,12 @@ Future<void> performQuitSequence({
 ///
 /// Call only after [performQuitSequence]'s tunnel stop has completed.
 void exitAppProcess() {
-  // dart:io exit — required so Packet Tunnel host + UI both leave.
-  // SystemNavigator.pop alone does not guarantee process death on iOS/macOS.
+  // Android: finish the activity via SystemNavigator first so Quit feels like
+  // a normal exit (not only a raw process kill). Still call exit as backup.
+  // iOS/macOS: SystemNavigator alone is not enough for full process death.
+  try {
+    SystemNavigator.pop();
+  } catch (_) {}
+  // dart:io exit - required so Packet Tunnel host + UI both leave.
   exit(0);
 }

@@ -744,5 +744,36 @@ bool shouldStopTunnelOnAppLifecycle(String lifecycleStateName) {
 }
 
 /// Human message after intentional tunnel stop (channel or quit).
+///
+/// ASCII hyphen only - em dash U+2014 mis-decodes on some Android log/print
+/// surfaces as mojibake (e.g. "å€" / "â€"").
 const String kDisconnectedResidualIpMessage =
-    'Disconnected — system VPN stopped; residual public IP restored';
+    'Disconnected - system VPN stopped; residual public IP restored';
+
+/// Normalize punctuation for the main-screen print/status window.
+///
+/// Strips em/en dashes and ellipsis (and common Latin-1 misreads of UTF-8 em
+/// dash) so Android never shows garbage like `å€` in disconnect lines.
+String sanitizeStatusForPrint(String message) {
+  var s = message;
+  // Real Unicode punctuation.
+  s = s.replaceAll('\u2014', '-'); // em dash
+  s = s.replaceAll('\u2013', '-'); // en dash
+  s = s.replaceAll('\u2026', '...'); // ellipsis
+  // UTF-8 em dash (E2 80 94) mis-decoded as Windows-1252 → "â€"" (U+00E2 U+20AC U+201D).
+  s = s.replaceAll('\u00e2\u20ac\u201d', '-');
+  s = s.replaceAll('\u00e2\u20ac\u201c', '-');
+  s = s.replaceAll('\u00e2\u20ac\u2013', '-');
+  s = s.replaceAll('\u00e2\u20ac\u2014', '-');
+  // Same bytes misread as Latin-1 then re-encoded (â + C2 80 + C2 94).
+  s = s.replaceAll('\u00e2\u0080\u0094', '-');
+  s = s.replaceAll('\u00e2\u0080\u0093', '-');
+  // Font/device-specific garbage reported as "å€" between words.
+  s = s.replaceAll('\u00e5\u20ac', '-');
+  // Any leftover â€ / å€ fragments glued to spaces.
+  s = s.replaceAll(RegExp(r'[\u00e2\u00e5]\u20ac[\u201c\u201d\u2013\u2014]?'), '-');
+  // Normalize spaces around hyphen separators: " - " form.
+  s = s.replaceAll(RegExp(r'[ \t]*-[ \t]*'), ' - ');
+  s = s.replaceAll(RegExp(r' {2,}'), ' ');
+  return s.trim();
+}
