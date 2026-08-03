@@ -1,6 +1,7 @@
 // Unit tests for residual_core — call shipped functions with golden vectors
 // aligned to node/pfs.py + node/crypto_session.py + node/protocol.py.
 #include "residual_core/aead.hpp"
+#include "residual_core/lean_residual.hpp"
 #include "residual_core/pfs.hpp"
 #include "residual_core/protocol.hpp"
 #include "residual_core/residual_core.h"
@@ -227,6 +228,68 @@ void test_c_abi() {
               "C ABI pack_keepalive length 13");
   expect_true(std::memcmp(ka, "RPT2", 4) == 0 && ka[4] == RPT_MSG_KEEPALIVE,
               "C ABI keepalive magic+type");
+
+  // C ABI seal/open drives real residual AEAD entry points
+  std::uint8_t key[32]{};
+  for (int i = 0; i < 32; ++i) key[static_cast<std::size_t>(i)] =
+      static_cast<std::uint8_t>(i);
+  std::uint8_t nonce[12]{};
+  for (int i = 0; i < 12; ++i) nonce[static_cast<std::size_t>(i)] =
+      static_cast<std::uint8_t>(i);
+  const char* pt = "lean residual packet";
+  const std::size_t pt_len = std::strlen(pt);
+  std::uint8_t sealed[64]{};
+  std::size_t sealed_len = 0;
+  expect_true(rpt_chacha20_poly1305_seal(key, nonce,
+                                         reinterpret_cast<const uint8_t*>(pt),
+                                         pt_len, nullptr, 0, sealed,
+                                         sizeof(sealed), &sealed_len) == 0 &&
+                  sealed_len == pt_len + 16,
+              "C ABI seal length pt+tag");
+  std::uint8_t opened[64]{};
+  std::size_t opened_len = 0;
+  expect_true(rpt_chacha20_poly1305_open(key, nonce, sealed, sealed_len,
+                                         nullptr, 0, opened, sizeof(opened),
+                                         &opened_len) == 0 &&
+                  opened_len == pt_len &&
+                  std::memcmp(opened, pt, pt_len) == 0,
+              "C ABI open round-trips plaintext");
+}
+
+void test_lean_residual_defaults() {
+  using residual_core::kLeanResidualDefaults;
+  using residual_core::kResidualUdpPort;
+  using residual_core::lean_residual_path_active;
+
+  expect_true(!kLeanResidualDefaults.traffic_shape,
+              "lean default traffic_shape off");
+  expect_true(!kLeanResidualDefaults.outer_obfuscation,
+              "lean default outer_obfuscation off");
+  expect_true(!kLeanResidualDefaults.multihop, "lean default multihop off");
+  expect_true(kLeanResidualDefaults.require_pfs, "lean still requires PFS");
+  expect_true(kLeanResidualDefaults.require_session_aead,
+              "lean still requires session AEAD");
+  expect_true(lean_residual_path_active(),
+              "default LeanResidualDefaults is lean path");
+  expect_true(!lean_residual_path_active(true, false, false),
+              "shape on leaves lean path");
+  expect_true(!lean_residual_path_active(false, true, false),
+              "obfs on leaves lean path");
+  expect_true(!lean_residual_path_active(false, false, true),
+              "multihop on leaves lean path");
+  expect_true(kResidualUdpPort == 44044, "residual UDP port 44044");
+
+  int shape_off = 0, obfs_off = 0, mh_off = 0, port = 0;
+  rpt_lean_residual_defaults(&shape_off, &obfs_off, &mh_off, &port);
+  expect_true(shape_off == 1 && obfs_off == 1 && mh_off == 1 && port == 44044,
+              "C ABI lean defaults all off + port 44044");
+  expect_true(rpt_lean_residual_path_active(0, 0, 0) == 1,
+              "C ABI lean path active when all off");
+  expect_true(rpt_lean_residual_path_active(1, 0, 0) == 0,
+              "C ABI lean path inactive when shape on");
+  expect_true(std::strstr(residual_core::kNoDartDataplaneRule, "Dart") !=
+                  nullptr,
+              "no-Dart-dataplane rule string present");
 }
 
 }  // namespace
@@ -238,6 +301,7 @@ int main() {
   test_x25519_rfc7748();
   test_chacha20_poly1305_roundtrip();
   test_c_abi();
+  test_lean_residual_defaults();
   if (g_fails != 0) {
     std::fprintf(stderr, "FAILED: %d assertion(s)\n", g_fails);
     return 1;

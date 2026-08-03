@@ -7,6 +7,17 @@
 
 ---
 
+
+## 0. Continuing implementer rule (this monorepo)
+
+**C++ residual_core** owns pure residual crypto and wire helpers. **Flutter** owns UI and
+`MethodChannel('restore_privacy/vpn')` bridge only — **no residual IP AEAD / UDP
+dataplane in Dart**. **Do not** full-rewrite residual nodes (`node/server.py`) into C++
+in this phase. **Lean residual defaults** (traffic shape / outer obfuscation / multi-hop
+**off**) keep client CPU and hop cost low for product single-hop Connect; privacy-scale
+layers stay user opt-in. Residual UDP **44044** is the product residual port for RTT honesty.
+
+---
 ## 1. Current product residual stack (ground truth)
 
 | Layer | Location | Role today |
@@ -18,7 +29,7 @@
 | Residual nodes (Python) | `node/server.py`, `node/sessions.py`, admission/payment gates | UDP residual admit + session AEAD |
 | Apple residual engine | `client_app/apple_shared/Rpt2/` (Swift CryptoKit) | Packet Tunnel path: X25519 PFS, ChaChaPoly, HELLO parity |
 | Apple NE host | `client_app/macos/NativePrep/PacketTunnelProvider.swift` (and iOS twin) | OS residual capture |
-| C++ residual core (new) | `residual_core/` | **Started:** `derive_pfs_session_shared`, `derive_session_key` (HKDF), `pack_keepalive`, C ABI |
+| C++ residual core | `residual_core/` | **Shipped pure:** PFS IKM + HKDF, X25519, ChaCha20-Poly1305, keepalive/frames, lean residual defaults; C ABI for future host/FFI |
 
 **Product residual truth (must not be regressed):**
 
@@ -37,7 +48,7 @@
 |----------------|-----------|
 | Python | `cryptography` `X25519PrivateKey` / `exchange` in `node/pfs.py` (`EphemeralX25519`, `x25519_shared_secret`) |
 | Swift (Apple) | CryptoKit Curve25519 in `RptClientEngine` / HELLO build-parse |
-| C++ `residual_core` | **Transcript only** so far: IKM from a pre-shared `eph_shared` blob — **no DH yet** |
+| C++ `residual_core` | **X25519 DH + PFS IKM** shipped (`x25519.hpp` / RFC 7748 goldens + product PFS) |
 
 Client HELLO embeds client eph public; SERVER_HELLO opening includes server eph public when PFS is required (`client/connect.py` `require_pfs=True` product default).
 
@@ -72,7 +83,7 @@ Client HELLO embeds client eph public; SERVER_HELLO opening includes server eph 
 |----------------|-----------|
 | Python | `ChaCha20Poly1305` seal/open in `node/crypto_session.py` (session data + hybrid blob AAD `RPT2-HYBRID` / `RPT2-SERVER-HELLO` + session_id) |
 | Swift | `CryptoKit.ChaChaPoly` in `RptSessionCrypto.swift` |
-| C++ | **Not yet** in `residual_core` |
+| C++ | **Shipped** `chacha20_poly1305_seal` / `open` + C ABI |
 
 Dataplane path (`client/dataplane.py`) seals IP packets and optional cover frames through `SessionCrypto`, with traffic-shape padding applied **around** AEAD (not instead of it).
 

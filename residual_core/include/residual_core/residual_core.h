@@ -38,6 +38,28 @@ int rpt_derive_session_key(
 int rpt_pack_keepalive(const uint8_t session_id[8], uint8_t* out, size_t out_cap,
                        size_t* out_len);
 
+/* ChaCha20-Poly1305 seal (IETF, 12-byte nonce). out_cap must hold pt_len+16.
+ * Returns 0 and sets *out_len on success. */
+int rpt_chacha20_poly1305_seal(const uint8_t key32[32], const uint8_t nonce12[12],
+                               const uint8_t* plaintext, size_t pt_len,
+                               const uint8_t* aad, size_t aad_len, uint8_t* out,
+                               size_t out_cap, size_t* out_len);
+
+/* ChaCha20-Poly1305 open. ct_and_tag_len is ciphertext||tag. Returns 0 on success. */
+int rpt_chacha20_poly1305_open(const uint8_t key32[32], const uint8_t nonce12[12],
+                               const uint8_t* ct_and_tag, size_t ct_and_tag_len,
+                               const uint8_t* aad, size_t aad_len, uint8_t* out,
+                               size_t out_cap, size_t* out_len);
+
+/* Product lean residual defaults (1 = true). Traffic shape / outer obfs /
+ * multihop product defaults are off for low-ping residual. */
+void rpt_lean_residual_defaults(int* traffic_shape_off, int* outer_obfs_off,
+                                int* multihop_off, int* residual_udp_port);
+
+/* 1 if all three privacy-scale flags are off (lean residual path). */
+int rpt_lean_residual_path_active(int traffic_shape, int outer_obfs,
+                                  int multihop);
+
 #ifdef __cplusplus
 }
 #endif
