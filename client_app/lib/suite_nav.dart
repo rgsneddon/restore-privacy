@@ -58,34 +58,17 @@ bool suiteNavIsPercentEvolveFamily(SuiteNavDest dest) {
   }
 }
 
-/// Ordered main-bar destinations for install flags + Evolve app access.
+/// Ordered main-bar destinations — **VPN only** for the dedicated residual app.
 ///
-/// - VPN always first; rpAI last when installed.
-/// - % and Evolve are **one family**: no dual top-level "%" + "EVOLVE" slots.
-/// - Analysis / Voting only when Evolve is installed **and** [hasAppAccess].
-/// - When neither wallet nor evolve is installed, family destinations omitted.
-/// - May return a single destination (VPN only) — shell must not assert ≥2.
+/// Evolve / wallet / Backup / Voting / Credit / rpAI are not product chrome.
+/// [parts] / [hasAppAccess] are ignored so install flags cannot re-expand the bar.
 List<SuiteNavDest> suiteNavDestinations(
   SuitePartsState parts, {
   bool hasAppAccess = true,
 }) {
-  final out = <SuiteNavDest>[SuiteNavDest.vpn];
-  final family = parts.walletInstalled || parts.evolveInstalled;
-  if (family) {
-    if (parts.evolveInstalled && hasAppAccess) {
-      out.add(SuiteNavDest.analysis);
-    }
-    out.add(SuiteNavDest.wallet);
-    out.add(SuiteNavDest.security);
-    if (parts.evolveInstalled && hasAppAccess) {
-      out.add(SuiteNavDest.voting);
-    }
-    out.add(SuiteNavDest.credit);
-  }
-  if (parts.rpaiInstalled) {
-    out.add(SuiteNavDest.rpai);
-  }
-  return List<SuiteNavDest>.unmodifiable(out);
+  final _ = parts;
+  final __ = hasAppAccess;
+  return List<SuiteNavDest>.unmodifiable(const [SuiteNavDest.vpn]);
 }
 
 /// Clamp index into [suiteNavDestinations].

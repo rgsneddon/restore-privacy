@@ -7,9 +7,7 @@ import 'package:restore_privacy_client/first_run_portal.dart';
 import 'package:restore_privacy_client/licence_gate.dart';
 import 'package:restore_privacy_client/main.dart';
 import 'package:restore_privacy_client/settings_store.dart';
-import 'package:restore_privacy_client/suite_account.dart';
 import 'package:restore_privacy_client/suite_shell.dart';
-import 'package:restore_privacy_client/suite_version.dart';
 import 'package:restore_privacy_client/theme.dart';
 
 LicenceGate _memoryGate({bool licenceAccepted = false}) {
@@ -60,10 +58,8 @@ void main() {
   testWidgets('locked entry shows first-run portal before shell', (tester) async {
     final gate = _memoryGate();
     final b = MemorySettingsBackend();
-    final accounts = SuiteAccountStore(b);
     final first = FirstRunStore(
       backend: b,
-      isAccountRegistered: accounts.isRegistered,
       hasAcceptedLicence: () => gate.hasAcceptedLicence(),
     );
 
@@ -72,7 +68,6 @@ void main() {
         home: AppEntryRoot(
           licenceGate: gate,
           firstRunStore: first,
-          accountStore: accounts,
           initialUnlocked: false,
           child: const Scaffold(
             key: Key('main_shell_marker'),
@@ -81,12 +76,12 @@ void main() {
         ),
       ),
     );
-    await tester.pump(); // schedule _loadInjected
-    await tester.pump(); // settle portal state
+    await tester.pump();
+    await tester.pump();
 
-    // First-run portal (account → seed → licence), not KEYGEN surface.
+    // First-run portal (licence → KEYGEN/trial), not multi-product account.
     expect(find.byKey(kFirstRunPortalKey), findsOneWidget);
-    expect(find.text(kFirstRunAccountTitle), findsOneWidget);
+    expect(find.text(kFirstRunLicenceStepTitle), findsOneWidget);
     expect(find.text('MAIN_SHELL'), findsNothing);
     expect(find.byKey(const Key('main_shell_marker')), findsNothing);
     expect(find.byKey(kEntryAccessScreenKey), findsNothing);
@@ -116,14 +111,12 @@ void main() {
   });
 
   testWidgets(
-      'first-run complete reveals shell without process restart (KEYGEN alone does not)',
+      'licence + KEYGEN unlock reveals shell; KEYGEN alone does not',
       (tester) async {
     final gate = _memoryGate();
     final b = MemorySettingsBackend();
-    final accounts = SuiteAccountStore(b);
     final first = FirstRunStore(
       backend: b,
-      isAccountRegistered: accounts.isRegistered,
       hasAcceptedLicence: () => gate.hasAcceptedLicence(),
     );
 
@@ -132,7 +125,6 @@ void main() {
         home: AppEntryRoot(
           licenceGate: gate,
           firstRunStore: first,
-          accountStore: accounts,
           initialUnlocked: false,
           child: const Scaffold(body: Text('MAIN_SHELL_AFTER_UNLOCK')),
         ),
@@ -142,7 +134,7 @@ void main() {
     expect(find.byKey(kFirstRunPortalKey), findsOneWidget);
     expect(find.text('MAIN_SHELL_AFTER_UNLOCK'), findsNothing);
 
-    // KEYGEN / payment alone must not open the shell.
+    // KEYGEN / payment alone must not open the shell without licence.
     await gate.recordPaymentSuccess(
       'cs_test_entry',
       keygen: 'RPT-KEY-TEST-ENTRY-AAAA',
@@ -153,10 +145,9 @@ void main() {
     expect(find.byKey(kFirstRunPortalKey), findsOneWidget);
     expect(find.text('MAIN_SHELL_AFTER_UNLOCK'), findsNothing);
 
-    // Real first-run path: account → seed → licence.
-    await accounts.markRegistered('alice');
-    await first.markSeedDone();
+    // Licence + entitlement opens shell.
     await gate.acceptLicence();
+    await first.markEntryUnlockDone();
     await root.markUnlockedAndRefresh();
     await tester.pump();
 
@@ -175,7 +166,6 @@ void main() {
     );
     await tester.pump();
 
-    // Locked root shows first-run portal (or its loading scaffold), never shell.
     expect(find.byKey(kFirstRunPortalKey), findsOneWidget);
     expect(find.byType(SuiteShell), findsNothing);
     expect(find.byKey(kEntryAccessScreenKey), findsNothing);
@@ -195,21 +185,18 @@ void main() {
     expect(find.byKey(kFirstRunPortalKey), findsNothing);
   });
 
-  test('isAppEntryUnlocked requires first-run complete not KEYGEN alone',
+  test('isAppEntryUnlocked requires licence + entitlement not KEYGEN alone',
       () async {
-    final gate = _memoryGate(licenceAccepted: true);
+    final gate = _memoryGate(licenceAccepted: false);
     final b = MemorySettingsBackend();
-    final accounts = SuiteAccountStore(b);
     final incomplete = FirstRunStore(
       backend: b,
-      isAccountRegistered: accounts.isRegistered,
       hasAcceptedLicence: () => gate.hasAcceptedLicence(),
     );
     expect(
       await isAppEntryUnlocked(
         gate,
         firstRunStore: incomplete,
-        accountStore: accounts,
         backend: b,
       ),
       isFalse,
@@ -219,29 +206,40 @@ void main() {
       'cs_ok',
       keygen: 'RPT-KEY-OK-OK-OK-OK',
     );
-    // Payment/KEYGEN still does not open shell.
+    // Payment/KEYGEN still does not open shell without licence.
     expect(
       await isAppEntryUnlocked(
         gate,
         firstRunStore: incomplete,
-        accountStore: accounts,
         backend: b,
       ),
       isFalse,
     );
 
-    await accounts.markRegistered('bob');
-    await incomplete.markSeedDone();
-    // Licence already accepted via _memoryGate.
+    await gate.acceptLicence();
     expect(
       await isAppEntryUnlocked(
         gate,
         firstRunStore: incomplete,
-        accountStore: accounts,
         backend: b,
       ),
       isTrue,
     );
     expect(await isAppEntryUnlocked(null), isFalse);
+  });
+
+  test('return visit blocks when trial/KEYGEN not active', () async {
+    final gate = _memoryGate(licenceAccepted: true);
+    final b = MemorySettingsBackend();
+    final first = FirstRunStore(
+      backend: b,
+      hasAcceptedLicence: () => gate.hasAcceptedLicence(),
+    );
+    await first.markEntryUnlockDone();
+    // No payment, no trial → locked.
+    expect(
+      await isAppEntryUnlocked(gate, firstRunStore: first, backend: b),
+      isFalse,
+    );
   });
 }

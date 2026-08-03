@@ -11,16 +11,11 @@ import 'suite_parts_store.dart';
 import 'suite_rpai_tab.dart';
 import 'suite_version.dart';
 
-/// Unified Restore Privacy Suite shell: flat main bottom bar.
+/// Residual VPN shell (dedicated VPN product chrome).
 ///
-/// Destinations: **VPN** · promoted **%/Evolve** surfaces (Analysis / Wallet /
-/// Backup / Voting / Credit as installed + entitled) · **rpAI**. Nested
-/// wallet/evolve bottom bars are off on the Suite embed path. Family pages share
-/// one [SuiteFamilyHost] bootstrap (not one provider tree per tab).
-///
-/// Horizontal [PageView] uses natural orientation ([reverse] false). End blocks
-/// at first and last destination (no wrap). When only one destination is
-/// visible, the bottom [NavigationBar] is omitted (Material requires ≥2).
+/// Destinations: **VPN only**. Optional Suite family surfaces (%, Evolve, rpAI,
+/// Backup) are not product chrome. When only one destination is visible, the
+/// bottom [NavigationBar] is omitted (Material requires ≥2).
 class SuiteShell extends StatefulWidget {
   const SuiteShell({
     super.key,
@@ -148,8 +143,8 @@ class SuiteShellState extends State<SuiteShell> {
   @override
   void initState() {
     super.initState();
-    // Fresh default is VPN + rpAI until store load or explicit initialParts.
-    _parts = widget.initialParts ?? SuitePartsState.vpnAndRpai;
+    // Fresh default is residual VPN only.
+    _parts = widget.initialParts ?? SuitePartsState.vpnOnly;
     _index = clampSuiteNavIndex(
       widget.initialTabIndex,
       _parts,
@@ -241,9 +236,12 @@ class SuiteShellState extends State<SuiteShell> {
     }
   }
 
-  bool get _hasFamilyInstall =>
-      suitePartShowsFullSurface(_parts, SuitePartId.wallet) ||
-      suitePartShowsFullSurface(_parts, SuitePartId.evolve);
+  /// Product chrome is VPN-only — never mount %/Evolve family host.
+  bool get _hasFamilyInstall {
+    // Destinations never include family surfaces; install flags are ignored.
+    final dests = destinations;
+    return dests.any(suiteNavIsPercentEvolveFamily);
+  }
 
   /// Production family path (no test inject overrides).
   bool get _useSharedFamilyHost {

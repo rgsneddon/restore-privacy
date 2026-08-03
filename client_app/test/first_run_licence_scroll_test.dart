@@ -1,4 +1,4 @@
-/// First-run licence: full scrollable text, scroll-to-bottom accept, public link.
+/// First-run licence: full scrollable justified text, scroll-to-bottom accept.
 library;
 
 import 'package:flutter/material.dart';
@@ -8,23 +8,19 @@ import 'package:restore_privacy_client/first_run_portal.dart';
 import 'package:restore_privacy_client/legal_links.dart';
 import 'package:restore_privacy_client/licence_gate.dart';
 import 'package:restore_privacy_client/settings_store.dart';
-import 'package:restore_privacy_client/suite_account.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late MemorySettingsBackend prefs;
   late LicenceGate gate;
-  late SuiteAccountStore accounts;
   late FirstRunStore firstRun;
 
   setUp(() {
     prefs = MemorySettingsBackend();
     gate = LicenceGate(MemoryLicenceBackend({}));
-    accounts = SuiteAccountStore(prefs);
     firstRun = FirstRunStore(
       backend: prefs,
-      isAccountRegistered: accounts.isRegistered,
       hasAcceptedLicence: () => gate.hasAcceptedLicence(),
     );
   });
@@ -32,8 +28,6 @@ void main() {
   testWidgets(
     'licence accept disabled until scroll-to-bottom; link targets public licence',
     (tester) async {
-      await accounts.markRegistered('lic_user');
-      await firstRun.markSeedDone();
       Uri? opened;
       await tester.pumpWidget(
         MaterialApp(
@@ -43,16 +37,14 @@ void main() {
             child: FirstRunPortal(
               onComplete: () {},
               licenceGate: gate,
-              accountStore: accounts,
               firstRunStore: firstRun,
               openLicenceUrl: (uri) async {
                 opened = uri;
                 return true;
               },
               initialState: const FirstRunState(
-                accountDone: true,
-                seedDone: true,
                 licenceAccepted: false,
+                entryUnlockDone: false,
               ),
             ),
           ),
@@ -69,8 +61,18 @@ void main() {
       );
       expect(find.textContaining('1. DEFINITIONS'), findsOneWidget);
       expect(find.textContaining('Client Package'), findsWidgets);
+      expect(find.textContaining('residual VPN'), findsWidgets);
       expect(find.textContaining('END OF LICENCE'), findsOneWidget);
       expect(find.textContaining('STRONG DISCLAIMER'), findsOneWidget);
+
+      // Justified body text.
+      final licenceText = tester.widget<Text>(
+        find.descendant(
+          of: find.byKey(kFirstRunLicenceScrollKey),
+          matching: find.byType(Text),
+        ).first,
+      );
+      expect(licenceText.textAlign, TextAlign.justify);
 
       // Bounded pane: Expanded licence region must leave room for chrome.
       final scrollBox = tester.renderObject<RenderBox>(
@@ -104,7 +106,6 @@ void main() {
         greaterThan(500),
         reason: 'full LICENSE body must require substantial scroll',
       );
-      // Jump to end — full LICENSE is multi-page (~10k+ px).
       pos.jumpTo(pos.maxScrollExtent);
       await tester.pumpAndSettle();
       expect(pos.pixels, greaterThanOrEqualTo(pos.maxScrollExtent - 12));
@@ -123,6 +124,12 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
       expect(await gate.hasAcceptedLicence(), isTrue);
+
+      // After accept, KEYGEN/trial step (not account/seed).
+      await tester.pumpAndSettle();
+      expect(find.text(kFirstRunKeygenStepTitle), findsOneWidget);
+      expect(find.byKey(kFirstRunContinueTrialKey), findsOneWidget);
+      expect(find.byKey(kFirstRunKeygenContinueKey), findsOneWidget);
     },
   );
 

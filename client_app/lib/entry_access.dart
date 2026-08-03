@@ -1,7 +1,8 @@
-/// Full-screen licence unlock entry surface (app root gate).
+/// Full-screen residual VPN entry gate (licence + KEYGEN/trial).
 ///
-/// Shown before Suite shell (VPN / % / EVOLVE) until the device has a valid
-/// KEYGEN entitlement unlock. Styling: orange body text on dark navy blue.
+/// Shown before the main VPN shell until the device has accepted the end-user
+/// licence **and** holds a valid residual entitlement (KEYGEN or active trial).
+/// No username/password. Styling: orange body text on dark navy blue.
 /// Do not use the word "paywall" in any user-visible string here.
 library;
 
@@ -15,8 +16,6 @@ import 'keygen_field.dart';
 import 'licence_gate.dart';
 import 'prefs_backend.dart';
 import 'settings_store.dart';
-import 'suite_account.dart';
-import 'suite_session_rehydrate.dart';
 import 'suite_version.dart';
 import 'theme.dart';
 
@@ -40,9 +39,9 @@ const String kEntryAccessGuidanceText =
     'Windows Firewall/UDP, or that the node is online. On Windows, run '
     'AllowFirewall.bat (or reinstall) if residual is blocked.';
 
-const String kEntryAccessTitle = 'Unlock Restore Privacy Suite';
+const String kEntryAccessTitle = 'Unlock Restore Privacy residual VPN';
 const String kEntryAccessSubtitle =
-    'Enter your licence keygen to open the app on this device.';
+    'Enter your KEYGEN or continue the free trial to open residual VPN.';
 const String kEntryAccessUnlockLabel = 'Unlock with keygen';
 const String kEntryAccessAcceptLicenceLabel = 'Accept end-user licence';
 const String kEntryAccessRenewLabel = 'Renew licence';
@@ -79,49 +78,52 @@ bool entryAccessCopyIsValid(String copy) {
   return true;
 }
 
-/// Whether the device may enter the main Suite shell.
+/// Whether the device may enter the main residual VPN shell.
 ///
-/// Shell entry requires **first-run complete** (account → seed → licence).
-/// Residual Connect still needs trial or KEYGEN ([LicenceGate.mayConnect]) and
-/// is gated inside the shell / Connect path — not at this shell door.
+/// Requires licence accepted **and** residual entitlement (trial or KEYGEN).
+/// First-use portal records [FirstRunStore.markEntryUnlockDone] after unlock.
 Future<bool> isAppEntryUnlocked(
   LicenceGate? gate, {
   bool requirePayment = true,
   FirstRunStore? firstRunStore,
-  SuiteAccountStore? accountStore,
   SettingsBackend? backend,
+  /// @deprecated ignored — no Suite account gate
+  Object? accountStore,
 }) async {
   if (gate == null) return false;
   FirstRunStore store = firstRunStore ??
       FirstRunStore(
-        backend: backend ??
-            MemorySettingsBackend(), // tests must inject real backend
-        isAccountRegistered: () async =>
-            accountStore != null && await accountStore.isRegistered(),
+        backend: backend ?? MemorySettingsBackend(),
         hasAcceptedLicence: () => gate.hasAcceptedLicence(),
       );
-  // When no injectable backend was provided, load SharedPreferences.
   if (firstRunStore == null && backend == null) {
     try {
       final prefs = await SharedPreferences.getInstance();
       final b = SharedPreferencesBackend(prefs);
-      final accounts = accountStore ?? SuiteAccountStore(b);
       store = FirstRunStore(
         backend: b,
-        isAccountRegistered: accounts.isRegistered,
         hasAcceptedLicence: () => gate.hasAcceptedLicence(),
       );
     } catch (_) {
       return false;
     }
   }
-  final done = await store.isComplete();
-  return mayEnterSuiteShell(firstRunDone: done);
+  final st = await store.load();
+  if (!st.licenceAccepted) return false;
+  final entitled =
+      await gate.paymentAllowsConnect(require: requirePayment);
+  if (!entitled) return false;
+  // Migration / return: entitled + licence is enough. Mark unlock if missing.
+  if (!st.entryUnlockDone) {
+    await store.markEntryUnlockDone();
+  }
+  return mayEnterVpnShell(
+    firstRunDone: true,
+    trialOrKeygenOk: true,
+  );
 }
 
-/// Root gate: first-run portal until complete, then [child] (Suite shell).
-///
-/// Residual Connect / KEYGEN / trial are enforced on Connect, not at shell entry.
+/// Root gate: first-run / KEYGEN portal until entitled, then [child] (VPN shell).
 class AppEntryRoot extends StatefulWidget {
   const AppEntryRoot({
     super.key,
@@ -130,20 +132,21 @@ class AppEntryRoot extends StatefulWidget {
     this.requirePayment = true,
     this.initialUnlocked,
     this.firstRunStore,
+    /// @deprecated ignored
     this.accountStore,
   });
 
-  /// Main app shell (Suite tabs) after first-run.
+  /// Main residual VPN shell after entry unlock.
   final Widget child;
 
   final LicenceGate? licenceGate;
   final bool requirePayment;
 
-  /// When non-null, skips async load (tests) — treats as first-run complete.
+  /// When non-null, skips async load (tests) — treats as entry unlocked.
   final bool? initialUnlocked;
 
   final FirstRunStore? firstRunStore;
-  final SuiteAccountStore? accountStore;
+  final Object? accountStore;
 
   @override
   State<AppEntryRoot> createState() => AppEntryRootState();
@@ -154,7 +157,6 @@ class AppEntryRootState extends State<AppEntryRoot> {
   Object? _loadError;
   LicenceGate? _gate;
   FirstRunStore? _firstRun;
-  SuiteAccountStore? _accounts;
 
   bool get isUnlocked => _unlocked == true;
 
@@ -190,26 +192,20 @@ class AppEntryRootState extends State<AppEntryRoot> {
           ),
         );
       }
-      final accounts = widget.accountStore ?? SuiteAccountStore(backend);
-      // Cold start: restore in-process Suite identity so %/Evolve rehydrate.
-      await seedSuiteAccountBusFromStore(accounts);
       final first = widget.firstRunStore ??
           FirstRunStore(
             backend: backend,
-            isAccountRegistered: accounts.isRegistered,
             hasAcceptedLicence: () => gate!.hasAcceptedLicence(),
           );
       final ok = await isAppEntryUnlocked(
         gate,
         requirePayment: widget.requirePayment,
         firstRunStore: first,
-        accountStore: accounts,
         backend: backend,
       );
       if (!mounted) return;
       setState(() {
         _gate = gate;
-        _accounts = accounts;
         _firstRun = first;
         _unlocked = ok;
         _loadError = null;
@@ -229,7 +225,6 @@ class AppEntryRootState extends State<AppEntryRoot> {
         effectiveGate,
         requirePayment: widget.requirePayment,
         firstRunStore: _firstRun ?? widget.firstRunStore,
-        accountStore: _accounts ?? widget.accountStore,
       );
       if (!mounted) return;
       setState(() {
@@ -263,11 +258,11 @@ class AppEntryRootState extends State<AppEntryRoot> {
     if (_unlocked == true) {
       return widget.child;
     }
-    // First-run portal (account → seed → licence) before shell / permissions.
+    // Licence → KEYGEN/trial portal (also return visits when entitlement lapsed).
     return FirstRunPortal(
       licenceGate: effectiveGate,
-      accountStore: _accounts ?? widget.accountStore,
       firstRunStore: _firstRun ?? widget.firstRunStore,
+      requirePayment: widget.requirePayment,
       onComplete: () {
         markUnlockedAndRefresh();
       },
@@ -275,7 +270,7 @@ class AppEntryRootState extends State<AppEntryRoot> {
   }
 }
 
-/// Full-screen licence unlock entry (orange text on dark blue).
+/// Full-screen KEYGEN / trial unlock (return visit or standalone).
 class EntryAccessScreen extends StatefulWidget {
   const EntryAccessScreen({
     super.key,
@@ -380,7 +375,7 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
     }
     setState(() {
       _busy = false;
-      _statusLine = 'Unlocked. Opening the app…';
+      _statusLine = 'Unlocked. Opening residual VPN…';
     });
     await widget.onUnlocked?.call();
   }
@@ -398,7 +393,6 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
   }
 
   Future<void> _openShop() async {
-    // Always send users to the pay page for a KEYGEN (not storefront-only).
     final uri = Uri.parse(shopPayUrl());
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -442,7 +436,7 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
     }
     setState(() {
       _busy = false;
-      _statusLine = 'Free trial active. Opening the app…';
+      _statusLine = 'Free trial active. Opening residual VPN…';
     });
     await widget.onUnlocked?.call();
   }
@@ -493,7 +487,7 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
                   const SizedBox(height: 10),
                   const Text(
                     kEntryAccessSubtitle,
-                    textAlign: TextAlign.center,
+                    textAlign: TextAlign.justify,
                     style: TextStyle(
                       color: kEntryAccessOrange,
                       fontSize: 14,
@@ -501,9 +495,9 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Required guidance — orange on dark blue.
                   Text(
                     kEntryAccessGuidanceText,
+                    textAlign: TextAlign.justify,
                     style: const TextStyle(
                       color: kEntryAccessOrange,
                       fontSize: 14,
@@ -591,12 +585,12 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
                       side: BorderSide(color: kWhite.withValues(alpha: 0.55)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: const Text(kStartFreeTrialButtonLabel),
+                    child: const Text(kContinueTrialButtonLabel),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     kEntryAccessTrialHint,
-                    textAlign: TextAlign.center,
+                    textAlign: TextAlign.justify,
                     style: TextStyle(
                       color: kWhite.withValues(alpha: 0.75),
                       fontSize: 12,

@@ -1,7 +1,7 @@
-/// Full-screen first-run portal: account → seed → licence (before shell/VPN).
+/// Full-screen first-run portal: licence → KEYGEN or continue trial (no account).
+///
+/// Product is residual VPN only. Username/password and seed steps are removed.
 library;
-
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,25 +9,22 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'first_run_gate.dart';
 import 'full_end_user_licence.dart';
+import 'keygen_field.dart';
 import 'legal_links.dart';
 import 'licence_gate.dart';
 import 'prefs_backend.dart';
 import 'settings_store.dart';
-import 'suite_account.dart';
-import 'suite_account_apply.dart';
-import 'suite_account_seed.dart';
-import 'suite_session_rehydrate.dart';
 import 'suite_version.dart';
 import 'theme.dart';
 
 /// Finder keys for tests / automation.
 const Key kFirstRunPortalKey = Key('first_run_portal');
-const Key kFirstRunAccountContinueKey = Key('first_run_account_continue');
-const Key kFirstRunSeedGenerateKey = Key('first_run_seed_generate');
-const Key kFirstRunSeedConfirmKey = Key('first_run_seed_confirm');
 const Key kFirstRunLicenceAcceptKey = Key('first_run_licence_accept');
 const Key kFirstRunLicenceScrollKey = Key('first_run_licence_scroll');
 const Key kFirstRunLicenceLinkKey = Key('first_run_licence_link');
+const Key kFirstRunKeygenContinueKey = Key('first_run_keygen_continue');
+const Key kFirstRunContinueTrialKey = Key('first_run_continue_trial');
+const Key kFirstRunGetKeygenKey = Key('first_run_get_keygen');
 
 /// Public licence page opened from first-run (status-host LICENSE).
 final Uri kFirstRunPublicLicenceUri = Uri.parse(
@@ -36,52 +33,57 @@ final Uri kFirstRunPublicLicenceUri = Uri.parse(
       .url,
 );
 
-/// Ordered first-run surface. Calls [onComplete] when account+seed+licence done.
+/// Ordered first-run surface. Calls [onComplete] when licence + entitlement done.
 class FirstRunPortal extends StatefulWidget {
   const FirstRunPortal({
     super.key,
     required this.onComplete,
     this.licenceGate,
-    this.accountStore,
     this.firstRunStore,
-    this.applyCredentials,
-    this.seedOffer,
     this.initialState,
-    this.generateSeedWords,
-    this.attachAndPublishSeed,
-    this.seedConfirmTimeout = kSuiteSeedConfirmTimeout,
-    this.surfaces,
     this.suitePrefsBackend,
     this.licenceBackend,
     this.openLicenceUrl,
+    this.requirePayment = true,
+    // Legacy Suite injects (ignored — no account/seed path).
+    this.accountStore,
+    this.applyCredentials,
+    this.seedOffer,
+    this.generateSeedWords,
+    this.attachAndPublishSeed,
+    this.seedConfirmTimeout = const Duration(seconds: 60),
+    this.surfaces,
   });
 
   final VoidCallback onComplete;
   final LicenceGate? licenceGate;
-  final SuiteAccountStore? accountStore;
   final FirstRunStore? firstRunStore;
-  final SuiteAccountAuthRunner? applyCredentials;
-  final SuiteSeedOfferFn? seedOffer;
 
   /// When set, skips async load (widget tests).
   final FirstRunState? initialState;
 
-  /// Override real BIP39 generate (tests inject [generateSuiteSeedWords] path).
-  final Future<List<String>> Function()? generateSeedWords;
-
-  /// Override attach+publish after write-down confirm.
-  final Future<void> Function(List<String> words)? attachAndPublishSeed;
-
-  /// Wall-clock budget for seed confirm (tests inject short timeouts).
-  final Duration seedConfirmTimeout;
-
-  /// Wallet surfaces for production attach (or injectable test stores).
-  final SuiteAccountPackageSurfaces? surfaces;
   final SettingsBackend? suitePrefsBackend;
   final SettingsBackend? licenceBackend;
 
   /// Open public licence URL (tests inject).
   final Future<bool> Function(Uri url)? openLicenceUrl;
+
+  final bool requirePayment;
+
+  /// @deprecated ignored
+  final Object? accountStore;
+  /// @deprecated ignored
+  final Object? applyCredentials;
+  /// @deprecated ignored
+  final Object? seedOffer;
+  /// @deprecated ignored
+  final Object? generateSeedWords;
+  /// @deprecated ignored
+  final Object? attachAndPublishSeed;
+  /// @deprecated ignored
+  final Duration seedConfirmTimeout;
+  /// @deprecated ignored
+  final Object? surfaces;
 
   @override
   State<FirstRunPortal> createState() => _FirstRunPortalState();
@@ -90,20 +92,14 @@ class FirstRunPortal extends StatefulWidget {
 class _FirstRunPortalState extends State<FirstRunPortal> {
   FirstRunState? _state;
   LicenceGate? _gate;
-  SuiteAccountStore? _accounts;
   FirstRunStore? _firstRun;
   Object? _error;
   var _busy = false;
-  final _user = TextEditingController();
-  final _pass = TextEditingController();
-  /// Credentials retained for post-account seed attach (not uploaded).
-  String _pendingUsername = '';
-  String _pendingPassword = '';
-  List<String>? _seedWords;
   var _status = '';
-  /// Licence step: accept enabled only after scroll-to-bottom.
   var _licenceScrolledToBottom = false;
+  var _entitled = false;
   final ScrollController _licenceScroll = ScrollController();
+  final _keygenCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -112,14 +108,10 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
     if (widget.initialState != null) {
       _state = widget.initialState;
       _gate = widget.licenceGate;
-      _accounts = widget.accountStore;
       _firstRun = widget.firstRunStore;
-    } else if (widget.firstRunStore != null &&
-        widget.licenceGate != null &&
-        widget.accountStore != null) {
-      // Injectable stores (tests / AppEntryRoot) — no SharedPreferences.
+      _hydrateEntitlement();
+    } else if (widget.firstRunStore != null && widget.licenceGate != null) {
       _gate = widget.licenceGate;
-      _accounts = widget.accountStore;
       _firstRun = widget.firstRunStore;
       _loadInjected();
     } else {
@@ -130,22 +122,38 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
   @override
   void dispose() {
     _licenceScroll.removeListener(_onLicenceScroll);
-    _user.dispose();
-    _pass.dispose();
     _licenceScroll.dispose();
+    _keygenCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _hydrateEntitlement() async {
+    final gate = _gate ?? widget.licenceGate;
+    if (gate == null) return;
+    final ok = await gate.paymentAllowsConnect(require: widget.requirePayment);
+    if (!mounted) return;
+    setState(() => _entitled = ok);
+    final st = _state;
+    if (st != null && st.licenceAccepted && ok) {
+      await _firstRun?.markEntryUnlockDone();
+      widget.onComplete();
+    }
   }
 
   Future<void> _loadInjected() async {
     try {
       final first = _firstRun!;
       final st = await first.load();
+      final gate = _gate!;
+      final ok = await gate.paymentAllowsConnect(require: widget.requirePayment);
       if (!mounted) return;
       setState(() {
         _state = st;
+        _entitled = ok;
         _error = null;
       });
-      if (firstRunComplete(st)) {
+      if (st.licenceAccepted && ok) {
+        if (!st.entryUnlockDone) await first.markEntryUnlockDone();
         widget.onComplete();
       }
     } catch (e) {
@@ -171,24 +179,23 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
               },
             ),
           );
-      final accounts = widget.accountStore ?? SuiteAccountStore(backend);
-      await seedSuiteAccountBusFromStore(accounts);
       final first = widget.firstRunStore ??
           FirstRunStore(
             backend: backend,
-            isAccountRegistered: accounts.isRegistered,
             hasAcceptedLicence: () => gate.hasAcceptedLicence(),
           );
       final st = await first.load();
+      final ok = await gate.paymentAllowsConnect(require: widget.requirePayment);
       if (!mounted) return;
       setState(() {
         _gate = gate;
-        _accounts = accounts;
         _firstRun = first;
         _state = st;
+        _entitled = ok;
         _error = null;
       });
-      if (firstRunComplete(st)) {
+      if (st.licenceAccepted && ok) {
+        if (!st.entryUnlockDone) await first.markEntryUnlockDone();
         widget.onComplete();
       }
     } catch (e) {
@@ -199,181 +206,18 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
 
   Future<void> _reload() async {
     final first = _firstRun;
-    if (first == null) return;
+    final gate = _gate;
+    if (first == null || gate == null) return;
     final st = await first.load();
+    final ok = await gate.paymentAllowsConnect(require: widget.requirePayment);
     if (!mounted) return;
-    setState(() => _state = st);
-    if (firstRunComplete(st)) {
+    setState(() {
+      _state = st;
+      _entitled = ok;
+    });
+    if (st.licenceAccepted && ok) {
+      if (!st.entryUnlockDone) await first.markEntryUnlockDone();
       widget.onComplete();
-    }
-  }
-
-  Future<void> _submitAccount({required bool register}) async {
-    if (_busy) return;
-    final u = _user.text.trim();
-    final p = _pass.text;
-    if (u.isEmpty || p.isEmpty) {
-      setState(() => _status = 'Enter username and password.');
-      return;
-    }
-    if (p.length < 8) {
-      setState(() => _status = 'Password must be at least 8 characters.');
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _status = register ? 'Creating account…' : 'Signing in…';
-    });
-    final store = _accounts!;
-    final SuiteAccountAuthRunner apply = widget.applyCredentials ??
-        ({
-          required String username,
-          required String password,
-          required bool register,
-        }) =>
-            applySuiteAccountToWalletAndEvolve(
-              username: username,
-              password: password,
-              register: register,
-              // Portal owns seed write-down after account; attach on confirm.
-              skipSeedOffer: true,
-              surfaces: widget.surfaces,
-              suitePrefsBackend: widget.suitePrefsBackend,
-              licenceBackend: widget.licenceBackend,
-            );
-    try {
-      await apply(
-        username: u,
-        password: p,
-        register: register,
-      );
-      await store.markRegistered(u);
-      SuiteAccountBus.instance.notifyRegistered(u);
-      if (!mounted) return;
-      setState(() {
-        _pendingUsername = u;
-        _pendingPassword = p;
-        _busy = false;
-        _status = '';
-      });
-      await _reload();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _status = 'Account failed: $e';
-      });
-    }
-  }
-
-  Future<void> _generateSeed() async {
-    if (_busy) return;
-    setState(() {
-      _busy = true;
-      _status = 'Generating seed…';
-    });
-    try {
-      final gen = widget.generateSeedWords ?? generateSuiteSeedWords;
-      final words = await gen();
-      if (isStubSuiteSeedWords(words)) {
-        throw StateError('stub seed words rejected');
-      }
-      if (!mounted) return;
-      setState(() {
-        _seedWords = words;
-        _busy = false;
-        _status = 'Write these words offline, then continue.';
-      });
-    } catch (e) {
-      // Fail closed — never substitute fake word01..word12.
-      if (!mounted) return;
-      setState(() {
-        _seedWords = null;
-        _busy = false;
-        _status = 'Could not generate recovery seed: $e';
-      });
-    }
-  }
-
-  Future<void> _confirmSeed() async {
-    if (_busy) return;
-    if (_seedWords == null || _seedWords!.length != 12) {
-      setState(() => _status = 'Generate the 12-word phrase first.');
-      return;
-    }
-    if (isStubSuiteSeedWords(_seedWords!)) {
-      setState(() => _status = 'Invalid seed — generate again.');
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _status = 'Saving recovery envelope…';
-    });
-    final budget = widget.seedConfirmTimeout;
-    try {
-      final attach = widget.attachAndPublishSeed;
-      if (attach != null) {
-        await attach(_seedWords!).timeout(
-          budget,
-          onTimeout: () => throw TimeoutException(
-            'Seed save timed out after ${budget.inSeconds}s',
-            budget,
-          ),
-        );
-      } else {
-        final u = _pendingUsername.trim().isNotEmpty
-            ? _pendingUsername.trim()
-            : _user.text.trim();
-        final p = _pendingPassword.isNotEmpty ? _pendingPassword : _pass.text;
-        if (u.isEmpty || p.isEmpty) {
-          throw StateError('Account credentials required to save seed');
-        }
-        final result = await attachAndPublishSuiteSeedForUser(
-          words: _seedWords!,
-          username: u,
-          password: p,
-          surfaces: widget.surfaces,
-          suitePrefsBackend: widget.suitePrefsBackend,
-          licenceBackend: widget.licenceBackend,
-          overallTimeout: budget,
-        );
-        if (!result.localOk) {
-          throw StateError('Seed local attach failed');
-        }
-        if (!result.published && mounted) {
-          // Advance anyway — user wrote the words; network backup is optional.
-          setState(() {
-            _status = result.publishError is TimeoutException
-                ? 'Seed saved on this device (network backup timed out).'
-                : 'Seed saved on this device (network backup skipped).';
-          });
-        }
-      }
-      await _firstRun?.markSeedDone();
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        if (_status.startsWith('Seed saved')) {
-          // keep soft publish note briefly into licence step via reload
-        } else {
-          _status = '';
-        }
-      });
-      await _reload();
-    } on TimeoutException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _status =
-            'Seed save timed out (${e.duration?.inSeconds ?? budget.inSeconds}s). '
-            'Check network and tap continue again — or note your written words.';
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _status = 'Seed save failed: $e';
-      });
     }
   }
 
@@ -388,14 +232,100 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
     setState(() => _busy = true);
     await gate.acceptLicence();
     if (!mounted) return;
-    setState(() => _busy = false);
+    setState(() {
+      _busy = false;
+      _status = '';
+    });
     await _reload();
+  }
+
+  Future<void> _tryKeygenUnlock() async {
+    if (_busy) return;
+    final gate = _gate;
+    if (gate == null) {
+      setState(() => _status = 'Unlock is unavailable on this build.');
+      return;
+    }
+    final raw = _keygenCtrl.text.trim();
+    if (raw.isEmpty) {
+      setState(() => _status = 'Paste the KEYGEN from your fulfilment email.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _status = 'Verifying KEYGEN…';
+    });
+    final st = await gate.importKeygenAndVerify(raw);
+    final ok = await gate.paymentAllowsConnect(require: widget.requirePayment);
+    if (!mounted) return;
+    if (!ok) {
+      setState(() {
+        _busy = false;
+        _status =
+            'KEYGEN not active (status=$st). Check the code and subscription.';
+      });
+      return;
+    }
+    await _firstRun?.markEntryUnlockDone();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _status = 'Unlocked. Opening residual VPN…';
+      _entitled = true;
+    });
+    widget.onComplete();
+  }
+
+  Future<void> _continueOrStartTrial() async {
+    if (_busy) return;
+    final gate = _gate;
+    if (gate == null) {
+      setState(() => _status = 'Trial is unavailable on this build.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _status = 'Checking free 3-day trial…';
+    });
+    // Active trial: paymentAllowsConnect already true after claim/refresh.
+    var ok = await gate.paymentAllowsConnect(require: widget.requirePayment);
+    if (!ok) {
+      final remote = await gate.claimDeviceTrial();
+      ok = remote['connect_allowed'] == true || remote['ok'] == true;
+      if (!ok) {
+        final err = remote['error']?.toString() ?? 'trial_denied';
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _status = err == 'trial_exhausted'
+              ? kContinueTrialExpiredHint
+              : (err == kDeviceTrialStatusExpired
+                  ? kContinueTrialExpiredHint
+                  : 'Trial not available ($err). Enter a KEYGEN to continue.');
+        });
+        return;
+      }
+    }
+    await _firstRun?.markEntryUnlockDone();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _status = 'Trial active. Opening residual VPN…';
+      _entitled = true;
+    });
+    widget.onComplete();
+  }
+
+  Future<void> _openShop() async {
+    final uri = Uri.parse(shopPayUrl());
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
   }
 
   void _onLicenceScroll() {
     if (!_licenceScroll.hasClients) return;
     final pos = _licenceScroll.position;
-    // No overflow → entire licence already visible → treat as bottom reached.
     final atBottom = pos.maxScrollExtent <= 0 ||
         pos.pixels >= (pos.maxScrollExtent - 12);
     if (atBottom && !_licenceScrolledToBottom) {
@@ -406,7 +336,6 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // After first frame of licence step, re-check short content.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final st = _state;
@@ -431,6 +360,13 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
     }
   }
 
+  /// UI step: licence, or KEYGEN/trial when not entitled.
+  FirstRunStep _uiStep(FirstRunState st) {
+    if (!st.licenceAccepted) return FirstRunStep.licence;
+    if (_entitled) return FirstRunStep.complete;
+    return FirstRunStep.keygenOrTrial;
+  }
+
   @override
   Widget build(BuildContext context) {
     final st = _state;
@@ -446,7 +382,7 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
         ),
       );
     }
-    final step = nextFirstRunStep(st);
+    final step = _uiStep(st);
     final header = <Widget>[
       Text(
         kSuiteProductName,
@@ -468,7 +404,7 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
       ),
       const SizedBox(height: 8),
       Text(
-        'Step ${_stepIndex(step)} of 3',
+        'Step ${_stepIndex(step)} of 2',
         textAlign: TextAlign.center,
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.6),
@@ -488,8 +424,6 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
           ]
         : const <Widget>[];
 
-    // Licence uses Expanded scroll pane (not nested outer SingleChildScrollView)
-    // so scroll-to-bottom gating receives real scroll metrics within app bounds.
     if (step == FirstRunStep.licence) {
       return Scaffold(
         key: kFirstRunPortalKey,
@@ -499,7 +433,8 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 440),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -515,6 +450,7 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
       );
     }
 
+    // KEYGEN / continue trial (first-use step 2 and return when trial expired).
     return Scaffold(
       key: kFirstRunPortalKey,
       backgroundColor: const Color(0xFF0A1628),
@@ -528,8 +464,7 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   ...header,
-                  if (step == FirstRunStep.account) _buildAccountStep(context),
-                  if (step == FirstRunStep.seed) _buildSeedStep(context),
+                  _buildKeygenOrTrialStep(context),
                   ...status,
                 ],
               ),
@@ -542,23 +477,21 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
 
   int _stepIndex(FirstRunStep s) {
     switch (s) {
-      case FirstRunStep.account:
-        return 1;
-      case FirstRunStep.seed:
-        return 2;
       case FirstRunStep.licence:
-        return 3;
+        return 1;
+      case FirstRunStep.keygenOrTrial:
+        return 2;
       case FirstRunStep.complete:
-        return 3;
+        return 2;
     }
   }
 
-  Widget _buildAccountStep(BuildContext context) {
+  Widget _buildKeygenOrTrialStep(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          kFirstRunAccountTitle,
+          kFirstRunKeygenStepTitle,
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.white,
@@ -568,101 +501,90 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
         ),
         const SizedBox(height: 12),
         const Text(
-          kFirstRunAccountBody,
-          style: TextStyle(color: Color(0xFFFF9800), fontSize: 14, height: 1.4),
+          kFirstRunKeygenStepBody,
+          textAlign: TextAlign.justify,
+          style: TextStyle(
+            color: Color(0xFFFF9800),
+            fontSize: 14,
+            height: 1.45,
+          ),
         ),
         const SizedBox(height: 20),
-        _field(_user, kSuiteAccountUsernameLabel),
-        const SizedBox(height: 12),
-        _field(_pass, kSuiteAccountPasswordLabel, obscure: true),
-        const SizedBox(height: 16),
-        FilledButton(
-          key: kFirstRunAccountContinueKey,
-          onPressed: _busy ? null : () => _submitAccount(register: true),
-          child: Text(_busy ? 'Please wait…' : kSuiteAccountRegisterLabel),
-        ),
-        const SizedBox(height: 8),
-        TextButton(
-          onPressed: _busy ? null : () => _submitAccount(register: false),
-          child: Text(
-            kSuiteAccountLoginLabel,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.85)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSeedStep(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          kFirstRunSeedTitle,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          kFirstRunSeedBody,
-          style: TextStyle(color: Color(0xFFFF9800), fontSize: 14, height: 1.4),
-        ),
-        const SizedBox(height: 16),
-        if (_seedWords != null) ...[
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF132A4A),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white24),
-            ),
-            child: Text(
-              _seedWords!.join(' '),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                height: 1.5,
-                fontWeight: FontWeight.w600,
+        Theme(
+          data: Theme.of(context).copyWith(
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              fillColor: const Color(0xFF132A4A),
+              labelStyle: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.35),
+                ),
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFFFF9800)),
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Write these words on paper. Do not screenshot cloud storage.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
-              fontSize: 12,
-            ),
+          child: KeygenEntryField(
+            controller: _keygenCtrl,
+            labelText: 'KEYGEN (RPT-KEY-…) from fulfilment email',
+            isDense: true,
+            enabled: !_busy,
+            style: const TextStyle(fontSize: 14, color: Colors.white),
           ),
-        ],
-        const SizedBox(height: 16),
-        if (_seedWords == null)
-          FilledButton(
-            key: kFirstRunSeedGenerateKey,
-            onPressed: _busy ? null : _generateSeed,
-            child: Text(_busy ? 'Please wait…' : kSuiteSeedGenerateLabel),
-          )
-        else
-          FilledButton(
-            key: kFirstRunSeedConfirmKey,
-            onPressed: _busy ? null : _confirmSeed,
-            child: Text(
-              _busy ? 'Please wait…' : kFirstRunSeedConfirmLabel,
-            ),
+        ),
+        const SizedBox(height: 14),
+        FilledButton(
+          key: kFirstRunKeygenContinueKey,
+          onPressed: _busy ? null : _tryKeygenUnlock,
+          style: FilledButton.styleFrom(
+            backgroundColor: suitePrimaryOf(context),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
           ),
+          child: Text(_busy ? 'Please wait…' : kEntryAccessUnlockLabelFallback),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          key: kFirstRunContinueTrialKey,
+          onPressed: _busy ? null : _continueOrStartTrial,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.55)),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+          child: const Text(kContinueTrialButtonLabel),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          kFirstRunCompleteHint,
+          textAlign: TextAlign.justify,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.75),
+            fontSize: 12,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          key: kFirstRunGetKeygenKey,
+          onPressed: _busy ? null : _openShop,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFFFF9800),
+            side: const BorderSide(color: Color(0xFFFF9800)),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+          child: const Text(kGetKeygenButtonLabel),
+        ),
       ],
     );
   }
 
   Widget _buildLicenceStep(BuildContext context) {
-    // Bounded licence pane inside Expanded parent so macOS windows stay
-    // within app dimensions; accept unlocks only after scroll-to-bottom.
-    // Full product LICENSE (not the short summary) + residual disclaimer.
     const licenceBody = '$kFullEndUserLicenceText\n\n'
         '---\n\n'
         '$kPaymentConnectDisclaimerPlain\n\n'
@@ -681,9 +603,9 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
         ),
         const SizedBox(height: 12),
         Text(
-          'Scroll through the full licence below. Accept unlocks only after '
-          'you reach the end.',
-          textAlign: TextAlign.center,
+          'Scroll through the full residual VPN licence below. Accept unlocks '
+          'only after you reach the end.',
+          textAlign: TextAlign.justify,
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.75),
             fontSize: 12,
@@ -716,6 +638,7 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
                   padding: const EdgeInsets.all(14),
                   child: const Text(
                     licenceBody,
+                    textAlign: TextAlign.justify,
                     style: TextStyle(
                       color: Color(0xFFFF9800),
                       fontSize: 13,
@@ -742,7 +665,8 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
         const SizedBox(height: 8),
         FilledButton(
           key: kFirstRunLicenceAcceptKey,
-          onPressed: (_busy || !_licenceScrolledToBottom) ? null : _acceptLicence,
+          onPressed:
+              (_busy || !_licenceScrolledToBottom) ? null : _acceptLicence,
           child: Text(
             _busy
                 ? 'Please wait…'
@@ -754,28 +678,7 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
       ],
     );
   }
-
-  Widget _field(
-    TextEditingController c,
-    String label, {
-    bool obscure = false,
-  }) {
-    return TextField(
-      controller: c,
-      obscureText: obscure,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
-        filled: true,
-        fillColor: const Color(0xFF132A4A),
-        enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
-        ),
-        focusedBorder: const OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFFFF9800)),
-        ),
-      ),
-    );
-  }
 }
+
+/// Local label (avoids entry_access import cycle).
+const String kEntryAccessUnlockLabelFallback = 'Unlock with KEYGEN';

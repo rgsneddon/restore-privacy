@@ -83,33 +83,33 @@ void main() {
       expect(suiteNavLabel(SuiteNavDest.security), isNot('Security'));
     });
 
-    test('all installed: VPN + family (no dual EVOLVE top-level) + rpAI', () {
-      final d = suiteNavDestinations(SuitePartsState.allInstalled);
-      final labels = d.map(suiteNavLabel).toList();
-      expect(labels.first, 'VPN');
-      expect(labels.last, 'rpAI');
-      // Unified %/Evolve family — Wallet once, no separate EVOLVE product slot.
-      expect(labels.where((l) => l == 'EVOLVE'), isEmpty);
-      expect(labels.where((l) => l == '%'), isEmpty);
-      expect(labels, containsAll(['Analysis', 'Wallet', 'Backup', 'Voting', 'Credit']));
-      expect(labels, isNot(contains('Security')));
-      // % and Evolve share family — Analysis/Voting from evolve, Wallet shared.
-      expect(d.where(suiteNavIsPercentEvolveFamily).length, greaterThanOrEqualTo(3));
+    test('product chrome is VPN only regardless of install flags', () {
+      for (final parts in [
+        SuitePartsState.allInstalled,
+        SuitePartsState.vpnAndRpai,
+        SuitePartsState.vpnOnly,
+      ]) {
+        final d = suiteNavDestinations(parts);
+        final labels = d.map(suiteNavLabel).toList();
+        expect(labels, ['VPN'], reason: '$parts');
+        expect(labels, isNot(contains('rpAI')));
+        expect(labels, isNot(contains('Wallet')));
+        expect(labels, isNot(contains('Analysis')));
+        expect(d.where(suiteNavIsPercentEvolveFamily), isEmpty);
+      }
     });
 
-    test('wallet only: no Analysis/Voting', () {
+    test('wallet install flags cannot expand product bar', () {
       const parts = SuitePartsState(
         walletInstalled: true,
         evolveInstalled: false,
         rpaiInstalled: true,
       );
       final labels = suiteNavDestinations(parts).map(suiteNavLabel).toList();
-      expect(labels, ['VPN', 'Wallet', 'Backup', 'Credit', 'rpAI']);
-      expect(labels, isNot(contains('Analysis')));
-      expect(labels, isNot(contains('Voting')));
+      expect(labels, ['VPN']);
     });
 
-    test('neither wallet nor evolve: VPN + rpAI only', () {
+    test('rpAI flag alone still VPN only', () {
       const parts = SuitePartsState(
         walletInstalled: false,
         evolveInstalled: false,
@@ -117,7 +117,7 @@ void main() {
       );
       expect(
         suiteNavDestinations(parts).map(suiteNavLabel).toList(),
-        ['VPN', 'rpAI'],
+        ['VPN'],
       );
     });
 
@@ -132,15 +132,15 @@ void main() {
       expect(d.length, 1);
     });
 
-    test('!hasAppAccess hides Analysis/Voting', () {
+    test('!hasAppAccess still VPN only (product chrome)', () {
       final d = suiteNavDestinations(
         SuitePartsState.allInstalled,
         hasAppAccess: false,
       );
       final labels = d.map(suiteNavLabel).toList();
+      expect(labels, ['VPN']);
       expect(labels, isNot(contains('Analysis')));
       expect(labels, isNot(contains('Voting')));
-      expect(labels, containsAll(['VPN', 'Wallet', 'Backup', 'Credit', 'rpAI']));
     });
 
     test('evolve shell index maps limited vs full access', () {
@@ -199,7 +199,7 @@ void main() {
     });
   });
 
-  testWidgets('main bar lists promoted tabs; no nested wallet/evolve bars',
+  testWidgets('product shell is VPN only; no multi-product main bar',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -222,48 +222,22 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    // Main bar destinations (promoted family).
-    expect(find.byKey(const Key('suite_shell_main_nav')), findsOneWidget);
-    expect(find.text('VPN'), findsWidgets);
-    expect(find.text('Wallet'), findsWidgets);
-    expect(find.text('Analysis'), findsWidgets);
-    expect(find.text('Backup'), findsWidgets);
-    expect(find.text('Voting'), findsWidgets);
-    expect(find.text('Credit'), findsWidgets);
-    expect(find.text('rpAI'), findsWidgets);
-    // No dual top-level EVOLVE product label on main bar.
+    // Single VPN destination → no main NavigationBar.
+    expect(find.byKey(const Key('suite_shell_main_nav')), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.text('VPN_SURFACE'), findsOneWidget);
+    expect(find.text('Wallet'), findsNothing);
+    expect(find.text('Analysis'), findsNothing);
+    expect(find.text('rpAI'), findsNothing);
     expect(find.text('EVOLVE'), findsNothing);
 
-    // PageView is not reverse (swipes natural).
     final pv = tester.widget<PageView>(find.byKey(const Key('suite_shell_page_view')));
     expect(pv.reverse, isFalse);
 
-    // Nested package bars must not appear on Suite embed path (inject stubs).
-    expect(find.byKey(const Key('wallet_shell_embed_no_bottom_bar')), findsNothing);
-    expect(find.byKey(const Key('evolve_shell_embed_no_bottom_bar')), findsNothing);
-    // Only one NavigationBar — the Suite main bar.
-    expect(find.byType(NavigationBar), findsOneWidget);
-    // Inject path does not mount shared family host (no multi-bootstrap host).
     expect(find.byKey(const Key('suite_family_host')), findsNothing);
 
     final shell = tester.state<SuiteShellState>(find.byType(SuiteShell));
-    final dests = shell.destinations;
-    expect(dests.first, SuiteNavDest.vpn);
-    expect(dests, contains(SuiteNavDest.wallet));
-    expect(dests, contains(SuiteNavDest.analysis));
-    expect(dests.where((d) => d == SuiteNavDest.vpn).length, 1);
-
-    // Select Analysis (index 1 with all installed).
-    final analysisIdx = dests.indexOf(SuiteNavDest.analysis);
-    shell.selectTab(analysisIdx);
-    await tester.pump();
-    expect(find.text('EVOLVE_INJECT'), findsOneWidget);
-
-    // Select Wallet — inject wallet when wallet part installed.
-    final walletIdx = dests.indexOf(SuiteNavDest.wallet);
-    shell.selectTab(walletIdx);
-    await tester.pump();
-    expect(find.text('WALLET_INJECT'), findsOneWidget);
+    expect(shell.destinations, [SuiteNavDest.vpn]);
   });
 
   testWidgets('only VPN: no NavigationBar assert (single destination)',
@@ -309,11 +283,9 @@ void main() {
   });
 
   testWidgets(
-      'production SuiteFamilyHost path: single host, embed shells, no nested bar',
+      'production path: VPN only (family host not mounted for product chrome)',
       (tester) async {
-    // No walletTab/evolveTab injects → real SuiteFamilyHost + SuiteFamilyBody.
-    // familyBoot injects ready providers (memory stores) so boot completes
-    // deterministically without hanging on path_provider.
+    // Product destinations are VPN only — SuiteFamilyHost is not mounted.
     await tester.pumpWidget(
       MaterialApp(
         home: SuiteShell(
@@ -329,96 +301,16 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
-    // Shared host present once (not one host per family tab).
-    expect(find.byKey(const Key('suite_family_host')), findsOneWidget);
-    // VPN still mounts under the same PageView while family boots.
+    expect(find.byKey(const Key('suite_family_host')), findsNothing);
     expect(find.text('VPN_PROD'), findsOneWidget);
-    expect(find.byKey(const Key('suite_shell_main_nav')), findsOneWidget);
-
-    // Wait for inject boot to finish (must not spin forever).
-    var hostReady = false;
-    for (var i = 0; i < 80; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-      if (find.byKey(const Key('suite_family_host_ready')).evaluate().isNotEmpty) {
-        hostReady = true;
-        break;
-      }
-      if (find.byKey(const Key('suite_family_boot_retry')).evaluate().isNotEmpty) {
-        fail(
-          'SuiteFamilyHost boot failed to Retry UI (should complete via familyBoot)',
-        );
-      }
-    }
-    expect(hostReady, isTrue, reason: 'familyBoot must reach ready state');
-    // Fail hard on spinner-forever.
-    expect(find.byKey(const Key('suite_family_boot_spinner')), findsNothing);
-
-    final hostState =
-        tester.state<SuiteFamilyHostState>(find.byType(SuiteFamilyHost));
-    expect(hostState.isReady, isTrue);
-    expect(hostState.bootError, isNull);
-    expect(hostState.hasAppAccess, isTrue);
+    expect(find.byKey(const Key('suite_shell_main_nav')), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.text('RPAI_PROD'), findsNothing);
 
     final shell = tester.state<SuiteShellState>(find.byType(SuiteShell));
-    final dests = shell.destinations;
-    expect(dests, contains(SuiteNavDest.analysis));
-    expect(dests, contains(SuiteNavDest.wallet));
-    expect(shell.hasAppAccess, isTrue);
-
-    // PageView only builds the selected page — open Analysis so the
-    // production SuiteFamilyBody path mounts EvolveShellScreen.
-    final analysisIdx = dests.indexOf(SuiteNavDest.analysis);
-    shell.selectTab(analysisIdx);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    // Still exactly one family host after navigation.
-    expect(find.byKey(const Key('suite_family_host')), findsOneWidget);
-
-    // Unconditional: real package shell, no nested bottom bar.
-    expect(find.byType(EvolveShellScreen), findsWidgets);
-    final evolveShells = tester
-        .widgetList<EvolveShellScreen>(find.byType(EvolveShellScreen))
-        .toList();
-    expect(evolveShells, isNotEmpty);
-    expect(evolveShells.every((s) => s.showBottomBar == false), isTrue);
-    expect(
-      evolveShells.any((s) => s.tabIndex == 0),
-      isTrue,
-      reason: 'Analysis full-access index 0 must be embedded',
-    );
-    expect(
-      find.byKey(const Key('evolve_shell_embed_no_bottom_bar')),
-      findsWidgets,
-    );
-
-    // Wallet destination → full-access evolve index 1.
-    final walletIdx = dests.indexOf(SuiteNavDest.wallet);
-    shell.selectTab(walletIdx);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    final afterWallet = tester
-        .widgetList<EvolveShellScreen>(find.byType(EvolveShellScreen))
-        .toList();
-    expect(afterWallet, isNotEmpty);
-    expect(
-      afterWallet.any((w) => w.tabIndex == 1 && w.showBottomBar == false),
-      isTrue,
-      reason: 'Wallet full-access index 1 must be embedded without nested bar',
-    );
-
-    // Only Suite main NavigationBar (no nested bars from package shells).
-    expect(find.byType(NavigationBar), findsOneWidget);
-
-    // Wallet/Analysis bodies may start inbound burst + rendezvous retries
-    // (Future.delayed 250/500ms). Stop polling, dispose shell, drain fakes.
-    evolve_coord.PercNetworkCoordinator.instance.stopInboundPollingForTest();
-    evolve_hub.PercLedgerHub.resetForTest();
-    await tester.pumpWidget(const SizedBox.shrink());
-    for (var i = 0; i < 20; i++) {
-      await tester.pump(const Duration(milliseconds: 250));
-    }
+    expect(shell.destinations, [SuiteNavDest.vpn]);
   });
 
   test('SuiteFamilyHost source: timeouts, boot seam, Theme only on body', () {

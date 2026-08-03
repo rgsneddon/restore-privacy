@@ -1,4 +1,8 @@
 /// Durable Suite part install flags (optional surfaces only).
+///
+/// Product path is residual VPN only: [load] always resolves to
+/// [SuitePartsState.vpnOnly]. Optional Suite family install flags are not
+/// product chrome (write path retained for migration / pure unit tests).
 library;
 
 import 'settings_store.dart';
@@ -10,32 +14,27 @@ class SuitePartsStore {
 
   final SettingsBackend backend;
 
-  /// Fresh / missing keys → [SuitePartsState.vpnAndRpai] (VPN + rpAI).
-  /// Wallet/Evolve need explicit `true`. rpAI missing → on; explicit `false`
-  /// stays off (honest uninstall). Explicit stored flags win on upgrade.
+  /// Product: residual VPN only — optional Suite family parts never on.
   Future<SuitePartsState> load() async {
-    final w = await backend.getBool(kKeySuitePartWallet);
-    final e = await backend.getBool(kKeySuitePartEvolve);
-    final r = await backend.getBool(kKeySuitePartRpai);
-    return SuitePartsState(
-      walletInstalled: w == true,
-      evolveInstalled: e == true,
-      // null (missing) or true → installed; only false is uninstalled.
-      rpaiInstalled: r != false,
-    );
+    // Still touch keys so migration/uninstall paths can clear legacy values.
+    final _ = await backend.getBool(kKeySuitePartWallet);
+    final __ = await backend.getBool(kKeySuitePartEvolve);
+    final ___ = await backend.getBool(kKeySuitePartRpai);
+    return SuitePartsState.vpnOnly;
   }
 
   Future<void> save(SuitePartsState state) async {
-    // Never persist a "vpn off" flag — VPN is not optional.
-    await backend.setBool(kKeySuitePartWallet, state.walletInstalled);
-    await backend.setBool(kKeySuitePartEvolve, state.evolveInstalled);
-    await backend.setBool(kKeySuitePartRpai, state.rpaiInstalled);
+    // Persist VPN-only product posture (optional parts always off).
+    await backend.setBool(kKeySuitePartWallet, false);
+    await backend.setBool(kKeySuitePartEvolve, false);
+    await backend.setBool(kKeySuitePartRpai, false);
+    final _ = state;
   }
 
-  /// Set one optional part; VPN is a no-op. Returns the new state.
+  /// Set one optional part; product always stays VPN-only after save.
   ///
-  /// Uninstall requires [confirmPhrase] matching the part label exactly.
-  /// Reinstall does not require confirmation or a new KEYGEN/register wall.
+  /// Uninstall requires [confirmPhrase] matching the part label exactly for
+  /// pure apply path; load still returns [SuitePartsState.vpnOnly].
   Future<SuitePartsState> setInstalled(
     SuitePartId id,
     bool installed, {
@@ -48,9 +47,8 @@ class SuitePartsStore {
       installed: installed,
       confirmPhrase: confirmPhrase,
     );
-    if (next != cur) {
-      await save(next);
-    }
-    return next;
+    await save(SuitePartsState.vpnOnly);
+    final _ = next;
+    return SuitePartsState.vpnOnly;
   }
 }

@@ -34,9 +34,9 @@ product going forward.)
   a competing service or clone of the product design.
 
   “Client Package” means an end-user installer, application binary, or package
-  distributed for use on a personal device to run Restore Privacy Suite and
-  connect residual traffic (including Windows, Android, iOS, macOS, and Linux
-  catalog packages).
+  distributed for use on a personal device to run Restore Privacy residual VPN
+  and connect residual traffic (including Windows, Android, iOS, macOS, and
+  Linux catalog packages).
 
   “Licensor” means Raskul / Restore Privacy copyright owner(s).
 
@@ -69,8 +69,8 @@ product going forward.)
   licence where prompted, and continuous compliance with this document:
 
   3.1 You may **install and run** a Client Package **solely** for the appropriate
-      purpose of operating a personal device with **Restore Privacy Suite**
-      residual Connect, on the service operated by or for the Licensor (Connect /
+      purpose of operating a personal device with **Restore Privacy residual VPN**
+      Connect, on the service operated by or for the Licensor (Connect /
       residual tunnel to the product entry and, where configured, exit residual path).
 
   3.2 You may make a reasonable number of backup copies of a Client Package

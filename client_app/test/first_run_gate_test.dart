@@ -2,125 +2,108 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/first_run_gate.dart';
 import 'package:restore_privacy_client/licence_gate.dart';
 import 'package:restore_privacy_client/settings_store.dart';
-import 'package:restore_privacy_client/suite_account.dart';
 
 void main() {
-  test('first-run order is account → seed → licence → complete', () {
+  test('first-use order is licence → keygenOrTrial → complete', () {
     var s = const FirstRunState(
-      accountDone: false,
-      seedDone: false,
       licenceAccepted: false,
+      entryUnlockDone: false,
     );
-    expect(nextFirstRunStep(s), FirstRunStep.account);
-    expect(firstRunComplete(s), isFalse);
-    expect(mayEnterSuiteShell(firstRunDone: false), isFalse);
-    expect(mayRequestResidualPermissions(firstRunDone: false), isFalse);
-
-    s = s.copyWith(accountDone: true);
-    expect(nextFirstRunStep(s), FirstRunStep.seed);
-    // Account alone still blocks shell and residual permission/tunnel prep.
-    expect(firstRunComplete(s), isFalse);
-    expect(mayEnterSuiteShell(firstRunDone: firstRunComplete(s)), isFalse);
-    expect(
-      mayRequestResidualPermissions(firstRunDone: firstRunComplete(s)),
-      isFalse,
-    );
-
-    s = s.copyWith(seedDone: true);
     expect(nextFirstRunStep(s), FirstRunStep.licence);
-    // Account+seed without licence still blocks residual paths.
     expect(firstRunComplete(s), isFalse);
-    expect(mayEnterSuiteShell(firstRunDone: firstRunComplete(s)), isFalse);
     expect(
-      mayRequestResidualPermissions(firstRunDone: firstRunComplete(s)),
+      mayEnterVpnShell(firstRunDone: false, trialOrKeygenOk: true),
       isFalse,
     );
+    expect(mayRequestResidualPermissions(firstRunDone: false), isFalse);
 
     s = s.copyWith(licenceAccepted: true);
+    expect(nextFirstRunStep(s), FirstRunStep.keygenOrTrial);
+    expect(firstRunComplete(s), isFalse);
+    expect(
+      mayEnterVpnShell(firstRunDone: firstRunComplete(s), trialOrKeygenOk: true),
+      isFalse,
+    );
+
+    s = s.copyWith(entryUnlockDone: true);
     expect(nextFirstRunStep(s), FirstRunStep.complete);
     expect(firstRunComplete(s), isTrue);
-    expect(mayEnterSuiteShell(firstRunDone: true), isTrue);
+    expect(
+      mayEnterVpnShell(firstRunDone: true, trialOrKeygenOk: true),
+      isTrue,
+    );
     expect(mayRequestResidualPermissions(firstRunDone: true), isTrue);
   });
 
-  test('out-of-order flags still advance through account then seed then licence',
-      () {
-    // Licence accepted early must not skip account/seed steps.
-    final s = const FirstRunState(
-      accountDone: false,
-      seedDone: false,
+  test('licence alone is not first-run complete', () {
+    const s = FirstRunState(
       licenceAccepted: true,
+      entryUnlockDone: false,
     );
-    expect(nextFirstRunStep(s), FirstRunStep.account);
+    expect(nextFirstRunStep(s), FirstRunStep.keygenOrTrial);
     expect(firstRunComplete(s), isFalse);
-    expect(mayRequestResidualPermissions(firstRunDone: false), isFalse);
-
-    final seedOnly = const FirstRunState(
-      accountDone: false,
-      seedDone: true,
-      licenceAccepted: false,
-    );
-    expect(nextFirstRunStep(seedOnly), FirstRunStep.account);
-
-    final accountAndLicence = const FirstRunState(
-      accountDone: true,
-      seedDone: false,
-      licenceAccepted: true,
-    );
-    expect(nextFirstRunStep(accountAndLicence), FirstRunStep.seed);
-    expect(firstRunComplete(accountAndLicence), isFalse);
   });
 
-  test('residual permission/tunnel helpers stay false until first-run complete',
-      () {
-    const partials = [
-      FirstRunState(
-        accountDone: false,
-        seedDone: false,
-        licenceAccepted: false,
-      ),
-      FirstRunState(
-        accountDone: true,
-        seedDone: false,
-        licenceAccepted: false,
-      ),
-      FirstRunState(
-        accountDone: true,
-        seedDone: true,
-        licenceAccepted: false,
-      ),
-      FirstRunState(
-        accountDone: true,
-        seedDone: false,
+  test('return visit: trial or KEYGEN required for shell', () {
+    expect(
+      mayEnterVpnShellOnReturn(
         licenceAccepted: true,
+        trialActive: true,
+        keygenOk: false,
       ),
-      FirstRunState(
-        accountDone: false,
-        seedDone: true,
-        licenceAccepted: true,
-      ),
-    ];
-    for (final s in partials) {
-      final done = firstRunComplete(s);
-      expect(done, isFalse, reason: '$s');
-      expect(mayEnterSuiteShell(firstRunDone: done), isFalse);
-      expect(mayRequestResidualPermissions(firstRunDone: done), isFalse);
-      expect(
-        mayResidualConnectAfterFirstRun(
-          firstRunDone: done,
-          trialOrKeygenOk: true,
-        ),
-        isFalse,
-        reason: 'trial alone cannot open residual before first-run: $s',
-      );
-    }
-    const full = FirstRunState(
-      accountDone: true,
-      seedDone: true,
-      licenceAccepted: true,
+      isTrue,
     );
-    expect(firstRunComplete(full), isTrue);
-    expect(mayRequestResidualPermissions(firstRunDone: true), isTrue);
+    expect(
+      mayEnterVpnShellOnReturn(
+        licenceAccepted: true,
+        trialActive: false,
+        keygenOk: true,
+      ),
+      isTrue,
+    );
+    expect(
+      mayEnterVpnShellOnReturn(
+        licenceAccepted: true,
+        trialActive: false,
+        keygenOk: false,
+      ),
+      isFalse,
+    );
+    expect(
+      mayEnterVpnShellOnReturn(
+        licenceAccepted: false,
+        trialActive: true,
+        keygenOk: false,
+      ),
+      isFalse,
+    );
+  });
+
+  test('mustEnterKeygen when trial inactive and no KEYGEN', () {
+    expect(
+      mustEnterKeygen(
+        licenceAccepted: true,
+        trialActive: false,
+        keygenOk: false,
+      ),
+      isTrue,
+    );
+    expect(
+      mustEnterKeygen(
+        licenceAccepted: true,
+        trialActive: true,
+        keygenOk: false,
+      ),
+      isFalse,
+    );
+    expect(
+      mayContinueTrialInsteadOfKeygen(trialActive: true),
+      isTrue,
+    );
+    expect(
+      mayContinueTrialInsteadOfKeygen(trialActive: false),
+      isFalse,
+    );
   });
 
   test('residual Connect needs first-run and trial/keygen', () {
@@ -147,9 +130,8 @@ void main() {
     );
   });
 
-  test('FirstRunStore marks seed and loads complete', () async {
+  test('FirstRunStore marks entry unlock and loads complete', () async {
     final b = MemorySettingsBackend();
-    final accounts = SuiteAccountStore(b);
     final gate = LicenceGate(
       PrefsLicenceBackend(
         (k) async => b.getBool(k),
@@ -164,23 +146,22 @@ void main() {
     );
     final store = FirstRunStore(
       backend: b,
-      isAccountRegistered: accounts.isRegistered,
       hasAcceptedLicence: () => gate.hasAcceptedLicence(),
     );
     expect(await store.isComplete(), isFalse);
-    await accounts.markRegistered('alice');
-    expect(nextFirstRunStep(await store.load()), FirstRunStep.seed);
-    await store.markSeedDone();
-    expect(nextFirstRunStep(await store.load()), FirstRunStep.licence);
     await gate.acceptLicence();
+    expect(nextFirstRunStep(await store.load()), FirstRunStep.keygenOrTrial);
+    await store.markEntryUnlockDone();
     expect(await store.isComplete(), isTrue);
   });
 
-  test('seed write-down copy is strong offline advice', () {
-    expect(kFirstRunSeedBody.toLowerCase(), contains('write'));
-    expect(kFirstRunSeedBody.toLowerCase(), contains('12'));
-    expect(kFirstRunSeedConfirmLabel.toLowerCase(), contains('wrote'));
-    expect(kFirstRunAccountTitle.toLowerCase(), contains('suite'));
+  test('VPN-only first-run copy has no username/password path', () {
+    expect(kFirstRunKeygenStepTitle.toLowerCase(), contains('keygen'));
+    expect(kContinueTrialButtonLabel.toLowerCase(), contains('trial'));
+    expect(kFirstRunLicenceStepTitle.toLowerCase(), contains('licence'));
+    expect(kFirstRunCompleteHint.toLowerCase(), contains('residual'));
+    expect(kFirstRunKeygenStepBody.toLowerCase(), isNot(contains('password')));
+    expect(kFirstRunKeygenStepBody.toLowerCase(), isNot(contains('username')));
   });
 
   test('trial and keygen still compose Connect after first-run', () {
@@ -196,6 +177,14 @@ void main() {
           trialOk: false,
         ),
       ),
+      isFalse,
+    );
+  });
+
+  test('mayEnterSuiteShell alias requires entitlement when passed', () {
+    expect(mayEnterSuiteShell(firstRunDone: true), isTrue);
+    expect(
+      mayEnterSuiteShell(firstRunDone: true, trialOrKeygenOk: false),
       isFalse,
     );
   });

@@ -243,8 +243,9 @@ const String kPaymentConnectDisclaimerPlain =
     'purchase/install until a successful payment is completed.';
 
 const String kShortLicenceSummary =
-    'Restore Privacy Suite is proprietary full copyright: client packages may be used '
-    'only to run a device with residual Connect, with no warranty (AS IS). '
+    'Restore Privacy residual VPN is proprietary full copyright: client packages '
+    'may be used only to run residual Connect on this device, with no warranty '
+    '(AS IS). This product is residual VPN only (no multi-product Suite account). '
     'Copy or transmission of the product architecture is not permitted. '
     'Third-party components keep their own licences (see LICENSE / CREDITS). '
     'By accepting, you agree to those terms. Acceptance is stored only on this device. '

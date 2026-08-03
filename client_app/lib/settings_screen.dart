@@ -907,8 +907,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Startup and autoconnect default off. Seamless power-up needs both on '
             '(startup launches the app; autoconnect starts the VPN). '
             'OS VPN permission / Administrator may still be required. '
-            'Suite updates are manual — download the latest free Suite package when '
-            'the in-app “new version available” notice appears. '
+            'Client updates are manual — download the latest free residual VPN '
+            'package when the in-app “new version available” notice appears. '
             'Appearance (dark/light) is only changed in this Settings panel.',
             style: TextStyle(color: suiteTextMutedOf(context), fontSize: 12),
           ),
@@ -938,10 +938,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                for (var i = 0; i < kSuitePartCatalog.length; i++) ...[
-                  if (i > 0) const Divider(height: 1),
-                  _buildPartTile(kSuitePartCatalog[i]),
-                ],
+                // VPN-only product: never surface optional Suite family install tiles.
+                _buildPartTile(kSuitePartVpn),
               ],
             ),
           ),
