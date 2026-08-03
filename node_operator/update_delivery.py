@@ -119,7 +119,7 @@ def render_update_delivery_matrix_html(
             f"<td><code>{_esc(str(s.get('client_id') or '')[:16])}…</code></td>"
             f"<td>{_esc(s.get('vpn_ip'))}</td>"
             f"<td>{int(s.get('priority') or 0)}</td>"
-            f"<td>IS/DE residual · UPDATE_PUSH</td>"
+            f"<td>Manual free Suite download (catalog monopin)</td>"
             f"</tr>"
         )
     client_body = (
@@ -133,10 +133,11 @@ def render_update_delivery_matrix_html(
          data-catalog-version="{ver}">
   <h3 id="{_esc(prefix)}-matrix-heading">Clients · packages · multihop nodes</h3>
   <p class="muted" id="{_esc(prefix)}-matrix-blurb">
-    Residual client UPDATE_PUSH is <strong>disabled</strong>; packages host on Helsinki only. Historical note: (version/url/mechanical
-    directive). Packages are monopin <code>{ver}</code> installers. Clients may dial
-    multihop-capable residual peers below to stay residual-connected while checking
-    breadcrumbs / applying updates.
+    Residual client update push is <strong>disabled</strong>. Host Suite packages on
+    Helsinki; users update manually from free Suite download when a newer monopin
+    is available (discrete in-app notice only). Packages listed below are monopin
+    <code>{ver}</code> installers. Multihop peers are dial targets for residual Connect —
+    not an update-apply path.
   </p>
   <div id="{_esc(prefix)}-peers" data-multihop-peers="1" class="{_esc(prefix)}-peer-row">
     <strong>Multihop residual peers:</strong> {peer_chips}

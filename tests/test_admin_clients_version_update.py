@@ -103,29 +103,21 @@ class TestAdminClientsVersionAndTilePush(unittest.TestCase):
             self.assertIn("Version 0.6.0", page)
             self.assertIn("Version unknown", page)
             self.assertIn('data-client-version-unknown="1"', page)
-            # Tiles operable for update
-            self.assertIn('data-client-tiles-pushable="1"', page)
-            self.assertIn('data-client-tile-push="1"', page)
-            self.assertIn('data-client-tile-update="1"', page)
-            self.assertIn(
+            # Client residual update-push tiles removed (manual update only)
+            self.assertNotIn('data-client-tiles-pushable="1"', page)
+            self.assertNotIn('data-client-tile-push="1"', page)
+            self.assertNotIn('data-client-tile-update="1"', page)
+            self.assertNotIn('name="action" value="push_update"', page)
+            self.assertNotIn(
                 f'data-client-update-target="{a["client_id"]}"', page
             )
-            self.assertIn(
-                f'name="target_client_id" value="{a["client_id"]}"', page
-            )
-            self.assertIn(
-                f'name="target_client_id" value="{b["client_id"]}"', page
-            )
-            self.assertIn('name="action" value="push_update"', page)
-            self.assertIn('action="/admin/node-operator/action"', page)
-            # Catalog directive version present on tile form (not invent client version)
-            cat = ctrl.catalog_version_default()
-            self.assertTrue(cat)
-            self.assertIn(f'name="version" value="{cat}"', page)
+            # Version display still present (not a push form)
+            self.assertIn('data-client-version="0.6.0"', page)
         finally:
             ctrl.stop()
 
     def test_tile_push_drives_shipped_per_client_update(self) -> None:
+        """Per-client tile push removed; admin action and controller reject."""
         from admin_node_operator import (
             get_operator_controller,
             handle_admin_node_operator_action,
@@ -144,64 +136,42 @@ class TestAdminClientsVersionAndTilePush(unittest.TestCase):
             page = render_admin_node_operator_page_html(selected_node="lab").decode(
                 "utf-8"
             )
-            # Extract the target-specific form fields from shipped HTML
-            m = re.search(
-                rf'data-client-update-target="{re.escape(target["client_id"])}"[^>]*>'
-                r"(.*?)</form>",
-                page,
-                re.DOTALL,
-            )
-            self.assertIsNotNone(m, "target tile form missing from admin HTML")
-            form_html = m.group(0)
-            self.assertIn(
-                f'name="target_client_id" value="{target["client_id"]}"',
-                form_html,
-            )
+            self.assertNotIn('data-client-tile-push="1"', page)
             self.assertNotIn(
-                f'name="target_client_id" value="{other["client_id"]}"',
-                form_html,
+                f'data-client-update-target="{target["client_id"]}"', page
             )
-            ver_m = re.search(r'name="version" value="([^"]*)"', form_html)
-            self.assertIsNotNone(ver_m)
-            directive_ver = ver_m.group(1)
-            self.assertTrue(directive_ver)
 
-            # Drive the real admin handler (same path as form POST)
             ok, msg, node = handle_admin_node_operator_action(
                 {
                     "node": "lab",
                     "action": "push_update",
-                    "version": directive_ver,
+                    "version": "0.6.0",
                     "url": "https://restoreprivacy.online/",
                     "message": "tile push test",
                     "target_client_id": target["client_id"],
                 }
             )
-            self.assertTrue(ok, msg)
+            self.assertFalse(ok, msg)
+            self.assertIn("disabled", msg.lower())
             self.assertEqual(node, "lab")
-            self.assertIn("1", msg)  # Pushed to 1 target(s)
 
-            # Controller-level: only target receives directive
             got_t = ctrl.client_pull_updates(target["client_id"])
             got_o = ctrl.client_pull_updates(other["client_id"])
-            self.assertTrue(got_t, "target should receive UPDATE_PUSH")
-            self.assertEqual(len(got_t), 1)
-            self.assertEqual(got_t[0].get("version"), directive_ver)
-            self.assertFalse(got_o, "other client must not receive targeted push")
+            self.assertFalse(got_t)
+            self.assertFalse(got_o)
 
-            # Direct controller path with target (shipped push_update)
             r = ctrl.push_update(
-                version=directive_ver,
+                version="0.6.0",
                 url="https://restoreprivacy.online/",
                 message="second",
                 target_client_id=target["client_id"],
             )
-            self.assertTrue(r.get("ok"), r)
-            self.assertEqual(int(r.get("count") or 0), 1)
-            delivered = list(r.get("delivered_to") or [])
-            self.assertEqual(delivered, [target["client_id"]])
+            self.assertFalse(r.get("ok"), r)
+            self.assertEqual(int(r.get("count") or 0), 0)
+            self.assertEqual(list(r.get("delivered_to") or []), [])
         finally:
             ctrl.stop()
+
 
     def test_public_status_title_only_no_sessions_or_versions(self) -> None:
         from admin_node_operator import get_operator_controller

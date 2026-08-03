@@ -207,6 +207,50 @@ class TestDocsNoLiveClientPush(unittest.TestCase):
         self.assertNotIn("Push update** —", text)
         self.assertIn("disabled", text.lower())
 
+    def test_delivery_matrix_html_manual_update_path_only(self) -> None:
+        """Shipped admin delivery matrix must not advertise residual UPDATE_PUSH apply."""
+        from node_operator.update_delivery import (
+            build_update_delivery_matrix,
+            render_update_delivery_matrix_html,
+        )
+
+        matrix = build_update_delivery_matrix(
+            sessions=[
+                {
+                    "client_id": "aabbccdd11223344",
+                    "vpn_ip": "10.88.0.2",
+                    "priority": 1,
+                }
+            ],
+            packages=[],
+            catalog_version="1.1.3",
+        )
+        html = render_update_delivery_matrix_html(matrix, id_prefix="test")
+        self.assertNotIn("UPDATE_PUSH", html)
+        self.assertNotIn("checking breadcrumbs", html.lower())
+        self.assertNotIn("applying updates", html.lower())
+        self.assertIn("Manual free Suite download", html)
+        self.assertIn("disabled", html.lower())
+
+    def test_mac_operator_and_admin_client_push_suites_fail_closed(self) -> None:
+        """Ratchet: adjacent suites that once asserted push success stay fail-closed."""
+        # Smoke the shipped entry points those suites exercise
+        from node.update_push import operator_push_update, UpdatePushQueue
+
+        r = operator_push_update(
+            version="0.6.0",
+            url="https://restoreprivacy.online/",
+            queue=UpdatePushQueue(),
+            connected_client_ids=["x"],
+        )
+        self.assertFalse(r.get("ok"), r)
+
+        admin_src = (ROOT / "status_page" / "admin_node_operator.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Client update push is disabled", admin_src)
+        self.assertIn("update_push=None", admin_src)
+
 
 if __name__ == "__main__":
     unittest.main()

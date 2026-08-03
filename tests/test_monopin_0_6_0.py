@@ -2,7 +2,7 @@
 
 Current Suite catalog monopin is **1.0.0** (see ``tests/test_suite_monopin_1_0_0.py``
 and ``client/VERSION``). This module only covers archival 0.6.0 packaging notes
-and that residual UPDATE_PUSH still delivers an arbitrary target version string
+and that residual UPDATE_PUSH enqueue/apply is product-disabled (manual update only)
 (including historical 0.6.0) — it must **not** re-pin the live catalog to 0.6.0.
 """
 
@@ -25,10 +25,11 @@ class TestMonopin060Pins(unittest.TestCase):
         """Archive 0.6.0 packaging must not redefine the live Suite catalog pin."""
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
         self.assertNotEqual(ver, "0.6.0")
-        self.assertEqual(ver, "1.0.0")
+        # Live pin moves with monopin ship — only require not frozen at 0.6.0
+        self.assertRegex(ver, r"^\d+\.\d+\.\d+$")
         from downloads import RELEASE_VERSION
 
-        self.assertEqual(RELEASE_VERSION, "1.0.0")
+        self.assertEqual(RELEASE_VERSION, ver)
         self.assertNotEqual(RELEASE_VERSION, "0.6.0")
 
     def test_release_notes_and_build_script_list_all_platforms(self) -> None:
@@ -65,18 +66,17 @@ class TestMonopin060Pins(unittest.TestCase):
 
 
 class TestUpdatePush060(unittest.TestCase):
-    def test_operator_push_0_6_0_client_receive_apply(self) -> None:
-        from client.update_receive import (
-            apply_client_update_directive,
-            handle_residual_update_frame,
-        )
+    def test_operator_push_disabled_for_monopin_string(self) -> None:
+        """Enqueue and apply are fail-closed; wire type may still pack."""
         from node.protocol import MsgType, pack_update_push, peek_type
         from node.update_push import (
+            apply_client_update_directive,
             client_receive_update_directives,
             operator_push_update,
             pack_update_push_json,
             reset_global_update_queue_for_tests,
         )
+        from client.update_receive import handle_residual_update_frame
 
         q = reset_global_update_queue_for_tests()
         url = "https://restoreprivacy.online/"
@@ -87,18 +87,18 @@ class TestUpdatePush060(unittest.TestCase):
             connected_client_ids=["client-a", "client-b"],
             queue=q,
         )
-        self.assertTrue(r["ok"], r)
-        self.assertEqual(r["directive"]["version"], "0.6.0")
-        self.assertEqual(set(r["delivered_to"]), {"client-a", "client-b"})
+        self.assertFalse(r.get("ok"), r)
+        self.assertTrue(r.get("disabled") or "disabled" in str(r.get("error", "")).lower())
+        self.assertEqual(list(r.get("delivered_to") or []), [])
 
         pending = client_receive_update_directives("client-a", queue=q)
-        self.assertTrue(any(p.get("version") == "0.6.0" for p in pending))
+        self.assertEqual(pending, [])
         applied = apply_client_update_directive(
-            next(p for p in pending if p.get("version") == "0.6.0")
+            {"version": "0.6.0", "url": url, "message": "Upgrade to monopin 0.6.0"}
         )
-        self.assertTrue(applied["ok"], applied)
-        self.assertEqual(applied["store"]["pending_update_version"], "0.6.0")
-        self.assertEqual(applied["store"]["pending_update_url"], url)
+        self.assertTrue(applied.get("ok"), applied)
+        self.assertTrue(applied.get("skipped") or applied.get("disabled"))
+        self.assertIsNone(applied.get("store"))
 
         frame = pack_update_push(
             b"\x06" * 8,
@@ -112,8 +112,9 @@ class TestUpdatePush060(unittest.TestCase):
         )
         self.assertEqual(peek_type(frame), MsgType.UPDATE_PUSH)
         got = handle_residual_update_frame(frame)
-        self.assertTrue(got["ok"], got)
-        self.assertEqual(got["store"]["pending_update_version"], "0.6.0")
+        self.assertTrue(got.get("ok"), got)
+        self.assertTrue(got.get("skipped") or got.get("disabled") or got.get("store") is None)
+
 
 
 if __name__ == "__main__":

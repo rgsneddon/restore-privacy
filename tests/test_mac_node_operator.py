@@ -32,7 +32,8 @@ class TestClientPriority(unittest.TestCase):
 
 
 class TestUpdatePush(unittest.TestCase):
-    def test_operator_push_and_client_receive_apply(self) -> None:
+    def test_operator_push_and_client_receive(self) -> None:
+        """Product residual UPDATE_PUSH enqueue is disabled (manual update only)."""
         from node.protocol import MsgType, pack_update_push, parse_update_push, peek_type
         from node.update_push import (
             apply_client_update_directive,
@@ -51,17 +52,29 @@ class TestUpdatePush(unittest.TestCase):
             connected_client_ids=["aa11", "bb22"],
             queue=q,
         )
-        self.assertTrue(r["ok"], r)
-        self.assertEqual(set(r["delivered_to"]), {"aa11", "bb22"})
+        self.assertFalse(r.get("ok"), r)
+        self.assertTrue(r.get("disabled") or "disabled" in str(r.get("error", "")).lower())
+        self.assertEqual(r.get("count") or 0, 0)
+        self.assertEqual(list(r.get("delivered_to") or []), [])
 
         pending = client_receive_update_directives("aa11", queue=q)
-        self.assertGreaterEqual(len(pending), 1)
-        applied = apply_client_update_directive(pending[0])
-        self.assertTrue(applied["ok"], applied)
-        self.assertEqual(applied["store"]["pending_update_version"], "0.5.9")
-        self.assertIn("restoreprivacy.online", applied["store"]["pending_update_url"])
+        self.assertEqual(pending, [])
 
-        raw = pack_update_push_json(pending[0])
+        applied = apply_client_update_directive(
+            {
+                "version": "0.5.9",
+                "url": "https://restoreprivacy.online/",
+                "message": "x",
+            }
+        )
+        self.assertTrue(applied.get("ok"))
+        self.assertTrue(applied.get("skipped") or applied.get("disabled"))
+        self.assertIsNone(applied.get("store"))
+
+        # Wire frame type may still exist; product apply path must not store pending
+        raw = pack_update_push_json(
+            {"version": "0.5.9", "url": "https://restoreprivacy.online/", "message": "x"}
+        )
         frame = pack_update_push(b"\x01" * 8, raw)
         self.assertEqual(peek_type(frame), MsgType.UPDATE_PUSH)
         sid, body = parse_update_push(frame)
@@ -75,10 +88,9 @@ class TestUpdatePush(unittest.TestCase):
             connected_client_ids=["aa11", "bb22"],
             queue=q,
         )
-        self.assertTrue(r2["ok"])
-        self.assertEqual(r2["delivered_to"], ["only-me"])
-        only = client_receive_update_directives("only-me", queue=q)
-        self.assertTrue(any(x.get("version") == "0.6.0" for x in only))
+        self.assertFalse(r2.get("ok"), r2)
+        self.assertEqual(list(r2.get("delivered_to") or []), [])
+
 
 
 class TestOperatorController(unittest.TestCase):
@@ -119,10 +131,13 @@ class TestOperatorController(unittest.TestCase):
             url="https://example.com/u",
             message="upgrade",
         )
-        self.assertTrue(push["ok"], push)
-        self.assertGreaterEqual(push["count"], 1)
+        self.assertFalse(push.get("ok"), push)
+        self.assertTrue(
+            push.get("disabled") or "disabled" in str(push.get("error", "")).lower()
+        )
+        self.assertEqual(int(push.get("count") or 0), 0)
         pulled = ctrl.client_pull_updates(a["client_id"])
-        self.assertTrue(any(p.get("version") == "0.5.9" for p in pulled))
+        self.assertFalse(any(p.get("version") == "0.5.9" for p in pulled))
 
         stopped = ctrl.stop()
         self.assertEqual(stopped.state, "stopped")
@@ -148,7 +163,7 @@ class TestNodeOperatorAppEntry(unittest.TestCase):
         self.assertIn("Node Operator", html)
         self.assertIn('id="op-start-btn"', html)
         self.assertIn('id="op-priority-btn"', html)
-        self.assertIn('id="op-push-btn"', html)
+        self.assertNotIn('id="op-push-btn"', html)
         self.assertIn('id="op-sessions-table"', html)
         # Upload packages card (manual Helsinki deploy)
         self.assertIn('id="op-deploy-packages"', html)
@@ -159,6 +174,8 @@ class TestNodeOperatorAppEntry(unittest.TestCase):
         self.assertIn('id="op-packages-table"', html)
         self.assertIn("/op/upload-packages", html)
         self.assertIn('id="op-update-push"', html)
+        self.assertIn('data-client-push-disabled="1"', html)
+        self.assertIn("manual only", html.lower())
 
     def test_upload_catalog_packages_inventory_and_gui_post(self) -> None:
         from node.operator_admin import NodeOperatorController
@@ -235,12 +252,18 @@ class TestNodeOperatorAppEntry(unittest.TestCase):
             ),
         )
         got = handle_residual_update_frame(frame)
-        self.assertTrue(got["ok"], got)
-        self.assertEqual(got["store"]["pending_update_version"], "0.5.9")
+        self.assertTrue(got.get("ok"), got)
+        # Product apply path disabled — no pending store
+        self.assertTrue(
+            got.get("skipped") or got.get("disabled") or got.get("store") is None
+        )
+        self.assertIsNone(got.get("store"))
         bad = handle_residual_update_frame(b"RPT2\x03not-update")
         self.assertFalse(bad["ok"])
         applied = apply_client_update_directive({"version": "1.0.0"})
-        self.assertTrue(applied["ok"])
+        self.assertTrue(applied.get("ok"))
+        self.assertTrue(applied.get("skipped") or applied.get("disabled"))
+        self.assertIsNone(applied.get("store"))
 
 
 if __name__ == "__main__":
