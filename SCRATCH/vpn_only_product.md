@@ -1,6 +1,7 @@
-# VPN-only dedicated residual product
+# VPN-only dedicated residual product — evidence
 
-Date: 2026-08-03
+Date: 2026-08-03  
+Commits: `3f8ae8c` (product), follow-up EULA + PASS captures
 
 ## Goal
 Strip multi-product Suite chrome (Evolve / % wallet / rpAI / Backup) and
@@ -12,22 +13,26 @@ username/password first-use. Ship residual VPN only:
    KEYGEN is mandatory → main VPN.
 3. No Suite account / seed first-use path.
 
+## Verification plan captures (implementer SCRATCH)
+
+Directory:
+`/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-90d777e1b612/implementer/`
+
+| Capture | Tests / audit | Observation |
+|---------|----------------|-------------|
+| `vpn_only_entry_flow.out` | first_run_gate, entry_access, portal, seed hang retirement | **All tests passed!** (+21) |
+| `vpn_only_shell.out` | suite_parts_usage, suite_flat_nav, vpn_only_product | **All tests passed!** (+31) |
+| `licence_vpn_only.out` | first_run_licence_scroll (justify, scroll-to-bottom, VPN EULA) | **All tests passed!** (+3) |
+| `no_suite_family_entry.out` | structural grep + vpn_only_product + portal | **RESULT: PASS** + **All tests passed!** (+6) |
+
 ## Product locks
-- `suiteNavDestinations` always `[vpn]` (install flags cannot expand bar).
-- `SuitePartsState.fromJson` / `SuitePartsStore.load` → `vpnOnly`.
-- Settings product panel shows VPN tile only.
-- `FirstRunStep`: licence → keygenOrTrial → complete.
-- `isAppEntryUnlocked`: licence accepted + trial/KEYGEN entitlement.
-- Licence copy scoped to residual VPN (full EULA + short summary).
+- `suiteNavDestinations` always `[vpn]`
+- `SuitePartsState.fromJson` / `SuitePartsStore.load` → `vpnOnly`
+- Settings product panel shows VPN tile only
+- `FirstRunStep`: licence → keygenOrTrial → complete
+- `isAppEntryUnlocked`: licence accepted + trial/KEYGEN entitlement
+- Full EULA: residual VPN only (no `USE OF RESTORE PRIVACY SUITE` / `Suite installers`)
 
-## Tests
-- first_run_gate_test, entry_access_test, first_run_licence_scroll_test
-- first_run_portal_seed_test (no account/seed surfaces)
-- suite_parts_usage_test, suite_flat_nav_test (VPN-only chrome)
-- vpn_only_product_test (source locks)
-
-## Out of scope
-- Full C++ UI rewrite
-- monopin rebuild unless release ship needed
-- trial duration change
-- reintroducing UPDATE_PUSH
+## Desktop
+`client/first_run_flow.py` already sequences licence → keygen → settings → main
+(no username/password identity gate).

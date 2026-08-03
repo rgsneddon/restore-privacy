@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/first_run_gate.dart';
 import 'package:restore_privacy_client/first_run_portal.dart';
+import 'package:restore_privacy_client/full_end_user_licence.dart';
 import 'package:restore_privacy_client/legal_links.dart';
 import 'package:restore_privacy_client/licence_gate.dart';
 import 'package:restore_privacy_client/settings_store.dart';
@@ -136,5 +137,17 @@ void main() {
   test('public licence URI is status-host LICENSE path', () {
     expect(kFirstRunPublicLicenceUri.host, 'restoreprivacy.online');
     expect(kFirstRunPublicLicenceUri.path, '/LICENSE');
+  });
+
+  test('full EULA is residual-VPN scoped (no multi-product Suite grant)', () {
+    final body = kFullEndUserLicenceText;
+    expect(body, contains('residual VPN'));
+    expect(body, contains('CLIENT PACKAGES / VPN USE ONLY'));
+    // Forbidden multi-product product-grant framing.
+    expect(body.contains('USE OF RESTORE PRIVACY SUITE'), isFalse);
+    expect(body.contains('Suite installers'), isFalse);
+    expect(body.contains('Restore Privacy Suite residual Connect'), isFalse);
+    // May mention Suite only to deny multi-product rights.
+    expect(body, contains('residual VPN use only'));
   });
 }

@@ -124,7 +124,8 @@ product going forward.)
   LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY (INCLUDING INDIRECT,
   INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR LOSS OF PROFITS,
   DATA, OR GOODWILL), WHETHER IN CONTRACT, TORT, OR OTHERWISE, ARISING FROM OR
-  RELATED TO THE SOFTWARE, CLIENT PACKAGES, OR USE OF RESTORE PRIVACY SUITE.
+  RELATED TO THE SOFTWARE, CLIENT PACKAGES, OR USE OF RESTORE PRIVACY RESIDUAL
+  VPN.
 
   Some jurisdictions do not allow certain limitations; in those cases liability
   is limited to the maximum extent permitted by applicable law, and where a
@@ -139,26 +140,28 @@ product going forward.)
   free 3-day (72-hour) trial on this device (no card). After the trial ends,
   Connect needs a paid KEYGEN / active subscription where the product so requires.
   If payment fails at any time after purchase (failed checkout, failed charge,
-  refund, dispute, or revoked entitlement), the ability to Connect with the
-  Restore Privacy app is cancelled for that purchase/install until a successful
+  refund, dispute, or revoked entitlement), the ability to Connect with Restore
+  Privacy residual VPN is cancelled for that purchase/install until a successful
   payment is completed.
 
   Catalog installers may include a “Restore Internet” failsafe that restores
-  residual network settings and can erase product parts from the device. After a
-  full wipe, a new paid one-time download link may be required; contact
-  rus@restoreprivacy.online (or re-purchase on the status host).
+  residual network settings and can remove residual VPN client configuration
+  from the device. After a full wipe, a new paid one-time download link may be
+  required; contact rus@restoreprivacy.online (or re-purchase on the status host).
 
   Ordinary Disconnect / Quit is designed to restore residual routes without
-  uninstalling the product.
+  uninstalling the residual VPN client.
 
   The failsafe is a convenience for residual recovery and complete removal; it
   does not create a warranty of re-download rights beyond the operator’s paid
   fulfilment process.
 
-  Product distribution: end-user installers for catalog v1.0.8 are fulfilled via the
-  public status host (restoreprivacy.online). Suite installers may be free to
-  download; residual Connect has a free 3-day (72-hour) device trial, then requires
-  a paid KEYGEN / active subscription (Stripe). The operator source tree may be private.
+  Product distribution: residual VPN client installers are fulfilled via the
+  public status host (restoreprivacy.online). Catalog installers may be free to
+  download; residual Connect has a free 3-day (72-hour) device trial, then
+  requires a paid KEYGEN / active subscription (Stripe). The operator source tree
+  may be private. This licence governs residual VPN use only — it does not grant
+  multi-product Suite wallet, Evolve analysis, rpAI, or Backup product rights.
 
 -------------------------------------------------------------------------------
 7. ACCEPTANCE

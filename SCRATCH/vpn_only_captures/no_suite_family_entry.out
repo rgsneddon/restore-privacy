@@ -1,0 +1,143 @@
+=== no_suite_family_entry structural audit ===
+date: 2026-08-03T17:15:49Z
+
+--- FirstRunStep enum ---
+3:/// First use: licence (scroll-to-accept) → KEYGEN or continue trial → main VPN.
+10:/// Durable flag: first-use flow finished (licence accepted + unlocked once).
+14:const String kKeyFirstRunSeedDone = 'first_run_seed_done';
+16:const String kFirstRunLicenceStepTitle = 'Accept end-user licence';
+31:/// Product first-use / return steps (no account or seed).
+32:enum FirstRunStep {
+33:  licence,
+34:  keygenOrTrial,
+35:  complete,
+41:    required this.licenceAccepted,
+45:  final bool licenceAccepted;
+51:    bool? licenceAccepted,
+55:        licenceAccepted: licenceAccepted ?? this.licenceAccepted,
+60:/// First-use complete when licence accepted and entry unlock done once.
+62:    s.licenceAccepted && s.entryUnlockDone;
+64:/// Next incomplete first-use step.
+66:  if (!s.licenceAccepted) return FirstRunStep.licence;
+67:  if (!s.entryUnlockDone) return FirstRunStep.keygenOrTrial;
+68:  return FirstRunStep.complete;
+71:/// Shell (main VPN) allowed after first-use complete **and** residual entitled.
+85:/// Residual permissions / tunnel prep after first-use licence+unlock.
+100:/// Pure: after licence, require KEYGEN when trial expired / inactive.
+102:  required bool licenceAccepted,
+106:  if (!licenceAccepted) return false;
+113:  required bool licenceAccepted,
+117:  if (!licenceAccepted) return false;
+121:/// Durable first-use store (licence + entry unlock flag).
+126:    /// Legacy Suite account hook — ignored (no username/password gate).
+137:    // No-op product path — seed gate removed.
+152:      licenceAccepted: lic,
+
+--- suiteNavDestinations (VPN only) ---
+28:    case SuiteNavDest.vpn:
+55:    case SuiteNavDest.vpn:
+65:List<SuiteNavDest> suiteNavDestinations(
+71:  return List<SuiteNavDest>.unmodifiable(const [SuiteNavDest.vpn]);
+74:/// Clamp index into [suiteNavDestinations].
+80:  final n = suiteNavDestinations(parts, hasAppAccess: hasAppAccess).length;
+
+--- first_run_portal: account/seed builders must be ABSENT ---
+OK: no account/seed step builders
+
+--- entry_access entitlement gate ---
+85:Future<bool> isAppEntryUnlocked(
+114:      await gate.paymentAllowsConnect(require: requirePayment);
+120:  return mayEnterVpnShell(
+200:      final ok = await isAppEntryUnlocked(
+224:      final ok = await isAppEntryUnlocked(
+366:    final ok = await gate.paymentAllowsConnect(require: widget.requirePayment);
+
+--- suite_shell family host gated on family dests ---
+240:  bool get _hasFamilyInstall {
+243:    return dests.any(suiteNavIsPercentEvolveFamily);
+251:    return _hasFamilyInstall;
+356:      pageView = SuiteFamilyHost(
+
+--- full EULA multi-product grant phrases ---
+OK: no USE OF RESTORE PRIVACY SUITE / Suite installers
+
+--- residual VPN present in EULA ---
+37:  distributed for use on a personal device to run Restore Privacy residual VPN
+72:      purpose of operating a personal device with **Restore Privacy residual VPN**
+144:  Privacy residual VPN is cancelled for that purchase/install until a successful
+148:  residual network settings and can remove residual VPN client configuration
+153:  uninstalling the residual VPN client.
+159:  Product distribution: residual VPN client installers are fulfilled via the
+163:  may be private. This licence governs residual VPN use only — it does not grant
+
+--- desktop python residual entry (username/password first-run) ---
+scan client/windows:
+client/windows/ui_chrome.py:35:    "settings_first_run": ((700, 920), (620, 780)),
+client/windows/settings_store.py:32:KEY_FIRST_RUN_SETTINGS_COMPLETED = "first_run_settings_completed"
+client/windows/settings_store.py:71:    first_run_settings_completed: bool = False
+client/windows/settings_store.py:100:        first_run_settings_completed=False,
+client/windows/settings_store.py:135:            first_run_settings_completed=bool(
+client/windows/settings_store.py:164:            settings.first_run_settings_completed
+client/windows/app.py:127:from client.first_run_flow import (
+client/windows/app.py:131:    first_run_next_surface,
+client/windows/app.py:132:    mark_first_run_settings_completed,
+client/windows/app.py:1189:                self._open_settings(first_run=True)
+client/windows/app.py:1546:            self._present_first_run_surface(force=True)
+client/windows/app.py:2186:    def _present_first_run_surface(self, *, force: bool = False) -> None:
+client/windows/app.py:2189:        Always drives :func:`first_run_next_surface` so unlock-absent installs
+client/windows/app.py:2193:        surface = first_run_next_surface()
+client/windows/app.py:2207:            self._open_settings(first_run=True)
+client/windows/app.py:2394:    def _open_settings(self, *, first_run: bool = False) -> None:
+client/windows/app.py:2397:        When *first_run* is True (post-keygen onboarding), the window is large
+client/windows/app.py:2416:        win.title("Settings" + (" — first run" if first_run else ""))
+client/windows/app.py:2420:            surface="settings_first_run" if first_run else "settings",
+client/windows/app.py:2470:                if first_run
+scan client/linux:
+client/linux/app.py:1672:        def _first_run_gates() -> None:
+client/linux/app.py:1680:        app.root.after(500, _first_run_gates)
+
+--- flutter structural tests ---
+Resolving dependencies...
+Downloading packages...
+  flutter_lints 5.0.0 (6.0.0 available)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.2 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+! flutter_secure_storage_windows 3.1.2+stub1 from path ../../git/stubs/flutter_secure_storage_windows (overridden)
+  google_fonts 6.3.3 (8.2.0 available)
+  hooks 2.0.2 (2.1.0 available)
+  intl 0.20.2 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  lints 5.1.1 (6.1.0 available)
+  local_auth 2.3.0 (3.0.2 available)
+  local_auth_android 1.0.56 (2.0.9 available)
+  local_auth_darwin 1.6.1 (2.0.3 available)
+  local_auth_windows 1.0.11 (2.0.1 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+! path_provider_android 2.2.19 (overridden) (2.3.1 available)
+  permission_handler 12.0.3 (13.0.0 available)
+  permission_handler_android 13.0.1 (14.0.0 available)
+  permission_handler_html 0.1.4+0 (0.1.4+1 available)
+  pointycastle 3.9.1 (4.0.0 available)
+  qr 3.0.2 (4.0.0 available)
+  record_use 0.6.0 (1.0.0 available)
+  test_api 0.7.11 (0.7.13 available)
+  vector_math 2.2.0 (2.4.2 available)
+  win32 5.15.0 (6.3.0 available)
+  window_to_front 0.0.4 (1.0.0 available)
+Got dependencies!
+28 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /Users/russellsneddon/restore-privacy/client_app/test/vpn_only_product_test.dart
+00:00 +0: /Users/russellsneddon/restore-privacy/client_app/test/vpn_only_product_test.dart: first-use steps never include account or seed
+00:00 +1: /Users/russellsneddon/restore-privacy/client_app/test/vpn_only_product_test.dart: shell destinations always VPN only
+00:00 +2: /Users/russellsneddon/restore-privacy/client_app/test/vpn_only_product_test.dart: fromJson cannot re-enable Suite family parts
+00:00 +3: /Users/russellsneddon/restore-privacy/client_app/test/vpn_only_product_test.dart: source locks: no first-run username/password UI
+00:00 +4: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: portal has no username/password or seed surfaces
+00:00 +5: /Users/russellsneddon/restore-privacy/client_app/test/first_run_portal_seed_test.dart: after licence, KEYGEN/trial step — no account continue
+00:00 +6: All tests passed!
+
+RESULT: PASS — zero Suite family destinations / account-seed first-use as live product path
