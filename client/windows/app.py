@@ -2454,7 +2454,6 @@ class TunnelClientApp:
         self._settings = cur
         run_var = tk.BooleanVar(value=cur.run_at_startup)
         auto_var = tk.BooleanVar(value=cur.autoconnect_on_launch)
-        crumbs_var = tk.BooleanVar(value=False)  # push-receive removed
         shape_var = tk.BooleanVar(value=cur.privacy_traffic_shape)
         obfs_var = tk.BooleanVar(value=cur.privacy_outer_obfuscation)
         multihop_var = tk.BooleanVar(value=cur.privacy_multihop)
@@ -2554,7 +2553,7 @@ class TunnelClientApp:
                 ),
                 first_run_settings_completed=prev_done,
                 ui_mode=mode,
-                check_breadcrumbs=bool(crumbs_var.get()),
+                check_breadcrumbs=False,  # push-receive removed — manual update only
             )
 
         def _save_run() -> None:
