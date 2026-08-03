@@ -208,8 +208,29 @@ def assess_macos_catalog_zip_codesign(path: Path | str) -> dict[str, Any]:
             out.update(seal)
             out["codesign_exit"] = proc.returncode
             out["app_path"] = str(app)
-            # Live Gatekeeper assess when seal claims DevID
-            if seal.get("ok"):
+            # Deep seal: nested frameworks must verify (Python zipfile packaging
+            # often leaves outer DevID leaf but unsigned FlutterMacOS.framework).
+            deep = subprocess.run(
+                [
+                    "codesign",
+                    "--verify",
+                    "--deep",
+                    "--strict",
+                    "--verbose=2",
+                    str(app),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            deep_text = ((deep.stderr or "") + (deep.stdout or "")).strip()
+            out["codesign_deep_exit"] = deep.returncode
+            out["codesign_deep_text"] = deep_text[:400]
+            out["codesign_deep_ok"] = deep.returncode == 0
+            if seal.get("ok") and deep.returncode != 0:
+                out["ok"] = False
+                out["reason"] = "codesign_deep_verify_failed"
+            # Live Gatekeeper assess when seal claims DevID + deep ok
+            if out.get("ok"):
                 sp = subprocess.run(
                     ["spctl", "--assess", "--type", "execute", "-vv", str(app)],
                     capture_output=True,

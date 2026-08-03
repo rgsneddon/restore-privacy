@@ -102,6 +102,10 @@ class TestLiveMonopinZipDistribution(unittest.TestCase):
         self.assertTrue(report.get("is_developer_id_application"), report)
         self.assertFalse(report.get("is_apple_development"), report)
         self.assertTrue(
+            report.get("codesign_deep_ok"),
+            msg=f"nested frameworks must deep-verify: {report.get('codesign_deep_text')}",
+        )
+        self.assertTrue(
             report.get("spctl_notarized_developer_id"),
             msg=report.get("spctl_text"),
         )

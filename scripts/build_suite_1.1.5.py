@@ -163,6 +163,13 @@ def build_android() -> Path | None:
 
 
 def build_macos() -> Path | None:
+    """Build, Developer-ID sign, notarize, and ditto-zip the macOS residual client.
+
+    Must **not** use Python ``zipfile`` for the catalog zip — that strips nested
+    framework signatures and produces Gatekeeper
+    \"Apple could not verify … free of malware\" on download. Packaging is
+    ``scripts/sign_and_notarize_macos.py`` (ditto + notarytool + staple).
+    """
     app = (
         CLIENT_APP
         / "build"
@@ -195,15 +202,42 @@ def build_macos() -> Path | None:
         app = apps[0]
     dest = OUT / NAMES["macos"]
     dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists():
-        dest.unlink()
-    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, _dirs, files in os.walk(app):
-            for fn in files:
-                fp = Path(root) / fn
-                arc = fp.relative_to(app.parent)
-                zf.write(fp, arc.as_posix())
-    print(f"staged {dest.name} flutter macos zip sha256={sha256_file(dest)[:16]}…")
+    sign_script = ROOT / "scripts" / "sign_and_notarize_macos.py"
+    if not sign_script.is_file():
+        print("sign_and_notarize_macos.py missing", file=sys.stderr)
+        return None
+    try:
+        _run(
+            [
+                sys.executable,
+                str(sign_script),
+                "--app",
+                str(app),
+                "--zip",
+                str(dest),
+            ],
+            cwd=ROOT,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"macos sign/notarize failed: {e}", file=sys.stderr)
+        return None
+    if not dest.is_file() or dest.stat().st_size < 1_000_000:
+        print(f"macos sealed zip missing or too small: {dest}", file=sys.stderr)
+        return None
+    # Fail closed: catalog zip must be Notarized Developer ID after deep verify
+    try:
+        sys.path.insert(0, str(ROOT / "status_page"))
+        from apple_package_audit import require_macos_zip_developer_id_distribution
+
+        report = require_macos_zip_developer_id_distribution(dest)
+        print(
+            f"macos distribution seal ok reason={report.get('reason')!r} "
+            f"spctl_notarized={report.get('spctl_notarized_developer_id')}"
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"macos catalog seal rejected: {e}", file=sys.stderr)
+        return None
+    print(f"staged {dest.name} notarized DevID zip sha256={sha256_file(dest)[:16]}…")
     return dest
 
 
