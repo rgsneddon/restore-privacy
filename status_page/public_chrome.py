@@ -1422,9 +1422,10 @@ SUITE_HOME_INTRO_HEADING = "...privacy you can actually use..."
 SUITE_HOME_INTRO_HEADING_LEGACY = "Privacy you can actually use"
 # What the product is + how to start. Price once. Closing typewriter carries the tagline.
 SUITE_HOME_INTRO_BODY = (
-    "Restore Privacy is a virtual private network for your device. "
-    "Download free below, try three days with no card, then keep going "
-    "with a KEYGEN (£3 a month or £30 a year)."
+    "Restore Privacy is a virtual private network for your device and personal use. "
+    "Download the client free from the link below, try three days free with no "
+    "obligation to pay, then keep your privacy restored with a Restore Privacy VPN "
+    "subscription (£3 a month or £30 a year)."
 )
 # Foot retired: closing typewriter is the end line
 SUITE_HOME_INTRO_FOOT = ""

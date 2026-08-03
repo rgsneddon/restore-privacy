@@ -8,7 +8,10 @@
   var lastRunEl = document.getElementById("audit-last-run-time");
   var helpers = globalThis.RptAuditLastRun || null;
   var pollEveryTicks = 60; // ~60s light poll for new generated_at
+  var pollEveryTicksWhenRolled = 15; // faster poll after deadline until last-run advances
   var tickCount = 0;
+  var awaitingNewRun = false;
+  var lastSeenIso = lastRunEl ? (lastRunEl.getAttribute("datetime") || "") : "";
 
   function pad(n) {
     return n < 10 ? "0" + n : String(n);
@@ -42,6 +45,21 @@
         var iso = helpers.generatedAtFromPayload(data);
         if (!iso) return;
         helpers.applyLastRunToTimeElement(lastRunEl, iso);
+        // When timer expiry produced a newer stamp, realign countdown deadline.
+        if (iso !== lastSeenIso) {
+          lastSeenIso = iso;
+          awaitingNewRun = false;
+          var parsed = Date.parse(iso);
+          if (!isNaN(parsed)) {
+            deadlineMs = parsed + period * 1000;
+            while (deadlineMs <= Date.now()) {
+              deadlineMs += period * 1000;
+            }
+            if (root) {
+              root.setAttribute("data-next-audit", new Date(deadlineMs).toISOString());
+            }
+          }
+        }
       })
       .catch(function () {
         /* honest: leave last-run unchanged if fetch fails */
@@ -58,13 +76,15 @@
     while (deadlineMs <= now) {
       deadlineMs += period * 1000;
       rolled = true;
+      awaitingNewRun = true;
     }
     var rem = Math.max(0, Math.floor((deadlineMs - now) / 1000));
     el.textContent = fmt(rem);
     tickCount += 1;
-    // Refresh last-run when the period rolls (may coincide with a new audit write)
-    // and on a light periodic poll so an audit mid-period updates without reload.
-    if (rolled || tickCount === 1 || tickCount % pollEveryTicks === 0) {
+    // Refresh last-run when the period rolls (timer expiry) and periodically so
+    // a scheduled publish mid-period updates without full page reload.
+    var interval = awaitingNewRun ? pollEveryTicksWhenRolled : pollEveryTicks;
+    if (rolled || tickCount === 1 || tickCount % interval === 0) {
       refreshLastRun();
     }
   }

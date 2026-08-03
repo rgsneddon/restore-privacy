@@ -77,21 +77,28 @@ class TestPublicSiteCopyHuman(unittest.TestCase):
         # Foot retired in favour of closing typewriter line
         self.assertEqual(SUITE_HOME_INTRO_FOOT, "")
         self.assertIn("YOUR PRIVACY, RESTORED", body)
-        # Human VPN intro: product + free trial + KEYGEN price once
+        # Human VPN intro: personal use + free trial + subscription price once
         self.assertTrue(
             SUITE_HOME_INTRO_BODY.startswith("Restore Privacy is a virtual private network"),
             msg=f"intro open clause: {SUITE_HOME_INTRO_BODY!r}",
         )
-        self.assertIn("KEYGEN", SUITE_HOME_INTRO_BODY)
+        self.assertIn("personal use", SUITE_HOME_INTRO_BODY)
+        self.assertIn("no obligation to pay", SUITE_HOME_INTRO_BODY)
+        self.assertIn("subscription", SUITE_HOME_INTRO_BODY)
         self.assertIn("£3", SUITE_HOME_INTRO_BODY)
         self.assertIn("£30", SUITE_HOME_INTRO_BODY)
         self.assertIn("three days", SUITE_HOME_INTRO_BODY.lower())
+        # Old lead wording must not remain
+        self.assertNotIn(
+            "Download free below, try three days with no card, then keep going",
+            SUITE_HOME_INTRO_BODY,
+        )
         # No multi-product pitch
         self.assertNotIn("fun rewards token wallet", SUITE_HOME_INTRO_BODY)
         self.assertNotIn("RPSuite extras", SUITE_HOME_INTRO_BODY)
         self.assertNotIn("The Restore Privacy Suite", SUITE_HOME_INTRO_BODY)
         self.assertNotIn("mothly sunscription", SUITE_HOME_INTRO_BODY)
-        # Closing typewriter owns the tagline — body does not restate it
+        # Closing typewriter owns the all-caps tagline
         self.assertNotIn("your privacy, restored", SUITE_HOME_INTRO_BODY.lower())
         # Anti-patterns: dense residual laundry as lead voice
         for bad in (

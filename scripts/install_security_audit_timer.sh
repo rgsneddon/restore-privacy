@@ -192,10 +192,13 @@ else
 fi
 
 # Wrapper: one-line journal result; never pipes suite dumps to journal
+# After successful --write, optional constrained status publish (scp-only when
+# RPT_AUDIT_STATUS_SSH is set) so public last-run can advance without a manual
+# laptop command. Probes stay localhost-only; general git push remains off.
 WRAPPER="${INSTALL_ROOT}/scripts/rpt_security_audit_oneshot.sh"
 cat >"${WRAPPER}" <<WRAP
 #!/usr/bin/env bash
-# Local-only audit oneshot — no network exfil of AUDIT.md.
+# Local write + optional narrow audit-artifact publish for public last-run.
 set -euo pipefail
 export PYTHONPATH="${INSTALL_ROOT}:${INSTALL_ROOT}/status_page"
 export RPT_INSTALL_ROOT="${INSTALL_ROOT}"
@@ -212,18 +215,45 @@ export RPT_VPS_ASSET_BASE="\${RPT_VPS_ASSET_BASE:-https://135.181.152.10.sslip.i
 if [[ -z "\${RPT_ASSET_FETCH_TOKEN:-}" && -r "${INSTALL_ROOT}/var/rpt_asset_fetch_token" ]]; then
   export RPT_ASSET_FETCH_TOKEN="\$(tr -d ' \\t\\r\\n' <"${INSTALL_ROOT}/var/rpt_asset_fetch_token")"
 fi
+# Optional narrow status scp (audit JSON + AUDIT.md only) — set on node if used
+if [[ -z "\${RPT_AUDIT_STATUS_SSH:-}" && -r "${INSTALL_ROOT}/var/rpt_audit_status_ssh" ]]; then
+  export RPT_AUDIT_STATUS_SSH="\$(tr -d ' \\t\\r\\n' <"${INSTALL_ROOT}/var/rpt_audit_status_ssh")"
+fi
+if [[ -z "\${RPT_SSH_KEY:-}" && -r "${INSTALL_ROOT}/var/rpt_audit_status_key" ]]; then
+  export RPT_SSH_KEY="${INSTALL_ROOT}/var/rpt_audit_status_key"
+fi
 export TMPDIR="${INSTALL_ROOT}/var/audit-scratch"
 mkdir -p "\${TMPDIR}"
-# Never git push / curl upload AUDIT.md from this job
+# Never git push AUDIT.md from residual probes path
 unset GIT_ASKPASS SSH_ASKPASS
 rc=0
 "${PY}" "${INSTALL_ROOT}/scripts/run_security_audit.py" --node-only --write --out "${INSTALL_ROOT}/AUDIT.md" \\
   >/dev/null 2>"\${TMPDIR}/audit.err" || rc=\$?
+# Mirror into status_page so local/static JSON has the same stamp as AUDIT.md
+if [[ "\$rc" -eq 0 ]]; then
+  mkdir -p "${INSTALL_ROOT}/status_page/static" "${INSTALL_ROOT}/status_page/public"
+  # run_security_audit --write already mirrors when monorepo layout present
+  if [[ -f "${INSTALL_ROOT}/status_page/static/security_audit_latest.json" ]]; then
+    touch "${INSTALL_ROOT}/var/last_audit_write.ok" 2>/dev/null || true
+    date -u +"generated_ready %Y-%m-%dT%H:%M:%SZ" >"${INSTALL_ROOT}/var/last_audit_write.stamp" 2>/dev/null || true
+  fi
+  # Constrained status publish: scp audit JSON+md when RPT_AUDIT_STATUS_SSH is set.
+  # Does not re-run probes; does not enable general git/HTTP from the probe path.
+  if [[ -n "\${RPT_AUDIT_STATUS_SSH:-}" && -f "${INSTALL_ROOT}/scripts/run_security_audit.py" ]]; then
+    "${PY}" -c "
+import os, sys
+sys.path.insert(0, '${INSTALL_ROOT}/scripts')
+os.chdir('${INSTALL_ROOT}')
+import run_security_audit as rsa
+print(rsa.publish_audit_artifacts(commit=False, push=False))
+" >>"\${TMPDIR}/audit.pub" 2>&1 || true
+  fi
+fi
 # Wipe ephemeral capture
 rm -f "\${TMPDIR}/audit.err" 2>/dev/null || true
 find "\${TMPDIR}" -mindepth 1 -delete 2>/dev/null || true
 if [[ "\$rc" -eq 0 ]]; then
-  echo "rpt-security-audit: OK wrote ${INSTALL_ROOT}/AUDIT.md"
+  echo "rpt-security-audit: OK wrote ${INSTALL_ROOT}/AUDIT.md (timer path; pull agent --publish for status last-run)"
 else
   echo "rpt-security-audit: FAIL rc=\$rc (details redacted; see AUDIT.md overall status)"
 fi
@@ -233,6 +263,11 @@ chmod 0755 "${WRAPPER}"
 if id -u "${AUDIT_USER}" >/dev/null 2>&1; then
   chown root:root "${WRAPPER}" || true
 fi
+# Ship publish helper next to runner (pull agent / optional status scp)
+_rpt_audit_cp "${REPO_ROOT}/scripts/publish_timer_audit_to_status.py" \
+  "${INSTALL_ROOT}/scripts/publish_timer_audit_to_status.py"
+_rpt_audit_cp "${REPO_ROOT}/scripts/sync_audit_artifacts_from_node.py" \
+  "${INSTALL_ROOT}/scripts/sync_audit_artifacts_from_node.py"
 
 cat >/etc/systemd/system/rpt-security-audit.service <<EOF
 [Unit]

@@ -28,10 +28,15 @@ class TestPublicCopyHumanCadence(unittest.TestCase):
         body = SUITE_HOME_INTRO_BODY
         html = render_suite_home_intro_html()
         self.assertIn("virtual private network", body.lower())
-        self.assertEqual(_count_ci(body, "KEYGEN"), 1)
+        self.assertIn("personal use", body.lower())
+        self.assertIn("no obligation to pay", body.lower())
+        self.assertIn("subscription", body.lower())
+        # Price once (subscription wording may omit KEYGEN in the lead)
         self.assertEqual(_count_ci(body, "£3"), 1)
         self.assertEqual(_count_ci(body, "£30"), 1)
+        self.assertLessEqual(_count_ci(body, "KEYGEN"), 1)
         # Closing typewriter owns the tagline — body does not restate it
+        # (lead may say "privacy restored" as product phrase; full tagline is typewriter)
         self.assertNotIn("your privacy, restored", body.lower())
         self.assertIn(SUITE_HOME_CLOSING_TYPE, html)
         # No residual/tunnel jargon stack in the lead
