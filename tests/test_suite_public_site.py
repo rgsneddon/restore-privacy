@@ -29,25 +29,25 @@ class TestSuitePublicBrand(unittest.TestCase):
         )
 
         html = render_html({"title": PUBLIC_BRAND_TITLE}).decode("utf-8")
-        self.assertIn("Restore Privacy Suite", html)
+        # Dedicated VPN product — not multi-product Suite pitch
+        self.assertIn("Restore Privacy", html)
+        self.assertNotIn("Restore Privacy Suite", html)
         self.assertIn(PUBLIC_BRAND_VERSION, html)
         self.assertIn(PUBLIC_BRAND_DISPLAY.split()[0], html)  # Restore
         self.assertIn("suite-home-intro", html)
         self.assertIn(SUITE_HOME_INTRO_BODY[:40], html)
-        self.assertIn("residual VPN protection", html)
-        self.assertIn("fun rewards token wallet", html)
-        self.assertIn("Evolve analysis engine", html)
-        self.assertIn("RPSuite extras", html)
-        self.assertIn("£3 per month", html)
-        self.assertIn("£30 annually", html)
+        self.assertIn("virtual private network", html.lower())
+        self.assertNotIn("fun rewards token wallet", html)
+        self.assertNotIn("Evolve analysis engine", html)
+        self.assertNotIn("RPSuite extras", html)
+        self.assertIn("£3", html)
+        self.assertIn("£30", html)
         self.assertIn(".:WELCOME, ANON:.", html)
         self.assertIn("YOUR PRIVACY, RESTORED", html)
         self.assertNotIn("mothly sunscription", html)
         self.assertIn("suite-storefront", html)
         self.assertIn("data-free-download", html)
         self.assertIn("KEYGEN", html)
-        self.assertIn("£3", html)
-        # Not solely obsolete VPN-only brand as document identity
         self.assertNotIn(">RESTORE PRIVACY VPN<", html)
         self.assertNotIn("paywall", html.lower())
         # Homepage is not the operator console
@@ -77,28 +77,22 @@ class TestPublicSiteCopyHuman(unittest.TestCase):
         # Foot retired in favour of closing typewriter line
         self.assertEqual(SUITE_HOME_INTRO_FOOT, "")
         self.assertIn("YOUR PRIVACY, RESTORED", body)
-        # Grammatical intro: residual VPN + Evolve + rewards wallet + licence
-        open_clause = (
-            "The Restore Privacy Suite brings together residual VPN protection, the Evolve"
-        )
+        # Human VPN intro: product + free trial + KEYGEN price once
         self.assertTrue(
-            SUITE_HOME_INTRO_BODY.startswith(open_clause),
-            msg=f"intro open clause missing residual VPN: {SUITE_HOME_INTRO_BODY!r}",
+            SUITE_HOME_INTRO_BODY.startswith("Restore Privacy is a virtual private network"),
+            msg=f"intro open clause: {SUITE_HOME_INTRO_BODY!r}",
         )
-        self.assertIn("fun rewards token wallet", SUITE_HOME_INTRO_BODY)
-        self.assertIn("convenient app", SUITE_HOME_INTRO_BODY)
-        self.assertIn("£3 per month", SUITE_HOME_INTRO_BODY)
-        self.assertIn("£30 annually", SUITE_HOME_INTRO_BODY)
-        self.assertIn("The Restore Privacy Suite", SUITE_HOME_INTRO_BODY)
-        self.assertIn("RPSuite extras", SUITE_HOME_INTRO_BODY)
-        self.assertIn(open_clause, body)
+        self.assertIn("KEYGEN", SUITE_HOME_INTRO_BODY)
+        self.assertIn("£3", SUITE_HOME_INTRO_BODY)
+        self.assertIn("£30", SUITE_HOME_INTRO_BODY)
+        self.assertIn("three days", SUITE_HOME_INTRO_BODY.lower())
+        # No multi-product pitch
+        self.assertNotIn("fun rewards token wallet", SUITE_HOME_INTRO_BODY)
+        self.assertNotIn("RPSuite extras", SUITE_HOME_INTRO_BODY)
+        self.assertNotIn("The Restore Privacy Suite", SUITE_HOME_INTRO_BODY)
         self.assertNotIn("mothly sunscription", SUITE_HOME_INTRO_BODY)
-        self.assertNotIn("mothly sunscription", body)
-        # Retired prior open clause
-        self.assertNotIn(
-            "a residual VPN protection, a private wallet and the Evolve analysis engine",
-            SUITE_HOME_INTRO_BODY,
-        )
+        # Closing typewriter owns the tagline — body does not restate it
+        self.assertNotIn("your privacy, restored", SUITE_HOME_INTRO_BODY.lower())
         # Anti-patterns: dense residual laundry as lead voice
         for bad in (
             "178.105.187.178",
@@ -110,9 +104,6 @@ class TestPublicSiteCopyHuman(unittest.TestCase):
             self.assertNotIn(bad, SUITE_HOME_INTRO_BODY)
             self.assertNotIn(bad, SUITE_HOME_INTRO_HEADING)
         self.assertGreater(len(SUITE_HOME_INTRO_BODY), 40)
-        self.assertIn("£3", SUITE_HOME_INTRO_BODY)
-        self.assertIn("licence", SUITE_HOME_INTRO_BODY.lower())
-        # free + licence facts
         self.assertTrue(
             "free" in SUITE_HOME_INTRO_BODY.lower()
             or "Download" in SUITE_HOME_INTRO_BODY
@@ -133,7 +124,8 @@ class TestAdminNotOnPublicPages(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertTrue((out / "index.html").is_file())
         idx = (out / "index.html").read_text(encoding="utf-8")
-        self.assertIn("Restore Privacy Suite", idx)
+        self.assertIn("Restore Privacy", idx)
+        self.assertNotIn("Restore Privacy Suite", idx)
         from public_chrome import PUBLIC_BRAND_VERSION
 
         self.assertIn(PUBLIC_BRAND_VERSION, idx)

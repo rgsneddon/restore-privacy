@@ -172,37 +172,31 @@ except Exception:  # noqa: BLE001
     PRICE_LABEL = "£3.00"
     PRICE_YEARLY_LABEL = "£30.00"
     _YEARLY_SAVE_PCT = 17
-# Large white bold callout under "Download client v…" on the public homepage.
+# Large white bold callout under "Download client v…" (price only; trial lives on intro).
 ONLY_PRICE_BANNER = (
-    f"ONLY {PRICE_LABEL} per month - or annual {PRICE_YEARLY_LABEL} "
-    f"(save ~{_YEARLY_SAVE_PCT}% vs 12 × monthly) - free 3-day residual trial, then KEYGEN"
+    f"ONLY {PRICE_LABEL} per month — or {PRICE_YEARLY_LABEL} a year "
+    f"(save ~{_YEARLY_SAVE_PCT}% vs 12 × monthly)"
 )
-# Short single-line note under the price box (no re-listing of £ amounts).
+# Short note under the price box — plan choice only (no re-list of trial/KEYGEN story).
 YEARLY_PLAN_NOTE = (
-    "Select your device and plan below when you are ready for a KEYGEN. "
+    "Choose your device and plan below. "
     f"Annual is {PRICE_YEARLY_LABEL} (save ~{_YEARLY_SAVE_PCT}% vs 12 × monthly). "
-    "Residual Connect: free 3-day (72-hour) trial on this device - no card. "
-    "After the trial ends, a paid KEYGEN / active subscription is required. "
-    "Local currency display uses the GBP anchors above "
-    "(we accept your local currency when Stripe allows; otherwise USD)."
+    "Prices show in local currency when Stripe allows; otherwise GBP or USD."
 )
 # Shown under the selection form (bold bright white, price-box-like frame).
 PLATFORM_SELECT_NOTE = (
-    "Please select your device platform carefully - you will only receive "
-    "the installer for that platform."
+    "Choose your device carefully — you only receive that platform’s installer."
 )
 # Homepage download price block (single shipped contract for public #downloads).
 PACKAGE_IDENTITY = "one device licence"
-# Catalog trial copy (kept name for import stability). Residual trial first; KEYGEN after.
+# Catalog plan line (kept name for import stability). Price once; trial not restated here.
 TRIAL_SUBSCRIPTION_SENTENCE = (
-    f"Select your device and plan - Monthly {PRICE_LABEL} or Annual {PRICE_YEARLY_LABEL} - "
-    "free 3-day (72-hour) residual trial without card; after that a paid KEYGEN is required"
+    f"Monthly {PRICE_LABEL} or annual {PRICE_YEARLY_LABEL} — pick a plan when you want a KEYGEN"
 )
 CATALOG_SUBSCRIPTION_SENTENCE = TRIAL_SUBSCRIPTION_SENTENCE
 PAY_AND_KEYGEN_CLAUSE = (
-    "Buy now opens secure Stripe checkout for a paid KEYGEN subscription "
-    "(use after the free residual trial, or anytime you want a KEYGEN). "
-    "Licence key and download links are emailed separately"
+    "Buy now opens Stripe checkout for a KEYGEN. "
+    "Your licence key is emailed after payment."
 )
 # Buy now label on the homepage form.
 BUY_NOW_LABEL = "Buy now"
@@ -816,16 +810,13 @@ def payment_connect_disclaimer_html() -> str:
     """
     return (
         '<p class="dl-payment-disclaimer" id="dl-payment-disclaimer">'
-        "<strong>STRONG DISCLAIMER - PAYMENT REQUIRED AFTER TRIAL:</strong> "
-        "Residual Connect includes a free <strong>3-day (72-hour)</strong> trial "
-        "on this device (<strong>no card</strong>). After the trial ends, Connect "
-        "needs a <strong>paid KEYGEN / active subscription</strong>. If payment "
-        "<strong>fails at any time</strong> after purchase (failed checkout, failed "
-        "charge, refund, dispute, revoked entitlement, or "
-        "<strong>subscription cancellation</strong> / end of the paid "
-        "subscription period), the ability to "
-        "<strong>Connect with the Restore Privacy app is cancelled</strong> "
-        "for that purchase/install until a successful payment is completed."
+        "<strong>STRONG DISCLAIMER — PAYMENT REQUIRED AFTER TRIAL:</strong> "
+        "Connect includes a free <strong>three-day</strong> trial on this device "
+        "(<strong>no card</strong>). After that, a "
+        "<strong>paid KEYGEN or active subscription</strong> is required. "
+        "If payment <strong>fails</strong>, is refunded or disputed, or the "
+        "subscription ends, <strong>Connect is cancelled</strong> until payment "
+        "succeeds again."
         "</p>"
     )
 
@@ -1152,7 +1143,7 @@ def render_homepage_buy_form_html(
             <span class="dl-plan-title">Monthly VPN plan</span>
             <div class="dl-plan-price">{_esc_html(month_label)} / month</div>
             <div class="dl-plan-price" style="font-weight:600;font-size:0.82rem;opacity:0.9">
-              Free residual trial 72h · then KEYGEN continues Connect</div>
+              Includes free 3-day trial</div>
           </label>
           <label class="dl-plan-option" id="dl-plan-year" data-interval="year">
             <input type="radio" name="interval" value="year"{year_checked}
@@ -1161,7 +1152,7 @@ def render_homepage_buy_form_html(
               <span class="dl-plan-save">SAVE ~{_YEARLY_SAVE_PCT}%</span></span>
             <div class="dl-plan-price">{_esc_html(year_label)} / year</div>
             <div class="dl-plan-price" style="font-weight:600;font-size:0.82rem;opacity:0.9">
-              Free residual trial 72h · then KEYGEN continues Connect</div>
+              Includes free 3-day trial</div>
           </label>
         </div>
       </div>
@@ -1183,19 +1174,18 @@ def render_homepage_buy_form_html(
 # Suite storefront (homepage section above VPN #downloads)
 SUITE_SECTION_ID = "suite-storefront"
 SUITE_PRODUCT_TITLE = "Restore Privacy"
+# Action line only — product definition lives on the homepage intro.
 SUITE_PRODUCT_SUBTITLE = (
-    "A dedicated virtual private network for residual traffic - free 3-day trial, then KEYGEN"
+    "Free download. Three-day trial. KEYGEN when you want to stay connected."
 )
 SUITE_VERSION_LABEL = f"v {RELEASE_VERSION}"
 # Retired left-box KEYGEN licence/trial line (no longer shown on storefront).
 SUITE_KEYGEN_HINT = ""
-# Left-box pay-hint: residual trial first (no card); pay after 72h for KEYGEN/subscription.
+# Pay-hint: price once; no second product definition or residual jargon stack.
 SUITE_PAY_HINT_HTML = (
-    "<strong>Free residual trial - 3 days (72 hours)</strong> on this device after "
-    "install (no card, no KEYGEN). When the trial ends, residual Connect needs a "
-    "<strong>paid KEYGEN / active subscription</strong> from Get KEYGEN above "
-    "(£3.00/month or yearly). Download free; pay only when you want to continue "
-    "past the trial. Yearly plans available (17% discount)."
+    "Install free. After the three-day trial, a "
+    f"<strong>KEYGEN</strong> keeps Connect working — "
+    f"{PRICE_LABEL}/month or yearly from the button above."
 )
 SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
 # Anonymous free-CTA delivery (no KEYGEN / no /pay) - detected platform only
@@ -1210,9 +1200,7 @@ DOWNLOADS_MAP_LABEL = "download map"
 FREEBIE_IMG_PATH = "/static/freebie.jpg"
 # Catalog monopin for links (face art no longer bakes a version string)
 FREE_DOWNLOAD_FACE_VERSION = RELEASE_VERSION
-FREEBIE_IMG_ALT = (
-    "Download Restore Privacy - free 3-day trial, then KEYGEN"
-)
+FREEBIE_IMG_ALT = "Download Restore Privacy free"
 FREE_DOWNLOAD_CTA_ID = "free-download-v1-cta"
 FREE_PACKAGES_PAGE_ID = "free-packages-page"
 DOWNLOADS_MAP_PAGE_ID = "downloads-map-page"
@@ -1928,10 +1916,8 @@ def render_downloads_map_page_html(
       <div class="downloads-map-center free-packages-center" id="downloads-map-center">
         <h1 id="downloads-map-heading">Downloads Map</h1>
         <p class="downloads-map-blurb free-packages-blurb" id="downloads-map-blurb">
-          <strong>Restore Privacy v{_esc_html(ver)}</strong> - one free download link
-          per device platform. Each platform link starts an immediate free download
-          for that device (same free path as the home
-          <strong>FREE DOWNLOAD</strong> button). KEYGEN residual licences remain on
+          <strong>Restore Privacy v{_esc_html(ver)}</strong> —
+          free installer for each platform. KEYGEN licences are on
           <a href="/pay?product=suite">/pay</a>.
         </p>
         {detect_hint}
@@ -2545,8 +2531,7 @@ def render_suite_storefront_html(
               data-product="suite" data-cart-cta="1">
         Get KEYGEN - {PRICE_LABEL}/month</button>
       <p class="suite-cart-hint" id="suite-cart-hint">
-        Continues to a short cart: one-month KEYGEN licence, choose device, and
-        whether to auto-renew - then secure Stripe checkout.
+        Short cart: pick device and auto-renew, then Stripe checkout.
       </p>
       <p class="dl-stripe-branding" id="suite-stripe-branding">{STRIPE_CHECKOUT_BRANDING_NOTE}</p>
     </form>

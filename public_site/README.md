@@ -1,8 +1,8 @@
-# Restore Privacy Suite — public site
+# Restore Privacy — public site
 
-Static GitHub Pages export for **Restore Privacy Suite v1.1.5**.
+Static GitHub Pages export for **Restore Privacy v1.1.6**.
 
-Free installers + **Downloads Map** of every product/platform package; KEYGEN licence from £3/month on restoreprivacy.online.
+Free installers and a Downloads Map; KEYGEN from £3/month on restoreprivacy.online.
 
 This tree is **public only**. It does **not** include `/admin` or operator tools.
 

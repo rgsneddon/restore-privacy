@@ -1411,7 +1411,7 @@ def public_display_title(raw: str | None = None) -> str:
     return t
 
 
-# Homepage lead copy (human cadence - dedicated VPN, not a feature inventory).
+# Homepage lead copy (human cadence — dedicated VPN; one job for this section).
 SUITE_HOME_INTRO_ID = "suite-home-intro"
 # Neon typewriter lines (one-shot keystroke animation on page load)
 SUITE_HOME_WELCOME_TYPE = ".:WELCOME, ANON:."
@@ -1420,11 +1420,11 @@ SUITE_HOME_CLOSING_TYPE = "YOUR PRIVACY, RESTORED"
 SUITE_HOME_INTRO_HEADING = "...privacy you can actually use..."
 # Legacy alias for callers/tests that still import the short human title idea
 SUITE_HOME_INTRO_HEADING_LEGACY = "Privacy you can actually use"
+# What the product is + how to start. Price once. Closing typewriter carries the tagline.
 SUITE_HOME_INTRO_BODY = (
-    "Restore Privacy is a dedicated virtual private network for your device - "
-    "built to protect residual traffic cleanly, without clutter. Download free "
-    "below, try three days on this device with no card, then continue with a "
-    "KEYGEN for £3 a month or £30 a year. One app. One job: your privacy, restored."
+    "Restore Privacy is a virtual private network for your device. "
+    "Download free below, try three days with no card, then keep going "
+    "with a KEYGEN (£3 a month or £30 a year)."
 )
 # Foot retired: closing typewriter is the end line
 SUITE_HOME_INTRO_FOOT = ""

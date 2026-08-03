@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the public GitHub Pages tree for Restore Privacy Suite (catalog monopin).
+"""Build the public GitHub Pages tree for Restore Privacy (catalog monopin).
 
 Writes a whitelist-only static site under ``public_site/``:
 
@@ -182,7 +182,7 @@ def build_index() -> str:
         f'href="{origin}/" data-free-download-v1="1" data-pay="0" '
         f'data-suite-latest="1" data-href-kind="map">'
         f'<img src="assets/freebie.jpg" width="1024" height="1024" '
-        f'alt="FREE DOWNLOAD — Restore Privacy Suite"/></a>'
+        f'alt="FREE DOWNLOAD — Restore Privacy"/></a>'
         f"""
 <script id="free-download-ua-detect">
 (function () {{
@@ -217,7 +217,7 @@ def build_index() -> str:
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<meta name="description" content="Restore Privacy Suite v{RELEASE_VERSION} — free download; KEYGEN licence from {PRICE_LABEL}/month or yearly"/>
+<meta name="description" content="Restore Privacy v{RELEASE_VERSION} — free download; KEYGEN from {PRICE_LABEL}/month or yearly"/>
 <title>{_esc(PUBLIC_BRAND_DISPLAY)}</title>
 <link rel="icon" href="assets/favicon.ico"/>
 <link rel="stylesheet" href="assets/site.css"/>
@@ -252,13 +252,12 @@ def build_index() -> str:
     <section class="panel" id="suite-storefront" data-free-download="1">
       <h2>FREE DOWNLOAD</h2>
       {free_cta}
-      <p class="muted">FREE DOWNLOAD detects your device and starts the latest Suite
-        installer (no /pay). Platform package paths and KEYGEN cart are on the live host
-        and the <a href="downloads-map.html">Downloads Map</a>.</p>
+      <p class="muted">Detects your device and starts the free installer.
+        All platforms and KEYGEN checkout are also on the
+        <a href="downloads-map.html">Downloads Map</a> and restoreprivacy.online.</p>
       <p class="keygen-note">
-        KEYGEN licence from <strong>{_esc(PRICE_LABEL)} per month</strong>
-        (yearly available on /pay). After you pay, enter the KEYGEN from your email
-        in the app — then Connect.
+        KEYGEN from <strong>{_esc(PRICE_LABEL)} per month</strong>
+        (yearly on /pay). Paste the code from your email in the app, then Connect.
       </p>
       <p class="cta-row">
         <a class="btn" href="https://restoreprivacy.online/pay?product=suite">Get a KEYGEN — /pay</a>
@@ -268,9 +267,9 @@ def build_index() -> str:
     <section class="panel" id="how-it-works">
       <h2>How it works</h2>
       <ol class="steps">
-        <li>Download and install the Suite for free (FREE DOWNLOAD button).</li>
-        <li>Take a monthly licence (from {_esc(PRICE_LABEL)}) via /pay when you want residual Connect.</li>
-        <li>Paste the KEYGEN from your fulfilment email and connect.</li>
+        <li>Download and install free (FREE DOWNLOAD button).</li>
+        <li>Try three days, then buy a KEYGEN from {_esc(PRICE_LABEL)}/month on /pay.</li>
+        <li>Paste the KEYGEN from your email and Connect.</li>
       </ol>
     </section>
 
@@ -318,7 +317,7 @@ def build_downloads_map() -> str:
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Downloads Map · Restore Privacy Suite v{RELEASE_VERSION}</title>
+<title>Downloads Map · Restore Privacy v{RELEASE_VERSION}</title>
 <link rel="icon" href="assets/favicon.ico"/>
 <link rel="stylesheet" href="assets/site.css"/>
 </head>
@@ -333,10 +332,8 @@ def build_downloads_map() -> str:
     </header>
     <section class="panel" id="downloads-map-page" data-downloads-map-page="1">
       <h1>Downloads Map</h1>
-      <p class="muted">Restore Privacy Suite latest clients only (monopin {RELEASE_VERSION}).
-        Each platform link starts an immediate free Suite download on
-        restoreprivacy.online (same free path as the home FREE DOWNLOAD button).
-        KEYGEN residual licences remain on /pay.</p>
+      <p class="muted">Restore Privacy v{RELEASE_VERSION} — free installer for each platform.
+        KEYGEN licences are on /pay.</p>
       {sections_html}
     </section>
 {static_site_footer(map_href="downloads-map.html")}
@@ -364,14 +361,14 @@ def build_simple_doc(title: str, body_html: str) -> str:
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>{_esc(title)} · Restore Privacy Suite</title>
+<title>{_esc(title)} · Restore Privacy</title>
 <link rel="icon" href="assets/favicon.ico"/>
 <link rel="stylesheet" href="assets/site.css"/>
 </head>
 <body class="site-public" data-theme="dark" data-product="suite">
   <div class="page-shell">
     <header class="brand-panel">
-      <p class="brand-name">Restore Privacy Suite</p>
+      <p class="brand-name">Restore Privacy</p>
       <nav class="site-nav"><a href="index.html">Home</a></nav>
     </header>
     <section class="panel">
@@ -405,9 +402,9 @@ def main() -> int:
     (OUT / "privacy.html").write_text(
         build_simple_doc(
             "Privacy",
-            "<p>We design for residual privacy. Local device settings stay on your machine. "
-            "Payment is handled by Stripe; we do not store your card details on this site.</p>"
-            "<p>The full policy is published on the live status host: "
+            "<p>Device settings stay on your machine. Stripe handles cards; "
+            "this site does not store card details.</p>"
+            "<p>Full policy: "
             '<a href="https://restoreprivacy.online/PRIVACY_POLICY.md">Privacy policy</a>.</p>',
         ),
         encoding="utf-8",
@@ -415,18 +412,18 @@ def main() -> int:
     (OUT / "licence.html").write_text(
         build_simple_doc(
             "Licence",
-            "<p>Restore Privacy Suite is proprietary full copyright software. "
-            "You may install the free download; residual Connect requires an active KEYGEN licence.</p>"
+            "<p>Restore Privacy is proprietary software. Install free; "
+            "Connect needs an active KEYGEN after the trial.</p>"
             '<p>Full terms: <a href="https://restoreprivacy.online/LICENSE">End-user licence</a>.</p>',
         ),
         encoding="utf-8",
     )
     (OUT / ".nojekyll").write_text("", encoding="utf-8")
     (OUT / "README.md").write_text(
-        "# Restore Privacy Suite — public site\n\n"
-        f"Static GitHub Pages export for **Restore Privacy Suite v{RELEASE_VERSION}**.\n\n"
-        "Free installers + **Downloads Map** of every product/platform package; "
-        "KEYGEN licence from £3/month on restoreprivacy.online.\n\n"
+        "# Restore Privacy — public site\n\n"
+        f"Static GitHub Pages export for **Restore Privacy v{RELEASE_VERSION}**.\n\n"
+        "Free installers and a Downloads Map; KEYGEN from £3/month on "
+        "restoreprivacy.online.\n\n"
         "This tree is **public only**. It does **not** include `/admin` or operator tools.\n\n"
         "## Live public open site\n\n"
         "| | |\n|--|--|\n"

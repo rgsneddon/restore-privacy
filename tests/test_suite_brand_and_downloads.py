@@ -42,7 +42,9 @@ class TestSuiteBrandSurfaces(unittest.TestCase):
 
         suite = render_suite_storefront_html()
         self.assertIn("Restore Privacy", suite)
-        self.assertIn("virtual private network", suite.lower())
+        # Storefront is action copy (free download / KEYGEN) — product definition is intro.
+        self.assertIn("Free download", suite)
+        self.assertIn("KEYGEN", suite)
         self.assertNotIn("Restore Privacy Suite", suite)
         self.assertNotIn("Perccent", suite)
         self.assertNotIn("Evolve", suite)
@@ -320,7 +322,8 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         self.assertIn('id="suite-stripe-branding"', suite)
         self.assertIn("suite-keygen-cta", suite)
         self.assertIn("Get KEYGEN", suite)
-        self.assertIn("Continues to a short cart", suite)
+        self.assertIn("Short cart", suite)
+        self.assertIn("Stripe checkout", suite)
 
 
 if __name__ == "__main__":

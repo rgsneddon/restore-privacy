@@ -1227,36 +1227,30 @@ ol{{padding-left:1.25rem;color:var(--rb-muted)}}
 {header}
 <section class="panel-card doc-body-panel" id="how-to-buy-panel">
 <h1 id="how-to-buy-heading">How to buy Restore Privacy</h1>
-<p class="muted">Restore Privacy is a <strong>dedicated virtual private network</strong>.
-Installers are <strong>free</strong> on the shop.
-Residual Connect includes a free <strong>3-day (72-hour) trial</strong> on this
-device (<strong>no card</strong>). After the trial ends, residual Connect needs a
-<strong>paid KEYGEN / active subscription</strong>: monthly
-({_escape(PRICE_LABEL)} / month GBP) or yearly
-({_escape(PRICE_YEARLY_LABEL)} / year). You do not need payment details before
-the free residual trial.</p>
+<p class="muted">Install free from the shop. Pay only when you want a
+<strong>KEYGEN</strong> after the three-day trial —
+{_escape(PRICE_LABEL)}/month or {_escape(PRICE_YEARLY_LABEL)}/year.
+No card needed for the trial.</p>
 
 <div class="card" id="how-to-buy-steps">
-<h2>Select your plan</h2>
+<h2>Steps</h2>
 <ol>
   <li>Open the shop: <a href="{_escape(home)}">{_escape(home)}</a></li>
-  <li>Download the free installer for your device, then under residual
-      plans pick Monthly VPN plan or Yearly VPN plan. You can also open the plan
-      page at <code>{_escape(SITE_PAY_PLAN_PATH)}</code> (<code>/pay</code>).</li>
-  <li>Continue to Stripe Checkout
-      ({_escape(PRICE_LABEL)}/month or {_escape(PRICE_YEARLY_LABEL)}/year):
+  <li>Download the free installer for your device.</li>
+  <li>When you want a KEYGEN, open
       <a id="how-to-buy-payment-page" href="{_escape(pay)}"
-      rel="noopener noreferrer">{_escape(pay)}</a></li>
-  <li>After checkout, your KEYGEN arrives in email
-      (USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY). Paste it in the app, then
-      Connect. Older paid-download success links
-      (<code>{_escape(claim)}?session_id=…</code>) remain valid for
+      rel="noopener noreferrer">{_escape(pay)}</a>
+      (<code>{_escape(SITE_PAY_PLAN_PATH)}</code>) and pick monthly or yearly.</li>
+  <li>After checkout, paste the KEYGEN from your email into the app, then Connect.
+      Older success links
+      (<code>{_escape(claim)}?session_id=…</code>) stay valid for
       <strong>12 hours</strong> when fulfilment still issues a package URL.</li>
 </ol>
-<p class="muted">Fulfilment listens for Stripe
-<code>checkout.session.completed</code> on
-<code>{_escape(webhook)}</code>. Connect stays active through the paid period
-(and trial when offered); refunds and subscription end revoke access.</p>
+<p class="muted">Connect runs for the paid period (and the free trial).
+Refunds or subscription end revoke access.
+Fulfilment uses Stripe
+<code>checkout.session.completed</code> at
+<code>{_escape(webhook)}</code>.</p>
 </div>
 
 <div class="card" id="how-to-buy-public-docs">

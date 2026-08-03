@@ -31,16 +31,14 @@ INSTALL_HOWTO_BOX_ID = "install-run-howto-box"
 
 SUITE_GUIDE_INTRO_HEADING = "How to use Restore Privacy"
 SUITE_GUIDE_INTRO_BODY = (
-    "This guide walks you through the VPN in everyday language. "
-    "Download free. Residual Connect includes a free 3-day "
-    "(72-hour) trial on this device (no card). After the trial ends, enter a "
-    "KEYGEN to continue. Connect from the main screen; open Settings from the gear."
+    "This VPN guide is short. Download free, try three days, then enter a "
+    "KEYGEN to keep connecting. Use Connect on the main screen; open Settings "
+    "from the gear."
 )
+# One short line — no second trial/KEYGEN lecture (body already covers the path).
 SUITE_GUIDE_INTRO_FOOT = (
-    "Nothing here is an operator console. Installers are free; residual Connect "
-    "has a free 3-day (72-hour) trial, then needs a paid KEYGEN / active "
-    "subscription (monthly from £3). The unlock screen is for your KEYGEN after "
-    "the trial - not for card details before you try residual Connect."
+    "This page is a user guide, not an operator console. "
+    "Monthly KEYGEN starts at £3."
 )
 
 
@@ -64,51 +62,39 @@ def suite_howto_parts_catalog() -> list[dict[str, str]]:
             "id": "suite-unlock",
             "title": "Free install, 3-day trial, then KEYGEN",
             "what": (
-                "You install Restore Privacy without paying for the package. "
-                "Residual Connect includes a free 3-day (72-hour) trial on this "
-                "device (no card). After the trial ends, enter a KEYGEN from your "
-                "fulfilment email to keep connecting."
+                "Install free. After three free days of Connect, enter the KEYGEN "
+                "from your email to keep going."
             ),
             "how": (
-                "Download your platform build from the homepage free installer button "
-                "(or /suite/download). Open the app, accept the end-user licence, "
-                "use the free residual trial, then when it ends enter the KEYGEN "
-                "(RPT-KEY-…) on the unlock screen or under Settings → Payment "
-                "entitlement. A monthly licence starts at £3; yearly residual plans "
-                "remain on /pay if you prefer that option."
+                "Download from the homepage free button. Accept the licence, use the "
+                "trial, then paste the KEYGEN (RPT-KEY-…) on the unlock screen or under "
+                "Settings. Monthly from £3; yearly on /pay."
             ),
-            "default": "Download free; 72h residual trial; then KEYGEN",
+            "default": "Free install · 3-day trial · KEYGEN",
         },
         {
             "id": "suite-vpn",
-            "title": "Main screen - residual Connect",
+            "title": "Main screen — Connect",
             "what": (
-                "The main screen is where you start and stop residual protection. "
-                "It shows connection status, a short local log, entry country, "
-                "and a discrete notice when a newer build is available "
-                "(manual free download)."
+                "Start and stop protection. See status, a short log, and entry country."
             ),
             "how": (
-                "Choose an entry country if you like (Germany is the product default), "
-                "then press Connect and approve any system VPN prompt. Wait until "
-                "status is honestly connected before you rely on residual IP. "
-                "Press Disconnect when you are done - minimize does not stop the tunnel. "
-                "Quit (lower-left) disconnects residual, then fully exits the app."
+                "Press Connect and approve any system VPN prompt. Wait until status "
+                "shows connected. Disconnect when finished — minimizing does not stop "
+                "the tunnel. Quit (lower-left) disconnects, then exits."
             ),
-            "default": "Manual Connect; entry Germany (DE)",
+            "default": "Manual Connect · entry Germany (DE)",
         },
         {
             "id": "suite-settings-gear",
             "title": "Settings (gear)",
             "what": (
-                "Settings cover power-up, residual privacy scale, "
-                "KEYGEN fallback, local log, leak test, and legal links."
+                "Startup options, privacy extras, KEYGEN, local log, leak test, and legal."
             ),
             "how": (
-                "Open Settings from the gear. Defaults are lean: startup and autoconnect "
-                "off, traffic shaping / outer obfuscation / multi-hop off. "
-                "Turn on only what you understand. Each control is listed below. "
-                "App updates are always manual (free download) when a new monopin ships."
+                "Defaults stay lean (startup and autoconnect off; shaping, obfuscation, "
+                "and multi-hop off). Turn on only what you need. Each control is below. "
+                "Updates are always a free manual download."
             ),
             "default": "Lean off until you opt in",
         },
