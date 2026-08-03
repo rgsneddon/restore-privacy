@@ -433,7 +433,7 @@ Future<String?> lookupPublicEgressIp({
       if (!seen.add(url)) continue;
       try {
         final req = await client.getUrl(Uri.parse(url)).timeout(timeout);
-        req.headers.set(HttpHeaders.userAgentHeader, 'rpt-leak-test/1.1.2');
+        req.headers.set(HttpHeaders.userAgentHeader, 'rpt-leak-test/1.1.3');
         final resp = await req.close().timeout(timeout);
         if (resp.statusCode < 200 || resp.statusCode >= 300) continue;
         final body = (await resp.transform(utf8.decoder).join()).trim();
