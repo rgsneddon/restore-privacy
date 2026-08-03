@@ -86,8 +86,8 @@ def _product_version_pin() -> str:
 
 
 VERSION = _product_version_pin()
-# User-facing shortcut / tray product name (logo icon on Start Menu + Desktop)
-SHORTCUT_DISPLAY_NAME = "Privacy Restored"
+# User-facing shortcut name (Start Menu + Desktop). Tray hover text is rpT0.
+SHORTCUT_DISPLAY_NAME = "Privacy, Restored"
 # Default: Program Files\Restore Privacy (see client.install_paths).
 INSTALL_DIR = default_windows_install_dir()
 USER_SECRETS = Path.home() / ".restore-privacy" / "secrets"
@@ -190,7 +190,7 @@ def _rmtree_best_effort(path: Path) -> None:
         except OSError as exc:
             raise RuntimeError(
                 f"Could not replace existing install at {path}. "
-                f"Close Restore Privacy / Privacy Restored if it is running, then try again. ({exc})"
+                f"Close Restore Privacy / rpT0 if it is running, then try again. ({exc})"
             ) from exc
 
 
@@ -813,7 +813,7 @@ def install(
             batch.append(
                 (
                     allow_bat,
-                    START_MENU / "Allow Firewall for Privacy Restored.lnk",
+                    START_MENU / "Allow Firewall for rpT0.lnk",
                     INSTALL_DIR,
                     icon,
                     None,

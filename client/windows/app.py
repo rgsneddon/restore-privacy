@@ -483,7 +483,6 @@ class TunnelClientApp:
             wraplength=400,
             justify=tk.LEFT,
         )
-        self.hint.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.quit_btn = tk.Button(
             self.hint_row,
             text="Quit",
@@ -498,7 +497,9 @@ class TunnelClientApp:
             bd=0,
             padx=6,
         )
-        self.quit_btn.pack(side=tk.RIGHT)
+        # Lower-left: Quit first, then seamless hint expands to the right.
+        self.quit_btn.pack(side=tk.LEFT)
+        self.hint.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(8, 0))
 
         # --- Header ---
         self.header = tk.Frame(self.chrome, bg=self._t["chrome_bg"])
@@ -787,7 +788,7 @@ class TunnelClientApp:
 
 
     def _start_system_tray(self) -> None:
-        """Tray identity: Privacy Restored + product logo (one system-wide icon)."""
+        """Tray identity: rpT0 + product logo (one system-wide icon)."""
         try:
             # Drop any orphan / other-process product icon (fixed GUID).
             try:

@@ -196,7 +196,7 @@ def apply_run_at_startup(enabled: bool) -> str:
             "[Desktop Entry]\n"
             "Type=Application\n"
             "Version=1.0\n"
-            "Name=Privacy Restored\n"
+            "Name=Privacy, Restored\n"
             "Comment=Restore Privacy Suite client\n"
             f"Exec={exec_line}\n"
             f"Path={root}\n"

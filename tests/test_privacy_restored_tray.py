@@ -1,4 +1,4 @@
-"""Privacy Restored tray identity + logo shortcuts / brand assets.
+"""Privacy, Restored tray identity + logo shortcuts / brand assets.
 
 Also covers Connect/Disconnect tray tip+icon state flips (NIF_TIP|NIF_ICON).
 """
@@ -36,15 +36,15 @@ from client.windows.installer import (  # noqa: E402
 
 class TestTrayBranding(unittest.TestCase):
     def test_tray_display_name_is_privacy_restored(self):
-        self.assertEqual(TRAY_DISPLAY_NAME, "Privacy Restored")
+        self.assertEqual(TRAY_DISPLAY_NAME, "Privacy, Restored")
 
     def test_tray_tooltip_uses_product_name(self):
         tip = tray_tooltip_for_state(connected=True, residual=True)
-        self.assertIn("Privacy Restored", tip)
+        self.assertIn("Privacy, Restored", tip)
         self.assertIn("connected", tip.lower())
         self.assertNotIn("â€", tip)
         tip2 = tray_tooltip_for_state(connected=False)
-        self.assertIn("Privacy Restored", tip2)
+        self.assertIn("Privacy, Restored", tip2)
         self.assertIn("disconnected", tip2.lower())
 
     def test_tray_tooltip_session_only(self):
@@ -73,7 +73,10 @@ class TestTrayBranding(unittest.TestCase):
         self.assertIn("WindowsSystemTray", src)
         self.assertIn("TRAY_DISPLAY_NAME", src)
         self.assertIn("_start_system_tray", src)
-        self.assertIn("Privacy Restored", src)  # log / close message uses tray name
+        # Live tray string lives in tray_win.TRAY_DISPLAY_NAME (imported here).
+        from client.windows.tray_win import TRAY_DISPLAY_NAME as _tray
+
+        self.assertEqual(_tray, "Privacy, Restored")
 
 
 class TestTrayStatusUpdate(unittest.TestCase):
@@ -258,7 +261,7 @@ class TestPurgeProductTrayIcon(unittest.TestCase):
 
 class TestShortcutLogo(unittest.TestCase):
     def test_shortcut_display_name(self):
-        self.assertEqual(SHORTCUT_DISPLAY_NAME, "Privacy Restored")
+        self.assertEqual(SHORTCUT_DISPLAY_NAME, "Privacy, Restored")
 
     def test_installer_sets_icon_location(self):
         src = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")

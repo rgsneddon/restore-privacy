@@ -1,6 +1,6 @@
 # Windows brand breadcrumbs checklist — monopin 1.1.3
 
-Generated: 2026-08-03T16:03:55Z
+Generated: 2026-08-03T16:25:10Z
 Large-drive dest: `{RPT_WINDOWS_DRIVE}` (configured=False, reachable=False)
 Monorepo mirror path: `{RPT_WINDOWS_DRIVE}/restore-privacy`
 

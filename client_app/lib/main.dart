@@ -186,7 +186,7 @@ class _RestorePrivacyAppState extends State<RestorePrivacyApp> {
 /// Seamless product shell: hero status, Connect/Disconnect, Settings transparency.
 ///
 /// Minimize / background does **not** stop the tunnel — only Disconnect or Quit
-/// do. Quit (macOS/iOS main screen, bottom-right) stops the tunnel then exits.
+/// do. Quit (main screen, lower-left) stops the tunnel then fully exits.
 /// Licence acceptance is required before Connect; autoconnect cannot bypass it.
 class TunnelHome extends StatefulWidget {
   const TunnelHome({
@@ -1666,12 +1666,12 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   fontSize: 11,
                 ),
               ),
-              // Discrete Quit — bottom-right of main connection screen (macOS + iOS).
-              // Placement marker: kQuitButtonPlacement == bottomRight
+              // Discrete Quit — lower-left of main connection screen (all platforms).
+              // Placement marker: kQuitButtonPlacement == bottomLeft
               if (showsMainScreenQuitOnThisDevice()) ...[
                 const SizedBox(height: 4),
                 Align(
-                  alignment: Alignment.centerRight, // bottomRight of column
+                  alignment: Alignment.centerLeft, // bottomLeft of column
                   child: TextButton(
                     key: const Key('main_quit_button'),
                     onPressed: _busy ? null : _onQuit,

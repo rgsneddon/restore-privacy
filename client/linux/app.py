@@ -250,15 +250,7 @@ class TunnelClientApp:
 
         quit_row = tk.Frame(self.bottom, bg=CHROME_BG)
         quit_row.pack(fill=tk.X)
-        tk.Button(
-            quit_row,
-            text="Settings",
-            command=self._open_settings,
-            bg=CHROME_BG,
-            fg=PRIMARY_DARK,
-            relief=tk.FLAT,
-            font=("DejaVu Sans", 9, "bold"),
-        ).pack(side=tk.LEFT)
+        # Lower-left: Quit, then Settings to its right.
         tk.Button(
             quit_row,
             text="Quit",
@@ -267,7 +259,16 @@ class TunnelClientApp:
             fg=TEXT_MUTED,
             relief=tk.FLAT,
             font=("DejaVu Sans", 9),
-        ).pack(side=tk.RIGHT)
+        ).pack(side=tk.LEFT)
+        tk.Button(
+            quit_row,
+            text="Settings",
+            command=self._open_settings,
+            bg=CHROME_BG,
+            fg=PRIMARY_DARK,
+            relief=tk.FLAT,
+            font=("DejaVu Sans", 9, "bold"),
+        ).pack(side=tk.LEFT, padx=(12, 0))
 
         top = tk.Frame(self.chrome, bg=CHROME_BG)
         top.pack(side=tk.TOP, fill=tk.BOTH, expand=True)

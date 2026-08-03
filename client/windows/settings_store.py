@@ -183,7 +183,7 @@ def should_run_at_startup(settings: Optional[ProductSettings] = None) -> bool:
 
 
 def startup_shortcut_name() -> str:
-    return "Privacy Restored.lnk"
+    return "Privacy, Restored.lnk"
 
 
 def startup_folder() -> Path:
@@ -245,7 +245,7 @@ def apply_run_at_startup(enabled: bool) -> str:
             f'$s.TargetPath = {target!r}; '
             f'$s.Arguments = {params!r}; '
             f'$s.WorkingDirectory = {cwd!r}; '
-            f'$s.Description = "Privacy Restored — start with Windows"; '
+            f'$s.Description = "Privacy, Restored — start with Windows"; '
             f"$s.Save();"
         )
         from client.windows.hidden_subprocess import run_hidden

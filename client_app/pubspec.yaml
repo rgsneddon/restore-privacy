@@ -1,11 +1,11 @@
 name: restore_privacy_client
-description: "Restore Privacy Suite — residual VPN, Perccent wallet (%), and Evolve."
+description: "Restore Privacy residual VPN client."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-# Restore Privacy Suite v 1.1.3 monopin.
-version: 1.1.3+1
+# Restore Privacy residual VPN v 1.1.5 monopin.
+version: 1.1.5+1
 
 environment:
   sdk: '>=3.2.0 <4.0.0'

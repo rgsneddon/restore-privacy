@@ -1,4 +1,4 @@
-"""Release download catalog + paid download UI (Restore Privacy Suite v1.1.3).
+"""Release download catalog + paid download UI (Restore Privacy residual VPN v1.1.5).
 
 Primary path: pay **£3.00** (GBP) via Stripe Checkout per package, then a
 time-limited download token (default **12 hours**, reusable until expiry).
@@ -7,7 +7,7 @@ the status host **proxies** the installer (authenticated GitHub API / local
 assets) so fulfilment works when the restore-privacy repo is **private**.
 Buy Me a Coffee is tip/support only.
 
-Current catalog packages: Restore Privacy Suite **1.1.3**
+Current catalog packages: Restore Privacy residual VPN **1.1.5**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
 iOS Team-signed sideload).
 """
@@ -33,10 +33,10 @@ except ImportError:  # package import path (status_page as package)
         site_copyright_text,
     )
 
-RELEASE_VERSION = "1.1.3"
+RELEASE_VERSION = "1.1.5"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "1.1.3"
+RELEASE_TAG = "1.1.5"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )
@@ -1182,7 +1182,7 @@ def render_homepage_buy_form_html(
 
 # Suite storefront (homepage section above VPN #downloads)
 SUITE_SECTION_ID = "suite-storefront"
-SUITE_PRODUCT_TITLE = "Restore Privacy Suite"
+SUITE_PRODUCT_TITLE = "Restore Privacy residual VPN"
 SUITE_PRODUCT_SUBTITLE = (
     "VPN, Perccent wallet (%), and Evolve in one app — free 3-day trial, then KEYGEN"
 )
@@ -1211,7 +1211,7 @@ FREEBIE_IMG_PATH = "/static/freebie.jpg"
 # Catalog monopin for links (face art no longer bakes a version string)
 FREE_DOWNLOAD_FACE_VERSION = RELEASE_VERSION
 FREEBIE_IMG_ALT = (
-    "Download Restore Privacy Suite — free 3-day residual trial, then KEYGEN"
+    "Download Restore Privacy residual VPN — free 3-day residual trial, then KEYGEN"
 )
 FREE_DOWNLOAD_CTA_ID = "free-download-v1-cta"
 FREE_PACKAGES_PAGE_ID = "free-packages-page"
@@ -1600,7 +1600,7 @@ def render_free_download_cta_html(
     if def_plat:
         title = platform_face_title(def_plat)
         aria = (
-            f"FREE DOWNLOAD — latest Restore Privacy Suite for {title} "
+            f"FREE DOWNLOAD — latest Restore Privacy residual VPN for {title} "
             f"(v{ver}, no payment)"
         )
         detect_attrs = (
@@ -1611,7 +1611,7 @@ def render_free_download_cta_html(
         pay_attr = ' data-pay="0" data-free-direct="1"'
     else:
         aria = (
-            "FREE DOWNLOAD — open Downloads Map for Restore Privacy Suite "
+            "FREE DOWNLOAD — open Downloads Map for Restore Privacy residual VPN "
             f"v{ver} (device not detected)"
         )
         detect_attrs = ' data-fallback-map="1"'
@@ -1788,7 +1788,7 @@ def list_downloads_map_rows(
         fname = str(p.get("filename") or "")
         rows.append(
             {
-                "product": "Restore Privacy Suite",
+                "product": "Restore Privacy residual VPN",
                 "kind": "suite_client",
                 "platform": plat,
                 "filename": fname,
@@ -1924,11 +1924,11 @@ def render_downloads_map_page_html(
     <main class="downloads-map-page free-packages-page panel-card"
           id="{DOWNLOADS_MAP_PAGE_ID}" data-downloads-map-page="1"
           data-free-packages-page="1" data-version="{_esc_html(ver)}"
-          aria-label="Downloads Map — Restore Privacy Suite latest only"{detect_main_attr}>
+          aria-label="Downloads Map — Restore Privacy residual VPN latest only"{detect_main_attr}>
       <div class="downloads-map-center free-packages-center" id="downloads-map-center">
         <h1 id="downloads-map-heading">Downloads Map</h1>
         <p class="downloads-map-blurb free-packages-blurb" id="downloads-map-blurb">
-          <strong>Restore Privacy Suite v{_esc_html(ver)}</strong> only — one link
+          <strong>Restore Privacy residual VPN v{_esc_html(ver)}</strong> only — one link
           per device platform (no companion products). Each platform link starts an
           immediate free Suite download for that device (same free path as the home
           <strong>FREE DOWNLOAD</strong> button). KEYGEN residual licences remain on
@@ -2524,7 +2524,7 @@ def render_suite_storefront_html(
     default_platform: str = "",
     default_interval: str = "month",
 ) -> str:
-    """Homepage **Restore Privacy Suite** block (above VPN downloads).
+    """Homepage **Restore Privacy residual VPN** block (above VPN downloads).
 
     Suite downloads freely. Residual Connect: free **3-day (72h)** device trial
     (no card), then paid KEYGEN / active subscription to continue.
@@ -2563,7 +2563,7 @@ def render_suite_storefront_html(
 
     return f"""
   <section class="suite-storefront panel-card" id="{SUITE_SECTION_ID}"
-           aria-label="Download Restore Privacy Suite"
+           aria-label="Download Restore Privacy residual VPN"
            data-product="suite" data-storefront="suite"
            data-suite-version="{_esc_html(RELEASE_VERSION)}"{detect_attr}>
     <h2 id="suite-storefront-title">{SUITE_PRODUCT_TITLE}</h2>
@@ -2652,7 +2652,7 @@ def render_download_section_html(
     # Upper explainer boxes (only-price banner + price-box panel) removed.
     return f"""
   <section class="downloads panel-card" id="downloads"
-    aria-label="Download Restore Privacy Suite client"
+    aria-label="Download Restore Privacy residual VPN client"
     data-product="suite" data-catalog-version="{RELEASE_VERSION}"
     data-price-currency="{local.currency}" data-accept-currency="{local.currency}">
     <h2>Download Suite client v{RELEASE_VERSION}</h2>

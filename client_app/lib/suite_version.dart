@@ -1,17 +1,17 @@
-/// Restore Privacy Suite product identity and monopin.
+/// Restore Privacy residual VPN product identity and monopin.
 ///
-/// Suite v1.1.3 unifies residual VPN, Perccent wallet (%), and Evolve under one
-/// shell. Paid catalog / client [productVersion] pins must match this monopin.
+/// Catalog monopin **1.1.5** — dedicated residual VPN client (no multi-product
+/// Suite chrome). Paid catalog / client [productVersion] pins must match.
 library;
 
 /// Catalog / pubspec monopin for the suite product.
-const String kSuiteVersion = '1.1.3';
+const String kSuiteVersion = '1.1.5';
 
 /// User-visible product family name.
-const String kSuiteProductName = 'Restore Privacy Suite';
+const String kSuiteProductName = 'Restore Privacy residual VPN';
 
-/// Canonical chrome / about / startup string: "Restore Privacy Suite v 1.1.3".
-const String kSuiteDisplayVersion = 'Restore Privacy Suite v 1.1.3';
+/// Canonical chrome / about / startup string: "Restore Privacy residual VPN v 1.1.5".
+const String kSuiteDisplayVersion = 'Restore Privacy residual VPN v 1.1.5';
 
 /// Top-level suite tab labels (exact product copy).
 const String kSuiteTabVpn = 'VPN';

@@ -1,4 +1,5 @@
-// macOS menu bar (system tray) status item for Restore Privacy.
+// macOS menu bar (system tray) status item for residual VPN.
+// Durable tray text is always "rpT0" (forward monopin identity).
 // Hide main window after product full-tunnel Connect; restore via tray menu.
 // Closing the last window does not quit while tray mode is active; Packet Tunnel
 // is never stopped by hide/window-close (Disconnect remains explicit).
@@ -7,6 +8,8 @@ import Cocoa
 import FlutterMacOS
 
 enum RptTrayController {
+  /// Durable system-tray / status-item title (all forward monopin ships).
+  static let trayDisplayName = "Privacy, Restored"
   static let channelName = "restore_privacy/window"
   private static var statusItem: NSStatusItem?
   private static var messenger: FlutterBinaryMessenger?
@@ -64,8 +67,8 @@ enum RptTrayController {
         button.image = img
         button.imagePosition = .imageLeading
       }
-      button.title = " RP"
-      button.toolTip = "Restore Privacy — click to show window"
+      button.title = trayDisplayName
+      button.toolTip = "\(trayDisplayName) — click to show window"
       // Left-click restores window; right-click / Ctrl-click shows menu.
       // (Assigning item.menu would steal left-click and only open the menu.)
       button.target = StatusMenuTarget.shared
@@ -74,7 +77,7 @@ enum RptTrayController {
     }
     let menu = NSMenu()
     menu.addItem(NSMenuItem(
-      title: "Show Restore Privacy",
+      title: "Show \(trayDisplayName)",
       action: #selector(StatusMenuTarget.showWindow(_:)),
       keyEquivalent: ""
     ))
@@ -102,9 +105,9 @@ enum RptTrayController {
     connected = value
     if let button = statusItem?.button {
       button.toolTip = value
-        ? "Restore Privacy — Connected (residual VPN active)"
-        : "Restore Privacy — Disconnected"
-      button.title = value ? " RP●" : " RP"
+        ? "\(trayDisplayName) — connected (VPN active)"
+        : "\(trayDisplayName) — disconnected"
+      button.title = value ? "\(trayDisplayName)●" : trayDisplayName
     }
   }
 

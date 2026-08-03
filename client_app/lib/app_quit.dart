@@ -10,11 +10,11 @@ import 'dart:io' show Platform, exit;
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 
-/// Button label on the main connection screen (macOS + iOS residual shell).
+/// Button label on the main connection screen.
 const String kQuitButtonLabel = 'Quit';
 
-/// Layout marker: control sits bottom-right of the main connection screen.
-const String kQuitButtonPlacement = 'bottomRight';
+/// Layout marker: control sits **lower left** of the main connection screen.
+const String kQuitButtonPlacement = 'bottomLeft';
 
 /// Tooltip / accessibility hint (low visual weight).
 const String kQuitButtonTooltip =
@@ -22,17 +22,22 @@ const String kQuitButtonTooltip =
 
 /// True when this platform shows the main-screen discrete Quit control.
 ///
-/// Shown on macOS, iOS, and Android residual shells (disconnect then process exit).
+/// Shown on **all** residual client platforms (macOS, iOS, Android, Windows,
+/// Linux Flutter shells). Web is excluded.
 bool showsMainScreenQuitButton({
   bool? isMacOS,
   bool? isIOS,
   bool? isAndroid,
+  bool? isWindows,
+  bool? isLinux,
 }) {
   if (kIsWeb) return false;
   final mac = isMacOS ?? (!kIsWeb && Platform.isMacOS);
   final ios = isIOS ?? (!kIsWeb && Platform.isIOS);
   final android = isAndroid ?? (!kIsWeb && Platform.isAndroid);
-  return mac || ios || android;
+  final win = isWindows ?? (!kIsWeb && Platform.isWindows);
+  final linux = isLinux ?? (!kIsWeb && Platform.isLinux);
+  return mac || ios || android || win || linux;
 }
 
 /// Same as [showsMainScreenQuitButton] using Flutter's target platform
@@ -40,7 +45,9 @@ bool showsMainScreenQuitButton({
 bool showsMainScreenQuitForTarget(TargetPlatform platform) {
   return platform == TargetPlatform.macOS ||
       platform == TargetPlatform.iOS ||
-      platform == TargetPlatform.android;
+      platform == TargetPlatform.android ||
+      platform == TargetPlatform.windows ||
+      platform == TargetPlatform.linux;
 }
 
 /// Running-platform helper for UI wiring (no inject).
