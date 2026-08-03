@@ -1174,18 +1174,16 @@ def render_homepage_buy_form_html(
 # Suite storefront (homepage section above VPN #downloads)
 SUITE_SECTION_ID = "suite-storefront"
 SUITE_PRODUCT_TITLE = "Restore Privacy"
-# Action line only — product definition lives on the homepage intro.
-SUITE_PRODUCT_SUBTITLE = (
-    "Free download. Three-day trial. KEYGEN when you want to stay connected."
-)
+# Storefront split: blurb = download action only; pay-hint = KEYGEN price only.
+# Trial/KEYGEN journey lives on homepage intro — not restated as a second lecture here.
+SUITE_PRODUCT_SUBTITLE = "Free download for every device."
 SUITE_VERSION_LABEL = f"v {RELEASE_VERSION}"
 # Retired left-box KEYGEN licence/trial line (no longer shown on storefront).
 SUITE_KEYGEN_HINT = ""
-# Pay-hint: price once; no second product definition or residual jargon stack.
+# Price/KEYGEN line only (no free/trial restatement next to the blurb).
 SUITE_PAY_HINT_HTML = (
-    "Install free. After the three-day trial, a "
-    f"<strong>KEYGEN</strong> keeps Connect working — "
-    f"{PRICE_LABEL}/month or yearly from the button above."
+    f"<strong>KEYGEN</strong> from {PRICE_LABEL}/month or yearly — "
+    "button above."
 )
 SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
 # Anonymous free-CTA delivery (no KEYGEN / no /pay) - detected platform only

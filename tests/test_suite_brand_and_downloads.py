@@ -42,9 +42,10 @@ class TestSuiteBrandSurfaces(unittest.TestCase):
 
         suite = render_suite_storefront_html()
         self.assertIn("Restore Privacy", suite)
-        # Storefront is action copy (free download / KEYGEN) — product definition is intro.
+        # Storefront: free download blurb + KEYGEN price line (not product re-definition).
         self.assertIn("Free download", suite)
         self.assertIn("KEYGEN", suite)
+        self.assertNotIn("Three-day trial. KEYGEN when you want", suite)
         self.assertNotIn("Restore Privacy Suite", suite)
         self.assertNotIn("Perccent", suite)
         self.assertNotIn("Evolve", suite)

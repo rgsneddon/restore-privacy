@@ -48,23 +48,39 @@ class TestPublicCopyHumanCadence(unittest.TestCase):
             SUITE_PAY_HINT_HTML,
             render_suite_storefront_html,
         )
+        import re
 
         sub = SUITE_PRODUCT_SUBTITLE
         hint = SUITE_PAY_HINT_HTML
         suite = render_suite_storefront_html()
-        # Action language, not a second "what is a VPN" lecture
+        # Blurb = download action only; pay-hint = KEYGEN price only (not two journeys).
         self.assertIn("Free download", sub)
-        self.assertIn("KEYGEN", sub)
+        self.assertNotIn("KEYGEN", sub)
+        self.assertNotIn("trial", sub.lower())
         self.assertNotIn("virtual private network", sub.lower())
         self.assertNotIn("dedicated virtual", sub.lower())
         self.assertNotIn("residual traffic", sub.lower())
-        # Pay hint: KEYGEN once in the HTML block (strong tag still one concept)
         self.assertEqual(_count_ci(hint, "KEYGEN"), 1)
+        self.assertNotIn("trial", hint.lower())
+        self.assertNotIn("free", hint.lower())
         self.assertNotIn("72-hour", hint.lower())
-        self.assertNotIn("residual Connect", hint)
+        self.assertNotIn("residual", hint.lower())
         self.assertIn("suite-blurb", suite)
         self.assertIn(sub, suite)
-        # Intro-style product definition must not reappear in storefront section alone
+        # Adjacent blurb + pay-hint together: trial journey at most once (prefer zero —
+        # homepage intro owns free/trial/KEYGEN path).
+        blurb_m = re.search(
+            r'id="suite-blurb"[^>]*>([^<]+)', suite, flags=re.I
+        )
+        hint_m = re.search(
+            r'id="suite-pay-hint"[^>]*>(.*?)</p>', suite, flags=re.S | re.I
+        )
+        self.assertIsNotNone(blurb_m)
+        self.assertIsNotNone(hint_m)
+        pair = (blurb_m.group(1) + " " + hint_m.group(1)).lower()  # type: ignore[union-attr]
+        self.assertNotIn("three-day", pair)
+        self.assertNotIn("3-day", pair)
+        self.assertNotIn("72-hour", pair)
         self.assertNotIn("virtual private network for residual", suite.lower())
 
     def test_how_to_buy_and_map_are_concise(self) -> None:
@@ -119,6 +135,44 @@ class TestPublicCopyHumanCadence(unittest.TestCase):
         self.assertIn("KEYGEN", html.upper())
         self.assertIn("VPN", html.upper())
 
+    def test_settings_page_html_forbids_residual_trial_stacks(self) -> None:
+        """Drive shipped full-page renderer — install box + unlock must not re-stack."""
+        from settings_explainer import (
+            render_install_howto_box_html,
+            render_settings_explainer_page_html,
+            suite_howto_parts_catalog,
+        )
+
+        install = render_install_howto_box_html()
+        page = render_settings_explainer_page_html().decode("utf-8")
+        for blob, label in ((install, "install_box"), (page, "full_page")):
+            low = blob.lower()
+            for banned in (
+                "72-hour",
+                "72 hours",
+                "free residual trial",
+                "residual connect",
+                "residual public ip",
+                "residual hello",
+                "monopin",
+            ):
+                self.assertNotIn(
+                    banned,
+                    low,
+                    msg=f"{label} still has mechanical stack: {banned!r}",
+                )
+        # Unlock part is paste-focused, not a second free-install lecture
+        unlock = next(p for p in suite_howto_parts_catalog() if p["id"] == "suite-unlock")
+        self.assertIn("KEYGEN", unlock["title"].upper())
+        unlock_blob = f"{unlock['title']} {unlock['what']} {unlock['how']} {unlock['default']}"
+        self.assertNotIn("Install free", unlock_blob)
+        self.assertNotIn("3-day trial", unlock_blob.lower())
+        self.assertNotIn("three free days", unlock_blob.lower())
+        # Intro owns the free/trial journey once; install still mentions KEYGEN once
+        self.assertIn("KEYGEN", install.upper())
+        self.assertIn("Press Connect", install)
+        self.assertIn("install-run-howto-box", page)
+        self.assertIn("suite-guide-intro", page)
 
 if __name__ == "__main__":
     unittest.main()

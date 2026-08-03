@@ -60,17 +60,17 @@ def suite_howto_parts_catalog() -> list[dict[str, str]]:
     return [
         {
             "id": "suite-unlock",
-            "title": "Free install, 3-day trial, then KEYGEN",
+            # Intro already covers free download + trial path — this part is unlock only.
+            "title": "KEYGEN unlock",
             "what": (
-                "Install free. After three free days of Connect, enter the KEYGEN "
-                "from your email to keep going."
+                "Paste the code from your fulfilment email when you want Connect "
+                "to keep working past the free trial."
             ),
             "how": (
-                "Download from the homepage free button. Accept the licence, use the "
-                "trial, then paste the KEYGEN (RPT-KEY-…) on the unlock screen or under "
-                "Settings. Monthly from £3; yearly on /pay."
+                "Use the unlock screen or Settings → Payment. Paste the KEYGEN "
+                "(RPT-KEY-…). Monthly from £3; yearly on /pay."
             ),
-            "default": "Free install · 3-day trial · KEYGEN",
+            "default": "Paste KEYGEN when the trial ends",
         },
         {
             "id": "suite-vpn",
@@ -89,7 +89,7 @@ def suite_howto_parts_catalog() -> list[dict[str, str]]:
             "id": "suite-settings-gear",
             "title": "Settings (gear)",
             "what": (
-                "Startup options, privacy extras, KEYGEN, local log, leak test, and legal."
+                "Startup options, privacy extras, local log, leak test, and legal links."
             ),
             "how": (
                 "Defaults stay lean (startup and autoconnect off; shaping, obfuscation, "
@@ -234,14 +234,11 @@ def settings_parts_catalog() -> list[dict[str, str]]:
         {
             "id": "keygen",
             "title": "Payment entitlement / KEYGEN unlock",
-            "default": "Required for Connect",
+            "default": "Required after the free trial",
             "body": (
-                "Installers are free. Residual Connect needs a KEYGEN after you take "
-                "a monthly licence (from £3) on restoreprivacy.online - email delivers "
-                "RPT-KEY-…. Enter it on the unlock screen or Settings → Payment "
-                "entitlement. Download alone does not unlock residual HELLO. Connect "
-                "only works while the subscription is active; refunds or failed charges "
-                "stop Connect until you renew."
+                "Paste RPT-KEY-… from your email on the unlock screen or under "
+                "Settings → Payment. Connect needs an active KEYGEN after the free "
+                "trial; refunds or failed charges stop Connect until you renew."
             ),
         },
         {
@@ -446,49 +443,37 @@ def render_explainers_box_html(parts: list[dict[str, str]] | None = None) -> str
 
 
 def render_install_howto_box_html() -> str:
-    """How to install and run: free download + KEYGEN + Connect."""
+    """How to install and run — OS steps + Connect; trial/KEYGEN path is intro only."""
     return f"""    <section class="panel-card" id="{INSTALL_HOWTO_BOX_ID}" aria-labelledby="install-howto-heading">
       <h2 class="panel-title" id="install-howto-heading">How to install and run</h2>
       <ol class="howto-steps" id="install-howto-steps">
-        <li><strong>Download free.</strong> Open
+        <li><strong>Download free</strong> from
           <a href="/" style="color:var(--rb-link);font-weight:700;">restoreprivacy.online</a>
-          and use FREE DOWNLOAD for your device (or
-          <code>/suite/download</code>). You do not pay for the package itself.</li>
+          (FREE DOWNLOAD, or <code>/suite/download</code>).</li>
         <li><strong>Install for your OS.</strong>
-          Windows: run the setup exe (Admin may be needed later for residual).
+          Windows: run the setup exe.
           Android: allow the APK source, then install.
           Linux: extract the tar.gz and run the entry script.
           macOS / iOS: follow the package notes (signed / sideload).</li>
-        <li><strong>Accept the end-user licence</strong> on first use. Acceptance is local only  - 
-          Connect stays blocked until you accept.</li>
-        <li><strong>Free residual trial - 3 days (72 hours).</strong>
-          After first-run setup, residual Connect can run without a card or KEYGEN
-          for 72 hours on this device. No payment details are required to start
-          the trial.</li>
-        <li><strong>Get a KEYGEN when the trial ends</strong> (or anytime you prefer).
-          Take a monthly licence from £3 on the site (or a yearly residual plan on
-          <code>/pay</code>). Email delivers KEYGEN (<code>RPT-KEY-…</code>) after checkout.</li>
-        <li><strong>Enter the KEYGEN</strong> on the unlock screen (or Settings → Payment entitlement)
-          after the free trial if you want to continue residual Connect.</li>
-        <li><strong>Press Connect</strong> on the main screen. Approve elevation / VPN permission when asked
-          so residual public IP uses the product path. Wait until status is honestly connected.</li>
-        <li><strong>Optional Settings.</strong> Traffic shaping / outer obfuscation OFF feels
-          snappier (weaker traffic-analysis resistance). Multi-hop ON uses the exit path
-          (higher latency). Updates are always <strong>manual</strong> - when a new
-          monopin is available, download free from the shop.</li>
-        <li><strong>Disconnect</strong> when finished. Residual routing stops on Disconnect.
-          Minimize keeps the tunnel until you Disconnect. <strong>Quit</strong> (lower-left)
-          disconnects residual, then fully exits the app.</li>
+        <li><strong>Accept the end-user licence</strong> on first use
+          (local only — Connect waits until you accept).</li>
+        <li><strong>Press Connect</strong> on the main screen. Approve any system VPN
+          prompt, then wait until status shows connected.</li>
+        <li><strong>When you need a KEYGEN</strong> (after the free trial or anytime),
+          buy on <code>/pay</code>, then paste the code on the unlock screen or under
+          Settings → Payment.</li>
+        <li><strong>Optional Settings</strong> for shaping, obfuscation, or multi-hop —
+          defaults stay lean. App updates are always a free manual download from the shop.</li>
+        <li><strong>Disconnect</strong> when finished. Minimize does not stop the tunnel.
+          <strong>Quit</strong> (lower-left) disconnects, then exits the app.</li>
       </ol>
       <p class="howto-note" id="install-howto-note">
         If Connect fails after KEYGEN: re-enter the key, confirm the subscription is
         still active, check firewall / UDP path, and open the
         <a href="/AUDIT.md" style="color:var(--rb-link);">security audit</a>.
-        Privacy policy and licence are linked from the homepage and Settings.
       </p>
     </section>
 """
-
 
 def render_settings_explainer_page_html(*, title: str | None = None) -> bytes:
     """Full VPN settings guide: intro, how-to parts, Settings controls, install steps."""
