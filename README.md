@@ -1,15 +1,14 @@
-# Restore Privacy residual VPN
+# Restore Privacy
 
-**Version 1.1.5** — dedicated residual VPN client.
+**Version v1.1.5** — a dedicated virtual private network for residual traffic.
 
-This app protects residual traffic on your device. It is **not** a multi-product
-Suite: Evolve analysis, Perccent wallet (%), rpAI, and Backup are not product
-chrome.
+Restore Privacy protects residual traffic on your device. Download free, try three
+days with no card, then continue with a KEYGEN.
 
 ## What you get
 
 - Residual Connect (full-tunnel path where the OS allows it)
-- Free **3-day (72-hour)** device trial, then a paid **KEYGEN** (£3/month or yearly)
+- Free **3-day (72-hour)** device trial, then a paid **KEYGEN** (£3.00/month or yearly)
 - First-use: accept the end-user licence → paste KEYGEN **or** continue trial → main VPN
 - Return visits: trial remaining or KEYGEN required
 - **No username/password** sign-up or sign-in on the product path
@@ -32,6 +31,8 @@ Public storefront: [restoreprivacy.online](https://restoreprivacy.online).
 
 ## Settings (lean)
 
+Defaults: run at startup off, autoconnect off, traffic shaping / outer obfuscation / multi-hop off by default until you opt in.
+
 - Residual leak posture honesty (no absolute zero-leak marketing)
 - Manual free-package updates when a new monopin is published
 - Appearance and residual privacy toggles as shipped in Settings
@@ -47,6 +48,19 @@ Public storefront: [restoreprivacy.online](https://restoreprivacy.online).
 
 Proprietary full copyright — residual VPN client use only. See `LICENSE` and the
 in-app end-user licence scroll pane.
+
+## Install
+
+Download free from the shop, open the package for your OS, accept the licence, try residual Connect for three days, then enter a KEYGEN.
+
+
+## Documents
+
+| Doc | |
+|-----|--|
+| Privacy | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
+| Licence | [LICENSE](LICENSE) |
+| Credits | [CREDITS.md](CREDITS.md) |
 
 ## Support
 

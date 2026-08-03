@@ -137,7 +137,7 @@ def _find_client_exe(root: Path) -> Path:
         p = root / name
         if p.is_file():
             return p
-    # Shallow only (onedir layout) — never full-tree rglob (slow on large payloads)
+    # Shallow only (onedir layout)  -  never full-tree rglob (slow on large payloads)
     try:
         for child in root.iterdir():
             if not child.is_dir():
@@ -241,7 +241,7 @@ def _copy_tree(src: Path, dst: Path) -> None:
                 stderr=subprocess.DEVNULL,
                 timeout=300,
             )
-            # robocopy: 0–7 = success with optional extras; ≥8 = failure
+            # robocopy: 0-7 = success with optional extras; ≥8 = failure
             if r.returncode < 8 and dst.is_dir() and any(dst.iterdir()):
                 return
         except Exception:
@@ -349,7 +349,7 @@ def strip_all_private_keys(root: Path) -> list[str]:
     removed: list[str] = []
     if not root.is_dir():
         return removed
-    # Known layouts only — full rglob on a frozen onedir is multi-second on HDDs
+    # Known layouts only  -  full rglob on a frozen onedir is multi-second on HDDs
     candidates = (
         root / "secrets",
         root / "_internal" / "secrets",
@@ -615,7 +615,7 @@ def install(
     _progress(3, "Installing admission secrets...")
     secrets_written = _provision_secrets(payload_dir, INSTALL_DIR)
 
-    # Auto-provision Connect entitlement (fast path only — no full Downloads walk).
+    # Auto-provision Connect entitlement (fast path only  -  no full Downloads walk).
     try:
         from client.payment_entitlement import (
             default_entitlement_path,
@@ -638,7 +638,7 @@ def install(
             *search, dest_path=default_entitlement_path()
         )
         if ent and ent.session_id:
-            pass  # silent — GUI progress already shows secrets/version steps
+            pass  # silent  -  GUI progress already shows secrets/version steps
     except Exception:
         pass
 
@@ -674,7 +674,7 @@ def install(
         except Exception:
             pass
 
-    # Brand logo ICO next to installed exe (known paths only — no full-tree rglob)
+    # Brand logo ICO next to installed exe (known paths only  -  no full-tree rglob)
     try:
         dest_ico = INSTALL_DIR / "app_icon.ico"
         if not dest_ico.is_file():
@@ -729,7 +729,7 @@ def install(
         try:
             if sys.stdout is not None and sys.stdout.isatty():
                 print(
-                    "WARNING: install bundle incomplete — need client .exe and "
+                    "WARNING: install bundle incomplete  -  need client .exe and "
                     f"Restore Internet under {INSTALL_DIR} "
                     f"(client={inv.client_entry!r} restore={inv.restore_internet_entry!r})"
                 )

@@ -1,4 +1,4 @@
-"""Public product brand is Suite; all catalog download links pin RELEASE_VERSION."""
+"""Public product brand is Restore Privacy (dedicated VPN); catalog pins RELEASE_VERSION."""
 
 from __future__ import annotations
 
@@ -15,34 +15,42 @@ from downloads import RELEASE_VERSION as SUITE_PIN  # noqa: E402
 
 
 class TestSuiteBrandSurfaces(unittest.TestCase):
-    def test_homepage_and_public_docs_product_name_is_suite(self) -> None:
+    def test_homepage_and_public_docs_product_name_is_restore_privacy(self) -> None:
         from app import render_html
         from downloads import render_download_section_html, render_suite_storefront_html
         from public_chrome import PUBLIC_BRAND_TITLE, public_display_title
         from public_docs import load_public_document_bytes
 
-        self.assertEqual(PUBLIC_BRAND_TITLE, "RESTORE PRIVACY SUITE")
+        self.assertEqual(PUBLIC_BRAND_TITLE, "RESTORE PRIVACY")
         self.assertEqual(
-            public_display_title("RESTORE PRIVACY VPN"), "RESTORE PRIVACY SUITE"
+            public_display_title("RESTORE PRIVACY VPN"), "RESTORE PRIVACY"
+        )
+        self.assertEqual(
+            public_display_title("RESTORE PRIVACY"), "RESTORE PRIVACY"
         )
 
         home = render_html({"title": "RESTORE PRIVACY VPN"}).decode("utf-8")
         # Product title in tab
-        self.assertIn("<title>RESTORE PRIVACY SUITE</title>", home)
-        self.assertNotIn("<title>RESTORE PRIVACY VPN</title>", home)
-        # Body product identity
-        self.assertIn("Restore Privacy Suite", home)
-        self.assertNotIn("Restore Privacy VPN", home)
-        self.assertNotIn("RESTORE PRIVACY VPN", home)
+        self.assertIn("<title>RESTORE PRIVACY</title>", home)
+        self.assertNotIn("<title>RESTORE PRIVACY SUITE</title>", home)
+        # Body product identity — dedicated VPN, not multi-product Suite pitch
+        self.assertIn("Restore Privacy", home)
+        self.assertIn("virtual private network", home.lower())
+        self.assertNotIn("Restore Privacy Suite", home)
+        self.assertNotIn("Perccent wallet", home)
+        self.assertNotIn("Evolve analysis", home)
 
         suite = render_suite_storefront_html()
-        self.assertIn("Restore Privacy Suite", suite)
-        self.assertNotIn("Restore Privacy VPN", suite)
+        self.assertIn("Restore Privacy", suite)
+        self.assertIn("virtual private network", suite.lower())
+        self.assertNotIn("Restore Privacy Suite", suite)
+        self.assertNotIn("Perccent", suite)
+        self.assertNotIn("Evolve", suite)
 
         dl = render_download_section_html()
-        self.assertIn("Download Suite client", dl)
+        self.assertIn("Download client", dl)
         self.assertIn(f"v{SUITE_PIN}", dl)
-        self.assertNotIn("Restore Privacy VPN", dl)
+        self.assertNotIn("Download Suite client", dl)
 
         # Current-facing public pack docs
         for name in ("README.md", "PRIVACY_POLICY.md", "LICENSE"):
@@ -50,30 +58,32 @@ class TestSuiteBrandSurfaces(unittest.TestCase):
             self.assertIsNotNone(raw, name)
             assert raw is not None
             text = raw.decode("utf-8")
-            self.assertNotIn("Restore Privacy VPN", text, msg=name)
-            self.assertNotIn("RESTORE PRIVACY VPN", text, msg=name)
-            if name != "LICENSE":
-                self.assertIn("Restore Privacy Suite", text, msg=name)
-            else:
-                self.assertIn("Restore Privacy Suite", text)
+            self.assertIn("Restore Privacy", text, msg=name)
+            self.assertNotIn("Restore Privacy Suite", text, msg=name)
+            if name == "PRIVACY_POLICY.md":
+                self.assertIn("virtual private network", text.lower())
+                self.assertNotIn("Perccent", text)
+                self.assertNotIn("Evolve analyser", text)
+            if name == "README.md":
+                self.assertIn("virtual private network", text.lower())
 
-    def test_connect_and_tester_copy_use_suite(self) -> None:
+    def test_connect_and_tester_copy_use_restore_privacy(self) -> None:
         from connect_web import ACTION_LINE, render_connect_via_web_html
         from tester_page import ALREADY_USED_MESSAGE
 
-        self.assertIn("Restore Privacy Suite", ACTION_LINE)
-        self.assertNotIn("Restore Privacy VPN", ACTION_LINE)
+        self.assertIn("Restore Privacy", ACTION_LINE)
+        self.assertNotIn("Restore Privacy Suite", ACTION_LINE)
         self.assertIn(SUITE_PIN, ACTION_LINE)
 
         frag = render_connect_via_web_html()
-        self.assertIn("Restore Privacy Suite", frag)
-        self.assertNotIn("Restore Privacy VPN", frag)
+        self.assertIn("Restore Privacy", frag)
+        self.assertNotIn("Restore Privacy Suite", frag)
         self.assertIn(f'data-catalog-version="{SUITE_PIN}"', frag)
 
-        self.assertIn("Restore Privacy Suite", ALREADY_USED_MESSAGE)
-        self.assertNotIn("Restore Privacy VPN", ALREADY_USED_MESSAGE)
+        self.assertIn("Restore Privacy", ALREADY_USED_MESSAGE)
+        self.assertNotIn("Restore Privacy Suite", ALREADY_USED_MESSAGE)
 
-    def test_browser_extension_product_chrome_is_suite(self) -> None:
+    def test_browser_extension_product_chrome_is_restore_privacy(self) -> None:
         ext = ROOT / "browser_extension"
         manifest = (ext / "manifest.json").read_text(encoding="utf-8")
         popup = (ext / "popup.html").read_text(encoding="utf-8")
@@ -83,12 +93,12 @@ class TestSuiteBrandSurfaces(unittest.TestCase):
             (popup, "popup"),
             (core, "vpn_core"),
         ):
-            self.assertNotIn("Restore Privacy VPN", blob, msg=label)
-            self.assertNotIn("RESTORE PRIVACY VPN", blob, msg=label)
-        self.assertIn("Restore Privacy Suite", manifest)
-        self.assertIn("RESTORE PRIVACY SUITE", popup)
-        self.assertIn("RESTORE PRIVACY SUITE", core)
-        self.assertIn('"name": "Restore Privacy Suite"', manifest)
+            self.assertNotIn("Restore Privacy Suite", blob, msg=label)
+            self.assertNotIn("RESTORE PRIVACY SUITE", blob, msg=label)
+        self.assertIn("Restore Privacy", manifest)
+        self.assertIn("RESTORE PRIVACY", popup)
+        self.assertIn("RESTORE PRIVACY", core)
+        self.assertIn('"name": "Restore Privacy"', manifest)
 
 
 class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
@@ -128,7 +138,7 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         self.assertIn("suite-keygen-buy", suite)
         self.assertNotIn('id="suite-free-grid"', suite)
         self.assertNotIn("Device for KEYGEN", suite)
-        # Downloads map / free-packages: Suite latest free_direct rows
+        # Downloads map / free-packages: latest free_direct rows
         from downloads import suite_free_direct_download_href
 
         free = render_free_packages_page_html(version=SUITE_PIN).decode("utf-8")
@@ -146,12 +156,12 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         from app import render_html
         from downloads import RELEASE_VERSION
 
-        # With detected platform: free CTA free_direct + Suite KEYGEN cart
+        # With detected platform: free CTA free_direct + KEYGEN cart
         html = render_html(
             {"title": "RESTORE PRIVACY"}, default_platform="macos"
         ).decode("utf-8")
         self.assertEqual(RELEASE_VERSION, SUITE_PIN)
-        self.assertIn(f"Download Suite client v{SUITE_PIN}", html)
+        self.assertIn(f"Download client v{SUITE_PIN}", html)
         self.assertIn(f'data-catalog-version="{SUITE_PIN}"', html)
         # Free CTA direct path + KEYGEN cart entry to /pay
         self.assertIn('action="/pay"', html)
@@ -282,6 +292,7 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         self.assertIn("Downloads Map", mmap)
         self.assertIn("downloads-map-back", mmap)
         self.assertIn("Back to home", mmap)
+
     def test_suite_keygen_cart_button_and_hint_centered(self) -> None:
         """Get KEYGEN + under-button cart text are centred (not left-flush)."""
         from downloads import render_suite_storefront_html, suite_storefront_css

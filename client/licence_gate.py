@@ -268,8 +268,8 @@ def short_licence_summary() -> str:
     from client.payment_entitlement import PAYMENT_CONNECT_DISCLAIMER_PLAIN
 
     return (
-        "Restore Privacy Suite is proprietary full copyright: client packages may be "
-        "used only to run a device with residual Connect, with no warranty (AS IS). "
+        "Restore Privacy is proprietary full copyright: client packages may be "
+        "used only to run a device with residual VPN Connect, with no warranty (AS IS). "
         "Copy or transmission of the product architecture is not permitted. "
         "Third-party components keep their own licences (see LICENSE / CREDITS). "
         "By accepting, you agree to those terms. Acceptance is stored only on this device. "

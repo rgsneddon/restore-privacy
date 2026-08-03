@@ -54,7 +54,7 @@ class TestSuiteStorefrontOrder(unittest.TestCase):
         )
         # VPN shop section id/role preserved
         self.assertIn('id="downloads"', html)
-        self.assertIn("Download Suite client", html)
+        self.assertIn("Download client", html)
 
     def test_suite_storefront_helper_emits_keygen_cart_without_device_box(self):
         from downloads import (
@@ -74,7 +74,8 @@ class TestSuiteStorefrontOrder(unittest.TestCase):
         self.assertNotIn("Get Suite", block)
         self.assertNotIn("/suite/download?platform=", block)
         self.assertIn("KEYGEN", block)
-        self.assertIn("Evolve", block)
+        self.assertNotIn("Evolve", block)
+        self.assertNotIn("Perccent", block)
         self.assertNotIn("coming soon", block.lower())
         # Monthly licence cart entry (GET /pay) — not direct checkout post
         self.assertIn('value="month"', block)

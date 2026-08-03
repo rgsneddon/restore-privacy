@@ -1,12 +1,12 @@
 # Residual node / operator path
 
-**Not** the Suite client installers. This page is for people who prefer to
+**Not** the VPN client installers. This page is for people who prefer to
 **host** a residual node (operator tooling / self-host) rather than only
-install Restore Privacy Suite for residual **Connect** on a phone or PC.
+install Restore Privacy for residual **Connect** on a phone or PC.
 
 | Role | What you get |
 |------|----------------|
-| **Suite client** | Free installers + KEYGEN on the VPN APP Shop — residual Connect on *your* device |
+| **VPN client** | Free installers + KEYGEN on the VPN APP Shop — residual Connect on *your* device |
 | **Node / operator** | Run the co-joined residual stack on a **host** you control |
 
 The monthly KEYGEN checkout unlocks **client** Connect. It does **not** replace
@@ -74,7 +74,7 @@ When packaged, the Linux operator GUI artifact is named like:
 `restore-privacy-node-operator-<version>-linux-x64.tar.gz`
 
 under `releases/node-operator/`. That artifact is **operator tooling**, not a
-Suite free-download client.
+free-download client.
 
 ---
 
@@ -82,10 +82,10 @@ Suite free-download client.
 
 | Doc | Path |
 |-----|------|
-| Suite client README | [/README.md](/README.md) |
+| VPN client README | [/README.md](/README.md) |
 | Privacy policy | [/PRIVACY_POLICY.md](/PRIVACY_POLICY.md) |
 | Security audit | [/AUDIT.md](/AUDIT.md) |
-| Public Suite Pages (client) | https://rgsneddon.github.io/restore-privacy-suite/ |
+| Public client docs | https://rgsneddon.github.io/restore-privacy-suite/ |
 | Admin rpS (operator auth) | `/admin/rps` |
 
 ---

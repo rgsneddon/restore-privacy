@@ -42,7 +42,7 @@ class TestSuitePayHrefBuilders(unittest.TestCase):
         for r in rows:
             self.assertEqual(r["kind"], "suite_client")
             self.assertEqual(r["version"], RELEASE_VERSION)
-            self.assertEqual(r["product"], "Restore Privacy Suite")
+            self.assertEqual(r["product"], "Restore Privacy")
             # Map package rows free_direct (like FREE DOWNLOAD), not /pay
             self.assertIn("/suite/download?", r["href"])
             self.assertIn("free_direct=1", r["href"])
@@ -97,7 +97,7 @@ class TestHomeAndMapRender(unittest.TestCase):
             self.assertIn("KEYGEN", suite)
 
             map_html = render_downloads_map_page_html().decode("utf-8")
-            self.assertIn("Restore Privacy Suite", map_html)
+            self.assertIn("Restore Privacy", map_html)
             self.assertIn(f"v{RELEASE_VERSION}", map_html)
             # Map package rows free_direct; KEYGEN /pay may still be mentioned in blurb only
             for plat in ("windows", "android", "macos", "ios", "linux"):

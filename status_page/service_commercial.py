@@ -1,9 +1,9 @@
-"""Public Service page — commercial own-company branded Suite licence (£3000/node).
+"""Public Service page - commercial own-company branded Suite licence (£3000/node).
 
 Main-nav destination ``/service``. Layout mirrors homepage: intro
 “Privacy you can actually use”, then dual half-width boxes. Left box is the
 commercial offer + one-time Stripe £3000 checkout. Right box is a light
-companion (individual free Suite / KEYGEN path) — not the £3000 offer.
+companion (individual free Suite / KEYGEN path) - not the £3000 offer.
 """
 
 from __future__ import annotations
@@ -30,28 +30,28 @@ SERVICE_INTRO_ID = "service-home-intro"
 
 SERVICE_INTRO_HEADING = "Privacy you can actually use"
 
-SERVICE_COMMERCIAL_TITLE = "Full business package — commercial node (£3000 deposit required)"
+SERVICE_COMMERCIAL_TITLE = "Full business package - commercial node (£3000 deposit required)"
 SERVICE_COMMERCIAL_SUBTITLE = (
     f"{COMMERCIAL_SUITE_NODE_PRICE_LABEL} deposit to begin the work · one-time"
 )
 
-# Commercial offer body — deposit framing first; business package substance.
+# Commercial offer body - deposit framing first; business package substance.
 SERVICE_COMMERCIAL_BODY = (
     f"Prices start with a <strong>{COMMERCIAL_SUITE_NODE_PRICE_LABEL} deposit</strong> "
-    "to do the work — that payment is a <strong>deposit</strong>, not the finished "
+    "to do the work - that payment is a <strong>deposit</strong>, not the finished "
     "all-in price. <em>Costs may be higher</em> once on-site network tasks, hardware, "
     "and scope are agreed; anything beyond the deposit is confirmed before further "
     "work. Run a residual node on your own server or arrange a dedicated host through "
     "<strong>Raskul</strong>. Includes mainframe establishment and deploy of "
     "<strong>Restore Privacy Operating System</strong> (rpOS) and matching Suite "
     "parts, customised accounting and branding SDK, internal VPN for office / WFH "
-    "staff, audit scripts, and optional Evolve + rewards token. "
+    "staff, and audit scripts. "
     "User-friendly interface and everyday business apps. "
     f"<strong>{COMMERCIAL_SUITE_NODE_PRICE_LABEL}</strong> deposit · one-time via Stripe."
 )
 
 SERVICE_COMMERCIAL_PAY_LABEL = (
-    f"Pay {COMMERCIAL_SUITE_NODE_PRICE_LABEL} deposit — begin the work (one-time)"
+    f"Pay {COMMERCIAL_SUITE_NODE_PRICE_LABEL} deposit - begin the work (one-time)"
 )
 SERVICE_COMMERCIAL_DEPOSIT_NOTE = (
     f"The {COMMERCIAL_SUITE_NODE_PRICE_LABEL} is a deposit to begin commercial node "
@@ -60,8 +60,8 @@ SERVICE_COMMERCIAL_DEPOSIT_NOTE = (
 
 SERVICE_COMPANION_TITLE = "Individuals & residual Connect"
 SERVICE_COMPANION_BODY = (
-    f"Need the free Suite installer and a monthly KEYGEN ({PRICE_LABEL}/month) "
-    "for personal residual Connect? That path stays on the homepage — not this "
+    f"Need the free installer and a monthly KEYGEN ({PRICE_LABEL}/month) "
+    "for personal residual Connect? That path stays on the homepage - not this "
     "commercial node licence."
 )
 
@@ -186,8 +186,8 @@ def render_service_intro_html() -> str:
            data-service-intro="1">
     <h2 id="service-home-intro-title">{SERVICE_INTRO_HEADING}</h2>
     <p class="service-home-lead" id="service-home-lead">
-      Commercial own-company branding and full community governance Suite for
-      businesses that run their own dedicated residual node — not the monthly
+      Commercial own-company branding and full residual node package for
+      businesses that run their own dedicated residual node - not the monthly
       personal KEYGEN path.
     </p>
   </section>
@@ -214,7 +214,7 @@ def render_service_commercial_box_html(*, pay_error: str = "") -> str:
            data-product-line="{_esc(COMMERCIAL_SUITE_PRODUCT_LINE)}"
            data-price-pence="{COMMERCIAL_SUITE_NODE_PRICE_PENCE}"
            data-billing="one_time" data-currency="gbp"
-           aria-label="Commercial Suite licence">
+           aria-label="Commercial residual node licence">
     <h2 id="service-commercial-title">{SERVICE_COMMERCIAL_TITLE}</h2>
     <p class="service-commercial-sub" id="service-commercial-sub">
       {SERVICE_COMMERCIAL_SUBTITLE}
@@ -252,7 +252,7 @@ def render_service_commercial_box_html(*, pay_error: str = "") -> str:
       <p class="service-stripe-note" id="service-stripe-note">
         {STRIPE_CHECKOUT_BRANDING_NOTE}
         One-time <strong>deposit</strong> of {COMMERCIAL_SUITE_NODE_PRICE_LABEL} GBP
-        via Stripe Checkout — begins the work; not a monthly KEYGEN subscription
+        via Stripe Checkout - begins the work; not a monthly KEYGEN subscription
         and not a final all-in quote.
       </p>
     </form>
@@ -265,7 +265,7 @@ SERVICE_RX_LINK_ID = "service-link-rx-browser"
 
 
 def render_service_rx_browser_box_html(*, user_agent: str = "") -> str:
-    """Rx Privacy Browser package link — device/UA-aware when UA is known."""
+    """Rx Privacy Browser package link - device/UA-aware when UA is known."""
     try:
         from downloads import (
             RELEASE_VERSION,
@@ -296,8 +296,8 @@ def render_service_rx_browser_box_html(*, user_agent: str = "") -> str:
            aria-label="Rx Privacy Browser">
     <h2 id="service-rx-title">Rx Privacy Browser</h2>
     <p class="service-companion-body" id="service-rx-body">
-      Suite <strong>{_esc(RELEASE_VERSION)}</strong> includes the <strong>Rx</strong>
-      Chromium MV3 companion — browser-scoped Connect/Disconnect (IPv4 basic path).
+      Catalog <strong>{_esc(RELEASE_VERSION)}</strong> includes the <strong>Rx</strong>
+      Chromium MV3 companion - browser-scoped Connect/Disconnect (IPv4 basic path).
       Not OS residual TUN. Load unpacked or install the zip in Chromium-class browsers.
     </p>
     <div class="service-companion-links" id="service-rx-links">
@@ -312,7 +312,7 @@ def render_service_rx_browser_box_html(*, user_agent: str = "") -> str:
 
 
 def render_service_companion_box_html(*, user_agent: str = "") -> str:
-    """Right half layout companion — free Suite / KEYGEN / Rx path pointer."""
+    """Right half layout companion - free Suite / KEYGEN / Rx path pointer."""
     try:
         from downloads import rx_browser_package_href
     except ImportError:  # pragma: no cover
@@ -320,13 +320,13 @@ def render_service_companion_box_html(*, user_agent: str = "") -> str:
     rx_href = rx_browser_package_href(user_agent=user_agent)
     return f"""
   <section class="panel-card service-companion-box" id="{SERVICE_COMPANION_BOX_ID}"
-           data-service-companion="1" aria-label="Individual Suite path">
+           data-service-companion="1" aria-label="Individual VPN path">
     <h2 id="service-companion-title">{SERVICE_COMPANION_TITLE}</h2>
     <p class="service-companion-body" id="service-companion-body">
       {SERVICE_COMPANION_BODY}
     </p>
     <div class="service-companion-links" id="service-companion-links">
-      <a href="/#suite-storefront" id="service-link-free-suite">Free Suite download</a>
+      <a href="/#suite-storefront" id="service-link-free-suite">Free download</a>
       <a href="/#suite-keygen-form" id="service-link-keygen">Monthly KEYGEN</a>
       <a href="{_esc(rx_href)}" id="service-link-rx-browser-inline"
          data-rx-browser-download="1">Rx Privacy Browser package</a>
@@ -345,7 +345,7 @@ def render_service_shop_row_html(
     return f"""
     <div class="service-shop-row home-shop-row" id="{SERVICE_SHOP_ROW_ID}"
          data-home-shop-row="1" data-service-shop-row="1"
-         data-layout="two-halves" aria-label="Commercial Suite and companion">
+         data-layout="two-halves" aria-label="Commercial residual node and companion">
 {left}
 {right}
     </div>
@@ -383,7 +383,7 @@ def render_service_page_html(
         ok_html = (
             '<p class="service-pay-ok" id="service-pay-ok" role="status">'
             "Payment started successfully. Complete Stripe Checkout if you have "
-            "not already — our team will follow up on commercial onboarding for "
+            "not already - our team will follow up on commercial onboarding for "
             f"your {COMMERCIAL_SUITE_NODE_PRICE_LABEL} node licence."
             "</p>"
         )
@@ -407,12 +407,12 @@ def render_service_page_html(
             1,
         )
 
-    body = f"""{public_head_open(title=f"Service — {PUBLIC_BRAND_TITLE}", extra_css=extra)}
+    body = f"""{public_head_open(title=f"Service - {PUBLIC_BRAND_TITLE}", extra_css=extra)}
   <div class="page-shell" id="page-shell" data-page="service" data-product="suite"
        data-chrome="pro" data-service-page="1">
 {header}
     <main class="service-page" id="{SERVICE_PAGE_ID}" data-service-page="1"
-          aria-label="Commercial Suite service">
+          aria-label="Commercial residual node service">
 {intro}
 {shop}
 {rx_box}

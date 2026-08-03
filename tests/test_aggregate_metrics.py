@@ -143,7 +143,7 @@ class TestPublicStatusStripsInjectedPayloads(unittest.TestCase):
                 "client_ip": "1.2.3.4",
             }
         )
-        self.assertEqual(out, {"title": "RESTORE PRIVACY SUITE"})
+        self.assertEqual(out, {"title": "RESTORE PRIVACY"})
         pub = status_app.public_status_payload(
             {
                 "title": "RESTORE PRIVACY",
@@ -152,7 +152,7 @@ class TestPublicStatusStripsInjectedPayloads(unittest.TestCase):
             }
         )
         self.assertEqual(set(pub.keys()), {"title"})
-        self.assertEqual(pub["title"], "RESTORE PRIVACY SUITE")
+        self.assertEqual(pub["title"], "RESTORE PRIVACY")
         for k in status_app.FORBIDDEN_STATUS_KEYS:
             self.assertNotIn(k, pub)
 
@@ -172,7 +172,7 @@ class TestPublicStatusStripsInjectedPayloads(unittest.TestCase):
         self.assertNotIn("clients_connected", html)
         self.assertNotIn("Currently connected", html)
         self.assertNotIn('id="clients-connected"', html)
-        self.assertIn("Download Suite client", html)
+        self.assertIn("Download client", html)
         self.assertIn("LICENCE", html)
 
 

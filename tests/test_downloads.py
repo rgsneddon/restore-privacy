@@ -173,7 +173,7 @@ class TestDownloadCatalog(unittest.TestCase):
 
     def test_render_download_section_uses_paid_paths(self):
         html = render_download_section_html()
-        self.assertIn(f"Download Suite client v{RELEASE_VERSION}", html)
+        self.assertIn(f"Download client v{RELEASE_VERSION}", html)
         self.assertIn('id="dl-buy-form"', html)
         self.assertNotIn('href="#"', html)
         self.assertIn("Buy now", html)
@@ -279,7 +279,7 @@ class TestDownloadCatalog(unittest.TestCase):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", page)
         self.assertNotIn("clients-connected", page)
-        self.assertIn(f"Download Suite client v{RELEASE_VERSION}", page)
+        self.assertIn(f"Download client v{RELEASE_VERSION}", page)
         # Live default: homepage buy form (device + plan + Buy now)
         self.assertIn("Buy now", page)
         self.assertIn("we accept *", page)

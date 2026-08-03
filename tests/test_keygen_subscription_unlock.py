@@ -34,7 +34,7 @@ class TestHomepageTrialSentence(unittest.TestCase):
         html = render_download_section_html(coming_soon=False)
         # Nested box inside #downloads
         self.assertIn('id="downloads"', html)
-        self.assertIn("Download Suite client v", html)
+        self.assertIn("Download client v", html)
         # Upper explainer boxes removed (only-price banner + navy price-box panel)
         self.assertNotIn('id="dl-only-price"', html)
         self.assertNotIn('id="dl-price-box"', html)
@@ -49,7 +49,7 @@ class TestHomepageTrialSentence(unittest.TestCase):
             msg="expected GBP catalog price or Local: line from resolve_local_price_display",
         )
         self.assertIn("we accept", low)
-        heading_i = html.find("Download Suite client v")
+        heading_i = html.find("Download client v")
         local_i = html.find('id="dl-local-price"')
         form_i = html.find("dl-buy-form") if "dl-buy-form" in html else html.find("dl-buttons")
         self.assertGreater(local_i, heading_i)

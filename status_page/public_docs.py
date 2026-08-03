@@ -91,14 +91,14 @@ PUBLIC_DOCS: tuple[PublicDoc, ...] = (
     PublicDoc(
         id="readme",
         path=README_PATH,
-        title="README — Restore Privacy",
+        title="README - Restore Privacy",
         filename="README.md",
         aliases=("/readme.md", "/docs/README.md"),
     ),
     PublicDoc(
         id="licence",
         path=LICENSE_PATH,
-        title="Licence — Restore Privacy",
+        title="Licence - Restore Privacy",
         filename="LICENSE",
         plain=True,
         aliases=("/licence", "/LICENSE.txt", "/docs/LICENSE"),
@@ -106,28 +106,28 @@ PUBLIC_DOCS: tuple[PublicDoc, ...] = (
     PublicDoc(
         id="privacy",
         path=PRIVACY_PATH,
-        title="Privacy policy — Restore Privacy",
+        title="Privacy policy - Restore Privacy",
         filename="PRIVACY_POLICY.md",
         aliases=("/privacy", "/privacy-policy", "/docs/PRIVACY_POLICY.md"),
     ),
     PublicDoc(
         id="audit",
         path=AUDIT_PATH,
-        title="Security audit — Restore Privacy",
+        title="Security audit - Restore Privacy",
         filename="AUDIT.md",
         aliases=("/audit.md", "/docs/AUDIT.md", "/docs/audit.md"),
     ),
     PublicDoc(
         id="credits",
         path=CREDITS_PATH,
-        title="Credits — Restore Privacy",
+        title="Credits - Restore Privacy",
         filename="CREDITS.md",
         aliases=("/credits", "/docs/CREDITS.md"),
     ),
     PublicDoc(
         id="node-operator",
         path=NODE_OPERATOR_PATH,
-        title="Residual node / operator path — Restore Privacy",
+        title="Residual node / operator path - Restore Privacy",
         filename="NODE_OPERATOR.md",
         aliases=(
             "/node-operator",
@@ -139,7 +139,7 @@ PUBLIC_DOCS: tuple[PublicDoc, ...] = (
     PublicDoc(
         id="evolve-docs",
         path=EVOLVE_DOCS_PATH,
-        title="Evolve docs — Chronoflux framework",
+        title="Evolve docs - Chronoflux framework",
         filename="EVOLVE.md",
         aliases=(
             "/evolve",
@@ -151,7 +151,7 @@ PUBLIC_DOCS: tuple[PublicDoc, ...] = (
     PublicDoc(
         id="rpos-docs",
         path=RPOS_DOCS_PATH,
-        title="rpOS — Restore Privacy Operating System",
+        title="rpOS - Restore Privacy Operating System",
         filename="RPOS.md",
         aliases=(
             "/rpos",
@@ -176,7 +176,7 @@ PUBLIC_DOCS: tuple[PublicDoc, ...] = (
     PublicDoc(
         id="cerberus-docs",
         path=CERBERUS_DOCS_PATH,
-        title="CERBERUS — residual fleet oracle",
+        title="CERBERUS - residual fleet oracle",
         filename="CERBERUS.md",
         aliases=(
             "/cerberus",
@@ -307,7 +307,7 @@ def _escape(s: str) -> str:
     )
 
 
-# Package RAG + section B State solid-colour cells — emoji or PASS/SKIP/FAIL words
+# Package RAG + section B State solid-colour cells - emoji or PASS/SKIP/FAIL words
 _RAG_SWATCH_MAP: dict[str, tuple[str, str]] = {
     "🟩": ("rag-green", "Green"),
     "🟧": ("rag-amber", "Amber"),
@@ -434,7 +434,7 @@ def _inline_format(escaped_line: str) -> str:
     """Limited inline markdown on already-escaped text (safe: no raw HTML)."""
     import re
 
-    # Links: [label](url) — only http(s) and relative paths
+    # Links: [label](url) - only http(s) and relative paths
     def link_sub(m: re.Match[str]) -> str:
         label, url = m.group(1), m.group(2)
         if url.startswith(("http://", "https://", "/")):
@@ -627,7 +627,7 @@ def markdownish_to_html(text: str) -> str:
             else:
                 tag = "td"
             # Package AUDIT STATE: scroll lengthy Package (col 2) / Notes (col 4) in-cell
-            # Section B: scroll lengthy Notes (col 3) only — Probe col stays identity
+            # Section B: scroll lengthy Notes (col 3) only - Probe col stays identity
             # UK ping / notes matrix: last Notes column scrolls (vertical + horizontal)
             scroll_cols: set[int] = set()
             notes_scroll_cols: set[int] = set()
@@ -784,7 +784,7 @@ table.doc-table th.notes-cell {
 }
 /*
  * Package AUDIT STATE (pkg-rag): fit content column; lengthy Package/Notes
- * scroll *inside the cell* — do not force full-page horizontal widen via max-content.
+ * scroll *inside the cell* - do not force full-page horizontal widen via max-content.
  */
 table.doc-table.pkg-rag {
   display: table;
@@ -1031,20 +1031,20 @@ def _is_audit_document(*, title: str, text: str) -> bool:
 def _active_nav_for_title(title: str, *, plain: bool = False) -> str | None:
     """Map document title → shared public nav *active* key.
 
-    Order is intentional: product titles often end with ``— Restore Privacy``,
+    Order is intentional: product titles often end with `` -  Restore Privacy``,
     so a bare ``\"privacy\" in title`` would steal Audit/README highlights.
     Match specific docs first; Privacy Policy only via policy phrasing.
     """
     t = (title or "").lower().strip()
     if plain or "licence" in t or "license" in t:
         return "licence"
-    # Security audit (before privacy — product name contains "privacy")
+    # Security audit (before privacy - product name contains "privacy")
     if "audit" in t or "code & policy" in t or "code and policy" in t:
         return "audit"
     # README / credits
     if "readme" in t or t.startswith("read me") or "credit" in t:
         return "readme"
-    # Privacy Policy only — not every string with the product name
+    # Privacy Policy only - not every string with the product name
     if "privacy policy" in t or "privacy_policy" in t or t.endswith("privacy policy"):
         return "privacy"
     if "privacy" in t and "policy" in t:
@@ -1138,9 +1138,9 @@ def render_document_html(
       </article>
     </section>
     <footer class="panel-card doc-foot" id="doc-foot" data-chrome="pro">
-      <p class="muted">Restore Privacy Suite public documents on the VPN APP Shop.
+      <p class="muted">Restore Privacy public documents - dedicated virtual private network.
       Free installers and KEYGEN checkout:
-      <a href="/#suite-storefront">Suite storefront</a>.</p>
+      <a href="/#suite-storefront">home storefront</a>.</p>
       <p>
         <a href="{PRIVACY_PATH}">Privacy</a>
         <a href="{LICENSE_PATH}">Licence</a>
@@ -1219,7 +1219,7 @@ def render_how_to_buy_html() -> bytes:
         title=PUBLIC_BRAND_TITLE,
         active="home",
     )
-    body = f"""{public_head_open(title="How to buy — Restore Privacy Suite", extra_css='''
+    body = f"""{public_head_open(title="How to buy - Restore Privacy", extra_css='''
 .card{{background:var(--rb-card);border-radius:12px;padding:1rem 1.15rem;margin:1rem 0;border:1px solid var(--rb-card-border)}}
 ol{{padding-left:1.25rem;color:var(--rb-muted)}}
 ''')}
@@ -1227,7 +1227,8 @@ ol{{padding-left:1.25rem;color:var(--rb-muted)}}
 {header}
 <section class="panel-card doc-body-panel" id="how-to-buy-panel">
 <h1 id="how-to-buy-heading">How to buy Restore Privacy</h1>
-<p class="muted">The Suite installers are <strong>free</strong> on the VPN APP Shop.
+<p class="muted">Restore Privacy is a <strong>dedicated virtual private network</strong>.
+Installers are <strong>free</strong> on the shop.
 Residual Connect includes a free <strong>3-day (72-hour) trial</strong> on this
 device (<strong>no card</strong>). After the trial ends, residual Connect needs a
 <strong>paid KEYGEN / active subscription</strong>: monthly
@@ -1238,8 +1239,8 @@ the free residual trial.</p>
 <div class="card" id="how-to-buy-steps">
 <h2>Select your plan</h2>
 <ol>
-  <li>Open the VPN APP Shop: <a href="{_escape(home)}">{_escape(home)}</a></li>
-  <li>Download the free Suite installer for your device, then under residual
+  <li>Open the shop: <a href="{_escape(home)}">{_escape(home)}</a></li>
+  <li>Download the free installer for your device, then under residual
       plans pick Monthly VPN plan or Yearly VPN plan. You can also open the plan
       page at <code>{_escape(SITE_PAY_PLAN_PATH)}</code> (<code>/pay</code>).</li>
   <li>Continue to Stripe Checkout

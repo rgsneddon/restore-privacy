@@ -1,8 +1,8 @@
-"""Connect-via-web panel for the public Restore Privacy Suite storefront.
+"""Connect-via-web panel for the public Restore Privacy storefront.
 
 A normal browser tab cannot create a full OS TUN / system-wide residual path.
 This module ships the maximum honest path: a clear Connect via web control that
-explains that limit and routes the user to real native Suite clients (1.0.0).
+explains that limit and routes the user to real native VPN clients.
 """
 
 from __future__ import annotations
@@ -16,14 +16,14 @@ HONESTY_LINE = (
     "device (browsers do not allow creating an OS tunnel from a tab alone)."
 )
 ACTION_LINE = (
-    "For full Restore Privacy Suite residual Connect, start the native Suite "
-    "installer for your platform below. Those are the real apps — catalog "
+    "For full Restore Privacy residual Connect, download the native app for your "
+    "platform below. Those are the real VPN clients - catalog "
     f"v{RELEASE_VERSION}."
 )
 
 
 def recommended_download_actions() -> list[dict[str, str]]:
-    """Primary actions: Suite storefront package paths (catalog monopin)."""
+    """Primary actions: storefront package paths (catalog monopin)."""
     actions: list[dict[str, str]] = []
     for asset in available_downloads():
         actions.append(
@@ -48,7 +48,7 @@ def render_connect_via_web_html() -> str:
             f'data-filename="{a["filename"]}">{a["label"]}</a>'
         )
     buttons_html = "\n".join(buttons)
-    # Limited in-page demo: only checks live status API — clearly not full residual
+    # Limited in-page demo: only checks live status API - clearly not full residual
     return f"""
   <section class="connect-web" id="connect-via-web" aria-label="Connect via web"
            data-product="suite" data-catalog-version="{RELEASE_VERSION}">
@@ -61,9 +61,9 @@ def render_connect_via_web_html() -> str:
     <details class="connect-limited">
       <summary>Limited web check (not full-device residual Connect)</summary>
       <p class="connect-limited-note">
-        This only contacts the Suite shop&rsquo;s live status API. It does
+        This only contacts the shop&rsquo;s live status API. It does
         <strong>not</strong> route your device traffic or replace the native
-        Suite client for Windows, Android, macOS, iOS, or Linux.
+        VPN client for Windows, Android, macOS, iOS, or Linux.
       </p>
       <button type="button" class="connect-probe" id="connect-web-probe">Run web status check</button>
       <p class="connect-probe-out" id="connect-web-probe-out" aria-live="polite"></p>
@@ -119,7 +119,7 @@ def connect_via_web_script() -> str:
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var n = (data && typeof data.clients_connected === 'number') ? data.clients_connected : 0;
-        out.textContent = 'Web check OK — currently connected clients: ' + n
+        out.textContent = 'Web check OK - currently connected clients: ' + n
           + '. Full VPN still requires the native client download above.';
       })
       .catch(function () {

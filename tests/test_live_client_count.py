@@ -171,7 +171,7 @@ class TestStatusApiTitleOnly(unittest.TestCase):
                 "clients_total": 999,
             }
         )
-        self.assertEqual(out, {"title": "RESTORE PRIVACY SUITE"})
+        self.assertEqual(out, {"title": "RESTORE PRIVACY"})
         self.assertNotIn("clients_connected", out)
 
 

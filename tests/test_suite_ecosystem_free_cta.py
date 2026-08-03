@@ -12,17 +12,12 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 
 class TestSuiteEcosystemNewLinks(unittest.TestCase):
-    """rpOS / Rx Privacy Browser / VPN as real <a> links with stable markers."""
+    """Product docs submenu: About / Settings / How to buy / Rx Browser."""
 
-    def test_submenu_links_include_rpos_rx_browser_vpn(self) -> None:
+    def test_submenu_links_are_vpn_docs_not_multi_product_pitch(self) -> None:
         from downloads import (
             SUITE_ECOSYSTEM_VPN_HREF,
             SUITE_ECOSYSTEM_VPN_KEY,
-            SUITE_ECOSYSTEM_VPN_LABEL,
-            SUITE_RPOS_HREF,
-            SUITE_RPOS_KEY,
-            SUITE_RPOS_LABEL,
-            SUITE_RPOS_TITLE,
             SUITE_RX_BROWSER_HREF,
             SUITE_RX_BROWSER_KEY,
             SUITE_RX_BROWSER_LABEL,
@@ -33,50 +28,40 @@ class TestSuiteEcosystemNewLinks(unittest.TestCase):
         links = suite_product_submenu_links()
         # (href, label, key, title)
         by_key = {row[2]: row for row in links}
-        self.assertIn(SUITE_RPOS_KEY, by_key)
-        self.assertIn(SUITE_RX_BROWSER_KEY, by_key)
         self.assertIn(SUITE_ECOSYSTEM_VPN_KEY, by_key)
+        self.assertIn(SUITE_RX_BROWSER_KEY, by_key)
+        self.assertIn("settings-guide", by_key)
+        self.assertIn("how-to-buy", by_key)
+        # No Evolve / Perccent product pitch on the storefront
+        self.assertNotIn("evolve-docs", by_key)
+        self.assertNotIn("perccent-wallet", by_key)
+        self.assertNotIn("perc-explorer", by_key)
 
-        href, label, key, title = by_key[SUITE_RPOS_KEY]
-        self.assertEqual(label, SUITE_RPOS_LABEL)
-        self.assertEqual(label, "rpOS")
-        self.assertEqual(href, SUITE_RPOS_HREF)
-        self.assertTrue(href, "rpOS must have an href (placeholder OK)")
-        self.assertIn("Restore Privacy Operating System", title)
+        href_v, label_v, _, _ = by_key[SUITE_ECOSYSTEM_VPN_KEY]
+        self.assertEqual(href_v, SUITE_ECOSYSTEM_VPN_HREF)
+        self.assertIn("About", label_v)
 
         href_b, label_b, _, _ = by_key[SUITE_RX_BROWSER_KEY]
         self.assertEqual(label_b, SUITE_RX_BROWSER_LABEL)
-        self.assertEqual(label_b, "Rx Privacy Browser")
         self.assertEqual(href_b, SUITE_RX_BROWSER_HREF)
-        self.assertTrue(href_b)
-
-        href_v, label_v, _, _ = by_key[SUITE_ECOSYSTEM_VPN_KEY]
-        self.assertEqual(label_v, SUITE_ECOSYSTEM_VPN_LABEL)
-        self.assertEqual(label_v, "VPN")
-        self.assertEqual(href_v, SUITE_ECOSYSTEM_VPN_HREF)
-        self.assertTrue(href_v)
 
         html = render_suite_product_submenu_html()
-        # Real <a> elements with stable markers
-        for key, href, label in (
-            (SUITE_RPOS_KEY, SUITE_RPOS_HREF, SUITE_RPOS_LABEL),
-            (SUITE_RX_BROWSER_KEY, SUITE_RX_BROWSER_HREF, SUITE_RX_BROWSER_LABEL),
-            (SUITE_ECOSYSTEM_VPN_KEY, SUITE_ECOSYSTEM_VPN_HREF, SUITE_ECOSYSTEM_VPN_LABEL),
+        for key in (
+            SUITE_ECOSYSTEM_VPN_KEY,
+            SUITE_RX_BROWSER_KEY,
+            "settings-guide",
+            "how-to-buy",
         ):
             self.assertIn(f'data-suite-sub="{key}"', html)
             self.assertIn(f'id="suite-sub-{key}"', html)
-            self.assertIn(f'href="{href}"', html)
-            self.assertIn(f">{label}</a>", html)
             self.assertRegex(
                 html,
                 rf'<a[^>]*data-suite-sub="{re.escape(key)}"[^>]*>',
             )
-        # rpOS expanded meaning via title and aria-label
-        self.assertIn(f'title="{SUITE_RPOS_TITLE}"', html)
-        self.assertIn(f'aria-label="{SUITE_RPOS_TITLE}"', html)
-        self.assertIn("Suite ecosystem (wip)", html)
-        self.assertIn("(wip)", html)
-        self.assertIn("suite-product-submenu-wip", html)
+        self.assertIn("Learn more", html)
+        self.assertNotIn("Suite ecosystem", html)
+        self.assertNotIn("Evolve docs", html)
+        self.assertNotIn("Perccent wallet", html)
 
 class TestSuiteEcosystemNeonUnderline(unittest.TestCase):
     """Menu items use neon-gradient underline, not filled pill/box chrome."""
@@ -95,9 +80,6 @@ class TestSuiteEcosystemNeonUnderline(unittest.TestCase):
         # Submenu anchors: transparent / no filled chip
         self.assertIn("background: transparent", css)
         self.assertIn("Neon-gradient underline", css)
-        # (wip) suffix stays lowercase under label uppercase transform
-        self.assertIn("suite-product-submenu-wip", css)
-        self.assertIn("text-transform: none", css)
         # Must not style suite-sub links as filled rounded pills
         # (old chrome used solid background + border-radius chips on anchors)
         block = re.search(

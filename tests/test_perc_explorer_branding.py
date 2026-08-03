@@ -22,11 +22,11 @@ class TestPercExplorerBranding(unittest.TestCase):
         self.assertIn("restore-privacy-logo.png", html)
         self.assertIn('data-rpt-logo="1"', html)
         self.assertIn('data-rpt-brand="1"', html)
-        self.assertIn("Restore Privacy Suite", html)
+        self.assertIn("Restore Privacy", html)
         self.assertIn("Restore Privacy logo", html)
         self.assertIn("rpt-logo", html)
         # Title names Suite product
-        self.assertIn("Restore Privacy Suite", html.split("<title>")[1].split("</title>")[0])
+        self.assertIn("Restore Privacy", html.split("<title>")[1].split("</title>")[0])
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ rpOS is a **privacy-first operating system** SDK surface for commercial deployme
 | **Tables** | Spreadsheets | `tables-*-installer.zip` |
 | **Slides** | Presentations | `slides-*-installer.zip` |
 
-Also: Database creator · Email (**rpMail**) · Private Browser (**Rx**) · VPN · **Evolve** · **MISHI** moderator GUI · **RxShell** CLI.
+Also: Database creator · Email (**rpMail**) · Private Browser (**Rx**) · VPN · **MISHI** moderator GUI · **RxShell** CLI.
 
 ## RxShell
 
@@ -77,7 +77,7 @@ python3 -m rpos.installer apps-tour --prefix ~/.rpos/install --auto
 ## Repositories
 
 - Private GitHub: `rgsneddon/rpOS`
-- Suite monorepo: `restore-privacy`
+- product monorepo: `restore-privacy`
 - Office apps: `rgsneddon/rpOffice` (**Pens · Tables · Slides**)
 
 ## Licence

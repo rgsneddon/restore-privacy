@@ -132,7 +132,7 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertNotIn("<h1>RESTORE PRIVACY VPN</h1>", header)
         # Document/page brand title is Suite identity (not a visible VPN H1)
         self.assertIn("RESTORE PRIVACY", PUBLIC_BRAND_TITLE)
-        self.assertIn("SUITE", PUBLIC_BRAND_TITLE)
+        self.assertNotIn("SUITE", PUBLIC_BRAND_TITLE)
         self.assertNotIn("VPN", PUBLIC_BRAND_TITLE)
         self.assertIn('class="brand-banner"', header)
         self.assertIn('id="brand-banner"', header)

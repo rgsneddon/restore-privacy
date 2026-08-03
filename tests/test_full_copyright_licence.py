@@ -32,8 +32,8 @@ class TestFullCopyrightLicenceShipped(unittest.TestCase):
         self.assertIn("transmission", text.lower())
         self.assertIn("AS IS", text)
         self.assertIn("WITHOUT WARRANTY", text.upper())
-        self.assertIn("Restore Privacy Suite", text)
-        self.assertNotIn("Restore Privacy VPN", text)
+        self.assertIn("Restore Privacy", text)
+        self.assertNotIn("Restore Privacy Suite", text)
         self.assertIn("Client Package", text)
         # Public mirror byte-equal
         pub = (ROOT / "status_page" / "public" / "LICENSE").read_text(encoding="utf-8")

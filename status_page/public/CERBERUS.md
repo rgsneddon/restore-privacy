@@ -2,14 +2,14 @@
 
 # CERBERUS
 
-**Private** residual-fleet oracle for Restore Privacy Suite — Helsinki-style
-collation of co-joined satellite heartbeats and honest Ned (rpAI) growth
+**Private** residual-fleet oracle for Restore Privacy — Helsinki-style
+collation of co-joined satellite heartbeats and honest fleet growth
 parameters.
 
 ## Privacy contract
 
 - **No user data observation retained.** Operational fleet signals only
-  (capacity, co-join readiness, Suite surface counters without PII).
+  (capacity, co-join readiness, fleet surface counters without PII).
 - **Forbidden keys are stripped** at the collate / learn boundary:
   connection logs, seed phrases / mnemonics, backup passphrases, backup file
   bytes, licence-acceptance prose, private keys.

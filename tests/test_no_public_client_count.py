@@ -25,7 +25,7 @@ class TestStatusPageNoCount(unittest.TestCase):
         out = status_app.normalize_status(
             {"title": "RESTORE PRIVACY", "clients_connected": 99, "secret": "x"}
         )
-        self.assertEqual(out, {"title": "RESTORE PRIVACY SUITE"})
+        self.assertEqual(out, {"title": "RESTORE PRIVACY"})
         self.assertNotIn("clients_connected", out)
         pub = status_app.public_status_payload(
             {"title": "RESTORE PRIVACY", "clients_connected": 5}
@@ -38,7 +38,7 @@ class TestStatusPageNoCount(unittest.TestCase):
             {"title": "RESTORE PRIVACY"}
         ).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", html)
-        self.assertIn("Download Suite client", html)
+        self.assertIn("Download client", html)
         self.assertNotIn("Currently connected clients", html)
         self.assertNotIn("clients-connected", html)
         self.assertNotIn("clients_connected", html)
@@ -59,7 +59,7 @@ class TestStatusPageNoCount(unittest.TestCase):
                     f"http://127.0.0.1:{port}/api/status", timeout=5
                 ) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
-            self.assertEqual(data, {"title": "RESTORE PRIVACY SUITE"})
+            self.assertEqual(data, {"title": "RESTORE PRIVACY"})
             self.assertNotIn("clients_connected", data)
         finally:
             httpd.shutdown()

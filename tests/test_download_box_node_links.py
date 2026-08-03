@@ -37,9 +37,9 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         self.assertIn("node_operator", low)
         self.assertIn("self-host", low)
         self.assertIn("selfhost_node", low)
-        self.assertIn("suite client", low)
+        self.assertIn("vpn client", low)
         self.assertIn("keygen", low)
-        self.assertRegex(text, r"(?i)\*\*not\*\*\s+the suite client")
+        self.assertRegex(text, r"(?i)\*\*not\*\*\s+the vpn client")
         self.assertRegex(
             text,
             r"(?i)does \*\*not\*\*.*keygen|keygen.*does \*\*not\*\*|not unlocked by keygen",
@@ -177,7 +177,7 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         self.assertNotIn("Full business package?", suite)
         dl = render_download_section_html()
         self.assertIn('id="downloads"', dl)
-        self.assertIn(f"Download Suite client v{RELEASE_VERSION}", dl)
+        self.assertIn(f"Download client v{RELEASE_VERSION}", dl)
         self.assertIn("dl-buy-now", dl)
 
     def test_public_site_mirror_suite_downloads_current(self) -> None:
@@ -185,7 +185,7 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         from downloads import RELEASE_VERSION
 
         html = (ROOT / "public_site" / "index.html").read_text(encoding="utf-8")
-        self.assertIn("Restore Privacy Suite", html)
+        self.assertIn("Restore Privacy", html)
         self.assertIn(RELEASE_VERSION, html)
         self.assertNotIn("RESTORE PRIVACY VPN", html)
         self.assertIn("restoreprivacy.online", html)

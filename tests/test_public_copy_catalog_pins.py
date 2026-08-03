@@ -63,12 +63,12 @@ class TestPublicCopyCatalogPins(unittest.TestCase):
 
         # Browser extension companion catalog label
         popup = (ROOT / "browser_extension" / "popup.html").read_text(encoding="utf-8")
-        self.assertIn(f"Suite {RELEASE_VERSION}", popup)
+        self.assertIn(f"{RELEASE_VERSION}", popup)
         manifest = (ROOT / "browser_extension" / "manifest.json").read_text(
             encoding="utf-8"
         )
         self.assertIn(f'"version": "{RELEASE_VERSION}"', manifest)
-        self.assertIn(f"Suite {RELEASE_VERSION}", manifest)
+        self.assertIn(f"{RELEASE_VERSION}", manifest)
 
     def test_homepage_render_has_current_price_and_trial_not_stale(self) -> None:
         from app import render_html

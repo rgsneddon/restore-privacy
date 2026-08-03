@@ -134,7 +134,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertNotIn('id="rust-repo-link"', html)
                     self.assertNotIn("installers after £3.00 payment only", html)
                     self.assertNotIn("releases/download/", html)
-                    self.assertIn("RESTORE PRIVACY SUITE", html)
+                    self.assertIn("RESTORE PRIVACY", html)
                     self.assertNotIn("<title>RESTORE PRIVACY VPN</title>", html)
         finally:
             httpd.shutdown()

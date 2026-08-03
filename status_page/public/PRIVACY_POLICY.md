@@ -1,29 +1,23 @@
-# Privacy Policy — Restore Privacy Suite
+# Privacy Policy — Restore Privacy
 
-**Last updated:** 2 August 2026  
-**Product:** Restore Privacy Suite **v1.0.8** — residual Connect, Perccent wallet (%), Evolve analyser, rpAI (Ned), Backup recovery, and the public VPN APP Shop  
-**Current packages (catalog v1.0.8):** free Suite installers on [restoreprivacy.online](https://restoreprivacy.online/) (VPN APP Shop). Residual Connect needs a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **Linux**, **Android**, **macOS**, **iOS**, and **Windows** monopin **1.0.8** packages are fulfilled from the product host. **macOS** is **Developer ID** + notarized (Team **SFCBP95595**). **iOS** ships as an **Apple Distribution** Team-signed **Runner.app** zip for sideload (same Team); a full App Store–style IPA export still needs `ExportOptions.plist` and is a separate path. Public GitHub Pages ship docs only — not operator admin.
+**Last updated:** 3 August 2026  
+**Product:** Restore Privacy **v1.1.5** — a dedicated residual virtual private network and the public shop  
+**Current packages (catalog v1.1.5):** free installers on [restoreprivacy.online](https://restoreprivacy.online/). Residual Connect needs a free device trial or a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **Linux**, **Android**, **macOS**, **iOS**, and **Windows** monopin **1.1.5** packages are fulfilled from the product host. **macOS** is **Developer ID** + notarized when sealed (Team **SFCBP95595**). **iOS** ships as an **Apple Distribution** Team-signed **Runner.app** zip for sideload (same Team). Public GitHub Pages ship docs only — not operator admin.
 
 ---
 
 ## What this product is
 
-Restore Privacy Suite is one app shell with several surfaces:
+Restore Privacy is a **dedicated virtual private network** for residual traffic on your device.
 
 | Surface | Role |
 |---------|------|
-| **VPN (residual Connect)** | Encrypted residual tunnel; free 3-day (72h) device trial (no card), then paid KEYGEN after trial |
-| **Wallet (%)** | Perccent private wallet (local ledger; optional encrypted backup / seed) |
-| **Evolve** | Chronoflux analysis + parish voting when entitled |
-| **Backup** | Encrypted export/import and optional 12-word seed recovery for wallet/analyser identity |
-| **rpAI (Ned)** | Local helper / growth surface; fleet oracle learns **operational** Suite map parameters only |
-| **Settings / licence** | End-user licence acceptance, KEYGEN unlock, residual toggles |
+| **Residual Connect** | Encrypted residual tunnel; free 3-day (72h) device trial (no card), then paid KEYGEN after trial |
+| **Settings / licence** | End-user licence acceptance, KEYGEN unlock, residual privacy toggles |
+
+First use: accept the end-user licence → paste KEYGEN **or** continue the free trial → main VPN. There is **no** username/password account gate and **no** seed phrase gate on the product path.
 
 ---
-
-## First-run account and seed (on-device)
-
-Before residual VPN permissions, you create a **Suite account** (username/password) and a **12-word recovery seed** kept only on your device, then accept the licence. Account credentials auto-enable % and Evolve. Seed phrases are not uploaded to residual nodes.
 
 ## Licence acceptance (your agreement)
 
@@ -39,12 +33,6 @@ Before residual Connect, you **accept the end-user licence** on this device (loc
 - Payment entitlement checks (session id + device public key bind) so Connect can confirm an **active** KEYGEN on this device.
 - **No user-info connection logs** are uploaded by the client. Export of a local connection log is **user-initiated** only (save/clipboard/email by you).
 
-### Free Suite surfaces (wallet, Evolve, Backup, Ned)
-
-- Wallet and Evolve ledgers live **locally** (and on optional user-chosen backup files / seed envelopes you control).
-- Encrypted backup files and seed recovery envelopes are **not** sent as plaintext secrets to the residual oracle. Optional seed rendezvous (when configured) carries **encrypted** envelope material only — never the raw 12-word phrase as a plaintext field.
-- Ned/oracle collates fleet **operational** signals (capacity, co-join readiness, Suite surface counters without PII). Forbidden user-secret keys are stripped and **not durably stored** by the oracle path.
-
 ### Payment / shop host
 
 - Checkout and KEYGEN fulfilment go through the public shop (`restoreprivacy.online`, including `/pay`). Payment processors process card data under their terms; we receive entitlement status and fulfilment codes needed to unlock Connect.
@@ -52,30 +40,30 @@ Before residual Connect, you **accept the end-user licence** on this device (loc
 
 ### What we do **not** do
 
-- No third-party advertising or analytics SDKs in the Suite client monopin.
-- No automatic upload of connection logs, seed phrases, backup passphrases, or licence-acceptance dumps to residual nodes or the oracle.
+- No third-party advertising or analytics SDKs in the client monopin.
+- No automatic upload of connection logs or licence-acceptance dumps to residual nodes or the oracle.
 - No public live “clients connected” count on node status pages (title-only public status).
 
 ---
 
 ## Settings defaults (lean residual)
 
-Run at startup **off**, autoconnect **off**, residual VPN core available after KEYGEN unlock, residual **IPv4** on, residual **IPv6** toggleable, traffic shaping / outer obfuscation / multi-hop **off** by default (opt-in). Optional browser extension is browser-scoped only.
+Run at startup **off**, autoconnect **off**, residual VPN core available after KEYGEN unlock (or during free trial), residual **IPv4** on, residual **IPv6** toggleable, traffic shaping / outer obfuscation / multi-hop **off** by default (opt-in).
 
 Force-on for operators/tests (not opt-out of defaults): set **`RPT_TRAFFIC_SHAPE=1`** and/or **`RPT_OBFS=1`** (or use in-app Settings) to enable traffic shaping / outer obfuscation when you want them. Defaults stay **off** so residual paths stay lean.
 
 ### Operational limits
 
 - Residual Connect is limited to devices with an **active free residual trial** or a valid **KEYGEN** entitlement (monthly or yearly residual licence) after the trial.
-- Free Suite installers are fulfilled on the product host; residual unlock remains KEYGEN-bound and **time-limited** to the active subscription / trial period (not an unlimited free residual CDN).
+- Free installers are fulfilled on the product host; residual unlock remains KEYGEN-bound and **time-limited** to the active subscription / trial period (not an unlimited free residual CDN).
 - Public node status stays **title-only** (no live client count).
 
 ---
 
 ## Your rights and contact
 
-You can export local connection logs, delete local wallet data, and stop using residual Connect by not renewing KEYGEN. For privacy questions: **rus@restoreprivacy.online**.
+You can export local connection logs and stop using residual Connect by not renewing KEYGEN. For privacy questions: **rus@restoreprivacy.online**.
 
 Related: end-user **LICENSE**, product **README**, and the public security **AUDIT**.
 
-This policy describes product behaviour for catalog **v1.0.8**. It is not a substitute for formal legal advice.
+This policy describes product behaviour for catalog **v1.1.5**. It is not a substitute for formal legal advice.

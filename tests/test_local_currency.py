@@ -119,7 +119,7 @@ class TestCatalogHtmlLocalCurrency(unittest.TestCase):
         # Local line sits under title; upper explainer boxes gone
         self.assertNotIn('id="dl-only-price"', html)
         self.assertNotIn('id="dl-price-box"', html)
-        heading_i = html.find("Download Suite client v")
+        heading_i = html.find("Download client v")
         local_i = html.find('id="dl-local-price"')
         self.assertGreater(local_i, heading_i)
         # Catalog embeds buy form (local amounts on plan radio labels)

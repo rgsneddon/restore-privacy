@@ -1,9 +1,9 @@
-# Restore Privacy residual VPN
+# Restore Privacy
 
-**Version 1.1.5** — dedicated residual VPN client.
+**Version v1.1.5** — a dedicated virtual private network for residual traffic.
 
-This product protects residual traffic on your device. It is **not** a multi-product
-Suite: Evolve analysis, Perccent wallet (%), rpAI, and Backup are not product chrome.
+Restore Privacy protects residual traffic on your device. Download free, try three
+days with no card, then continue with a KEYGEN.
 
 | | |
 |--|--|
@@ -38,6 +38,12 @@ Suite: Evolve analysis, Perccent wallet (%), rpAI, and Backup are not product ch
 - **macOS:** open the notarized/Developer ID app when sealed; allow Packet Tunnel in System Settings if prompted.
 - **Android / iOS:** sideload the catalog package; allow VPN when asked.
 - **Linux:** extract the tarball and run `install.sh` (needs python3, venv, tk, TUN, root for full residual).
+
+
+## Settings (lean)
+
+Defaults stay lean: run at startup off, autoconnect off, traffic shaping / outer
+obfuscation / multi-hop off by default until you opt in.
 
 ## Support
 

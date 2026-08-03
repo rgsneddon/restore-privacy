@@ -29,7 +29,7 @@ product going forward.)
   a competing service or clone of the product design.
 
   “Client Package” means an end-user installer, application binary, or package
-  distributed for use on a personal device to run Restore Privacy Suite and
+  distributed for use on a personal device to run Restore Privacy and
   connect residual traffic (including Windows, Android, iOS, macOS, and Linux
   catalog packages).
 
@@ -64,7 +64,7 @@ product going forward.)
   licence where prompted, and continuous compliance with this document:
 
   3.1 You may **install and run** a Client Package **solely** for the appropriate
-      purpose of operating a personal device with **Restore Privacy Suite**
+      purpose of operating a personal device with **Restore Privacy**
       residual Connect, on the service operated by or for the Licensor (Connect /
       residual tunnel to the product entry and, where configured, exit residual path).
 
@@ -119,7 +119,7 @@ product going forward.)
   LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY (INCLUDING INDIRECT,
   INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR LOSS OF PROFITS,
   DATA, OR GOODWILL), WHETHER IN CONTRACT, TORT, OR OTHERWISE, ARISING FROM OR
-  RELATED TO THE SOFTWARE, CLIENT PACKAGES, OR USE OF RESTORE PRIVACY SUITE.
+  RELATED TO THE SOFTWARE, CLIENT PACKAGES, OR USE OF RESTORE PRIVACY.
 
   Some jurisdictions do not allow certain limitations; in those cases liability
   is limited to the maximum extent permitted by applicable law, and where a
@@ -150,8 +150,8 @@ product going forward.)
   does not create a warranty of re-download rights beyond the operator’s paid
   fulfilment process.
 
-  Product distribution: end-user installers for catalog v1.0.8 are fulfilled via the
-  public status host (restoreprivacy.online). Suite installers may be free to
+  Product distribution: end-user installers for catalog v1.1.5 are fulfilled via the
+  public status host (restoreprivacy.online). Installers may be free to
   download; residual Connect has a free 3-day (72-hour) device trial, then requires
   a paid KEYGEN / active subscription (Stripe). The operator source tree may be private.
 

@@ -1,8 +1,8 @@
 # Credits and third-party attributions
 
-**Restore Privacy Suite** (RPT) is an original product. The public storefront is the
-**VPN APP Shop**. The components below are used by the shipped tree or installers.
-They are **not** the RPT protocol itself.
+**Restore Privacy** (RPT) is an original dedicated virtual private network. The public
+storefront is the product shop. The components below are used by the shipped tree
+or installers. They are **not** the RPT protocol itself.
 
 ## Crypto libraries
 

@@ -44,7 +44,7 @@ class TestTitleLegalLinks(unittest.TestCase):
         self.assertNotIn('id="readme-link"', html)
         self.assertIn('id="settings-guide-link" href="/settings-explainer"', html)
         self.assertNotIn("how-to-buy-link", html)
-        self.assertNotIn('href="/how-to-buy"', html)
+        self.assertNotIn('id="how-to-buy-link"', html)  # not a main-nav control
         self.assertIn(status_app.SECURITY_AUDIT_LOCAL_PATH, html)
         self.assertIn('id="doc-links"', html)
         self.assertIn('id="licence-link"', html)
@@ -63,16 +63,17 @@ class TestTitleLegalLinks(unittest.TestCase):
         positions = [html.find(f'id="{eid}"') for eid in order_ids]
         for i in range(len(positions) - 1):
             self.assertLess(positions[i], positions[i + 1], order_ids[i : i + 2])
-        h1_pos = html.find("<h1>")
-        if h1_pos < 0:
-            h1_pos = html.find("<h1 ")
+        # Banner-only header: lead is h2 tagline (not h1 product chrome)
+        lead_pos = html.find('id="suite-home-intro-title"')
+        if lead_pos < 0:
+            lead_pos = html.find("<h2")
         links_pos = html.find('id="doc-links"')
-        self.assertGreater(h1_pos, 0)
-        self.assertGreater(links_pos, h1_pos)
+        self.assertGreater(lead_pos, 0)
+        self.assertGreater(links_pos, 0)
         # Downloads remain; live client count removed
         self.assertNotIn("clients-connected", html)
         self.assertNotIn("fetch('/api/status'", html)
-        self.assertIn("Download Suite client", html)
+        self.assertIn("Download client", html)
 
     def test_legal_url_constants_point_at_shipped_docs(self):
         self.assertTrue(

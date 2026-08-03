@@ -1,6 +1,6 @@
-# Restore Privacy residual VPN — public site
+# Restore Privacy Suite — public site
 
-Static GitHub Pages export for **Restore Privacy residual VPN v1.1.5**.
+Static GitHub Pages export for **Restore Privacy Suite v1.1.5**.
 
 Free installers + **Downloads Map** of every product/platform package; KEYGEN licence from £3/month on restoreprivacy.online.
 

@@ -63,7 +63,7 @@ def current_catalog_version() -> str:
     """Single current catalog version for pay buttons and fulfilment.
 
     This is the **shipped** catalog pin (``RELEASE_VERSION``). When the monorepo
-    ``client/VERSION`` is present it must match — use :func:`catalog_matches_product_pin`.
+    ``client/VERSION`` is present it must match - use :func:`catalog_matches_product_pin`.
     """
     return RELEASE_VERSION
 
@@ -107,7 +107,7 @@ def assure_current_catalog_packages() -> dict[str, object]:
     if pin is not None and pin != catalog:
         errors.append(
             f"catalog pin {catalog!r} does not match client/VERSION {pin!r} "
-            f"— bump RELEASE_VERSION / RELEASE_TAG / filenames together"
+            f" -  bump RELEASE_VERSION / RELEASE_TAG / filenames together"
         )
     pkgs = list_catalog_platform_packages()
     platforms = [p["platform"] for p in pkgs]
@@ -174,28 +174,28 @@ except Exception:  # noqa: BLE001
     _YEARLY_SAVE_PCT = 17
 # Large white bold callout under "Download client v…" on the public homepage.
 ONLY_PRICE_BANNER = (
-    f"ONLY {PRICE_LABEL} per month — or annual {PRICE_YEARLY_LABEL} "
-    f"(save ~{_YEARLY_SAVE_PCT}% vs 12 × monthly) — free 3-day residual trial, then KEYGEN"
+    f"ONLY {PRICE_LABEL} per month - or annual {PRICE_YEARLY_LABEL} "
+    f"(save ~{_YEARLY_SAVE_PCT}% vs 12 × monthly) - free 3-day residual trial, then KEYGEN"
 )
 # Short single-line note under the price box (no re-listing of £ amounts).
 YEARLY_PLAN_NOTE = (
     "Select your device and plan below when you are ready for a KEYGEN. "
     f"Annual is {PRICE_YEARLY_LABEL} (save ~{_YEARLY_SAVE_PCT}% vs 12 × monthly). "
-    "Residual Connect: free 3-day (72-hour) trial on this device — no card. "
+    "Residual Connect: free 3-day (72-hour) trial on this device - no card. "
     "After the trial ends, a paid KEYGEN / active subscription is required. "
     "Local currency display uses the GBP anchors above "
     "(we accept your local currency when Stripe allows; otherwise USD)."
 )
 # Shown under the selection form (bold bright white, price-box-like frame).
 PLATFORM_SELECT_NOTE = (
-    "Please select your device platform carefully — you will only receive "
+    "Please select your device platform carefully - you will only receive "
     "the installer for that platform."
 )
 # Homepage download price block (single shipped contract for public #downloads).
 PACKAGE_IDENTITY = "one device licence"
 # Catalog trial copy (kept name for import stability). Residual trial first; KEYGEN after.
 TRIAL_SUBSCRIPTION_SENTENCE = (
-    f"Select your device and plan — Monthly {PRICE_LABEL} or Annual {PRICE_YEARLY_LABEL} — "
+    f"Select your device and plan - Monthly {PRICE_LABEL} or Annual {PRICE_YEARLY_LABEL} - "
     "free 3-day (72-hour) residual trial without card; after that a paid KEYGEN is required"
 )
 CATALOG_SUBSCRIPTION_SENTENCE = TRIAL_SUBSCRIPTION_SENTENCE
@@ -213,11 +213,11 @@ AUTO_RENEW_HELP = (
     "Turn off for a single paid period (access until period end, no further charges)."
 )
 # Honest Stripe branding note (site form uses main CSS; Checkout is Stripe-hosted).
-# Custom domains (pay.yourdomain) only change the hostname — still not full CSS.
+# Custom domains (pay.yourdomain) only change the hostname - still not full CSS.
 STRIPE_CHECKOUT_BRANDING_NOTE = (
     "Card payment opens on Stripe’s secure checkout page. "
     "That page uses Stripe’s layout with optional Dashboard logo/colours "
-    "(and optional pay.yourdomain custom domain) — "
+    "(and optional pay.yourdomain custom domain) - "
     "it cannot load this website’s full CSS."
 )
 # Default tip identity; runtime public page uses coffee_tip_url() (env override).
@@ -393,15 +393,15 @@ def available_downloads(
     return out
 
 
-# Footer: catalog identity on the public status host (repo is private — no free GH).
+# Footer: catalog identity on the public status host (repo is private - no free GH).
 # RELEASE_PAGE_URL remains for bookkeeping; public HTML must not send buyers to a
 # 404 GitHub release page when the repository is private.
 # Keep this string in sync with payments.DEFAULT_PRODUCTION_PUBLIC_BASE_URL
-# (avoid importing payments here — circular with payments → downloads).
+# (avoid importing payments here - circular with payments → downloads).
 # Pre-RUST product line: restore-privacy Python RPT catalog (not RUST-IN-PRIVACY).
 PRODUCT_CATALOG_URL = "https://restoreprivacy.online/#downloads"
 PRODUCT_CATALOG_LABEL = (
-    f"Catalog v{RELEASE_VERSION} — installers after {PRICE_LABEL} payment only (signed packages)"
+    f"Catalog v{RELEASE_VERSION} - installers after {PRICE_LABEL} payment only (signed packages)"
 )
 # Back-compat aliases (historical RUST_REPO_* names; values are pre-RUST catalog).
 RUST_REPO_URL = PRODUCT_CATALOG_URL
@@ -415,7 +415,7 @@ WINDOWS_ZIP_FILENAME = WINDOWS_EXE_FILENAME
 def download_css() -> str:
     """CSS for catalog pay section (RB-donate inspired navy/blue palette)."""
     return """
-    /* Download shop — aligns with site-chrome-pro / data-path shell */
+    /* Download shop - aligns with site-chrome-pro / data-path shell */
     .downloads {
       width: 100%; text-align: center; box-sizing: border-box;
       position: relative;
@@ -425,7 +425,7 @@ def download_css() -> str:
       margin: 0 0 0.65rem; color: var(--rb-muted, var(--rb-cream));
       text-transform: uppercase;
     }
-    /* Single large price callout — no second £ amount banner below it */
+    /* Single large price callout - no second £ amount banner below it */
     .dl-only-price {
       margin: 0.25rem auto 0.55rem;
       padding: 0.55rem 0.85rem;
@@ -608,7 +608,7 @@ def download_css() -> str:
     [data-theme="light"] .dl-auto-renew-label {
       color: #0f2340;
     }
-    /* Light mode: downloads card sits on light panel-card — darken remaining pale notes */
+    /* Light mode: downloads card sits on light panel-card - darken remaining pale notes */
     [data-theme="light"] .downloads h2 {
       color: #0a2348;
     }
@@ -638,7 +638,7 @@ def download_css() -> str:
       color: #0a2348;
       text-shadow: none;
     }
-    /* Light: plan tiles on light form — light fill + dark title/price (not pale soft/white) */
+    /* Light: plan tiles on light form - light fill + dark title/price (not pale soft/white) */
     [data-theme="light"] .dl-plan-option {
       background: #e8f1f8;
       border-color: rgba(0, 180, 220, 0.35);
@@ -718,7 +718,7 @@ def download_css() -> str:
       display: flex; flex-direction: column; gap: 0.4rem; width: 100%;
       align-items: stretch;
     }
-    /* Shared buy control: pill, not square — month/year same size */
+    /* Shared buy control: pill, not square - month/year same size */
     a.dl, button.dl {
       display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 0.15rem;
@@ -816,7 +816,7 @@ def payment_connect_disclaimer_html() -> str:
     """
     return (
         '<p class="dl-payment-disclaimer" id="dl-payment-disclaimer">'
-        "<strong>STRONG DISCLAIMER — PAYMENT REQUIRED AFTER TRIAL:</strong> "
+        "<strong>STRONG DISCLAIMER - PAYMENT REQUIRED AFTER TRIAL:</strong> "
         "Residual Connect includes a free <strong>3-day (72-hour)</strong> trial "
         "on this device (<strong>no card</strong>). After the trial ends, Connect "
         "needs a <strong>paid KEYGEN / active subscription</strong>. If payment "
@@ -869,7 +869,7 @@ def platform_face_title(platform: str) -> str:
 def detect_platform_from_user_agent(user_agent: str = "") -> str:
     """Map browser User-Agent to a catalog free-download platform key.
 
-    Returns one of: windows, android, macos, ios, linux — empty if unknown.
+    Returns one of: windows, android, macos, ios, linux - empty if unknown.
     Order matters (iPhone/iPad before Mac; Android before Linux).
     """
     ua = (user_agent or "").strip()
@@ -888,7 +888,7 @@ def detect_platform_from_user_agent(user_agent: str = "") -> str:
     if "macintosh" in low or "mac os" in low or "mac_powerpc" in low:
         return "macos"
     if "cros" in low:
-        # ChromeOS — closest free package is Linux
+        # ChromeOS - closest free package is Linux
         return "linux"
     if "linux" in low or "x11" in low or "ubuntu" in low or "fedora" in low:
         return "linux"
@@ -984,16 +984,16 @@ def rx_browser_package_href(
 def rx_browser_download_label(user_agent: str = "") -> str:
     """Human label for the Rx download control (device-aware wording)."""
     plat = detect_platform_from_user_agent(user_agent)
-    base = f"Rx Privacy Browser · Suite {RELEASE_VERSION}"
+    base = f"Rx Privacy Browser · {RELEASE_VERSION}"
     if plat in ("android", "ios"):
-        return f"{base} ({plat} companion package — MV3 notes inside; full load-unpacked on desktop)"
+        return f"{base} ({plat} companion package - MV3 notes inside; full load-unpacked on desktop)"
     if plat == "windows":
         return f"{base} (Windows expandable zip · Chromium Edge/Chrome)"
     if plat == "macos":
         return f"{base} (macOS expandable zip · Chromium load unpacked)"
     if plat == "linux":
         return f"{base} (Linux package · Chromium load unpacked)"
-    return f"{base} (Chromium MV3 extension — expandable zip)"
+    return f"{base} (Chromium MV3 extension - expandable zip)"
 
 
 def list_rx_browser_platform_packages(
@@ -1182,23 +1182,23 @@ def render_homepage_buy_form_html(
 
 # Suite storefront (homepage section above VPN #downloads)
 SUITE_SECTION_ID = "suite-storefront"
-SUITE_PRODUCT_TITLE = "Restore Privacy residual VPN"
+SUITE_PRODUCT_TITLE = "Restore Privacy"
 SUITE_PRODUCT_SUBTITLE = (
-    "VPN, Perccent wallet (%), and Evolve in one app — free 3-day trial, then KEYGEN"
+    "A dedicated virtual private network for residual traffic - free 3-day trial, then KEYGEN"
 )
 SUITE_VERSION_LABEL = f"v {RELEASE_VERSION}"
 # Retired left-box KEYGEN licence/trial line (no longer shown on storefront).
 SUITE_KEYGEN_HINT = ""
 # Left-box pay-hint: residual trial first (no card); pay after 72h for KEYGEN/subscription.
 SUITE_PAY_HINT_HTML = (
-    "<strong>Free residual trial — 3 days (72 hours)</strong> on this device after "
+    "<strong>Free residual trial - 3 days (72 hours)</strong> on this device after "
     "install (no card, no KEYGEN). When the trial ends, residual Connect needs a "
     "<strong>paid KEYGEN / active subscription</strong> from Get KEYGEN above "
-    "(£3.00/month or yearly). Download the Suite freely; pay only when you want to "
-    "continue past the trial. Yearly plans available (17% discount)."
+    "(£3.00/month or yearly). Download free; pay only when you want to continue "
+    "past the trial. Yearly plans available (17% discount)."
 )
 SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
-# Anonymous free-CTA delivery (no KEYGEN / no /pay) — detected platform only
+# Anonymous free-CTA delivery (no KEYGEN / no /pay) - detected platform only
 SUITE_FREE_DIRECT_QUERY = "free_direct"
 SUITE_PAY_PATH = "/pay"
 SUITE_PAY_PRODUCT = "suite"
@@ -1211,14 +1211,14 @@ FREEBIE_IMG_PATH = "/static/freebie.jpg"
 # Catalog monopin for links (face art no longer bakes a version string)
 FREE_DOWNLOAD_FACE_VERSION = RELEASE_VERSION
 FREEBIE_IMG_ALT = (
-    "Download Restore Privacy residual VPN — free 3-day residual trial, then KEYGEN"
+    "Download Restore Privacy - free 3-day trial, then KEYGEN"
 )
 FREE_DOWNLOAD_CTA_ID = "free-download-v1-cta"
 FREE_PACKAGES_PAGE_ID = "free-packages-page"
 DOWNLOADS_MAP_PAGE_ID = "downloads-map-page"
 
-# Suite product ecosystem sub-menu (Perc explorer + Evolve + Perccent wallet docs).
-# Only real public destinations (verified live); align explorer base with admin_perc.
+# Optional external product doc destinations (not linked from the live storefront
+# product pitch). Explorer base aligns with admin_perc when used.
 try:
     from admin_perc import DEFAULT_PERC_PUBLIC_BASE as _PERC_EXPLORER_BASE
 except ImportError:  # pragma: no cover
@@ -1256,7 +1256,7 @@ SUITE_PERCCENT_WALLET_README_HREF = (
 )
 SUITE_PERCCENT_WALLET_README_LABEL = "Perccent wallet README"
 
-# Suite ecosystem product family — rpOS opens on-site README (same-origin)
+# Suite ecosystem product family - rpOS opens on-site README (same-origin)
 SUITE_RPOS_HREF = "/RPOS.md"
 SUITE_RPOS_LABEL = "rpOS"
 SUITE_RPOS_TITLE = "Restore Privacy Operating System"
@@ -1273,7 +1273,7 @@ SUITE_ECOSYSTEM_VPN_KEY = "suite-vpn"
 SUITE_CERBERUS_HREF = "/CERBERUS.md"
 SUITE_CERBERUS_LABEL = "CERBERUS"
 SUITE_CERBERUS_KEY = "cerberus"
-SUITE_CERBERUS_TITLE = "CERBERUS — residual fleet oracle"
+SUITE_CERBERUS_TITLE = "CERBERUS - residual fleet oracle"
 SUITE_CERBERUS_README_GITHUB_HREF = (
     "https://github.com/rgsneddon/CERBERUS/blob/main/README.md"
 )
@@ -1284,7 +1284,7 @@ NODE_PREFERENCE_SECTION_ID = "download-node-preference"
 NODE_OPERATOR_DOCS_HREF = "/NODE_OPERATOR.md"
 NODE_OPERATOR_DOCS_LABEL = "Residual node / operator path"
 NODE_OPERATOR_DOCS_ALIAS_HREF = "/node-operator"
-# Public open Suite Pages (client storefront docs only — no /admin).
+# Public open Suite Pages (client storefront docs only - no /admin).
 NODE_PUBLIC_SUITE_PAGES_HREF = "https://rgsneddon.github.io/restore-privacy-suite/"
 NODE_PUBLIC_SUITE_PAGES_LABEL = "Public Suite Pages (client docs)"
 NODE_PUBLIC_SUITE_SOURCE_HREF = "https://github.com/rgsneddon/restore-privacy-suite"
@@ -1314,7 +1314,7 @@ except ImportError:  # pragma: no cover
         _COMMERCIAL_KEY = "commercial_suite_node"
         _COMMERCIAL_LINE = "commercial_suite"
 
-# Private retained Service page path — not advertised from public customer HTML.
+# Private retained Service page path - not advertised from public customer HTML.
 NODE_PREFERENCE_COMMERCIAL_HREF = "/service"
 NODE_PREFERENCE_COMMERCIAL_CHECKOUT = _COMMERCIAL_CHECKOUT
 NODE_PREFERENCE_DEPOSIT_LABEL = _COMMERCIAL_PRICE
@@ -1323,20 +1323,20 @@ NODE_PREFERENCE_PRODUCT_KEY = _COMMERCIAL_KEY
 NODE_PREFERENCE_PRODUCT_LINE = _COMMERCIAL_LINE
 
 NODE_PREFERENCE_HEADING = "Full business package? (£3000 deposit required)"
-# HTML blurb — human cadence; £3000 is a deposit to start the work (not final total).
+# HTML blurb - human cadence; £3000 is a deposit to start the work (not final total).
 NODE_PREFERENCE_BLURB = (
     "Run a residual node on your own server, or arrange a dedicated host through "
     "<strong>Raskul</strong>. This is the full business package: on-site network "
     "tasks, mainframe establishment, and deploy of <strong>Restore Privacy "
-    "Operating System</strong> (rpOS) and the matching Suite parts — with a "
+    "Operating System</strong> (rpOS) and matching residual node work - with a "
     "user-friendly interface and everyday business apps. "
     f"Prices start with a <strong>{NODE_PREFERENCE_DEPOSIT_LABEL} deposit</strong> "
     "to do the work (that payment is a deposit, not the finished all-in price). "
     "<em>Costs may be higher</em> once scope, on-site work, and hardware are "
-    "agreed — we confirm anything beyond the deposit before further work."
+    "agreed - we confirm anything beyond the deposit before further work."
 )
 NODE_PREFERENCE_DEPOSIT_CTA = (
-    f"Pay {NODE_PREFERENCE_DEPOSIT_LABEL} deposit — begin the work (one-time)"
+    f"Pay {NODE_PREFERENCE_DEPOSIT_LABEL} deposit - begin the work (one-time)"
 )
 NODE_PREFERENCE_DEPOSIT_NOTE = (
     f"The {NODE_PREFERENCE_DEPOSIT_LABEL} is a <strong>deposit to do the work</strong>, "
@@ -1399,7 +1399,7 @@ def freebie_img_src() -> str:
     return f"{FREEBIE_IMG_PATH}?v={public_brand_asset_version()}"
 
 
-# Visible FREE DOWNLOAD label (typewriter face — matches Suite intro neon mono)
+# Visible FREE DOWNLOAD label (typewriter face - matches Suite intro neon mono)
 FREE_DOWNLOAD_CTA_LABEL = "FREE DOWNLOAD"
 # Transparent brand mark (dark fill) flanking FREE DOWNLOAD left + right
 FREE_DOWNLOAD_CTA_LOGO_SRC = "/logo_transparent.png"
@@ -1407,7 +1407,7 @@ FREE_DOWNLOAD_CTA_LOGO_CLASS = "free-download-cta-logo"
 
 
 def free_download_cta_css() -> str:
-    """Full-width rectangular free-download button — data-path chrome + typewriter label."""
+    """Full-width rectangular free-download button - data-path chrome + typewriter label."""
     return f"""
     .free-download-cta-wrap {{
       width: 100%; max-width: 100%; box-sizing: border-box;
@@ -1600,7 +1600,7 @@ def render_free_download_cta_html(
     if def_plat:
         title = platform_face_title(def_plat)
         aria = (
-            f"FREE DOWNLOAD — latest Restore Privacy residual VPN for {title} "
+            f"FREE DOWNLOAD - latest Restore Privacy for {title} "
             f"(v{ver}, no payment)"
         )
         detect_attrs = (
@@ -1611,7 +1611,7 @@ def render_free_download_cta_html(
         pay_attr = ' data-pay="0" data-free-direct="1"'
     else:
         aria = (
-            "FREE DOWNLOAD — open Downloads Map for Restore Privacy residual VPN "
+            "FREE DOWNLOAD - open Downloads Map for Restore Privacy "
             f"v{ver} (device not detected)"
         )
         detect_attrs = ' data-fallback-map="1"'
@@ -1646,7 +1646,7 @@ def render_free_download_cta_html(
 
 
 def free_packages_page_css() -> str:
-    """Legacy alias — Downloads Map styles."""
+    """Legacy alias - Downloads Map styles."""
     return downloads_map_page_css()
 
 
@@ -1683,7 +1683,7 @@ def downloads_map_page_css() -> str:
       margin: 0 0 0.55rem; font-size: 1.02rem; font-weight: 800;
       color: #dbeafe; letter-spacing: 0.03em;
     }
-    /* Light mode: map page body on light shell — darken titles/blurbs */
+    /* Light mode: map page body on light shell - darken titles/blurbs */
     [data-theme="light"] .downloads-map-page h1,
     [data-theme="light"] .free-packages-page h1 {
       color: #0a2348;
@@ -1788,13 +1788,13 @@ def list_downloads_map_rows(
         fname = str(p.get("filename") or "")
         rows.append(
             {
-                "product": "Restore Privacy residual VPN",
+                "product": "Restore Privacy",
                 "kind": "suite_client",
                 "platform": plat,
                 "filename": fname,
                 "href": suite_free_direct_download_href(plat),
                 "version": ver,
-                "label": f"{platform_face_title(plat)} — Suite v{ver}",
+                "label": f"{platform_face_title(plat)} - v{ver}",
             }
         )
     return rows
@@ -1889,8 +1889,8 @@ def render_downloads_map_page_html(
             f'<p class="downloads-map-detect-hint free-packages-detect-hint" '
             f'id="downloads-map-detect-hint" '
             f'data-detected-platform="{_esc_html(def_plat)}">'
-            f"Detected your device as <strong>{_esc_html(face)}</strong> — "
-            f"Suite v{_esc_html(ver)} free download link highlighted; all Suite platforms below.</p>"
+            f"Detected your device as <strong>{_esc_html(face)}</strong> - "
+            f"v{_esc_html(ver)} free download link highlighted; all platforms below.</p>"
         )
         detect_main_attr = f' data-detected-platform="{_esc_html(def_plat)}"'
     else:
@@ -1916,7 +1916,7 @@ def render_downloads_map_page_html(
     extra_css = public_site_css() + downloads_map_page_css()
     header = public_brand_header_html(active="home", product_active="vpn")
     motif = public_data_path_layer_html()
-    body = f"""{public_head_open(title=f"Downloads Map · Suite {ver}", extra_css=extra_css)}
+    body = f"""{public_head_open(title=f"Downloads Map · Restore Privacy {ver}", extra_css=extra_css)}
 {motif}
   <div class="page-shell" id="page-shell" data-page="downloads-map"
        data-product="suite" data-suite-version="{_esc_html(ver)}" data-chrome="pro">
@@ -1924,13 +1924,13 @@ def render_downloads_map_page_html(
     <main class="downloads-map-page free-packages-page panel-card"
           id="{DOWNLOADS_MAP_PAGE_ID}" data-downloads-map-page="1"
           data-free-packages-page="1" data-version="{_esc_html(ver)}"
-          aria-label="Downloads Map — Restore Privacy residual VPN latest only"{detect_main_attr}>
+          aria-label="Downloads Map - Restore Privacy latest only"{detect_main_attr}>
       <div class="downloads-map-center free-packages-center" id="downloads-map-center">
         <h1 id="downloads-map-heading">Downloads Map</h1>
         <p class="downloads-map-blurb free-packages-blurb" id="downloads-map-blurb">
-          <strong>Restore Privacy residual VPN v{_esc_html(ver)}</strong> only — one link
-          per device platform (no companion products). Each platform link starts an
-          immediate free Suite download for that device (same free path as the home
+          <strong>Restore Privacy v{_esc_html(ver)}</strong> - one free download link
+          per device platform. Each platform link starts an immediate free download
+          for that device (same free path as the home
           <strong>FREE DOWNLOAD</strong> button). KEYGEN residual licences remain on
           <a href="/pay?product=suite">/pay</a>.
         </p>
@@ -1948,61 +1948,55 @@ def render_downloads_map_page_html(
 
 
 def suite_product_submenu_links() -> list[tuple[str, str, str, str]]:
-    """(href, label, data-key, title) for Suite ecosystem submenu.
+    """(href, label, data-key, title) for public product submenu.
 
-    *title* is optional expanded meaning (e.g. rpOS → Restore Privacy Operating
-    System) for ``title`` / ``aria-label``; empty string when label is enough.
+    *title* is optional expanded meaning for ``title`` / ``aria-label``;
+    empty string when label is enough. VPN product links only - no multi-product
+    wallet/analysis pitch on the storefront.
     """
     return [
-        (SUITE_RPOS_HREF, SUITE_RPOS_LABEL, SUITE_RPOS_KEY, SUITE_RPOS_TITLE),
+        (
+            SUITE_ECOSYSTEM_VPN_HREF,
+            "About the app",
+            SUITE_ECOSYSTEM_VPN_KEY,
+            "What Restore Privacy is and how it works",
+        ),
+        (
+            "/settings-explainer",
+            "Settings guide",
+            "settings-guide",
+            "How to use Restore Privacy and Settings",
+        ),
+        (
+            "/how-to-buy",
+            "How to buy",
+            "how-to-buy",
+            "Plans, KEYGEN, and checkout",
+        ),
+        (
+            "/PRIVACY_POLICY.md",
+            "Privacy policy",
+            "privacy-policy",
+            "Privacy policy",
+        ),
         (
             SUITE_RX_BROWSER_HREF,
             SUITE_RX_BROWSER_LABEL,
             SUITE_RX_BROWSER_KEY,
             SUITE_RX_BROWSER_LABEL,
         ),
-        (
-            SUITE_ECOSYSTEM_VPN_HREF,
-            SUITE_ECOSYSTEM_VPN_LABEL,
-            SUITE_ECOSYSTEM_VPN_KEY,
-            "Restore Privacy residual VPN / Connect",
-        ),
-        (SUITE_PERC_EXPLORER_HREF, SUITE_PERC_EXPLORER_LABEL, "perc-explorer", ""),
-        (
-            SUITE_CERBERUS_HREF,
-            SUITE_CERBERUS_LABEL,
-            SUITE_CERBERUS_KEY,
-            SUITE_CERBERUS_TITLE,
-        ),
-        (SUITE_EVOLVE_DOCS_HREF, SUITE_EVOLVE_DOCS_LABEL, "evolve-docs", ""),
-        (
-            SUITE_EVOLVE_WHITEPAPER_HREF,
-            SUITE_EVOLVE_WHITEPAPER_LABEL,
-            "evolve-whitepaper",
-            "",
-        ),
-        (SUITE_EVOLVE_SOURCE_HREF, SUITE_EVOLVE_SOURCE_LABEL, "evolve-source", ""),
-        (SUITE_PERCCENT_WALLET_HREF, SUITE_PERCCENT_WALLET_LABEL, "perccent-wallet", ""),
-        (
-            SUITE_PERCCENT_WALLET_README_HREF,
-            SUITE_PERCCENT_WALLET_README_LABEL,
-            "perccent-readme",
-            "",
-        ),
     ]
 
 
-# Suite ecosystem submenu title (display: SUITE ECOSYSTEM (wip) via CSS uppercase + wip span)
-SUITE_PRODUCT_SUBMENU_LABEL = "Suite ecosystem (wip)"
-SUITE_PRODUCT_SUBMENU_LABEL_HTML = (
-    'Suite ecosystem <span class="suite-product-submenu-wip">(wip)</span>'
-)
+# Public product submenu title (storefront footer links)
+SUITE_PRODUCT_SUBMENU_LABEL = "Learn more"
+SUITE_PRODUCT_SUBMENU_LABEL_HTML = "Learn more"
 
 
 def render_suite_product_submenu_html() -> str:
-    """Sub-menu: product family (rpOS / browser / VPN) + Perc / Evolve / wallet.
+    """Sub-menu: product docs and guides under the KEYGEN cart.
 
-    Placed at the bottom of the Suite storefront box (after KEYGEN cart / pay-hint).
+    Placed at the bottom of the storefront box (after KEYGEN cart / pay-hint).
     """
     items: list[str] = []
     for href, label, key, title in suite_product_submenu_links():
@@ -2024,7 +2018,7 @@ def render_suite_product_submenu_html() -> str:
     return f"""
     <nav class="suite-product-submenu" id="{SUITE_SUBMENU_ID}"
          data-suite-product-submenu="1"
-         aria-label="{_esc_html(SUITE_PRODUCT_SUBMENU_LABEL)} — rpOS, Rx Privacy Browser, VPN, Perc, Evolve">
+         aria-label="{_esc_html(SUITE_PRODUCT_SUBMENU_LABEL)} - app docs and guides">
       <p class="suite-product-submenu-label" id="suite-product-submenu-label">
         {SUITE_PRODUCT_SUBMENU_LABEL_HTML}
       </p>
@@ -2065,7 +2059,7 @@ def render_suite_perc_wallet_explorer_iframe_html() -> str:
         <iframe class="suite-perc-wallet-explorer-frame"
                 id="{SUITE_PERC_WALLET_EXPLORER_IFRAME_ID}"
                 src="{_esc_html(src_href)}"
-                title="Perccent Network Explorer — Chronoflux Principia chain"
+                title="Perccent Network Explorer - Chronoflux Principia chain"
                 loading="eager"
                 referrerpolicy="no-referrer-when-downgrade"
                 allow="fullscreen"
@@ -2160,7 +2154,7 @@ def suite_storefront_css() -> str:
       text-transform: none;
       letter-spacing: 0.04em;
     }
-    /* Perccent explorer embed — forces connect on first homepage visit */
+    /* Block explorer embed - forces connect on first homepage visit */
     .suite-perc-wallet-explorer {
       width: 100%; max-width: 100%; box-sizing: border-box;
       margin: 0.75rem 0 1rem; text-align: left;
@@ -2296,7 +2290,7 @@ def suite_storefront_css() -> str:
         color: #0a2a6e;
       }
     }
-    /* World flags strip — bottom of right-hand downloads (#downloads) box */
+    /* World flags strip - bottom of right-hand downloads (#downloads) box */
     .downloads .suite-world-flags,
     .suite-world-flags {
       display: flex; flex-wrap: wrap; gap: 1px; justify-content: center;
@@ -2397,7 +2391,7 @@ def render_node_preference_html(*, standalone: bool = True) -> str:
         (NODE_OPERATOR_DOCS_ALIAS_HREF, "Node operator (short path)", "node-docs-alias"),
         (NODE_PUBLIC_SUITE_PAGES_HREF, NODE_PUBLIC_SUITE_PAGES_LABEL, "suite-pages"),
         (NODE_PUBLIC_SUITE_SOURCE_HREF, NODE_PUBLIC_SUITE_SOURCE_LABEL, "suite-source"),
-        # Commercial Service page (/service) is retained privately — not linked here.
+        # Commercial Service page (/service) is retained privately - not linked here.
     ]
     anchors: list[str] = []
     for href, label, key in links:
@@ -2414,7 +2408,7 @@ def render_node_preference_html(*, standalone: bool = True) -> str:
            data-node-preference="1" data-business-package="1"
            data-commercial-deposit="1"{stand_attr}
            data-price-pence="{NODE_PREFERENCE_DEPOSIT_PENCE}"
-           aria-label="Full business package — residual node and deposit">
+           aria-label="Full business package - residual node and deposit">
       <h3 id="node-pref-heading">{_esc_html(NODE_PREFERENCE_HEADING)}</h3>
       <p class="node-pref-blurb" id="node-pref-blurb">{NODE_PREFERENCE_BLURB}</p>
       <p class="node-pref-deposit-note" id="node-pref-deposit-note"
@@ -2540,7 +2534,7 @@ def render_suite_storefront_html(
         def_plat = ""
 
     # Cart entry: GET /pay (monthly Suite KEYGEN). Device is chosen on the /pay
-    # cart page — no homepage Device-for-KEYGEN select and no platform button grid.
+    # cart page - no homepage Device-for-KEYGEN select and no platform button grid.
     keygen_form = f"""
     <form class="dl-buy-form suite-keygen-cta" id="suite-keygen-form" method="get"
           action="/pay" data-pay-via="suite-keygen-cart" data-product="suite"
@@ -2549,10 +2543,10 @@ def render_suite_storefront_html(
       <input type="hidden" name="interval" value="month" id="suite-interval-field"/>
       <button type="submit" class="dl-buy-now" id="suite-keygen-buy"
               data-product="suite" data-cart-cta="1">
-        Get KEYGEN — {PRICE_LABEL}/month</button>
+        Get KEYGEN - {PRICE_LABEL}/month</button>
       <p class="suite-cart-hint" id="suite-cart-hint">
         Continues to a short cart: one-month KEYGEN licence, choose device, and
-        whether to auto-renew — then secure Stripe checkout.
+        whether to auto-renew - then secure Stripe checkout.
       </p>
       <p class="dl-stripe-branding" id="suite-stripe-branding">{STRIPE_CHECKOUT_BRANDING_NOTE}</p>
     </form>
@@ -2563,7 +2557,7 @@ def render_suite_storefront_html(
 
     return f"""
   <section class="suite-storefront panel-card" id="{SUITE_SECTION_ID}"
-           aria-label="Download Restore Privacy residual VPN"
+           aria-label="Download Restore Privacy - dedicated VPN"
            data-product="suite" data-storefront="suite"
            data-suite-version="{_esc_html(RELEASE_VERSION)}"{detect_attr}>
     <h2 id="suite-storefront-title">{SUITE_PRODUCT_TITLE}</h2>
@@ -2626,7 +2620,7 @@ def render_download_section_html(
         default_interval=default_interval,
     )
 
-    # One local-currency line (includes accept notice — no second accept paragraph).
+    # One local-currency line (includes accept notice - no second accept paragraph).
     accept = local.accept_notice  # e.g. we accept *EUR*
     if (local.currency or "").upper() in ("GBP", ""):
         local_line = (
@@ -2652,10 +2646,10 @@ def render_download_section_html(
     # Upper explainer boxes (only-price banner + price-box panel) removed.
     return f"""
   <section class="downloads panel-card" id="downloads"
-    aria-label="Download Restore Privacy residual VPN client"
+    aria-label="Download Restore Privacy client"
     data-product="suite" data-catalog-version="{RELEASE_VERSION}"
     data-price-currency="{local.currency}" data-accept-currency="{local.currency}">
-    <h2>Download Suite client v{RELEASE_VERSION}</h2>
+    <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-local-price" id="dl-local-price">{local_line}</p>
     <p class="dl-accept-currency" id="dl-accept-currency" hidden>{accept}</p>
     <div class="dl-buttons" id="dl-buttons"{buttons_mode}>

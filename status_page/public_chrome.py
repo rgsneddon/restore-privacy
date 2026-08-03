@@ -1,4 +1,4 @@
-"""Shared public site chrome — brand header, nav buttons, theme (light/dark/device).
+"""Shared public site chrome - brand header, nav buttons, theme (light/dark/device).
 
 Used by homepage, public documents, and Settings guide. **Not** used by /admin.
 
@@ -28,10 +28,10 @@ SETTINGS_GUIDE_LINK_ID = "settings-guide-link"
 SERVICE_LINK_ID = "service-link"
 
 # Public website brand / page identity (document <title> + default page title).
-# Visible header no longer shows this as an H1 — banner.jpg is the heading mark.
-# Browser-tab title: all-caps Suite brand (never "RESTORE PRIVACY VPN").
-PUBLIC_BRAND_TITLE = "RESTORE PRIVACY SUITE"
-# Keep in lockstep with downloads.RELEASE_VERSION (Suite catalog monopin).
+# Visible header no longer shows this as an H1 - banner.jpg is the heading mark.
+# Browser-tab title: all-caps product brand (dedicated VPN).
+PUBLIC_BRAND_TITLE = "RESTORE PRIVACY"
+# Keep in lockstep with downloads.RELEASE_VERSION (catalog monopin).
 try:
     from downloads import RELEASE_VERSION as _CATALOG_PIN
 except Exception:  # pragma: no cover
@@ -40,7 +40,7 @@ except Exception:  # pragma: no cover
     except Exception:  # pragma: no cover
         _CATALOG_PIN = "1.0.7"
 PUBLIC_BRAND_VERSION = str(_CATALOG_PIN).strip() or "1.0.7"
-PUBLIC_BRAND_DISPLAY = f"Restore Privacy Suite v{PUBLIC_BRAND_VERSION}"
+PUBLIC_BRAND_DISPLAY = f"Restore Privacy v{PUBLIC_BRAND_VERSION}"
 
 # Borderless mark: shield + protruding green key only (transparent outside).
 # Opaque logo.png remains for favicon/legacy plate uses; Stripe uses stripe_brand_*.
@@ -55,7 +55,7 @@ PUBLIC_BRAND_BANNER_STATIC_NAME = "banner.jpg"
 PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT = 160
 PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS = 96
 PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS = 260
-# Legacy size aliases (tests / callers) — height-matched to banner row.
+# Legacy size aliases (tests / callers) - height-matched to banner row.
 PUBLIC_BRAND_LOGO_SIZE_DEFAULT = PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT
 PUBLIC_BRAND_LOGO_SIZE_MIN_CSS = PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS
 PUBLIC_BRAND_LOGO_SIZE_MAX_CSS = PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS
@@ -82,11 +82,11 @@ PRODUCT_VAULT_PATH = "/vault"
 PRODUCT_VPN_KEY = "vpn"
 PRODUCT_BROWSER_KEY = "browser"
 PRODUCT_VAULT_KEY = "vault"
-# Suite is the public product; VPN remains the residual Connect tab inside the app.
-PRODUCT_VPN_LABEL = "Restore Privacy Suite"
+# Public product family: dedicated VPN is the live product; Browser/Vault landings stay.
+PRODUCT_VPN_LABEL = "Restore Privacy"
 PRODUCT_BROWSER_LABEL = "Restore Privacy Browser"
 PRODUCT_VAULT_LABEL = "Restore Privacy Vault"
-PRODUCT_VPN_TITLE = "RESTORE PRIVACY SUITE"
+PRODUCT_VPN_TITLE = "RESTORE PRIVACY"
 PRODUCT_BROWSER_TITLE = "RESTORE PRIVACY BROWSER"
 PRODUCT_VAULT_TITLE = "RESTORE PRIVACY VAULT"
 PRODUCT_TABS_ID = "product-tabs"
@@ -115,7 +115,7 @@ def public_brand_asset_version() -> str:
         "favicon.png",
         "apple-touch-icon.png",
         "data_path_motif.svg",
-        "freebie.jpg",  # FREE DOWNLOAD CTA face — cache-bust when art changes
+        "freebie.jpg",  # FREE DOWNLOAD CTA face - cache-bust when art changes
     ):
         p = _STATIC_DIR / name
         if p.is_file():
@@ -177,7 +177,7 @@ def public_site_css() -> str:
         from status_page.coffee_link import coffee_link_css  # type: ignore
     footer_css = coffee_link_css()
     return f"""
-/* === Public site chrome (shared) — site-chrome-pro / data-path === */
+/* === Public site chrome (shared) - site-chrome-pro / data-path === */
 {footer_css}
 :root, [data-theme="dark"] {{
   --rb-navy: #0a1628;
@@ -448,7 +448,7 @@ body, body.{SITE_CHROME_PRO_CLASS}, body.site-public {{
   position: relative;
   z-index: 1;
 }}
-/* Product family tabs (VPN / Browser / Vault) — equal full shell width */
+/* Product family tabs (VPN / Browser / Vault) - equal full shell width */
 #{PRODUCT_TABS_ID}, .product-tabs {{
   display: flex;
   flex-wrap: nowrap;
@@ -649,7 +649,7 @@ a.product-tab.is-active, .product-tab.is-active {{
   max-width: calc(100% - 2 * clamp(1.05rem, 2.6vw, 1.55rem));
   box-sizing: border-box;
 }}
-/* Banner-only brand mark (no flanking logos) — full width of brand box */
+/* Banner-only brand mark (no flanking logos) - full width of brand box */
 .brand-mark {{
   display: flex;
   flex-direction: row;
@@ -802,7 +802,7 @@ a.product-tab.is-active, .product-tab.is-active {{
   background: var(--rb-neon-border);
   opacity: 0.55;
 }}
-/* Refined nav — professional pills, not toy balloons */
+/* Refined nav - professional pills, not toy balloons */
 #{SITE_NAV_ID}, .site-nav, .doc-links, #site-nav {{
   margin: 0.2rem 0 0;
   max-width: 100%;
@@ -885,7 +885,7 @@ a.product-tab.is-active, .product-tab.is-active {{
   outline-offset: 3px;
 }}
 .doc-sep {{ display: none; }}
-/* Theme control — calmer segmented control */
+/* Theme control - calmer segmented control */
 #{THEME_MODE_CONTROL_ID}, .theme-mode-control {{
   display: flex;
   flex-wrap: wrap;
@@ -1206,7 +1206,7 @@ a.product-tab.is-active, .product-tab.is-active {{
     transition-duration: 0.01ms !important;
   }}
 }}
-/* Responsive — tablet */
+/* Responsive - tablet */
 @media (max-width: 820px) {{
   .page-shell, #{PAGE_SHELL_ID}, #doc-page-shell, #support-page-shell {{
     width: min(100% - 1.35rem, var(--rb-max));
@@ -1216,7 +1216,7 @@ a.product-tab.is-active, .product-tab.is-active {{
     padding: 0.7rem 0.35rem;
   }}
 }}
-/* Responsive — phone */
+/* Responsive - phone */
 @media (max-width: 520px) {{
   body, body.{SITE_CHROME_PRO_CLASS}, body.site-public {{
     padding: 0.85rem 0 2.25rem;
@@ -1349,7 +1349,7 @@ def public_nav_links_html(*, active: str | None = None) -> str:
     served as a document). Settings Guide remains in the top brand nav.
 
     Service (``SERVICE_PATH`` / ``/service``) is intentionally **not** in the
-    public main menu — the page module and route are retained for private use.
+    public main menu - the page module and route are retained for private use.
     """
     items = (
         ("HOME", HOME_PATH, HOME_LINK_ID, "home"),
@@ -1376,39 +1376,42 @@ def public_nav_links_html(*, active: str | None = None) -> str:
 def public_display_title(raw: str | None = None) -> str:
     """Normalize product title for public brand chrome and document ``<title>``.
 
-    Historical short titles and sole “VPN” branding map to
-    :data:`PUBLIC_BRAND_TITLE` (**RESTORE PRIVACY SUITE**). Empty / missing →
-    Suite brand. A VPN-branded upstream cannot reintroduce **RESTORE PRIVACY
-    VPN** into browser tabs.
+    Maps historical Suite / short titles to :data:`PUBLIC_BRAND_TITLE`
+    (**RESTORE PRIVACY**). Empty / missing → product brand. Body copy describes
+    the dedicated VPN; tab title stays the short brand.
     """
     t = (raw or "").strip()
     if not t:
         return PUBLIC_BRAND_TITLE
-    # Exact legacy VPN / short brand strings
+    # Exact legacy Suite / VPN / short brand strings → canonical brand
     if t in (
         "RESTORE PRIVACY",
         "RESTORE PRIVACY VPN",
+        "RESTORE PRIVACY SUITE",
         "Restore Privacy VPN",
         "Restore Privacy",
-        "Restore Privacy Suite",  # title-case → all-caps tab title
+        "Restore Privacy Suite",
         PUBLIC_BRAND_TITLE,
     ):
         return PUBLIC_BRAND_TITLE
-    # Case-insensitive / suffix-tolerant: any “…PRIVACY VPN” product brand
     compact = " ".join(t.upper().split())
     if compact in (
         "RESTORE PRIVACY",
         "RESTORE PRIVACY VPN",
         "RESTORE PRIVACY SUITE",
-    ) or compact.startswith("RESTORE PRIVACY VPN"):
+    ) or compact.startswith("RESTORE PRIVACY VPN") or compact.startswith(
+        "RESTORE PRIVACY SUITE"
+    ):
         return PUBLIC_BRAND_TITLE
-    # If the only product brand word is VPN (legacy tab), force Suite
-    if "VPN" in compact and "SUITE" not in compact and "RESTORE PRIVACY" in compact:
+    # Legacy sole-VPN product brand wording → canonical short brand
+    if "VPN" in compact and "RESTORE PRIVACY" in compact:
+        return PUBLIC_BRAND_TITLE
+    if "SUITE" in compact and "RESTORE PRIVACY" in compact:
         return PUBLIC_BRAND_TITLE
     return t
 
 
-# Homepage lead copy (human cadence — not a residual inventory list).
+# Homepage lead copy (human cadence - dedicated VPN, not a feature inventory).
 SUITE_HOME_INTRO_ID = "suite-home-intro"
 # Neon typewriter lines (one-shot keystroke animation on page load)
 SUITE_HOME_WELCOME_TYPE = ".:WELCOME, ANON:."
@@ -1418,12 +1421,10 @@ SUITE_HOME_INTRO_HEADING = "...privacy you can actually use..."
 # Legacy alias for callers/tests that still import the short human title idea
 SUITE_HOME_INTRO_HEADING_LEGACY = "Privacy you can actually use"
 SUITE_HOME_INTRO_BODY = (
-    "The Restore Privacy Suite brings together residual VPN protection, the Evolve "
-    "analysis engine and a fun rewards token wallet, for your personal use, all in "
-    "one convenient app. Download the installer for free using the button below, try "
-    "it for three days and when you are ready, buy a licence key — a licence for "
-    "personal use of The Restore Privacy Suite costs only £3 per month or £30 "
-    "annually. This gives you full access to the VPN and RPSuite extras."
+    "Restore Privacy is a dedicated virtual private network for your device - "
+    "built to protect residual traffic cleanly, without clutter. Download free "
+    "below, try three days on this device with no card, then continue with a "
+    "KEYGEN for £3 a month or £30 a year. One app. One job: your privacy, restored."
 )
 # Foot retired: closing typewriter is the end line
 SUITE_HOME_INTRO_FOOT = ""
@@ -1511,7 +1512,7 @@ def suite_home_intro_css() -> str:
       margin: 0.65rem 0 0; font-size: 0.78rem; letter-spacing: 0.06em; font-weight: 700;
       color: var(--rb-accent-sky, #7dd3fc); text-transform: uppercase;
     }
-    /* Neon typewriter (welcome + closing) — large mono, blue/green glow */
+    /* Neon typewriter (welcome + closing) - large mono, blue/green glow */
     .suite-typewriter,
     .neon-type {
       margin: 0 auto;
@@ -1554,7 +1555,7 @@ def suite_home_intro_css() -> str:
       50% { opacity: 0; }
     }
     /* Light mode only: dark blue typewriters + darker intro blurb (dark mode unchanged).
-       Scope .suite-typewriter only — do not recolor free-download .neon-type CTA. */
+       Scope .suite-typewriter only - do not recolor free-download .neon-type CTA. */
     [data-theme="light"] .suite-typewriter,
     [data-theme="light"] .suite-typewriter.neon-type,
     [data-theme="light"] .suite-typewriter-welcome,
@@ -1716,7 +1717,7 @@ def public_head_open(
 def public_page_close() -> str:
     """Close every public HTML shell with the shared copyright + map footer.
 
-    Copyright left, downloads map link right — same line on all public pages
+    Copyright left, downloads map link right - same line on all public pages
     that use this closer (home, downloads-map, docs, support, settings guide,
     product family landings, …). Admin routes do not use this helper.
     """

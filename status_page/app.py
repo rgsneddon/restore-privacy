@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Restore Privacy Suite status host (public shop + private admin).
+"""Restore Privacy status host (public shop + private admin).
 
-Public surface: Suite brand, free residual trial then KEYGEN, commercial deposit, docs.
+Public surface: dedicated VPN brand, free residual trial then KEYGEN, commercial deposit, docs.
 Residual Connect: free 72h device trial (no card); brand packages / paid path use
 KEYGEN or active entitlement. Business-Class requires the compulsory £3000 commercial deposit.
 Does **not** expose a connected-client count or poll a live session metric.
@@ -505,8 +505,7 @@ def render_html(
     title = public_display_title(
         str(status.get("title", PUBLIC_BRAND_TITLE) or PUBLIC_BRAND_TITLE)
     )
-    # Document <title> stays Suite-branded (all-caps PUBLIC_BRAND_TITLE). Never
-    # fall back to a VPN product name; only upgrade empty/legacy leftovers.
+    # Document <title> stays product-branded (all-caps PUBLIC_BRAND_TITLE).
     low = title.casefold()
     if "suite" not in low and "1.0.0" not in title and "vpn" in low:
         title = PUBLIC_BRAND_TITLE
@@ -1005,8 +1004,8 @@ class Handler(BaseHTTPRequestHandler):
                     400,
                     "text/html; charset=utf-8",
                     _html_page(
-                        "Suite download",
-                        '<p class="msg">Choose a platform from the Suite package links '
+                        "Client download",
+                        '<p class="msg">Choose a platform from the package links '
                         "(they open <a href=\"/pay?product=suite\">/pay</a>), or use "
                         "the home FREE DOWNLOAD button when your device is detected.</p>"
                         '<p><a href="/pay?product=suite">Start KEYGEN /pay</a>'
@@ -1087,15 +1086,15 @@ class Handler(BaseHTTPRequestHandler):
                     502,
                     "text/html; charset=utf-8",
                     _html_page(
-                        "Suite download unavailable",
+                        "Download unavailable",
                         f'<p class="msg">Installer for <strong>{_escape_html(plat)}</strong> '
                         f"(catalog <code>{_escape_html(str(_suite_pin))}</code> / "
                         f"<code>{_escape_html(str(fname))}</code>) could not be fetched "
-                        "from the package store. KEYGEN-gated Suite installers are published "
+                        "from the package store. KEYGEN-gated installers are published "
                         "under Helsinki paid-assets for this pin — try again shortly after "
                         "starting your free trial.</p>"
                         '<p><a href="/pay?product=suite">KEYGEN free trial</a> · '
-                        '<a href="/#suite-storefront">Back to Suite</a></p>',
+                        '<a href="/#suite-storefront">Back to home</a></p>',
                     ),
                 )
                 return

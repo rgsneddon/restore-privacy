@@ -113,7 +113,7 @@ class TestSuiteBoxWorldFlags(unittest.TestCase):
         # Downloads right box: still present, no flags strip
         dl = render_download_section_html()
         self.assertIn('id="downloads"', dl)
-        self.assertIn("Download Suite client", dl)
+        self.assertIn("Download client", dl)
         self.assertIn('id="dl-local-price"', dl)
         self.assertIn("dl-buy-form", dl)
         self.assertNotIn('id="dl-price-box"', dl)
@@ -140,7 +140,7 @@ class TestSuiteBoxWorldFlags(unittest.TestCase):
         dl_at = main.index('id="downloads"')
         dl_end = main.index("</section>", dl_at)
         dl_block = main[dl_at:dl_end]
-        self.assertIn("Download Suite client", dl_block)
+        self.assertIn("Download client", dl_block)
         self.assertIn('id="dl-local-price"', dl_block)
         self.assertIn("dl-buttons", dl_block)
         self.assertNotIn('id="dl-price-box"', dl_block)
