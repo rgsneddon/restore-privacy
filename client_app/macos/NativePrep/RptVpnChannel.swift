@@ -918,18 +918,25 @@ enum RptVpnChannel {
       + "re-sign with scripts/sign_macos_residual_team.py (public DevID omits host NE)."
   }
 
+  /// Load or create product Packet Tunnel manager and save `isEnabled=true`.
+  ///
+  /// Always calls `loadAllFromPreferences` / `saveToPreferences` — does **not**
+  /// short-circuit when the host entitlement probe is false. Catalog DevID builds
+  /// still attempt registration so System Settings can show Allow; if the OS
+  /// rejects NE without host packet-tunnel-provider, the error path is honest.
   private static func loadOrCreateManager(
     host: String,
     port: UInt16,
     completion: @escaping (NETunnelProviderManager?, String?) -> Void
   ) {
-    if !hostHasPacketTunnelNetworkExtensionEntitlement() {
-      completion(nil, hostMissingNeEntitlementMessage())
-      return
-    }
     NETunnelProviderManager.loadAllFromPreferences { managers, error in
       if let error {
-        completion(nil, describeNePreferencesError(error))
+        // Annotate residual-honest copy when host NE is missing (probe only).
+        var detail = describeNePreferencesError(error)
+        if !hostHasPacketTunnelNetworkExtensionEntitlement() {
+          detail = detail + " " + hostMissingNeEntitlementMessage()
+        }
+        completion(nil, detail)
         return
       }
       let manager = selectOrCreateManager(from: managers)
@@ -940,7 +947,11 @@ enum RptVpnChannel {
       manager.isOnDemandEnabled = false
       manager.saveToPreferences { saveErr in
         if let saveErr {
-          completion(nil, describeNePreferencesError(saveErr))
+          var detail = describeNePreferencesError(saveErr)
+          if !hostHasPacketTunnelNetworkExtensionEntitlement() {
+            detail = detail + " " + hostMissingNeEntitlementMessage()
+          }
+          completion(nil, detail)
           return
         }
         // Required after save so connection/session objects are valid for startTunnel.

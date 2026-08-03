@@ -90,6 +90,17 @@ def find_signables(app: Path) -> list[Path]:
     return out
 
 
+def host_ne_for_residual_catalog() -> bool:
+    """Whether catalog DevID host includes packet-tunnel-provider (residual).
+
+    Default **on** for residual monopin ships so free/paid macOS can register
+    Packet Tunnel in System Settings. Opt out with RPT_MACOS_HOST_NE=0 if AMFI
+    launch issues reappear without a matching Developer ID NE profile.
+    """
+    raw = os.environ.get("RPT_MACOS_HOST_NE", "1").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
 def entitlements_for(path: Path) -> Path | None:
     """Optional entitlements file for host app / PacketTunnel."""
     name = path.name
@@ -97,13 +108,25 @@ def entitlements_for(path: Path) -> Path | None:
         ent = ROOT / "client_app/macos/PacketTunnel/PacketTunnel.entitlements"
         return ent if ent.is_file() else None
     if path.suffix == ".app" or name == "restore_privacy_client":
-        # Developer ID host: Flutter needs CS allow-jit / unsigned-exec under Hardened Runtime
-        # (missing those → launchd spawn fail POSIX 163 / process SIGKILL 137).
+        # Residual catalog: host packet-tunnel-provider + Flutter Hardened Runtime CS.
+        if host_ne_for_residual_catalog():
+            residual = (
+                ROOT / "client_app/macos/Runner/DeveloperIDResidual.entitlements"
+            )
+            if residual.is_file():
+                print(
+                    f"host entitlements: residual NE ({residual.name})",
+                    flush=True,
+                )
+                return residual
+        # Fallback: DevID without host NE (AMFI-safe open; residual prepare still
+        # attempts loadOrCreateManager in RptVpnChannel).
         for candidate in (
             ROOT / "client_app/macos/Runner/DeveloperID.entitlements",
             ROOT / "client_app/macos/Runner/Release.entitlements",
         ):
             if candidate.is_file():
+                print(f"host entitlements: {candidate.name}", flush=True)
                 return candidate
     return None
 

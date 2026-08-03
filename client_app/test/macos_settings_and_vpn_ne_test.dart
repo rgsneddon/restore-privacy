@@ -73,6 +73,42 @@ void main() {
     expect(body.contains('saveToPreferences'), isTrue);
   });
 
+  test('loadOrCreateManager always calls loadAllFromPreferences (no host-NE gate)',
+      () {
+    final src =
+        File('macos/NativePrep/RptVpnChannel.swift').readAsStringSync();
+    final start = src.indexOf('private static func loadOrCreateManager');
+    expect(start, greaterThanOrEqualTo(0));
+    final end = src.indexOf('private static func startTunnel', start);
+    final body = src.substring(start, end > start ? end : src.length);
+    // Real path: must load preferences then save enabled product profile.
+    expect(body.contains('NETunnelProviderManager.loadAllFromPreferences'), isTrue);
+    expect(body.contains('saveToPreferences'), isTrue);
+    expect(body.contains('isEnabled = true'), isTrue);
+    // Forbidden: early-return solely on missing host NE before loadAll.
+    expect(
+      RegExp(
+        r'if !hostHasPacketTunnelNetworkExtensionEntitlement\(\)\s*\{\s*'
+        r'completion\(nil,\s*hostMissingNeEntitlementMessage\(\)\)\s*return',
+        multiLine: true,
+      ).hasMatch(body),
+      isFalse,
+      reason: 'loadOrCreateManager must not gate NE save on host entitlement probe',
+    );
+    // Host NE probe may annotate errors only — not skip the API.
+    expect(body.contains('hostHasPacketTunnelNetworkExtensionEntitlement'), isTrue);
+  });
+
+  test('sign_and_notarize prefers residual host NE for catalog residual ships', () {
+    final script = File('../scripts/sign_and_notarize_macos.py');
+    expect(script.existsSync(), isTrue);
+    final src = script.readAsStringSync();
+    expect(src.contains('DeveloperIDResidual.entitlements'), isTrue);
+    expect(src.contains('host_ne_for_residual_catalog'), isTrue);
+    expect(src.contains('RPT_MACOS_HOST_NE'), isTrue);
+    expect(src.contains('packet-tunnel-provider'), isTrue);
+  });
+
   test('build_suite_1.1.6 invokes residual team resign every macOS ship', () {
     final root = Directory.current.path;
     // flutter test cwd is client_app/

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Developer ID host + residual Packet Tunnel.
+
+	  Includes packet-tunnel-provider so catalog residual Connect can register
+	  NETunnelProviderManager / System VPN Allow. Flutter Hardened Runtime CS
+	  flags stay (required for Dart VM).
+
+	  Historical note: NE alone under DevID without a matching Developer ID
+	  Network Extension profile caused AMFI SIGKILL (exit 137). We still ship
+	  this for residual catalog when Team residual profiles authorize NE; if
+	  launch fails, fall back to DeveloperID.entitlements (no host NE).
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<key>com.apple.developer.networking.networkextension</key>
+	<array>
+		<string>packet-tunnel-provider</string>
+	</array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.restoreprivacy.shared</string>
+	</array>
+</dict>
+</plist>
