@@ -73,3 +73,6 @@ stripe_email_dns_report.json
 # macOS residual public monopin (never priv)
 !client_app/macos/Runner/secrets/
 !client_app/macos/Runner/secrets/*.pub
+
+# C++ residual core build tree
+residual_core/build/
