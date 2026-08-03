@@ -1191,69 +1191,99 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     }
   }
 
+  /// Open product Settings (connection log, leak test, honesty controls).
+  ///
+  /// Never silent no-op: if the store is not ready yet (race with launch
+  /// init), create one. Uses the root navigator so Suite shell nesting cannot
+  /// swallow the route (macOS report: Settings button appeared dead).
   Future<void> _openSettings() async {
-    final store = _store;
-    if (store == null) return;
-    SuitePartsStore? partsStore = widget.partsStore;
-    if (partsStore == null) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        partsStore = SuitePartsStore(SharedPreferencesBackend(prefs));
-      } catch (_) {
-        partsStore = SuitePartsStore(MemorySettingsBackend());
+    try {
+      if (_store == null) {
+        await _initSettings();
       }
-    }
-    final updated = await Navigator.of(context).push<ProductSettings>(
-      MaterialPageRoute(
-        builder: (_) => SettingsScreen(
-          store: store,
-          initial: _settings,
-          connectionLog: _connectionLog,
-          licenceGate: _licence,
-          residualCaptureActive: _connected,
-          residualConnected: _connected,
-          ipv6Protected: _connected &&
-              (_status.toLowerCase().contains('ipv6 isp path blocked') ||
-                  (_settings.residualIpv6 &&
-                      !_status.toLowerCase().contains('ipv6 not protected'))),
-          partsStore: partsStore,
-          initialParts: widget.initialParts,
-          onPartsChanged: widget.onPartsChanged,
-          suiteUpdateReloadToken: _suiteUpdateReloadToken,
-          onLicenceChanged: (accepted) {
-            if (mounted) setState(() => _licenceAccepted = accepted);
-          },
-          onChanged: (s) {
-            RptConfig.setRuntimeMultiHop(s.privacyMultihop);
-            _vpn.settingsForUpdatePush = s;
-            if (mounted) setState(() => _settings = s);
-            widget.onSettingsChanged?.call(s);
-            // Keep native App Group aligned when Settings change outside Connect.
-            unawaited(
-              _vpn.syncProductSettingsToNative(
-                residualIpv4: kResidualIpv4AlwaysOn,
-                residualIpv6: s.residualIpv6,
-                privacyTrafficShape: s.privacyTrafficShape,
-                privacyOuterObfuscation: s.privacyOuterObfuscation,
-                privacyMultihop: s.privacyMultihop,
-              ),
-            );
-          },
+      final store = resolveSettingsStoreForOpen(
+        existing: _store,
+        createPrimary: () {
+          // Sync path only for pure resolver; async create already ran in _initSettings.
+          return _store;
+        },
+        createFallback: () => SettingsStore(MemorySettingsBackend()),
+      );
+      if (mounted && !identical(_store, store)) {
+        setState(() => _store = store);
+      }
+      SuitePartsStore? partsStore = widget.partsStore;
+      if (partsStore == null) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          partsStore = SuitePartsStore(SharedPreferencesBackend(prefs));
+        } catch (_) {
+          partsStore = SuitePartsStore(MemorySettingsBackend());
+        }
+      }
+      if (!mounted) return;
+      final updated = await Navigator.of(context, rootNavigator: true)
+          .push<ProductSettings>(
+        MaterialPageRoute(
+          settings: const RouteSettings(name: 'product_settings'),
+          builder: (_) => SettingsScreen(
+            key: const Key('product_settings_screen'),
+            store: store,
+            initial: _settings,
+            connectionLog: _connectionLog,
+            licenceGate: _licence,
+            residualCaptureActive: _connected,
+            residualConnected: _connected,
+            ipv6Protected: _connected &&
+                (_status.toLowerCase().contains('ipv6 isp path blocked') ||
+                    (_settings.residualIpv6 &&
+                        !_status
+                            .toLowerCase()
+                            .contains('ipv6 not protected'))),
+            partsStore: partsStore,
+            initialParts: widget.initialParts,
+            onPartsChanged: widget.onPartsChanged,
+            suiteUpdateReloadToken: _suiteUpdateReloadToken,
+            onLicenceChanged: (accepted) {
+              if (mounted) setState(() => _licenceAccepted = accepted);
+            },
+            onChanged: (s) {
+              RptConfig.setRuntimeMultiHop(s.privacyMultihop);
+              _vpn.settingsForUpdatePush = s;
+              if (mounted) setState(() => _settings = s);
+              widget.onSettingsChanged?.call(s);
+              unawaited(
+                _vpn.syncProductSettingsToNative(
+                  residualIpv4: kResidualIpv4AlwaysOn,
+                  residualIpv6: s.residualIpv6,
+                  privacyTrafficShape: s.privacyTrafficShape,
+                  privacyOuterObfuscation: s.privacyOuterObfuscation,
+                  privacyMultihop: s.privacyMultihop,
+                ),
+              );
+            },
+          ),
         ),
-      ),
-    );
-    if (updated != null && mounted) {
-      setState(() => _settings = updated);
-      widget.onSettingsChanged?.call(updated);
-    }
-    if (mounted) {
-      final s = await store.load();
-      final licOk = await _licence?.hasAcceptedLicence() ?? false;
+      );
+      if (updated != null && mounted) {
+        setState(() => _settings = updated);
+        widget.onSettingsChanged?.call(updated);
+      }
+      if (mounted) {
+        final s = await store.load();
+        final licOk = await _licence?.hasAcceptedLicence() ?? false;
+        setState(() {
+          _settings = s;
+          _licenceAccepted = licOk;
+        });
+        widget.onSettingsChanged?.call(s);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _append('Settings could not open: $e');
       setState(() {
-        _settings = s;
-        _licenceAccepted = licOk;
+        _status = 'Settings could not open - try again.';
       });
-      widget.onSettingsChanged?.call(s);
     }
   }
 
@@ -1362,8 +1392,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     ),
                   ),
                   IconButton(
+                    key: const Key('main_settings_button'),
                     tooltip: 'Settings',
-                    onPressed: _openSettings,
+                    onPressed: _busy ? null : () => unawaited(_openSettings()),
                     icon: Icon(Icons.settings, color: suitePrimaryOf(context)),
                   ),
                 ],

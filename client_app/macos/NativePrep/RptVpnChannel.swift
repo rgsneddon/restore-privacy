@@ -261,17 +261,11 @@ enum RptVpnChannel {
     openSettingsOnDenial: Bool = false,
     completion: @escaping ([String: Any]) -> Void
   ) {
-    if !hostHasPacketTunnelNetworkExtensionEntitlement() {
-      var map: [String: Any] = productVpnIdentity()
-      map["ok"] = false
-      map["prepared"] = false
-      map["needsVpnSystemSettingsApproval"] = false
-      map["needsTeamResidualSign"] = true
-      map["hostHasPacketTunnelEntitlement"] = false
-      map["message"] = hostMissingNeEntitlementMessage()
-      completion(map)
-      return
-    }
+    // Always attempt loadOrCreateManager + save isEnabled=true so System Settings
+    // can list Restore Privacy Packet Tunnel and show Allow when required.
+    // Do **not** short-circuit solely on host entitlement probe — some residual
+    // builds still register the profile; if registration fails, report honestly.
+    let hostHasNe = hostHasPacketTunnelNetworkExtensionEntitlement()
     if let last = lastSuccessfulPrepareAt,
        Date().timeIntervalSince(last) < prepareDebounce {
       var map: [String: Any] = [
@@ -281,7 +275,7 @@ enum RptVpnChannel {
         "tunnelType": productTunnelType,
         "providerBundleId": providerBundleId,
         "localizedDescription": productLocalizedDescription,
-        "hostHasPacketTunnelEntitlement": true,
+        "hostHasPacketTunnelEntitlement": hostHasNe,
         "message":
           "Restore Privacy Packet Tunnel configuration already registered. "
           + "Press Connect when ready (Allow in System Settings if macOS asks).",
@@ -292,52 +286,63 @@ enum RptVpnChannel {
     }
     loadOrCreateManager(host: host, port: port) { manager, neError in
       if let manager {
-        // Only stamp success after loadOrCreateManager returned a saved manager.
+        // Stamp success only after a manager was saved/loaded for product identity.
         lastSuccessfulPrepareAt = Date()
-        // Confirm product Packet Tunnel identity (not legacy VPN types).
         let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
         let bid = proto?.providerBundleIdentifier ?? providerBundleId
-        let map: [String: Any] = [
-          "ok": true,
-          "prepared": true,
-          "tunnelType": productTunnelType,
-          "providerBundleId": bid,
-          "localizedDescription": manager.localizedDescription ?? productLocalizedDescription,
-          "enabled": manager.isEnabled,
-          "hostHasPacketTunnelEntitlement": true,
-          "connectionStatus": statusName(manager.connection.status),
-          "message":
-            "Restore Privacy Packet Tunnel registered in System VPN preferences. "
-            + "If macOS asked to Allow VPN configuration, choose Allow — "
-            + "do not add L2TP, Cisco IPsec, or IKEv2. Then press Connect.",
-        ]
-        completion(map)
+        // Re-assert enabled so System Settings shows the VPN entry.
+        manager.isEnabled = true
+        manager.isOnDemandEnabled = false
+        manager.saveToPreferences { _ in
+          let map: [String: Any] = [
+            "ok": true,
+            "prepared": true,
+            "tunnelType": productTunnelType,
+            "providerBundleId": bid,
+            "localizedDescription": manager.localizedDescription ?? productLocalizedDescription,
+            "enabled": manager.isEnabled,
+            "hostHasPacketTunnelEntitlement": hostHasNe,
+            "connectionStatus": statusName(manager.connection.status),
+            "message":
+              "Restore Privacy Packet Tunnel registered in System VPN preferences. "
+              + "If macOS asked to Allow VPN configuration, choose Allow - "
+              + "do not add L2TP, Cisco IPsec, or IKEv2. Then press Connect.",
+          ]
+          completion(map)
+        }
         return
       }
       // Failure: do NOT set lastSuccessfulPrepareAt — next prepare must re-attempt.
       let detail = neError ?? "NE preferences unavailable"
       let permissionClass = isNePermissionFailureDetail(detail)
-      // Sequence: only open Settings when Flutter/native opt-in — never by default
-      // during prepare so the NE Allow dialog is not missed among simultaneous panes.
+      let residualClass = isTeamResidualOrMissingHostNeDetail(detail)
+        || !hostHasNe
       var opened = false
       if permissionClass && openSettingsOnDenial {
         opened = openVpnSystemSettings(force: false)
       }
+      // When registration failed for permission, surface Open VPN settings control.
+      // When host NE is missing after a real attempt, still allow Settings open so
+      // the user can inspect Network / VPN (logs remain in-app Settings).
       var map: [String: Any] = [
         "ok": false,
         "prepared": false,
         "tunnelType": productTunnelType,
         "providerBundleId": providerBundleId,
         "localizedDescription": productLocalizedDescription,
-        "needsVpnSystemSettingsApproval": permissionClass,
+        "needsVpnSystemSettingsApproval": permissionClass || residualClass,
+        "needsTeamResidualSign": residualClass && !hostHasNe,
+        "hostHasPacketTunnelEntitlement": hostHasNe,
         "openedVpnSettings": opened,
-        "message":
-          "Could not pre-register Packet Tunnel VPN configuration: \(detail). "
-          + (permissionClass
-            ? "Allow Restore Privacy under System Settings → Network → VPN & Filters "
-              + "(Packet Tunnel — not L2TP / Cisco IPsec / IKEv2), then Connect."
-            : "Press Connect again. If this build lacks host Network Extension, "
-              + "use scripts/sign_macos_residual_team.py (public DevID omits host NE)."),
+        "message": residualClass && !hostHasNe
+          ? hostMissingNeEntitlementMessage()
+          : (
+            "Could not pre-register Packet Tunnel VPN configuration: \(detail). "
+              + (permissionClass
+                ? "Allow Restore Privacy under System Settings → Network → VPN & Filters "
+                  + "(Packet Tunnel - not L2TP / Cisco IPsec / IKEv2), then Connect."
+                : "Press Connect again, or Open VPN settings and Allow Restore Privacy.")
+          ),
       ]
       completion(map)
     }
@@ -627,18 +632,23 @@ enum RptVpnChannel {
           packetTunnelActive: false,
           detailMessage: full
         )
-        // Residual-honest flags when host lacks packet-tunnel-provider (prepare parity).
-        if isTeamResidualOrMissingHostNeDetail(detail)
+        let hostHasNe = hostHasPacketTunnelNetworkExtensionEntitlement()
+        let residualClass = isTeamResidualOrMissingHostNeDetail(detail)
           || isTeamResidualOrMissingHostNeDetail(full)
-          || !hostHasPacketTunnelNetworkExtensionEntitlement() {
+          || !hostHasNe
+        let permissionClass = isNePermissionFailureDetail(detail)
+        // Always surface Open VPN settings when registration failed so the user
+        // can complete Allow; residual re-sign note is additive, not a dead end.
+        map["needsVpnSystemSettingsApproval"] = true
+        map["openedVpnSettings"] = false
+        map["hostHasPacketTunnelEntitlement"] = hostHasNe
+        if residualClass && !hostHasNe {
           map["needsTeamResidualSign"] = true
-          map["hostHasPacketTunnelEntitlement"] = false
-          map["needsVpnSystemSettingsApproval"] = false
-          map["openedVpnSettings"] = false
-          // Prefer the explicit residual message when entitlement check fails.
-          if !hostHasPacketTunnelNetworkExtensionEntitlement() {
-            map["message"] = hostMissingNeEntitlementMessage()
-          }
+          map["message"] = hostMissingNeEntitlementMessage()
+            + " Also open System Settings → Network → VPN & Filters if macOS showed Allow."
+        } else if permissionClass {
+          map["message"] = full
+            + " Allow Restore Privacy under System Settings → Network → VPN & Filters, then Connect."
         }
         completion(map)
         return

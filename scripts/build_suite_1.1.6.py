@@ -201,6 +201,22 @@ def build_macos() -> Path | None:
         if not apps:
             return None
         app = apps[0]
+    # Every residual macOS catalog build: Team residual NE re-sign on a **copy**
+    # (host packet-tunnel-provider). Public DevID zip still omits host NE (AMFI).
+    # Fail soft when profiles missing so DevID ship continues; residual copy is
+    # for operator residual Connect on this Mac.
+    try:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import apple_ship_gates as _asg  # noqa: WPS433
+
+        r = _asg.run_residual_team_resign(app, require=False)
+        print(
+            f"residual_team_resign ok={r.get('ok')} skipped={r.get('skipped')} "
+            f"path={r.get('path')} err={r.get('error')}",
+            flush=True,
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"residual_team_resign best-effort failed: {e}", flush=True)
     dest = OUT / NAMES["macos"]
     dest.parent.mkdir(parents=True, exist_ok=True)
     sign_script = ROOT / "scripts" / "sign_and_notarize_macos.py"

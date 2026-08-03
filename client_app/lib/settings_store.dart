@@ -276,3 +276,24 @@ class SettingsStore {
 
   bool shouldRunAtStartup(ProductSettings s) => s.runAtStartup;
 }
+
+/// Pure: resolve a Settings store for the main-screen Settings control.
+///
+/// Never returns null — when [existing] is null, uses [createPrimary] then
+/// [createFallback], then an in-memory backend so Settings never silent-no-ops.
+SettingsStore resolveSettingsStoreForOpen({
+  SettingsStore? existing,
+  SettingsStore? Function()? createPrimary,
+  SettingsStore? Function()? createFallback,
+}) {
+  if (existing != null) return existing;
+  try {
+    final s = createPrimary?.call();
+    if (s != null) return s;
+  } catch (_) {}
+  try {
+    final fb = createFallback?.call();
+    if (fb != null) return fb;
+  } catch (_) {}
+  return SettingsStore(MemorySettingsBackend());
+}
