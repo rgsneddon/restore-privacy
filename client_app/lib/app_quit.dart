@@ -63,12 +63,16 @@ bool showsMainScreenQuitOnThisDevice() {
 /// Pure sequence for unit tests — inject [stopTunnel] and [exitApp] so the
 /// harness never kills itself. Production wires real [VpnController.disconnect]
 /// and [exitAppProcess].
+///
+/// [exitApp] is async so Android can **await** native `fullExit` before any
+/// dart:io [exit] backup — fire-and-forget invokeMethod + immediate exit(0)
+/// kills the isolate before the platform path runs (idle process bug).
 Future<void> performQuitSequence({
   required Future<void> Function() stopTunnel,
-  required void Function() exitApp,
+  required Future<void> Function() exitApp,
 }) async {
   await stopTunnel();
-  exitApp();
+  await exitApp();
 }
 
 /// Method channel for platform full-process exit (Android finishAndRemoveTask).
@@ -82,21 +86,38 @@ const String kAndroidFullExitMethod = 'fullExit';
 /// Call only after [performQuitSequence]'s tunnel stop has completed.
 ///
 /// On Android, [SystemNavigator.pop] alone only finishes the activity and can
-/// leave the process idle in the background. We call native [kAndroidFullExitMethod]
-/// (`finishAndRemoveTask` + `Process.killProcess`) then hard [exit] as backup.
-void exitAppProcess() {
-  if (!kIsWeb && Platform.isAndroid) {
-    // Fire-and-forget native full exit; still fall through to dart:io exit.
+/// leave the process idle. We **await** native [kAndroidFullExitMethod]
+/// (`finishAndRemoveTask` + `Process.killProcess`) so the channel message is
+/// delivered and native runs before any dart:io exit. Immediate exit(0) after
+/// a fire-and-forget invokeMethod aborts the channel and leaves an idle process.
+///
+/// Non-Android: SystemNavigator.pop then dart:io exit.
+Future<void> exitAppProcess({
+  MethodChannel? channel,
+  bool? isAndroid,
+  void Function(int code)? exitFn,
+}) async {
+  final android = isAndroid ?? (!kIsWeb && Platform.isAndroid);
+  final ch = channel ?? kAppQuitChannel;
+  final doExit = exitFn ?? exit;
+
+  if (android) {
+    // Await native full process takedown. MainActivity replies success then
+    // runs finishAndRemoveTask + killProcess; if that succeeds we never return.
     try {
-      kAppQuitChannel.invokeMethod<void>(kAndroidFullExitMethod);
-    } catch (_) {}
-  } else {
-    try {
-      SystemNavigator.pop();
-    } catch (_) {}
+      await ch.invokeMethod<dynamic>(kAndroidFullExitMethod);
+    } catch (_) {
+      // Channel missing / already tearing down — fall through to hard exit.
+    }
+    // Backup only if native did not kill us (e.g. test channel or failure).
+    doExit(0);
+    return;
   }
-  // dart:io exit — required so UI + host process leave (not idle).
-  exit(0);
+
+  try {
+    SystemNavigator.pop();
+  } catch (_) {}
+  doExit(0);
 }
 
 /// Testable Android exit path planner (pure): which steps the platform must run.
@@ -104,6 +125,7 @@ void exitAppProcess() {
 /// Production Android native implements the same order in MainActivity.fullExit.
 List<String> androidFullExitSteps() {
   return const [
+    'await_fullExit_channel',
     'finishAndRemoveTask',
     'process_killProcess',
   ];

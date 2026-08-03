@@ -1,10 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/app_quit.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('showsMainScreenQuitButton', () {
     test('all residual platforms show Quit (including Windows/Linux)', () {
       expect(
@@ -75,7 +78,7 @@ void main() {
         stopTunnel: () async {
           order.add('stop');
         },
-        exitApp: () {
+        exitApp: () async {
           order.add('exit');
         },
       );
@@ -89,7 +92,22 @@ void main() {
           await Future<void>.delayed(const Duration(milliseconds: 5));
           order.add('stop');
         },
-        exitApp: () {
+        exitApp: () async {
+          order.add('exit');
+        },
+      );
+      expect(order, ['stop', 'exit']);
+    });
+
+    test('awaits async exitApp (Android fullExit must complete before backup)',
+        () async {
+      final order = <String>[];
+      await performQuitSequence(
+        stopTunnel: () async {
+          order.add('stop');
+        },
+        exitApp: () async {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
           order.add('exit');
         },
       );
@@ -100,7 +118,7 @@ void main() {
       var exited = false;
       await performQuitSequence(
         stopTunnel: () async {},
-        exitApp: () {
+        exitApp: () async {
           exited = true;
         },
       );
@@ -116,31 +134,74 @@ void main() {
   });
 
   group('Android full process exit', () {
-    test('exit planner requires finishAndRemoveTask then process kill', () {
+    test('exit planner requires await channel then finishAndRemoveTask', () {
       final steps = androidFullExitSteps();
+      expect(steps, contains('await_fullExit_channel'));
       expect(steps, contains('finishAndRemoveTask'));
       expect(steps, contains('process_killProcess'));
-      expect(steps.indexOf('finishAndRemoveTask'), lessThan(steps.indexOf('process_killProcess')));
+      expect(
+        steps.indexOf('await_fullExit_channel'),
+        lessThan(steps.indexOf('finishAndRemoveTask')),
+      );
     });
 
-    test('app_quit.dart Android path uses fullExit channel not pop alone', () {
+    test('exitAppProcess awaits fullExit channel before dart exit', () async {
+      final order = <String>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const channel = MethodChannel('restore_privacy/vpn_test_quit');
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, kAndroidFullExitMethod);
+        order.add('native_fullExit');
+        // Simulate slow native path — must complete before exitFn.
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        order.add('native_done');
+        return {'ok': true};
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(channel, null);
+      });
+
+      await exitAppProcess(
+        channel: channel,
+        isAndroid: true,
+        exitFn: (code) {
+          order.add('dart_exit_$code');
+        },
+      );
+
+      expect(
+        order,
+        ['native_fullExit', 'native_done', 'dart_exit_0'],
+        reason: 'native fullExit must finish before dart:io exit backup',
+      );
+    });
+
+    test('app_quit.dart Android path awaits invokeMethod not fire-and-forget',
+        () {
       final src = File('lib/app_quit.dart').readAsStringSync();
       expect(src.contains('kAndroidFullExitMethod'), isTrue);
       expect(src.contains("'fullExit'"), isTrue);
-      expect(src.contains('Platform.isAndroid'), isTrue);
-      // Android branch invokes fullExit; SystemNavigator.pop is only in the else.
-      final androidStart = src.indexOf('if (!kIsWeb && Platform.isAndroid)');
-      expect(androidStart, greaterThanOrEqualTo(0));
-      final elseStart = src.indexOf('} else {', androidStart);
-      expect(elseStart, greaterThan(androidStart));
-      final androidOnly = src.substring(androidStart, elseStart);
-      expect(androidOnly.contains('kAndroidFullExitMethod'), isTrue);
-      expect(androidOnly.contains('SystemNavigator.pop'), isFalse);
-      final elseBlock = src.substring(elseStart, elseStart + 120);
-      expect(elseBlock.contains('SystemNavigator.pop'), isTrue);
+      // Critical: must await channel before any exit backup.
+      expect(src.contains('await ch.invokeMethod'), isTrue);
+      expect(
+        src.contains('Fire-and-forget'),
+        isFalse,
+        reason: 'fire-and-forget path was the idle-process bug',
+      );
+      // performQuitSequence must await exitApp
+      expect(src.contains('await exitApp()'), isTrue);
+      expect(src.contains('Future<void> Function() exitApp'), isTrue);
     });
 
-    test('MainActivity implements fullExit with finishAndRemoveTask + killProcess', () {
+    test('main.dart wires async exitAppProcess (not sync void only)', () {
+      final src = File('lib/main.dart').readAsStringSync();
+      expect(src.contains('await exitAppProcess()'), isTrue);
+      expect(src.contains('exitApp: () async'), isTrue);
+    });
+
+    test('MainActivity implements fullExit with finishAndRemoveTask + killProcess',
+        () {
       final kt = File(
         'android/app/src/main/kotlin/com/restoreprivacy/restore_privacy_client/MainActivity.kt',
       ).readAsStringSync();
@@ -149,6 +210,19 @@ void main() {
       expect(kt.contains('finishAndRemoveTask'), isTrue);
       expect(kt.contains('killProcess'), isTrue);
       expect(kt.contains('System.exit'), isTrue);
+      // Reply success before kill so awaiting Dart can complete invokeMethod.
+      final fullExitIdx = kt.indexOf('"fullExit"');
+      expect(fullExitIdx, greaterThanOrEqualTo(0));
+      final block = kt.substring(
+        fullExitIdx,
+        (fullExitIdx + 600).clamp(0, kt.length),
+      );
+      expect(block.contains('result.success'), isTrue);
+      expect(block.contains('fullProcessExit()'), isTrue);
+      expect(
+        block.indexOf('result.success'),
+        lessThan(block.indexOf('fullProcessExit()')),
+      );
     });
   });
 }

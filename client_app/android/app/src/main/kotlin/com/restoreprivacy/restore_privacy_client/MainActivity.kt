@@ -160,8 +160,12 @@ class MainActivity : FlutterActivity() {
                     "fullExit" -> {
                         // Quit: stop residual already done in Dart; fully kill process.
                         // SystemNavigator.pop alone leaves an idle process — not product Quit.
+                        // Reply first so awaiting Dart invokeMethod can complete; then kill
+                        // on next main-loop tick (immediate kill can abort the reply).
                         result.success(mapOf("ok" to true, "message" to "full_exit"))
-                        fullProcessExit()
+                        Handler(Looper.getMainLooper()).post {
+                            fullProcessExit()
+                        }
                     }
                     else -> result.notImplemented()
                 }

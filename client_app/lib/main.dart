@@ -1183,7 +1183,16 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
             await _macWindow.setTrayConnected(false);
           } catch (_) {}
         },
-        exitApp: widget.onQuitExit ?? exitAppProcess,
+        // Must await native Android fullExit — fire-and-forget + exit(0)
+        // leaves an idle process (channel never delivered).
+        exitApp: () async {
+          final custom = widget.onQuitExit;
+          if (custom != null) {
+            custom();
+            return;
+          }
+          await exitAppProcess();
+        },
       );
     } finally {
       // Only reached if exit was injected (tests) or exit failed.
