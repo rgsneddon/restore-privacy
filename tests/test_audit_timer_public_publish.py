@@ -25,10 +25,22 @@ class TestTimerWritePathStructural(unittest.TestCase):
         self.assertNotIn("--dry-run", text)
         # Timer period product default
         self.assertIn('PERIOD="${PERIOD:-1d}"', text)
-        # After write: stamp + optional constrained publish for public last-run
+        # Fresh stamp gate (do not treat prior generated_at as success)
+        self.assertIn("GEN_BEFORE", text)
+        self.assertIn("GEN_AFTER", text)
+        self.assertIn("uk_ping_estimates.py", text)
         self.assertIn("last_audit_write", text)
         self.assertIn("RPT_AUDIT_STATUS_SSH", text)
         self.assertIn("publish_audit_artifacts", text)
+
+    def test_build_markdown_soft_fails_missing_uk_ping(self) -> None:
+        src = (ROOT / "scripts" / "run_security_audit.py").read_text(encoding="utf-8")
+        self.assertIn("UK ping section unavailable this pass", src)
+        self.assertIn("never abort write_outputs", src)
+        # ImportError must not escape the soft-fail block
+        idx = src.index("from client.uk_ping_estimates import")
+        block = src[idx - 200 : idx + 500]
+        self.assertIn("except Exception", block)
 
     def test_pull_agent_timer_wires_sync_publish(self) -> None:
         path = ROOT / "scripts" / "install_audit_public_refresh_timer.sh"

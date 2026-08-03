@@ -1634,14 +1634,18 @@ def build_markdown(results: dict) -> str:
     multihop_md = render_multihop_structure_markdown(
         results.get("multihop_structure")
     )
-    # Privacy-scale UK ping + AVG-threshold RAG (live probes when reachable)
+    # Privacy-scale UK ping + AVG-threshold RAG (live probes when reachable).
+    # Soft-fail: residual timer hosts may ship a lean client/ tree without this
+    # module — never abort write_outputs / AUDIT.md stamp on ImportError.
+    uk_ping_md = ""
     try:
-        from client.uk_ping_estimates import render_audit_uk_ping_section
-    except ImportError:
-        sys.path.insert(0, str(ROOT))
-        from client.uk_ping_estimates import render_audit_uk_ping_section  # type: ignore
-
-    try:
+        try:
+            from client.uk_ping_estimates import render_audit_uk_ping_section
+        except ImportError:
+            sys.path.insert(0, str(ROOT))
+            from client.uk_ping_estimates import (  # type: ignore
+                render_audit_uk_ping_section,
+            )
         uk_ping_md = render_audit_uk_ping_section(measure=True) + "\n"
     except Exception as exc:  # noqa: BLE001
         uk_ping_md = (

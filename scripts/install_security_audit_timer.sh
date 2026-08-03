@@ -97,6 +97,10 @@ _rpt_audit_cp "${REPO_ROOT}/client/multihop.py" "${INSTALL_ROOT}/client/multihop
 _rpt_audit_cp "${REPO_ROOT}/client/endpoint.py" "${INSTALL_ROOT}/client/endpoint.py"
 # Multihop public labels (country names, not raw IPs) for residual honesty text
 _rpt_audit_cp "${REPO_ROOT}/client/residual_public.py" "${INSTALL_ROOT}/client/residual_public.py"
+# AUDIT.md UK ping section (build_markdown imports these — missing = write hard-fail)
+_rpt_audit_cp "${REPO_ROOT}/client/uk_ping_estimates.py" "${INSTALL_ROOT}/client/uk_ping_estimates.py"
+_rpt_audit_cp "${REPO_ROOT}/client/product_policy.py" "${INSTALL_ROOT}/client/product_policy.py"
+_rpt_audit_cp "${REPO_ROOT}/client/node_ping.py" "${INSTALL_ROOT}/client/node_ping.py"
 
 _rpt_audit_cp "${REPO_ROOT}/scripts/ephemeral_node.py" "${INSTALL_ROOT}/scripts/ephemeral_node.py"
 for _nscript in nolog.py install_host_privacy.sh install_disk_encryption.sh \
@@ -232,31 +236,47 @@ export TMPDIR="${INSTALL_ROOT}/var/audit-scratch"
 mkdir -p "\${TMPDIR}"
 # Never git push AUDIT.md from residual probes path
 unset GIT_ASKPASS SSH_ASKPASS
+JSON_PATH="${INSTALL_ROOT}/status_page/static/security_audit_latest.json"
+# Capture stamp BEFORE write — success requires a NEW generated_at this run
+# (do not treat a prior stale stamp as a successful write).
+GEN_BEFORE=""
+MTIME_BEFORE=""
+if [[ -f "\${JSON_PATH}" ]]; then
+  GEN_BEFORE="\$("${PY}" -c "import json;print(json.load(open('\${JSON_PATH}')).get('generated_at') or '')" 2>/dev/null || true)"
+  MTIME_BEFORE="\$(stat -c %Y "\${JSON_PATH}" 2>/dev/null || stat -f %m "\${JSON_PATH}" 2>/dev/null || true)"
+fi
 rc=0
 "${PY}" "${INSTALL_ROOT}/scripts/run_security_audit.py" --node-only --write --out "${INSTALL_ROOT}/AUDIT.md" \\
   >/dev/null 2>"\${TMPDIR}/audit.err" || rc=\$?
-# Successful timer run = artifacts written with generated_at (overall findings may
-# still be red/amber inside AUDIT.md). Do not treat posture FAIL as "skipped run".
-JSON_PATH="${INSTALL_ROOT}/status_page/static/security_audit_latest.json"
-GEN=""
+GEN_AFTER=""
+MTIME_AFTER=""
 if [[ -f "\${JSON_PATH}" ]]; then
-  GEN="\$("${PY}" -c "import json;print(json.load(open('\${JSON_PATH}')).get('generated_at') or '')" 2>/dev/null || true)"
+  GEN_AFTER="\$("${PY}" -c "import json;print(json.load(open('\${JSON_PATH}')).get('generated_at') or '')" 2>/dev/null || true)"
+  MTIME_AFTER="\$(stat -c %Y "\${JSON_PATH}" 2>/dev/null || stat -f %m "\${JSON_PATH}" 2>/dev/null || true)"
+fi
+# Fresh write this pass: new generated_at or JSON mtime advanced (same-second edge)
+write_ok=0
+if [[ -n "\${GEN_AFTER}" && -f "${INSTALL_ROOT}/AUDIT.md" ]]; then
+  if [[ "\${GEN_AFTER}" != "\${GEN_BEFORE}" ]]; then
+    write_ok=1
+  elif [[ -n "\${MTIME_AFTER}" && -n "\${MTIME_BEFORE}" && "\${MTIME_AFTER}" != "\${MTIME_BEFORE}" ]]; then
+    write_ok=1
+  elif [[ -z "\${GEN_BEFORE}" ]]; then
+    write_ok=1
+  fi
 fi
 pub_ok=0
-if [[ -n "\${GEN}" && -f "${INSTALL_ROOT}/AUDIT.md" ]]; then
-  write_ok=1
+if [[ "\${write_ok}" -eq 1 ]]; then
   mkdir -p "${INSTALL_ROOT}/var"
   touch "${INSTALL_ROOT}/var/last_audit_write.ok" 2>/dev/null || true
-  echo "generated_at=\${GEN}" >"${INSTALL_ROOT}/var/last_audit_write.stamp" 2>/dev/null || true
-  # ALWAYS attempt constrained scp when key present (timer → public last-run).
+  echo "generated_at=\${GEN_AFTER}" >"${INSTALL_ROOT}/var/last_audit_write.stamp" 2>/dev/null || true
+  # Constrained scp only after a proven fresh write this run
   if [[ -n "\${RPT_AUDIT_STATUS_SSH:-}" && -n "\${RPT_SSH_KEY:-}" && -f "\${RPT_SSH_KEY}" ]]; then
     PUB_OUT="\$("${PY}" -c "
 import os, sys
 sys.path.insert(0, '${INSTALL_ROOT}/scripts')
 os.chdir('${INSTALL_ROOT}')
-# ROOT inside run_security_audit is scripts/.. — align INSTALL_ROOT layout
 import run_security_audit as rsa
-# Point module ROOT at install root so artifact paths resolve
 rsa.ROOT = __import__('pathlib').Path('${INSTALL_ROOT}')
 r = rsa.publish_audit_artifacts(commit=False, push=False)
 print(r)
@@ -266,17 +286,16 @@ print(r)
       pub_ok=1
     fi
   fi
-else
-  write_ok=0
 fi
-# Wipe ephemeral capture
+# Wipe ephemeral capture (keep audit.err tail in journal only via oneshot message)
+ERR_TAIL="\$(tail -c 200 "\${TMPDIR}/audit.err" 2>/dev/null | tr '\\n' ' ' || true)"
 rm -f "\${TMPDIR}/audit.err" 2>/dev/null || true
 find "\${TMPDIR}" -mindepth 1 -delete 2>/dev/null || true
 if [[ "\${write_ok}" -eq 1 ]]; then
-  echo "rpt-security-audit: OK wrote ${INSTALL_ROOT}/AUDIT.md generated_at=\${GEN} publish_scp=\${pub_ok}"
+  echo "rpt-security-audit: OK wrote ${INSTALL_ROOT}/AUDIT.md generated_at=\${GEN_AFTER} (was \${GEN_BEFORE:--}) publish_scp=\${pub_ok}"
   exit 0
 fi
-echo "rpt-security-audit: FAIL rc=\${rc} (no generated_at artifact; see AUDIT.md)"
+echo "rpt-security-audit: FAIL rc=\${rc} gen_before=\${GEN_BEFORE:--} gen_after=\${GEN_AFTER:--} err=\${ERR_TAIL:--}"
 exit "\${rc:-1}"
 WRAP
 chmod 0755 "${WRAPPER}"
