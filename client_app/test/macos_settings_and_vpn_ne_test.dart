@@ -99,14 +99,18 @@ void main() {
     expect(body.contains('hostHasPacketTunnelNetworkExtensionEntitlement'), isTrue);
   });
 
-  test('sign_and_notarize prefers residual host NE for catalog residual ships', () {
+  test('sign_and_notarize defaults openable DevID (no host NE) + launch probe',
+      () {
     final script = File('../scripts/sign_and_notarize_macos.py');
     expect(script.existsSync(), isTrue);
     final src = script.readAsStringSync();
+    // Default RPT_MACOS_HOST_NE is off — public zip must launch (not AMFI 137).
+    expect(src.contains('RPT_MACOS_HOST_NE", "0"'), isTrue);
+    expect(src.contains('DeveloperID.entitlements'), isTrue);
+    expect(src.contains('launch_probe_alive'), isTrue);
+    expect(src.contains('return 4'), isTrue); // fail closed on dead launch
+    // Residual host NE remains opt-in only.
     expect(src.contains('DeveloperIDResidual.entitlements'), isTrue);
-    expect(src.contains('host_ne_for_residual_catalog'), isTrue);
-    expect(src.contains('RPT_MACOS_HOST_NE'), isTrue);
-    expect(src.contains('packet-tunnel-provider'), isTrue);
   });
 
   test('build_suite_1.1.6 invokes residual team resign every macOS ship', () {

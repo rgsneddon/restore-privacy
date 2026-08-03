@@ -91,14 +91,18 @@ def find_signables(app: Path) -> list[Path]:
 
 
 def host_ne_for_residual_catalog() -> bool:
-    """Whether catalog DevID host includes packet-tunnel-provider (residual).
+    """Whether catalog DevID host includes packet-tunnel-provider.
 
-    Default **on** for residual monopin ships so free/paid macOS can register
-    Packet Tunnel in System Settings. Opt out with RPT_MACOS_HOST_NE=0 if AMFI
-    launch issues reappear without a matching Developer ID NE profile.
+    Default **off**. Host NE under Developer ID without a matching Developer ID
+    Network Extension provisioning profile is AMFI-killed (exit 137) — the app
+    never launches, so Settings/VPN are unreachable. Public free/paid zip must
+    open: use DeveloperID.entitlements (no host NE). Residual host NE remains on
+    the every-build Team residual copy (sign_macos_residual_team.py) and can be
+    forced on DevID only with RPT_MACOS_HOST_NE=1 when a matching DevID NE
+    profile exists.
     """
-    raw = os.environ.get("RPT_MACOS_HOST_NE", "1").strip().lower()
-    return raw not in ("0", "false", "no", "off")
+    raw = os.environ.get("RPT_MACOS_HOST_NE", "0").strip().lower()
+    return raw in ("1", "true", "yes", "on")
 
 
 def entitlements_for(path: Path) -> Path | None:
@@ -108,25 +112,25 @@ def entitlements_for(path: Path) -> Path | None:
         ent = ROOT / "client_app/macos/PacketTunnel/PacketTunnel.entitlements"
         return ent if ent.is_file() else None
     if path.suffix == ".app" or name == "restore_privacy_client":
-        # Residual catalog: host packet-tunnel-provider + Flutter Hardened Runtime CS.
+        # Opt-in residual host NE on DevID only (RPT_MACOS_HOST_NE=1). Default
+        # path is AMFI-safe open without host packet-tunnel-provider.
         if host_ne_for_residual_catalog():
             residual = (
                 ROOT / "client_app/macos/Runner/DeveloperIDResidual.entitlements"
             )
             if residual.is_file():
                 print(
-                    f"host entitlements: residual NE ({residual.name})",
+                    f"host entitlements: residual NE ({residual.name}) "
+                    f"WARNING: requires matching DevID NE profile or AMFI may SIGKILL",
                     flush=True,
                 )
                 return residual
-        # Fallback: DevID without host NE (AMFI-safe open; residual prepare still
-        # attempts loadOrCreateManager in RptVpnChannel).
         for candidate in (
             ROOT / "client_app/macos/Runner/DeveloperID.entitlements",
             ROOT / "client_app/macos/Runner/Release.entitlements",
         ):
             if candidate.is_file():
-                print(f"host entitlements: {candidate.name}", flush=True)
+                print(f"host entitlements: {candidate.name} (no host NE)", flush=True)
                 return candidate
     return None
 
@@ -317,6 +321,46 @@ def assess(app: Path) -> str:
         return (e.stdout or "") + (e.stderr or "") + f"\nexit={e.returncode}"
 
 
+def launch_probe_alive(app: Path, *, settle_s: float = 2.5) -> dict:
+    """Prove the sealed app launches and stays alive (not AMFI SIGKILL 137).
+
+    Host packet-tunnel-provider under DevID without a matching NE profile is
+    known to die immediately with exit 137 — spctl can still say Accepted.
+    """
+    import time
+
+    main_bin = app / "Contents" / "MacOS" / "restore_privacy_client"
+    if not main_bin.is_file():
+        return {"ok": False, "error": f"missing main binary {main_bin}", "rc": None}
+    # Launch detached; do not use open(1) alone — capture process exit.
+    proc = subprocess.Popen(
+        [str(main_bin)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    time.sleep(settle_s)
+    rc = proc.poll()
+    if rc is None:
+        # Still running — healthy launch for residual UI path.
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        return {"ok": True, "rc": None, "alive": True, "error": None}
+    # Process already exited — AMFI often reports 137.
+    return {
+        "ok": False,
+        "rc": rc,
+        "alive": False,
+        "error": f"app exited immediately rc={rc} (137=AMFI SIGKILL often host NE)",
+    }
+
+
 def package_zip(app: Path, dest: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
@@ -407,6 +451,20 @@ def main(argv: list[str] | None = None) -> int:
                 "Gatekeeper may still block downloads.",
                 file=sys.stderr,
             )
+
+    # Fail closed: spctl "accepted" is not enough — host NE without matching
+    # DevID NE profile yields AMFI SIGKILL (rc=137) and Settings/VPN never open.
+    probe = launch_probe_alive(app)
+    print(f"launch_probe={probe}", flush=True)
+    if not probe.get("ok"):
+        print(
+            f"ERROR: sealed app failed launch probe: {probe.get('error')}\n"
+            "Catalog residual must open. Default host entitlements omit host "
+            "packet-tunnel-provider (DeveloperID.entitlements). Unset "
+            "RPT_MACOS_HOST_NE or set RPT_MACOS_HOST_NE=0 and re-sign.",
+            file=sys.stderr,
+        )
+        return 4
 
     if args.zip:
         package_zip(app, args.zip.resolve())
