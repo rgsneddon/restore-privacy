@@ -229,16 +229,19 @@ unset GIT_ASKPASS SSH_ASKPASS
 rc=0
 "${PY}" "${INSTALL_ROOT}/scripts/run_security_audit.py" --node-only --write --out "${INSTALL_ROOT}/AUDIT.md" \\
   >/dev/null 2>"\${TMPDIR}/audit.err" || rc=\$?
-# Mirror into status_page so local/static JSON has the same stamp as AUDIT.md
-if [[ "\$rc" -eq 0 ]]; then
-  mkdir -p "${INSTALL_ROOT}/status_page/static" "${INSTALL_ROOT}/status_page/public"
-  # run_security_audit --write already mirrors when monorepo layout present
-  if [[ -f "${INSTALL_ROOT}/status_page/static/security_audit_latest.json" ]]; then
-    touch "${INSTALL_ROOT}/var/last_audit_write.ok" 2>/dev/null || true
-    date -u +"generated_ready %Y-%m-%dT%H:%M:%SZ" >"${INSTALL_ROOT}/var/last_audit_write.stamp" 2>/dev/null || true
-  fi
+# Successful timer run = artifacts written with generated_at (overall findings may
+# still be red/amber inside AUDIT.md). Do not treat posture FAIL as "skipped run".
+JSON_PATH="${INSTALL_ROOT}/status_page/static/security_audit_latest.json"
+GEN=""
+if [[ -f "\${JSON_PATH}" ]]; then
+  GEN="\$("${PY}" -c "import json;print(json.load(open('\${JSON_PATH}')).get('generated_at') or '')" 2>/dev/null || true)"
+fi
+if [[ -n "\${GEN}" && -f "${INSTALL_ROOT}/AUDIT.md" ]]; then
+  write_ok=1
+  mkdir -p "${INSTALL_ROOT}/var"
+  touch "${INSTALL_ROOT}/var/last_audit_write.ok" 2>/dev/null || true
+  echo "generated_at=\${GEN}" >"${INSTALL_ROOT}/var/last_audit_write.stamp" 2>/dev/null || true
   # Constrained status publish: scp audit JSON+md when RPT_AUDIT_STATUS_SSH is set.
-  # Does not re-run probes; does not enable general git/HTTP from the probe path.
   if [[ -n "\${RPT_AUDIT_STATUS_SSH:-}" && -f "${INSTALL_ROOT}/scripts/run_security_audit.py" ]]; then
     "${PY}" -c "
 import os, sys
@@ -248,16 +251,18 @@ import run_security_audit as rsa
 print(rsa.publish_audit_artifacts(commit=False, push=False))
 " >>"\${TMPDIR}/audit.pub" 2>&1 || true
   fi
+else
+  write_ok=0
 fi
 # Wipe ephemeral capture
 rm -f "\${TMPDIR}/audit.err" 2>/dev/null || true
 find "\${TMPDIR}" -mindepth 1 -delete 2>/dev/null || true
-if [[ "\$rc" -eq 0 ]]; then
-  echo "rpt-security-audit: OK wrote ${INSTALL_ROOT}/AUDIT.md (timer path; pull agent --publish for status last-run)"
-else
-  echo "rpt-security-audit: FAIL rc=\$rc (details redacted; see AUDIT.md overall status)"
+if [[ "\${write_ok}" -eq 1 ]]; then
+  echo "rpt-security-audit: OK wrote ${INSTALL_ROOT}/AUDIT.md generated_at=\${GEN} (pull agent --publish advances public last-run)"
+  exit 0
 fi
-exit "\$rc"
+echo "rpt-security-audit: FAIL rc=\${rc} (no generated_at artifact; see AUDIT.md)"
+exit "\${rc:-1}"
 WRAP
 chmod 0755 "${WRAPPER}"
 if id -u "${AUDIT_USER}" >/dev/null 2>&1; then
