@@ -26,12 +26,12 @@ class TestAdminClientPushRemoved(unittest.TestCase):
         self.assertNotIn("def on_push", app)
 
     def test_settings_explainer_manual_update_only(self) -> None:
-        from settings_explainer import catalog_ids, render_settings_explainer_html
+        from settings_explainer import catalog_ids, render_settings_explainer_page_html
 
         ids = catalog_ids()
         self.assertIn("suite-manual-update", ids)
         self.assertNotIn("suite-self-update", ids)
-        html = render_settings_explainer_html().decode("utf-8", "replace").lower()
+        html = render_settings_explainer_page_html().decode("utf-8", "replace").lower()
         self.assertIn("suite updates (manual only)", html)
         self.assertNotIn("allow suite self-update", html)
         self.assertNotIn("push update to clients", html)
