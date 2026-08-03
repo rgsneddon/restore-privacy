@@ -85,6 +85,15 @@ class TestProductionCallSitesNoPushReceive(unittest.TestCase):
         self.assertNotIn('"CHECK BREADCRUMBS"', src)
         self.assertNotIn("on_check_breadcrumbs_setting_changed", src)
 
+    def test_linux_settings_no_check_breadcrumbs_checkbox(self) -> None:
+        src = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
+        self.assertNotIn(
+            "CHECK BREADCRUMBS (Helsinki monopin self-update)",
+            src,
+        )
+        self.assertNotIn("on_check_breadcrumbs_setting_changed", src)
+        self.assertNotIn("crumbs_var", src)
+
     def test_connect_no_live_breadcrumbs_after_connect(self) -> None:
         src = (ROOT / "client" / "connect.py").read_text(encoding="utf-8")
         # Method may exist but returns immediately

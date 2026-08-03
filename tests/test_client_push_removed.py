@@ -142,6 +142,22 @@ class TestClientPushReceiveRemoved(unittest.TestCase):
         self.assertIn("client update push disabled", vpn)
         self.assertIn("pollAndApplyUpdatePush", vpn)
 
+    def test_windows_settings_no_check_breadcrumbs_row(self) -> None:
+        src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
+        self.assertNotIn('"CHECK BREADCRUMBS"', src)
+        self.assertNotIn("on_check_breadcrumbs_setting_changed", src)
+
+    def test_linux_settings_no_check_breadcrumbs_checkbox(self) -> None:
+        """Linux Settings must not offer CHECK BREADCRUMBS push-receive opt-in."""
+        src = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
+        self.assertNotIn(
+            "CHECK BREADCRUMBS (Helsinki monopin self-update)",
+            src,
+        )
+        self.assertNotIn("on_check_breadcrumbs_setting_changed", src)
+        self.assertNotIn("crumbs_var", src)
+        self.assertIn("check_breadcrumbs=False", src)
+
 
 class TestUpgradeBannerStillPresent(unittest.TestCase):
     def test_version_is_behind_and_banner_text(self) -> None:
