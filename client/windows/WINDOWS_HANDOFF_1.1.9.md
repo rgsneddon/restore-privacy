@@ -1,9 +1,9 @@
 # Windows brand breadcrumbs — monopin 1.1.9
 
-**Audience:** Windows x64 build machine operator (and Linux/Arch rebuild when done here).  
+**Audience:** Windows x64 build machine operator.  
 **You must native-rebuild the Windows PE for 1.1.9.** Mac agents only stage carry-forward EXE; that is **not** a seal.
 
-Fetch this doc via Helsinki breadcrumbs vault when published:
+Fetch this doc via Helsinki breadcrumbs vault:
 
 ```bat
 python scripts\breadcrumbs_vault.py check --fetch
@@ -19,66 +19,89 @@ python scripts\breadcrumbs_vault.py check --fetch
 releases\1.1.9\restore-privacy-client-1.1.9-windows-x64-setup.exe
 ```
 
-**Do not** rename an ancient PE (e.g. payload `RestorePrivacy-0.5.8.exe`, tray `rpT0`, or monopin 1.1.5/1.1.6 carry) and claim 1.1.9 seal.
-
 ---
 
 ## 0. Product truth that MUST be in this PE (1.1.9)
 
 | Topic | Required in sealed Windows build |
 |-------|----------------------------------|
-| Shell | **Residual VPN only** — no Evolve analysis, Perccent wallet (%), rpAI/Ned, or Backup main-bar chrome |
-| First-use | **Licence** (full text, scroll-to-bottom accept) → **KEYGEN paste** or **continue 72h trial** → main VPN |
-| First-use **not** | Username/password Suite account, 12-word seed gate, multi-product splash |
-| Return visit | Trial remaining **or** valid KEYGEN; if trial expired KEYGEN is mandatory |
-| Quit | Control at **lower-left** of main connection screen; **disconnect residual then full process exit** (not hide-to-tray with tunnel up) |
-| Kill-switch enable | Settings kill-switch **ON** requires confirm dialog **ARE YOU SURE?** + user types exactly **`KILLSWITCH`** before opt-in saves; wrong/cancel leaves OFF |
-| Kill-switch disable | Slider/switch to **OFF** alone — **no** typed confirm |
-| System tray text | Exactly **`Privacy, Restored`** (comma + capital R) — durable for this and future monopin ships |
-| Tray **not** | `rpT0`, or `Privacy Restored` without the comma |
-| Self-update | **No** admin UPDATE_PUSH / in-app auto PE receive — manual free catalog download only |
-| Residual peers | IS + DE only (US retired) |
-| Trial | 72-hour KEYGEN-free device trial, then paid KEYGEN |
-
-Source of truth in tree (after `git pull`):
-
-| Fact | File / symbol |
-|------|----------------|
-| Monopin | `client\VERSION` → `1.1.9` |
-| Tray constant | `client\windows\tray_win.py` → `TRAY_DISPLAY_NAME = "Privacy, Restored"` |
-| Quit order | `client\windows\app.py` → `_quit_app` / `run_quit_residual_teardown` (disconnect then exit); Quit packed **left** |
-| Flutter Quit | `client_app\lib\app_quit.dart` → disconnect then `exitAppProcess` (Android: `fullExit` + finishAndRemoveTask) |
-| Kill-switch confirm | `client_app\lib\kill_switch_confirm.dart` → `evaluateKillSwitchConfirm` / token `KILLSWITCH` |
-| Settings wiring | `client_app\lib\settings_screen.dart` → `_setKillSwitch` |
-| Catalog pin | `status_page\downloads.py` → `RELEASE_VERSION = "1.1.9"` |
+| Shell | **Residual VPN only** — no Evolve / % / rpAI main-bar chrome |
+| First-use | **Licence** (scroll-to-bottom) → **KEYGEN** or **72h trial** → main VPN |
+| Quit | Lower-left; disconnect residual then process exit |
+| Tray text | Exactly **`Privacy, Restored`** |
+| Residual peers | IS + DE only |
+| Full-tunnel honesty | Product **Connected** only when residual capture (Wintun / full tunnel) is active — not host-only HELLO |
 
 ---
 
-## 1. Ordered steps — do these in order
+## 0b. OBSERVE — dual device identity (parity with macOS 1.1.9 fix)
 
-### Step 1 — Pull and pin check
+macOS residual Connect failed when **host HELLO** used one `client_ed25519.priv` (often under `~/.restore-privacy/secrets`, KEYGEN-bound) while **Packet Tunnel** used a **different** key in the App Group. Symptom:
+
+- Connect log: node assigned `10.88.0.x` (HELLO OK)
+- Then: tunnel / full residual not active (public IP unchanged)
+- **Not** trial-expired when a node IP was assigned
+
+### Windows — check the same class of bug before claiming PE seal
+
+Secrets search order is in `client/secrets_loader.py` (`candidate_secrets_dirs`, `preferred_writable_secrets_dir`).
+
+**Paths to inspect on the Windows machine** (after install + KEYGEN/trial + Connect attempt):
+
+| Store | Typical path |
+|-------|----------------|
+| User home secrets | `%USERPROFILE%\.restore-privacy\secrets\client_ed25519.priv` |
+| LocalAppData / Programs | `%LOCALAPPDATA%\Programs\RestorePrivacy\secrets\client_ed25519.priv` |
+| ProgramData / machine | `%ProgramData%\RestorePrivacy\secrets\` (if used) |
+| Install tree | install dir `secrets\` (package — **must not** adopt package `.priv` as device identity) |
+
+**Operator checks (PowerShell):**
+
+```powershell
+# After Connect attempt with KEYGEN or active trial:
+$paths = @(
+  "$env:USERPROFILE\.restore-privacy\secrets\client_ed25519.priv",
+  "$env:LOCALAPPDATA\Programs\RestorePrivacy\secrets\client_ed25519.priv"
+)
+foreach ($p in $paths) {
+  if (Test-Path $p) {
+    $h = Get-FileHash $p -Algorithm SHA256
+    Write-Host ("{0}  {1}  bytes={2}" -f $h.Hash.Substring(0,16), $p, (Get-Item $p).Length)
+  } else {
+    Write-Host "MISSING  $p"
+  }
+}
+```
+
+| Observation | Action |
+|-------------|--------|
+| **Two different 32-byte priv hashes** under home vs LocalAppData/Programs | **FAIL** — same dual-identity class as macOS. Host residual HELLO may succeed while Wintun/full-tunnel path uses another key. Fix: unify to one device key (prefer the KEYGEN-bound store) before Connect; mirror macOS `unifyDeviceAdmissionKeysAcrossWritables` policy in `secrets_loader` if missing. |
+| **One priv only**, Connect still “HELLO OK / no residual capture” | Log residual capture / Wintun status; not identity split — dig tunnel service. |
+| **Trial ended + no KEYGEN** | Expect purchase/KEYGEN copy — **not** tunnel residual wall as primary. |
+
+**Report to Helsinki breadcrumbs / support handoff:**
+
+1. Both hashes (first 16 hex of SHA-256 only is enough).  
+2. Whether node IP was assigned (connection log line).  
+3. Whether Wintun / residual capture showed active.  
+4. client_version from log header (must be 1.1.9).
+
+---
+
+## 1. Ordered steps
+
+### Step 1 — Pull and pin
 
 ```bat
 cd /d %RPT_WINDOWS_DRIVE%\restore-privacy
-rem or your monorepo clone path
-
 git fetch origin
 git checkout main
 git pull origin main
-
 type client\VERSION
 rem MUST print: 1.1.9
-
-findstr /C:"TRAY_DISPLAY_NAME" client\windows\tray_win.py
-rem MUST show: TRAY_DISPLAY_NAME = "Privacy, Restored"
-
-findstr /C:"KILLSWITCH" client_app\lib\kill_switch_confirm.dart
-rem MUST show: kKillSwitchConfirmToken = 'KILLSWITCH'
 ```
 
-If pin is not 1.1.9, **stop** — wrong branch or stale pull.
-
-### Step 2 — Optional large-drive monorepo mirror
+### Step 2 — Large-drive brand mirror
 
 ```powershell
 $env:RPT_WINDOWS_DRIVE = "D:\RestorePrivacyMirror"
@@ -86,119 +109,48 @@ python scripts\windows_brand_mirror.py plan
 python scripts\windows_brand_mirror.py apply --dest $env:RPT_WINDOWS_DRIVE
 ```
 
-Then build from the mirrored tree so the large drive holds the seal.
-
-### Step 3 — Source readiness (any OS; run on Windows before freeze)
+### Step 3 — Readiness
 
 ```bat
 python scripts\build_windows_multihop.py --check-only --version 1.1.9
 ```
 
-Expect readiness OK (pubs, multihop, wintun, pin). Fix failures before Step 4.
-
-### Step 4 — Native PE freeze (Windows x64 only)
+### Step 4 — Native PE freeze
 
 ```bat
 python scripts\build_windows_multihop.py --version 1.1.9
-rem or double-click / run:
-scripts\build_windows_multihop.bat
 ```
 
-Output path:
+### Step 5 — Dual-identity observe (this ship)
+
+Run the PowerShell hash check above on a clean user profile **and** on a profile that previously had KEYGEN / older monopin. Document results under operator notes / vault response.
+
+### Step 6 — Upload Helsinki
+
+Upload:
 
 ```text
 releases\1.1.9\restore-privacy-client-1.1.9-windows-x64-setup.exe
 ```
 
-### Step 5 — Authenticode sign
+to `paid_assets/1.1.9/` on Helsinki (native PE only — no 0.5.8 CF).
 
-Sign the setup EXE with the company code-signing certificate (product standard tool / `signtool`).  
-Unsigned PE must not be uploaded as the catalog seal.
-
-### Step 6 — Honesty checks before upload
-
-1. **SHA-256 differs** from any prior carry-forward (1.1.6 Mac stage was a different hash — yours must be new).
-2. Strings / frozen assets contain tray **`Privacy, Restored`** (not `rpT0`).
-3. Clean install: licence scroll → KEYGEN or trial → VPN; **no** username/password first-run.
-4. Main UI: Quit **lower-left**; Quit stops residual then exits the process.
-5. Settings: kill-switch ON → ARE YOU SURE + type `KILLSWITCH`; OFF is one-switch free.
-6. Filename is exactly `restore-privacy-client-1.1.9-windows-x64-setup.exe`.
-
-### Step 7 — Stage and upload to Helsinki paid assets
+Then re-publish breadcrumbs from any machine:
 
 ```bat
-python scripts\host_paid_assets_vps.py --stage --upload --version 1.1.9 --force
-```
-
-Confirm remote:
-
-```text
-/opt/restore-privacy/paid_assets/1.1.9/restore-privacy-client-1.1.9-windows-x64-setup.exe
-```
-
-Also mirror under `status_page\assets\1.1.9\` if the script does not already.
-
-### Step 8 — Re-publish breadcrumbs (so the next fetch sees seal status)
-
-```bat
-python scripts\breadcrumbs_vault.py stage --version 1.1.9
 python scripts\breadcrumbs_vault.py publish
 ```
 
 ---
 
-## 2. Linux / Arch on this machine (optional same day)
+## 2. Helsinki vault files (after publish)
 
-If this Windows host also rebuilds Linux:
-
-```bat
-python scripts\package_linux.py
-rem Output: releases\1.1.9\restore-privacy-client-1.1.9-linux-x64.tar.gz
-```
-
-Confirm desktop Name in packaged `install.sh` is exactly **`Privacy, Restored`**.  
-Then upload with the same host paid-assets command (version 1.1.9).
-
-**Arch Linux:**
-
-```bat
-python scripts\package_arch_linux.py
-rem or staged tree under releases\1.1.9\arch
-```
-
-PKGBUILD / package monopin must read **1.1.9** (not a stale 1.1.6 carry rename).  
-Include kill-switch confirm + Quit product truth above when packaging Flutter or Python residual shells.
+- `breadcrumbs/current/manifest.json` — `windows_actions` includes dual-identity observe  
+- `breadcrumbs/current/WINDOWS_HANDOFF.md` — this document  
+- `breadcrumbs/current/WINDOWS_BRAND_CHECKLIST.md`  
+- `breadcrumbs/current/windows_brand_mirror.json`  
 
 ---
 
-## 3. What Mac already did (do not re-do as PE)
-
-| Platform | Mac agent status (1.1.9) |
-|----------|---------------------------|
-| Android | Flutter release APK with kill-switch confirm + fullExit Quit |
-| macOS | Residual-team monopin zip (host Packet Tunnel NE + launch alive) |
-| iOS | Flutter zip + residual pub inject when recipe green |
-| Linux | **Carry-forward until this machine seals** (or package_linux.py here) |
-| Windows | **Carry-forward only until this machine seals** |
-
----
-
-## 4. Residual fleet / ops (context, not PE freeze)
-
-- Residual entry peers: **IS + DE** only.
-- Connect entitlement: 72h device trial then KEYGEN (status host / Stripe).
-- Node ops / admin surfaces live on status host — not multi-product client chrome.
-- Client updates: manual free catalog download (no UPDATE_PUSH receive).
-- Kill-switch OS arm may still be product-parked at kernel level; Settings confirm UX is required whenever the opt-in control is exposed.
-
----
-
-## 5. Failure modes
-
-| Symptom | Fix |
-|---------|-----|
-| Pin not 1.1.9 after pull | Wrong branch; `git checkout main && git pull` |
-| PE still named 1.1.6 | Rebuild with `--version 1.1.9`; do not rename |
-| Kill-switch enables without typing | Pull tree with `kill_switch_confirm.dart` + Settings wiring |
-| Quit leaves process idle | Ensure disconnect-then-exit path; Flutter shells use `app_quit.dart` |
-| Helsinki rejects upload | `--force` with matching monopin CFBundle/VERSION |
+> **Breadcrumbs vault (Helsinki)** is the source of truth for “what to update”.  
+> Fetch: `https://135.181.152.10.sslip.io/breadcrumbs/current/manifest.json` with `X-RPT-Asset-Token`.
