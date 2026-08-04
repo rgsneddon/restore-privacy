@@ -144,6 +144,16 @@ class MainActivity : FlutterActivity() {
                             ),
                         )
                     }
+                    "setAutoConnectIfIdle" -> {
+                        val enabled = call.argument<Boolean>("enabled") ?: false
+                        StartupPrefs.setAutoConnectIfIdle(this, enabled)
+                        result.success(
+                            mapOf(
+                                "ok" to true,
+                                "auto_connect_if_idle" to StartupPrefs.autoConnectIfIdleEnabled(this),
+                            ),
+                        )
+                    }
                     "setResidualStack" -> {
                         // Dual-stack residual Settings (defaults both ON).
                         val ipv4 = call.argument<Boolean>("ipv4")

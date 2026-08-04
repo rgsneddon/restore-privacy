@@ -488,6 +488,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
+  Future<void> _setAutoConnectIfIdle(bool value) async {
+    setState(() {
+      _busy = true;
+      _settings = _settings.copyWith(autoConnectIfIdle: value);
+    });
+    await widget.store.save(_settings);
+    try {
+      await _channel.invokeMethod<dynamic>('setAutoConnectIfIdle', {
+        'enabled': value,
+      });
+    } on MissingPluginException {
+      // Non-Android / host without channel — pref still saved for next APK.
+    } catch (_) {}
+    _note = value
+        ? 'Auto connect if idle on — residual will re-connect after a drop '
+            '(backoff; low battery cost). Disconnect still fully stops VPN.'
+        : 'Auto connect if idle off — after a drop, Connect is manual.';
+    widget.onChanged?.call(_settings);
+    if (mounted) setState(() => _busy = false);
+  }
+
   Future<void> _setLightAppearance(bool light) async {
     final next = light ? 'light' : 'dark';
     setState(() {
@@ -916,6 +937,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
+                  key: const Key('auto_connect_if_idle_tile'),
+                  title: Text(
+                    'Auto connect if idle',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    'If residual drops while you still want VPN (idle timeout, '
+                    'brief network blip), re-connect automatically with gentle '
+                    'backoff. Uses little battery; Disconnect still stops fully.',
+                  ),
+                  value: _settings.autoConnectIfIdle,
+                  activeThumbColor: suiteOnPrimaryOf(context),
+                  activeTrackColor: suitePrimaryOf(context),
+                  onChanged: _busy ? null : _setAutoConnectIfIdle,
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
                   key: const Key('suite_appearance_light_switch'),
                   title: Text(
                     'Light appearance',
@@ -937,6 +975,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text(
             'Startup and autoconnect default off. Seamless power-up needs both on '
             '(startup launches the app; autoconnect starts the VPN). '
+            '“Auto connect if idle” (default off) re-opens residual after an '
+            'unexpected drop while you meant to stay protected — Android applies '
+            'this in the VPN service with low-cost backoff. '
             'OS VPN permission / Administrator may still be required. '
             'Client updates are manual — download the latest free residual VPN '
             'package when the in-app “new version available” notice appears. '

@@ -32,12 +32,23 @@ class RptVpnService : VpnService() {
     private var worker: Thread? = null
     private var resultReceiver: ResultReceiver? = null
     private var reported = AtomicBoolean(false)
+    /** Bumped to cancel an in-flight reconnect backoff sleep. */
+    private val reconnectGeneration = AtomicLong(0)
+    private val reconnectAttempts = AtomicLong(0)
+    private var lastHost: String = PRODUCT_ENTRY_HOST
+    private var lastPort: Int = 44044
+    private var lastFullTunnel: Boolean = true
+    private var lastSession: String = "Privacy Restored"
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_CONNECT -> {
                 userStopped.set(false)
                 desiredConnected = true
+                StartupPrefs.setDesiredConnected(this, true)
+                // User/explicit Connect cancels any pending idle reconnect timer.
+                reconnectGeneration.incrementAndGet()
+                reconnectAttempts.set(0)
                 val host = intent.getStringExtra(EXTRA_HOST) ?: PRODUCT_ENTRY_HOST
                 val port = intent.getIntExtra(EXTRA_PORT, 44044)
                 val fullTunnel = intent.getBooleanExtra(EXTRA_FULL_TUNNEL, true)
@@ -47,6 +58,7 @@ class RptVpnService : VpnService() {
                 val obfs = intent.getBooleanExtra(EXTRA_OUTER_OBFS, false)
                 RptTrafficShape.applyPrivacyScale(shape)
                 RptObfuscation.applyPrivacyScale(obfs)
+                rememberConnectParams(host, port, fullTunnel, session, shape, obfs)
                 val recv = extractReceiver(intent)
                 // Already handshaking or up: reply to *this* receiver only — do not
                 // steal the active connect's ResultReceiver / reported flag (that hung
@@ -64,7 +76,7 @@ class RptVpnService : VpnService() {
                 try {
                     startForeground(NOTIFICATION_ID, buildNotification(session, connecting = true))
                 } catch (e: Exception) {
-                    report(false, "Foreground service failed: ${e.message}")
+                    report(false, "Foreground service failed: ${e.message}", allowReconnect = false)
                     stopSelf()
                     return START_NOT_STICKY
                 }
@@ -73,30 +85,89 @@ class RptVpnService : VpnService() {
                 return if (userStopped.get()) START_NOT_STICKY else START_STICKY
             }
             ACTION_DISCONNECT -> {
-                // Intentional stop: full teardown, no sticky resurrection
+                // Intentional stop: full teardown, no sticky resurrection / no idle reconnect
                 userStopped.set(true)
                 desiredConnected = false
+                StartupPrefs.setDesiredConnected(this, false)
+                reconnectGeneration.incrementAndGet()
+                reconnectAttempts.set(0)
                 stopTunnel()
                 return START_NOT_STICKY
             }
             else -> {
                 // Null intent / sticky restart: keep foreground if session already active.
                 // Do NOT tear down solely because Activity was destroyed (minimize).
-                if (userStopped.get() || !desiredConnected) {
+                if (userStopped.get()) {
+                    stopTunnel()
+                    return START_NOT_STICKY
+                }
+                // Rehydrate desired from prefs (process death) when idle auto-reconnect is on.
+                if (!desiredConnected && StartupPrefs.isDesiredConnected(this)) {
+                    desiredConnected = true
+                }
+                if (!desiredConnected) {
                     stopTunnel()
                     return START_NOT_STICKY
                 }
                 if (isSessionActive && running.get()) {
                     return START_STICKY
                 }
-                // Process was killed mid-session — cannot rehydrate TUN without credentials path;
-                // drop sticky so OS does not loop empty restarts. User taps Connect again.
+                // Process killed mid-session or empty sticky restart: re-open residual
+                // when Settings "Auto connect if idle" is on.
+                if (StartupPrefs.autoConnectIfIdleEnabled(this)) {
+                    val last = StartupPrefs.loadLastConnect(this, PRODUCT_ENTRY_HOST)
+                    rememberConnectParams(
+                        last.host,
+                        last.port,
+                        last.fullTunnel,
+                        last.session,
+                        last.trafficShape,
+                        last.outerObfs,
+                    )
+                    RptTrafficShape.applyPrivacyScale(last.trafficShape)
+                    RptObfuscation.applyPrivacyScale(last.outerObfs)
+                    reported.set(false)
+                    try {
+                        startForeground(
+                            NOTIFICATION_ID,
+                            buildNotification(last.session, connecting = true, reconnecting = true),
+                        )
+                    } catch (_: Exception) {
+                        return START_NOT_STICKY
+                    }
+                    startTunnel(last.host, last.port, last.fullTunnel, last.session)
+                    return START_STICKY
+                }
+                // No auto-reconnect: clear flags; user taps Connect again.
                 isSessionActive = false
                 activeVpnIp = ""
+                desiredConnected = false
+                StartupPrefs.setDesiredConnected(this, false)
                 return START_NOT_STICKY
             }
         }
         return if (userStopped.get()) START_NOT_STICKY else START_STICKY
+    }
+
+    private fun rememberConnectParams(
+        host: String,
+        port: Int,
+        fullTunnel: Boolean,
+        session: String,
+        shape: Boolean,
+        obfs: Boolean,
+    ) {
+        lastHost = host
+        lastPort = port
+        lastFullTunnel = fullTunnel
+        lastSession = session
+        StartupPrefs.saveLastConnect(this, host, port, fullTunnel, session, shape, obfs)
+    }
+
+    private fun wantsIdleAutoReconnect(): Boolean {
+        if (userStopped.get()) return false
+        if (!desiredConnected && !StartupPrefs.isDesiredConnected(this)) return false
+        return StartupPrefs.autoConnectIfIdleEnabled(this)
     }
 
     private fun extractReceiver(intent: Intent): ResultReceiver? {
@@ -114,14 +185,26 @@ class RptVpnService : VpnService() {
         vpnIp: String = "",
         ipv6Protected: Boolean? = null,
         connecting: Boolean = false,
+        /** When false on failure, keep desiredConnected so idle auto-reconnect can run. */
+        allowReconnect: Boolean = false,
     ) {
         if (!reported.compareAndSet(false, true)) return
         if (!ok && !connecting) {
             // Real connect failure only — never clear session for in-progress replies.
-            desiredConnected = false
             isSessionActive = false
             activeVpnIp = ""
             activeIpv6Protected = null
+            if (!allowReconnect || !wantsIdleAutoReconnect()) {
+                desiredConnected = false
+                StartupPrefs.setDesiredConnected(this, false)
+            }
+        } else if (ok && !connecting) {
+            reconnectAttempts.set(0)
+            desiredConnected = true
+            StartupPrefs.setDesiredConnected(this, true)
+            if (ipv6Protected != null) {
+                activeIpv6Protected = ipv6Protected
+            }
         } else if (ipv6Protected != null) {
             activeIpv6Protected = ipv6Protected
         }
@@ -136,6 +219,60 @@ class RptVpnService : VpnService() {
             // RESULT_OK only for residual full-tunnel success
             resultReceiver?.send(if (ok && !connecting) RESULT_OK else RESULT_ERR, b)
         } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * After unexpected tunnel death (or failed handshake while still desired),
+     * schedule a gentle backoff re-Connect when Settings auto-connect-if-idle is on.
+     * Safe to call once from the worker finally block (generation cancels prior timers).
+     */
+    private fun scheduleIdleReconnect(reason: String) {
+        if (!wantsIdleAutoReconnect()) return
+        if (running.get()) return
+        val attempt = reconnectAttempts.incrementAndGet().toInt()
+        val delayMs = reconnectBackoffMs(attempt)
+        val gen = reconnectGeneration.incrementAndGet()
+        desiredConnected = true
+        StartupPrefs.setDesiredConnected(this, true)
+        try {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(lastSession, connecting = true, reconnecting = true),
+            )
+        } catch (_: Exception) {
+            return
+        }
+        thread(name = "rpt-idle-reconnect", isDaemon = true) {
+            try {
+                Thread.sleep(delayMs)
+            } catch (_: InterruptedException) {
+                return@thread
+            }
+            if (gen != reconnectGeneration.get()) return@thread
+            if (userStopped.get() || !wantsIdleAutoReconnect()) return@thread
+            if (running.get() || isSessionActive) return@thread
+            reported.set(false)
+            val last = StartupPrefs.loadLastConnect(this@RptVpnService, lastHost)
+            RptTrafficShape.applyPrivacyScale(last.trafficShape)
+            RptObfuscation.applyPrivacyScale(last.outerObfs)
+            rememberConnectParams(
+                last.host,
+                last.port,
+                last.fullTunnel,
+                last.session,
+                last.trafficShape,
+                last.outerObfs,
+            )
+            try {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildNotification(last.session, connecting = true, reconnecting = true),
+                )
+            } catch (_: Exception) {
+                return@thread
+            }
+            startTunnel(last.host, last.port, last.fullTunnel, last.session)
         }
     }
 
@@ -246,6 +383,7 @@ class RptVpnService : VpnService() {
                 "Missing node public key — package must include node_elgamal.pub " +
                     "(plus exit_node_elgamal.pub / us_node_elgamal.pub for RO/US residual); " +
                     "device Ed25519 is auto-generated",
+                allowReconnect = false,
             )
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -279,10 +417,18 @@ class RptVpnService : VpnService() {
                         } else {
                             ""
                         }
-                    report(false, "RPT handshake failed: $detail$hint")
+                    val canRetry = wantsIdleAutoReconnect()
+                    report(
+                        false,
+                        "RPT handshake failed: $detail$hint",
+                        allowReconnect = canRetry,
+                    )
                     running.set(false)
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
+                    // Reconnect (if opted in) is scheduled from the worker finally block.
+                    if (!canRetry) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    }
                     return@thread
                 }
 
@@ -327,14 +473,18 @@ class RptVpnService : VpnService() {
                 val pfd = try {
                     builder.establish()
                 } catch (e: Exception) {
-                    report(false, "VpnService.establish failed: ${e.message}")
+                    report(false, "VpnService.establish failed: ${e.message}", allowReconnect = false)
                     running.set(false)
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
                     return@thread
                 }
                 if (pfd == null) {
-                    report(false, "VpnService.establish returned null — VPN permission or policy blocked TUN")
+                    report(
+                        false,
+                        "VpnService.establish returned null — VPN permission or policy blocked TUN",
+                        allowReconnect = false,
+                    )
                     running.set(false)
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
@@ -354,14 +504,18 @@ class RptVpnService : VpnService() {
                     } catch (_: Exception) {
                     }
                     tun = null
+                    val canRetry = wantsIdleAutoReconnect()
                     report(
                         false,
                         "Could not protect UDP to $host:$port after VPN establish " +
                             "(${e.message}) — residual traffic would blackhole",
+                        allowReconnect = canRetry,
                     )
                     running.set(false)
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
+                    if (!canRetry) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    }
                     return@thread
                 }
                 // Close handshake socket; dataplane uses protected dataSock only
@@ -467,6 +621,7 @@ class RptVpnService : VpnService() {
                 }
                 // Lean RPT2 KEEPALIVE while tunnel is up — independent of TUN data
                 // and independent of traffic-shape cover (node idle prune ~60s).
+                val kaFailStreak = AtomicLong(0)
                 val keepaliveThread = thread(name = "rpt-keepalive", isDaemon = true) {
                     val intervalMs = KEEPALIVE_INTERVAL_MS
                     while (running.get()) {
@@ -475,9 +630,20 @@ class RptVpnService : VpnService() {
                             if (!running.get()) break
                             val wire = engine.sealAndWrapKeepalive()
                             dataSock.send(DatagramPacket(wire, wire.size))
+                            kaFailStreak.set(0)
                         } catch (_: Exception) {
-                            // Transient send errors: keep timer alive; do not exit loop.
+                            // Sustained KA send failure while user still wants residual
+                            // → tear TUN so idle auto-reconnect can re-HELLO.
+                            val fails = kaFailStreak.incrementAndGet()
                             if (!running.get()) break
+                            if (fails >= KEEPALIVE_FAIL_STREAK_RECONNECT && wantsIdleAutoReconnect()) {
+                                running.set(false)
+                                try {
+                                    pfd.close()
+                                } catch (_: Exception) {
+                                }
+                                break
+                            }
                         }
                     }
                 }
@@ -506,13 +672,53 @@ class RptVpnService : VpnService() {
                 } catch (_: Exception) {
                 }
             } catch (e: Exception) {
-                report(false, "VPN tunnel error: ${e.message ?: e.javaClass.simpleName}")
+                val canRetry = wantsIdleAutoReconnect()
+                report(
+                    false,
+                    "VPN tunnel error: ${e.message ?: e.javaClass.simpleName}",
+                    allowReconnect = canRetry,
+                )
             } finally {
                 try {
                     sock.close()
                 } catch (_: Exception) {
                 }
+                val wasUserStop = userStopped.get()
+                val hadLiveSession = isSessionActive
                 running.set(false)
+                isSessionActive = false
+                activeVpnIp = ""
+                activeIpv6Protected = null
+                // Drop TUN so a later re-establish is clean (idle reconnect or next Connect).
+                val leftover = tun
+                tun = null
+                try {
+                    leftover?.close()
+                } catch (_: Exception) {
+                }
+                when {
+                    wasUserStop -> {
+                        // stopTunnel already tearing down; do not resurrect.
+                    }
+                    wantsIdleAutoReconnect() -> {
+                        // Unexpected drop (or failed connect with still-desired): backoff re-HELLO.
+                        scheduleIdleReconnect(
+                            if (hadLiveSession) "session dropped" else "connect incomplete",
+                        )
+                    }
+                    else -> {
+                        desiredConnected = false
+                        StartupPrefs.setDesiredConnected(this@RptVpnService, false)
+                        try {
+                            stopForeground(STOP_FOREGROUND_REMOVE)
+                        } catch (_: Exception) {
+                        }
+                        try {
+                            stopSelf()
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
             }
         }
     }
@@ -543,6 +749,7 @@ class RptVpnService : VpnService() {
      * Idempotent — safe to call repeatedly from disconnect / onDestroy / onRevoke.
      */
     private fun stopTunnel() {
+        reconnectGeneration.incrementAndGet()
         running.set(false)
         isSessionActive = false
         activeVpnIp = ""
@@ -586,11 +793,17 @@ class RptVpnService : VpnService() {
         // System revoked VPN permission / another VPN took over — tear down fully
         userStopped.set(true)
         desiredConnected = false
+        StartupPrefs.setDesiredConnected(this, false)
+        reconnectGeneration.incrementAndGet()
         stopTunnel()
         super.onRevoke()
     }
 
-    private fun buildNotification(session: String, connecting: Boolean): Notification {
+    private fun buildNotification(
+        session: String,
+        connecting: Boolean,
+        reconnecting: Boolean = false,
+    ): Notification {
         val channelId = "rpt_vpn"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
@@ -598,10 +811,13 @@ class RptVpnService : VpnService() {
                 NotificationChannel(channelId, "Restore Privacy VPN", NotificationManager.IMPORTANCE_LOW),
             )
         }
-        val text = if (connecting) {
-            "Connecting RPT tunnel…"
-        } else {
-            "Full VPN active — minimize keeps protection on. Use Disconnect to stop."
+        val text = when {
+            reconnecting ->
+                "Reconnecting residual tunnel… (auto connect if idle)"
+            connecting ->
+                "Connecting RPT tunnel…"
+            else ->
+                "Full VPN active — minimize keeps protection on. Use Disconnect to stop."
         }
         val title = if (session.isBlank()) "Privacy Restored" else session
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -698,6 +914,24 @@ class RptVpnService : VpnService() {
          * Mirrors client residual_keepalive_policy.RESIDUAL_KEEPALIVE_INTERVAL_SEC.
          */
         const val KEEPALIVE_INTERVAL_MS: Long = 25_000L
+
+        /**
+         * Consecutive KEEPALIVE send failures before tearing the TUN so idle
+         * auto-reconnect can re-HELLO (only when that Settings switch is on).
+         */
+        const val KEEPALIVE_FAIL_STREAK_RECONNECT: Long = 3L
+
+        /**
+         * Exponential backoff for idle auto-reconnect (attempt is 1-based).
+         * 2s, 4s, 8s, 16s, 32s, then 60s cap. Mirrors Dart residualAutoReconnectBackoffMs.
+         */
+        @JvmStatic
+        fun reconnectBackoffMs(attempt: Int): Long {
+            val a = if (attempt < 1) 1 else attempt
+            val exp = (a - 1).coerceIn(0, 5)
+            val ms = 2_000L * (1L shl exp)
+            return if (ms > 60_000L) 60_000L else ms
+        }
 
         /** UI rehydrate after minimize — true while TUN session is up. */
         @Volatile

@@ -1,6 +1,6 @@
 # Restore Privacy
 
-**Version v1.1.8** — a dedicated virtual private network for residual traffic.
+**Version v1.1.9** — a dedicated virtual private network for residual traffic.
 
 Restore Privacy protects residual traffic on your device. Download free, try three
 days with no card, then continue with a KEYGEN.
@@ -21,11 +21,11 @@ Catalog packages (free download; Connect still needs trial or KEYGEN):
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-1.1.8-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-1.1.8-android.apk` |
-| macOS | `restore-privacy-client-1.1.8-macos.zip` (Notarized Developer ID + residual Packet Tunnel host NE for first-use System VPN registration) |
-| iOS | `restore-privacy-client-1.1.8-ios.zip` (Team-signed sideload) |
-| Linux | `restore-privacy-client-1.1.8-linux-x64.tar.gz` |
+| Windows | `restore-privacy-client-1.1.9-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-1.1.9-android.apk` |
+| macOS | `restore-privacy-client-1.1.9-macos.zip` (Notarized Developer ID + residual Packet Tunnel host NE for first-use System VPN registration) |
+| iOS | `restore-privacy-client-1.1.9-ios.zip` (Team-signed sideload) |
+| Linux | `restore-privacy-client-1.1.9-linux-x64.tar.gz` |
 
 Public storefront: [restoreprivacy.online](https://restoreprivacy.online).
 
@@ -42,10 +42,10 @@ Defaults: run at startup off, autoconnect off, traffic shaping / outer obfuscati
 - **One-word full ship (Grok):** type `kyrusfables` or `/kyrusfables` — build all, Apple sign/notarize, NE tunnel assurances, commit+push, Helsinki deploy, docs
 - CLI skeleton: `scripts/kyrusfables.sh` (tests + `build_suite_<pin>`; use Grok skill for git/docs narrative)
 
-- Pin: `client/VERSION` → `1.1.8`
+- Pin: `client/VERSION` → `1.1.9`
 - Flutter client: `client_app/`
-- Five-platform stage script: `scripts/build_suite_1.1.8.py`
-- Windows / Linux handoff: `client/windows/WINDOWS_HANDOFF_1.1.8.md`
+- Five-platform stage script: `scripts/build_suite_1.1.9.py`
+- Windows / Linux handoff: `client/windows/WINDOWS_HANDOFF_1.1.9.md`
 
 ## Licence
 

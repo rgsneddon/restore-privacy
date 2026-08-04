@@ -109,7 +109,7 @@ class TestLiveMonopinZipDistribution(unittest.TestCase):
 
     def test_build_suite_monopin_requires_devid_not_residual(self) -> None:
         """Ship recipe must fail-closed for DevID monopin (not residual-team)."""
-        script = ROOT / "scripts" / "build_suite_1.1.8.py"
+        script = ROOT / "scripts" / "build_suite_1.1.9.py"
         self.assertTrue(script.is_file())
         text = script.read_text(encoding="utf-8")
         self.assertIn("require_macos_zip_developer_id_distribution", text)

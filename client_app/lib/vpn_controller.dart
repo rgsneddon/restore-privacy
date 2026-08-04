@@ -220,6 +220,7 @@ class VpnController {
         privacyTrafficShape: privacyTrafficShape,
         privacyOuterObfuscation: privacyOuterObfuscation,
         privacyMultihop: privacyMultihop,
+        autoConnectIfIdle: settingsForUpdatePush.autoConnectIfIdle,
       );
       tickConnecting();
       progress = Timer.periodic(connectingProgressInterval, (_) {
@@ -423,6 +424,7 @@ class VpnController {
     bool? privacyTrafficShape,
     bool? privacyOuterObfuscation,
     bool? privacyMultihop,
+    bool? autoConnectIfIdle,
   }) async {
     try {
       await _channel.invokeMethod<dynamic>('setResidualStack', {
@@ -433,6 +435,14 @@ class VpnController {
       // Non-Apple / host without channel.
     } catch (_) {
       // Best-effort — Connect still reads App Group defaults.
+    }
+    if (autoConnectIfIdle != null) {
+      try {
+        await _channel.invokeMethod<dynamic>('setAutoConnectIfIdle', {
+          'enabled': autoConnectIfIdle,
+        });
+      } on MissingPluginException {
+      } catch (_) {}
     }
     if (privacyTrafficShape == null &&
         privacyOuterObfuscation == null &&

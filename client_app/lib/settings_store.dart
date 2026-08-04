@@ -12,6 +12,9 @@ import 'country_select.dart';
 
 const String kKeyRunAtStartup = 'run_at_startup';
 const String kKeyAutoconnectOnLaunch = 'autoconnect_on_launch';
+/// Re-open residual tunnel if it drops while the user still wants VPN (idle/network).
+/// Product default **off**. Android applies this in the VPN foreground service.
+const String kKeyAutoConnectIfIdle = 'auto_connect_if_idle';
 const String kKeyPrivacyTrafficShape = 'privacy_traffic_shape';
 const String kKeyPrivacyOuterObfuscation = 'privacy_outer_obfuscation';
 const String kKeyPrivacyMultihop = 'privacy_multihop';
@@ -42,6 +45,8 @@ const bool kResidualIpv4AlwaysOn = true;
 class ProductSettings {
   final bool runAtStartup;
   final bool autoconnectOnLaunch;
+  /// When true, residual re-connects automatically after an unexpected drop.
+  final bool autoConnectIfIdle;
   final bool privacyTrafficShape;
   final bool privacyOuterObfuscation;
   final bool privacyMultihop;
@@ -61,6 +66,7 @@ class ProductSettings {
   const ProductSettings({
     this.runAtStartup = false,
     this.autoconnectOnLaunch = false,
+    this.autoConnectIfIdle = false,
     this.privacyTrafficShape = false,
     this.privacyOuterObfuscation = false,
     this.privacyMultihop = false,
@@ -82,6 +88,7 @@ class ProductSettings {
   ProductSettings copyWith({
     bool? runAtStartup,
     bool? autoconnectOnLaunch,
+    bool? autoConnectIfIdle,
     bool? privacyTrafficShape,
     bool? privacyOuterObfuscation,
     bool? privacyMultihop,
@@ -95,6 +102,7 @@ class ProductSettings {
     return ProductSettings(
       runAtStartup: runAtStartup ?? this.runAtStartup,
       autoconnectOnLaunch: autoconnectOnLaunch ?? this.autoconnectOnLaunch,
+      autoConnectIfIdle: autoConnectIfIdle ?? this.autoConnectIfIdle,
       privacyTrafficShape: privacyTrafficShape ?? this.privacyTrafficShape,
       privacyOuterObfuscation:
           privacyOuterObfuscation ?? this.privacyOuterObfuscation,
@@ -114,6 +122,7 @@ class ProductSettings {
   Map<String, dynamic> toJson() => {
         kKeyRunAtStartup: runAtStartup,
         kKeyAutoconnectOnLaunch: autoconnectOnLaunch,
+        kKeyAutoConnectIfIdle: autoConnectIfIdle,
         kKeyPrivacyTrafficShape: privacyTrafficShape,
         kKeyPrivacyOuterObfuscation: privacyOuterObfuscation,
         kKeyPrivacyMultihop: privacyMultihop,
@@ -133,6 +142,7 @@ class ProductSettings {
     return ProductSettings(
       runAtStartup: data[kKeyRunAtStartup] == true,
       autoconnectOnLaunch: data[kKeyAutoconnectOnLaunch] == true,
+      autoConnectIfIdle: data[kKeyAutoConnectIfIdle] == true,
       privacyTrafficShape: data[kKeyPrivacyTrafficShape] == true,
       privacyOuterObfuscation: data[kKeyPrivacyOuterObfuscation] == true,
       privacyMultihop: data[kKeyPrivacyMultihop] == true,
@@ -199,6 +209,7 @@ class SettingsStore {
   Future<ProductSettings> load() async {
     final run = await backend.getBool(kKeyRunAtStartup);
     final auto = await backend.getBool(kKeyAutoconnectOnLaunch);
+    final idleAuto = await backend.getBool(kKeyAutoConnectIfIdle);
     final shape = await backend.getBool(kKeyPrivacyTrafficShape);
     final obfs = await backend.getBool(kKeyPrivacyOuterObfuscation);
     final mh = await backend.getBool(kKeyPrivacyMultihop);
@@ -210,6 +221,7 @@ class SettingsStore {
     return ProductSettings(
       runAtStartup: run == true,
       autoconnectOnLaunch: auto == true,
+      autoConnectIfIdle: idleAuto == true,
       privacyTrafficShape: shape == true,
       privacyOuterObfuscation: obfs == true,
       privacyMultihop: mh == true,
@@ -228,6 +240,7 @@ class SettingsStore {
   Future<void> save(ProductSettings settings) async {
     await backend.setBool(kKeyRunAtStartup, settings.runAtStartup);
     await backend.setBool(kKeyAutoconnectOnLaunch, settings.autoconnectOnLaunch);
+    await backend.setBool(kKeyAutoConnectIfIdle, settings.autoConnectIfIdle);
     await backend.setBool(kKeyPrivacyTrafficShape, settings.privacyTrafficShape);
     await backend.setBool(
       kKeyPrivacyOuterObfuscation,
@@ -275,6 +288,18 @@ class SettingsStore {
   bool shouldAutoconnectOnLaunch(ProductSettings s) => s.autoconnectOnLaunch;
 
   bool shouldRunAtStartup(ProductSettings s) => s.runAtStartup;
+
+  bool shouldAutoConnectIfIdle(ProductSettings s) => s.autoConnectIfIdle;
+}
+
+/// Exponential backoff for residual auto-reconnect after idle/network drop.
+///
+/// Attempt is 1-based. Caps at 60s. Mirrors Android [RptVpnService.reconnectBackoffMs].
+int residualAutoReconnectBackoffMs(int attempt) {
+  final a = attempt < 1 ? 1 : attempt;
+  final exp = (a - 1).clamp(0, 5);
+  final ms = 2000 * (1 << exp);
+  return ms > 60000 ? 60000 : ms;
 }
 
 /// Pure: resolve a Settings store for the main-screen Settings control.

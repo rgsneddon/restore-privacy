@@ -8,6 +8,7 @@ void main() {
     const s = ProductSettings.defaults;
     expect(s.runAtStartup, isFalse);
     expect(s.autoconnectOnLaunch, isFalse);
+    expect(s.autoConnectIfIdle, isFalse);
     expect(s.privacyTrafficShape, isFalse);
     expect(s.privacyOuterObfuscation, isFalse);
     expect(s.privacyMultihop, isFalse);
@@ -140,6 +141,30 @@ void main() {
       store.shouldRunAtStartup(const ProductSettings(runAtStartup: true)),
       isTrue,
     );
+    expect(
+      store.shouldAutoConnectIfIdle(ProductSettings.defaults),
+      isFalse,
+    );
+    expect(
+      store.shouldAutoConnectIfIdle(
+        const ProductSettings(autoConnectIfIdle: true),
+      ),
+      isTrue,
+    );
+  });
+
+  test('auto connect if idle roundtrip + backoff policy', () async {
+    final shared = <String, dynamic>{};
+    final store = SettingsStore(MemorySettingsBackend(shared));
+    await store.save(const ProductSettings(autoConnectIfIdle: true));
+    final loaded = await store.load();
+    expect(loaded.autoConnectIfIdle, isTrue);
+    expect(shared[kKeyAutoConnectIfIdle], isTrue);
+    expect(residualAutoReconnectBackoffMs(1), 2000);
+    expect(residualAutoReconnectBackoffMs(2), 4000);
+    expect(residualAutoReconnectBackoffMs(3), 8000);
+    expect(residualAutoReconnectBackoffMs(6), 60000);
+    expect(residualAutoReconnectBackoffMs(99), 60000);
   });
 
   test('product Settings path: IPv4 always on + residual IPv6 ON/OFF honesty',

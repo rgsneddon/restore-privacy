@@ -425,6 +425,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       privacyTrafficShape: loaded.privacyTrafficShape,
       privacyOuterObfuscation: loaded.privacyOuterObfuscation,
       privacyMultihop: loaded.privacyMultihop,
+      autoConnectIfIdle: loaded.autoConnectIfIdle,
     );
     if (mounted) {
       setState(() => _settings = loaded);
@@ -1282,6 +1283,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   privacyTrafficShape: s.privacyTrafficShape,
                   privacyOuterObfuscation: s.privacyOuterObfuscation,
                   privacyMultihop: s.privacyMultihop,
+                  autoConnectIfIdle: s.autoConnectIfIdle,
                 ),
               );
             },
