@@ -311,4 +311,5 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 | **Settings** | Always openable (not gated by Connect `_busy`); `resolveSettingsStoreForOpen` + root navigator; failure surfaces *Settings could not open*. |
 | **macOS NE protocol** | Free monopin always assigns a **fresh** `NETunnelProviderProtocol()`; one-shot profile recreate + `startTunnel` retry after residual-team → monopin DR mismatch. |
 | **macOS Connect fail path** | Residual-capable free monopin: Packet Tunnel not Connected → Allow / System Settings guidance first (not Team residual re-sign as primary). Node-assigned IP proves entitlement is live (not trial expiry). True missing-host-NE uses separate `missingHostNeEntitlementMessage`. |
+| **Device identity unify** | Before Connect, host unifies `client_ed25519.priv` across App Group + `~/.restore-privacy` + App Support (home wins on conflict) so Packet Tunnel HELLO cannot use a different unbound key than host HELLO. |
 | **Android** | Optional **Auto connect if idle** with service reconnect backoff. |

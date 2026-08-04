@@ -786,12 +786,16 @@ enum RptVpnChannel {
         completion(map)
         return
       }
-      // Host pre-seed: copy IS/RO/DE pubs into App Group + home secrets so the
-      // Packet Tunnel can HELLO to residual host.
+      // Host pre-seed: unify device key (host ↔ App Group) + catalog residual pubs
+      // so Packet Tunnel HELLO uses the same KEYGEN/trial identity as host HELLO.
       do {
         try RptSecrets.preseedSharedWritableSecretsForResidualHost(residualHost: host)
       } catch {
-        // Best-effort; tunnel load may still find inject/package pins
+        // Still attempt startTunnel — extension may load bundle pins — but log via map if fail.
+        NSLog(
+          "RptVpnChannel preseedSharedWritableSecrets failed: %@",
+          String(describing: error)
+        )
       }
       // Apple: after save, prefer a freshly loaded manager instance for startTunnel.
       reloadProductManager(host: host, port: port) { live, reloadErr in
@@ -1259,12 +1263,16 @@ enum RptVpnChannel {
               )
               return
             }
-            let detail =
+            let disc = lastDisconnectErrorDescription(manager.connection)
+            var detail =
               "Packet Tunnel did not become Connected (status \(statusName(st))/\(st.rawValue)). "
               + "Open System Settings → Network → VPN & Filters, enable Restore Privacy, "
               + "choose Allow if macOS asks, then press Connect again. "
               + "Do not add L2TP, Cisco IPsec, or IKEv2. "
-              + "A node IP was not required here — residual Connect needs the OS tunnel on."
+              + "Residual Connect needs the OS tunnel on (host HELLO alone is not enough)."
+            if let disc, !disc.isEmpty {
+              detail += " Extension: \(disc)"
+            }
             var map = RptFullTunnelResult.productConnectMap(
               packetTunnelActive: false,
               detailMessage: detail
@@ -1291,6 +1299,24 @@ enum RptVpnChannel {
     } else {
       DispatchQueue.main.async(execute: work)
     }
+  }
+
+  /// Best-effort extension failure text after startTunnel leaves status disconnected.
+  static func lastDisconnectErrorDescription(_ connection: NEVPNConnection) -> String? {
+    // Prefer modern API when linked; fall back to KVC for broader macOS SDKs.
+    let mirror = Mirror(reflecting: connection)
+    for child in mirror.children {
+      if child.label == "lastDisconnectError", let err = child.value as? Error {
+        return err.localizedDescription
+      }
+    }
+    if let err = connection.value(forKey: "lastDisconnectError") as? Error {
+      return err.localizedDescription
+    }
+    if let err = connection.value(forKey: "error") as? Error {
+      return err.localizedDescription
+    }
+    return nil
   }
 
   /// Remove a stale system VPN profile and re-register free monopin protocol once.

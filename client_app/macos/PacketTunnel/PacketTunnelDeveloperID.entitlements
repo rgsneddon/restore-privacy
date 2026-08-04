@@ -21,5 +21,10 @@
 	<array>
 		<string>group.com.restoreprivacy.shared</string>
 	</array>
+	<!-- Fallback when App Group is empty: read unified host keys from home. -->
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
+	<array>
+		<string>.restore-privacy/</string>
+	</array>
 </dict>
 </plist>

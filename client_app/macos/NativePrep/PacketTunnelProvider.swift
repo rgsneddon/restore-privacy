@@ -5,8 +5,14 @@
 
 import Foundation
 import NetworkExtension
+import os.log
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
+  private static let log = OSLog(
+    subsystem: "com.restoreprivacy.restorePrivacyClient.PacketTunnel",
+    category: "start"
+  )
+
   private var engine: RptClientEngine?
   private var session: RptClientEngine.Session?
   private var keepaliveTimer: DispatchSourceTimer?
@@ -29,6 +35,13 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     } else if let p = options?["port"] as? NSNumber ?? providerCfg["port"] as? NSNumber {
       endpointPort = p.uint16Value
     }
+    os_log(
+      "startTunnel host=%{public}@ port=%{public}u",
+      log: Self.log,
+      type: .info,
+      endpointHost,
+      endpointPort
+    )
 
     pathQueue.async { [weak self] in
       guard let self else { return }
@@ -65,6 +78,13 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         for host in order {
           do {
             let material = try RptSecrets.loadAdmissionMaterial(residualHost: host)
+            os_log(
+              "admission ok host=%{public}@ privBytes=%{public}d",
+              log: Self.log,
+              type: .info,
+              host,
+              material.clientPriv.count
+            )
             let eng = try RptClientEngine(
               clientPrivRaw: material.clientPriv,
               nodeElgamalPubRaw: material.nodePub
@@ -81,6 +101,13 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             break
           } catch {
             lastError = error
+            os_log(
+              "admission/HELLO failed host=%{public}@: %{public}@",
+              log: Self.log,
+              type: .error,
+              host,
+              error.localizedDescription
+            )
             // Try next catalog peer only when residual looks unreachable
             if !RptEndpoint.isResidualUnreachableFailure(error.localizedDescription) {
               throw error
@@ -88,12 +115,13 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
           }
         }
         guard let engine, let session else {
+          let msg =
+            lastError?.localizedDescription
+            ?? "Connect failed: preferred residual and catalog alternates unreachable"
+          os_log("startTunnel abort: %{public}@", log: Self.log, type: .error, msg)
           completionHandler(
             lastError
-              ?? Self.error(
-                "Connect failed: preferred residual and catalog alternates unreachable",
-                code: 11
-              )
+              ?? Self.error(msg, code: 11)
           )
           return
         }
@@ -146,6 +174,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
           completionHandler(nil)
         }
       } catch {
+        os_log(
+          "startTunnel error: %{public}@",
+          log: Self.log,
+          type: .error,
+          error.localizedDescription
+        )
         completionHandler(Self.error(error.localizedDescription, code: 11))
       }
     }

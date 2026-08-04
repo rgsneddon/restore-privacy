@@ -94,6 +94,11 @@ public enum RptSecrets {
     ///
     /// Tunnel Bundle.main often lacks RO/DE pins; shared writable dirs historically
     /// only held Iceland. Call from host Connect path with the residual dial host.
+    ///
+    /// **Critical:** host HELLO and Packet Tunnel must use the **same** device
+    /// `client_ed25519.priv`. After wipe/reinstall, home may keep a KEYGEN-bound
+    /// key while App Group has a newly generated one — tunnel then fails while
+    /// host HELLO still assigns a node IP. Unify identity first.
     public static func preseedSharedWritableSecretsForResidualHost(
         residualHost: String,
         fileManager: FileManager = .default,
@@ -122,6 +127,13 @@ public enum RptSecrets {
                     .appendingPathComponent("secrets", isDirectory: true)
             )
         }
+        // 1) One device identity for host + sandboxed Packet Tunnel App Group.
+        try unifyDeviceAdmissionKeysAcrossWritables(
+            writables: writables,
+            candidates: candidates,
+            fileManager: fileManager
+        )
+        // 2) Catalog residual pubs (IS/DE/exit) into every writable.
         for dest in writables {
             seedCatalogPublicKeys(into: dest, candidates: candidates, fileManager: fileManager)
             try ensureResidualPubInWritableDir(
@@ -131,6 +143,109 @@ public enum RptSecrets {
                 fileManager: fileManager
             )
         }
+    }
+
+    /// Pure policy: which 32-byte device priv wins when multiple stores disagree.
+    ///
+    /// Prefer home, then Application Support, then App Group. Older installs bound
+    /// KEYGEN to `~/.restore-privacy`; the tunnel only sees App Group under sandbox
+    /// — so home/app-support win and are copied into the group.
+    public static func preferredDevicePrivAmong(
+        home: Data?,
+        appSupport: Data?,
+        appGroup: Data?
+    ) -> Data? {
+        for d in [home, appSupport, appGroup] {
+            if let d, d.count == 32 { return d }
+        }
+        return nil
+    }
+
+    /// Write one device priv into every writable secrets dir (overwrite mismatches).
+    /// Generates a new key into App Group (or first writable) when none exist.
+    @discardableResult
+    public static func unifyDeviceAdmissionKeysAcrossWritables(
+        writables: [URL],
+        candidates: [URL],
+        fileManager: FileManager = .default
+    ) throws -> Data {
+        func readPriv(_ dir: URL) -> Data? {
+            let p = dir.appendingPathComponent(clientPrivName)
+            guard fileManager.isReadableFile(atPath: p.path),
+                  let d = try? Data(contentsOf: p),
+                  d.count == 32
+            else { return nil }
+            return d
+        }
+
+        var homePriv: Data?
+        var supportPriv: Data?
+        var groupPriv: Data?
+        for dir in writables {
+            let path = dir.path
+            let d = readPriv(dir)
+            if path.contains("Group Containers") || path.contains(appGroupId) {
+                groupPriv = d ?? groupPriv
+            } else if path.contains(".restore-privacy") {
+                homePriv = d ?? homePriv
+            } else if path.contains(appSupportFolderName) || path.contains("Application Support") {
+                supportPriv = d ?? supportPriv
+            } else if groupPriv == nil {
+                groupPriv = d
+            }
+        }
+
+        var winner = preferredDevicePrivAmong(
+            home: homePriv,
+            appSupport: supportPriv,
+            appGroup: groupPriv
+        )
+
+        if winner == nil {
+            // No key anywhere — generate once into first writable (prefer App Group).
+            var nodeSrc: URL?
+            for d in candidates {
+                let n = d.appendingPathComponent(nodePubName)
+                if fileManager.isReadableFile(atPath: n.path) {
+                    nodeSrc = n
+                    break
+                }
+            }
+            let dest =
+                writables.first(where: {
+                    $0.path.contains("Group Containers") || $0.path.contains(appGroupId)
+                }) ?? writables.first
+            guard let dest, let nodeSrc else {
+                throw RptProtocol.ProtocolError(
+                    "Cannot unify device key: no writable secrets dir and no node_elgamal.pub"
+                )
+            }
+            _ = try ensureDeviceAdmissionKey(
+                in: dest,
+                nodePubSource: nodeSrc,
+                fileManager: fileManager
+            )
+            winner = readPriv(dest)
+        }
+
+        guard let priv = winner, priv.count == 32 else {
+            throw RptProtocol.ProtocolError("Device admission key missing after unify")
+        }
+
+        for dest in writables {
+            try fileManager.createDirectory(at: dest, withIntermediateDirectories: true)
+            let privURL = dest.appendingPathComponent(clientPrivName)
+            if let existing = readPriv(dest), existing == priv {
+                continue
+            }
+            try priv.write(to: privURL, options: .atomic)
+            // Best-effort mode 0600 (ignore failures on some volumes).
+            try? fileManager.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: privURL.path
+            )
+        }
+        return priv
     }
 
     public static var appGroupId: String { "group.com.restoreprivacy.shared" }
