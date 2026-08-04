@@ -116,21 +116,25 @@ void main() {
     expect(body.contains('hostHasPacketTunnelNetworkExtensionEntitlement'), isTrue);
   });
 
-  test('sign_and_notarize defaults openable DevID (no host NE) + launch probe',
+  test('sign_and_notarize free monopin residual NE when DevID profiles present',
       () {
     final script = File('../scripts/sign_and_notarize_macos.py');
     expect(script.existsSync(), isTrue);
     final src = script.readAsStringSync();
-    // Default RPT_MACOS_HOST_NE is off — DevID side path must launch (not AMFI 137).
-    expect(src.contains('RPT_MACOS_HOST_NE", "0"'), isTrue);
-    expect(src.contains('DeveloperID.entitlements'), isTrue);
+    // Free monopin uses DevID residual NE when MAC_APP_DIRECT profiles exist.
+    expect(src.contains('devid_ne_profiles_available'), isTrue);
+    expect(src.contains('embed_devid_ne_profiles'), isTrue);
+    expect(src.contains('DeveloperIDResidual.entitlements'), isTrue);
+    expect(src.contains('PacketTunnelDeveloperID.entitlements'), isTrue);
     expect(src.contains('launch_probe_alive'), isTrue);
     expect(src.contains('return 4'), isTrue); // fail closed on dead launch
-    // Residual host NE on DevID remains opt-in only (AMFI without DevID NE profile).
-    expect(src.contains('DeveloperIDResidual.entitlements'), isTrue);
+    // Fallback without profiles still uses DeveloperID.entitlements (no host NE).
+    expect(src.contains('DeveloperID.entitlements'), isTrue);
+    // Must keep MAC_APP_DIRECT profiles (not strip-all).
+    expect(src.contains('keeping distribution profile'), isTrue);
   });
 
-  test('build_suite_1.1.7 monopin is Notarized DevID (not residual-team)',
+  test('build_suite_1.1.7 monopin is Notarized DevID residual-capable free path',
       () {
     final root = Directory.current.path;
     // flutter test cwd is client_app/
@@ -145,6 +149,8 @@ void main() {
     expect(src.contains('sign_and_notarize_macos.py'), isTrue);
     expect(src.contains('require_macos_zip_developer_id_distribution'), isTrue);
     expect(src.contains('RPT_MACOS_HOST_NE'), isTrue);
+    // Free monopin prefers residual host NE for first-use VPN registration.
+    expect(src.contains('RPT_MACOS_HOST_NE"] = "1"') || src.contains("RPT_MACOS_HOST_NE'] = '1'"), isTrue);
     // Must not seal residual-team as monopin basename.
     expect(
       src.contains('require_macos_zip_residual_capable(dest)'),
@@ -152,5 +158,26 @@ void main() {
       reason: 'monopin uses DevID distribution seal, not residual-only audit',
     );
     expect(src.contains('Apple could not verify') || src.contains('Gatekeeper'), isTrue);
+  });
+
+  test('DevID residual entitlements use systemextension NE tokens', () {
+    final host = File('macos/Runner/DeveloperIDResidual.entitlements').readAsStringSync();
+    final tun =
+        File('macos/PacketTunnel/PacketTunnelDeveloperID.entitlements').readAsStringSync();
+    expect(host.contains('packet-tunnel-provider-systemextension'), isTrue);
+    expect(tun.contains('packet-tunnel-provider-systemextension'), isTrue);
+    // Bare packet-tunnel-provider alone under DevID is AMFI without profile match.
+    expect(
+      host.contains('<string>packet-tunnel-provider</string>'),
+      isFalse,
+      reason: 'DevID residual must use systemextension NE entitlement string',
+    );
+    final profDir = Directory('macos/Provisioning/DeveloperID');
+    expect(profDir.existsSync(), isTrue);
+    expect(File('${profDir.path}/host.provisionprofile').existsSync(), isTrue);
+    expect(
+      File('${profDir.path}/PacketTunnel.provisionprofile').existsSync(),
+      isTrue,
+    );
   });
 }

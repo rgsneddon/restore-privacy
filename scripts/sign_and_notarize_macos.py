@@ -90,30 +90,56 @@ def find_signables(app: Path) -> list[Path]:
     return out
 
 
-def host_ne_for_residual_catalog() -> bool:
-    """Whether catalog DevID host includes packet-tunnel-provider.
+def devid_ne_provisioning_dir() -> Path:
+    """Shipped Developer ID Network Extension provisioning profiles (MAC_APP_DIRECT)."""
+    return ROOT / "client_app/macos/Provisioning/DeveloperID"
 
-    Default **off**. Host NE under Developer ID without a matching Developer ID
-    Network Extension provisioning profile is AMFI-killed (exit 137) — the app
-    never launches, so Settings/VPN are unreachable. Public free/paid zip must
-    open: use DeveloperID.entitlements (no host NE). Residual host NE remains on
-    the every-build Team residual copy (sign_macos_residual_team.py) and can be
-    forced on DevID only with RPT_MACOS_HOST_NE=1 when a matching DevID NE
-    profile exists.
+
+def devid_ne_profiles_available() -> bool:
+    """True when host + PacketTunnel Developer ID NE profiles are on disk."""
+    d = devid_ne_provisioning_dir()
+    host = d / "host.provisionprofile"
+    tunnel = d / "PacketTunnel.provisionprofile"
+    return host.is_file() and tunnel.is_file() and host.stat().st_size > 100
+
+
+def host_ne_for_residual_catalog() -> bool:
+    """Whether free monopin DevID host includes residual Network Extension.
+
+    Default **on** when ``client_app/macos/Provisioning/DeveloperID/*.provisionprofile``
+    exist (MAC_APP_DIRECT profiles authorizing ``packet-tunnel-provider-systemextension``).
+    Without those profiles, bare ``packet-tunnel-provider`` under DevID is AMFI-killed
+    (exit 137) — then default **off** so the zip still opens.
+
+    Override: ``RPT_MACOS_HOST_NE=0`` forces no host NE; ``=1`` forces residual NE
+    (requires profiles + launch_probe).
     """
-    raw = os.environ.get("RPT_MACOS_HOST_NE", "0").strip().lower()
-    return raw in ("1", "true", "yes", "on")
+    raw = os.environ.get("RPT_MACOS_HOST_NE", "").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return False
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    # Auto: residual-capable free monopin when DevID NE profiles are present.
+    return devid_ne_profiles_available()
 
 
 def entitlements_for(path: Path) -> Path | None:
     """Optional entitlements file for host app / PacketTunnel."""
     name = path.name
     if name.endswith(".appex") or name == "PacketTunnel":
+        if host_ne_for_residual_catalog():
+            devid_tun = (
+                ROOT / "client_app/macos/PacketTunnel/PacketTunnelDeveloperID.entitlements"
+            )
+            if devid_tun.is_file():
+                print(
+                    f"tunnel entitlements: {devid_tun.name} (DevID systemextension NE)",
+                    flush=True,
+                )
+                return devid_tun
         ent = ROOT / "client_app/macos/PacketTunnel/PacketTunnel.entitlements"
         return ent if ent.is_file() else None
     if path.suffix == ".app" or name == "restore_privacy_client":
-        # Opt-in residual host NE on DevID only (RPT_MACOS_HOST_NE=1). Default
-        # path is AMFI-safe open without host packet-tunnel-provider.
         if host_ne_for_residual_catalog():
             residual = (
                 ROOT / "client_app/macos/Runner/DeveloperIDResidual.entitlements"
@@ -121,7 +147,7 @@ def entitlements_for(path: Path) -> Path | None:
             if residual.is_file():
                 print(
                     f"host entitlements: residual NE ({residual.name}) "
-                    f"WARNING: requires matching DevID NE profile or AMFI may SIGKILL",
+                    f"DevID systemextension + embedded MAC_APP_DIRECT profile",
                     flush=True,
                 )
                 return residual
@@ -158,48 +184,87 @@ def sign_path(path: Path, identity: str) -> None:
 
 
 def strip_development_profiles(app: Path) -> None:
-    """Remove Xcode-managed development provisioning profiles.
+    """Remove Xcode-managed *development* provisioning profiles only.
 
     Developer ID distribution must not embed a device-limited *Mac Team
     Provisioning Profile* (ProvisionedDevices). That mismatch causes launchd
-    spawn failure (RBSRequestErrorDomain Code=5 / POSIX 163) —
-    "The application can't be opened".
+    spawn failure (RBSRequestErrorDomain Code=5 / POSIX 163).
+
+    **Keep** MAC_APP_DIRECT / Developer ID Network Extension profiles (no
+    ProvisionedDevices, ProvisionsAllDevices) so residual host NE launches.
     """
+    import plistlib
+    import subprocess as _sp
+
     removed = 0
+    kept = 0
     for prof in app.rglob("embedded.provisionprofile"):
         try:
-            # Prefer parsing; if it lists ProvisionedDevices, it's development.
-            import plistlib
-            import subprocess as _sp
-
             raw = _sp.check_output(
                 ["security", "cms", "-D", "-i", str(prof)],
                 stderr=_sp.DEVNULL,
             )
             data = plistlib.loads(raw)
             name = str(data.get("Name", ""))
-            is_dev = bool(data.get("ProvisionedDevices")) or "Team Provisioning Profile" in name
-            if is_dev or True:
-                # Always strip for Developer ID path — distribution profiles for NE
-                # are not used the same way as iOS; host is Developer ID signed.
+            has_devices = bool(data.get("ProvisionedDevices"))
+            is_team_dev = "Team Provisioning Profile" in name
+            # Developer ID / direct distribution profiles: keep
+            if data.get("ProvisionsAllDevices") and not has_devices and not is_team_dev:
+                print(f"keeping distribution profile: {prof} ({name!r})", flush=True)
+                kept += 1
+                continue
+            if has_devices or is_team_dev:
                 print(f"removing development profile: {prof} ({name!r})", flush=True)
                 prof.unlink()
                 removed += 1
+                continue
+            # Unknown but not device-limited — keep (e.g. MAC_APP_DIRECT)
+            print(f"keeping profile: {prof} ({name!r})", flush=True)
+            kept += 1
         except Exception as exc:
-            # If unreadable, still remove for Developer ID packaging safety.
+            # Unreadable: remove for safety on DevID packaging
             print(f"removing unreadable profile {prof}: {exc}", flush=True)
             try:
                 prof.unlink()
                 removed += 1
             except OSError:
                 pass
-    print(f"stripped {removed} embedded.provisionprofile file(s)", flush=True)
+    print(
+        f"stripped {removed} development profile(s); kept {kept} distribution profile(s)",
+        flush=True,
+    )
+
+
+def embed_devid_ne_profiles(app: Path) -> None:
+    """Embed MAC_APP_DIRECT NE profiles for free monopin residual registration."""
+    if not host_ne_for_residual_catalog():
+        return
+    if not devid_ne_profiles_available():
+        print(
+            "WARNING: RPT residual host NE requested but "
+            f"{devid_ne_provisioning_dir()} profiles missing",
+            flush=True,
+        )
+        return
+    d = devid_ne_provisioning_dir()
+    host_src = d / "host.provisionprofile"
+    tun_src = d / "PacketTunnel.provisionprofile"
+    host_dst = app / "Contents" / "embedded.provisionprofile"
+    appex = app / "Contents" / "PlugIns" / "PacketTunnel.appex"
+    tun_dst = appex / "Contents" / "embedded.provisionprofile"
+    shutil.copy2(host_src, host_dst)
+    print(f"embedded host DevID NE profile → {host_dst}", flush=True)
+    if appex.is_dir():
+        tun_dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(tun_src, tun_dst)
+        print(f"embedded PacketTunnel DevID NE profile → {tun_dst}", flush=True)
 
 
 def sign_app(app: Path, identity: str) -> None:
     if not app.is_dir():
         raise FileNotFoundError(f"app not found: {app}")
     strip_development_profiles(app)
+    embed_devid_ne_profiles(app)
     # Sign deepest nested first
     nested: list[Path] = []
     for root, dirs, files in os.walk(app / "Contents"):
@@ -459,9 +524,10 @@ def main(argv: list[str] | None = None) -> int:
     if not probe.get("ok"):
         print(
             f"ERROR: sealed app failed launch probe: {probe.get('error')}\n"
-            "Catalog residual must open. Default host entitlements omit host "
-            "packet-tunnel-provider (DeveloperID.entitlements). Unset "
-            "RPT_MACOS_HOST_NE or set RPT_MACOS_HOST_NE=0 and re-sign.",
+            "Free monopin must launch. With residual host NE, require matching "
+            "MAC_APP_DIRECT profiles under client_app/macos/Provisioning/DeveloperID/ "
+            "and DeveloperIDResidual systemextension entitlements. "
+            "Fallback: RPT_MACOS_HOST_NE=0 (openable, no System VPN registration).",
             file=sys.stderr,
         )
         return 4

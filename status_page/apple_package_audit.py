@@ -296,6 +296,11 @@ def launch_probe_app_alive(app: Path | str, *, settle_s: float = 2.5) -> dict[st
         if not bins:
             return {"ok": False, "error": f"missing main binary under {mac}", "rc": None}
         main_bin = bins[0]
+    # Zip extract may drop +x; require execute for launch probe.
+    try:
+        main_bin.chmod(main_bin.stat().st_mode | 0o111)
+    except OSError:
+        pass
     proc = subprocess.Popen(
         [str(main_bin)],
         stdout=subprocess.DEVNULL,

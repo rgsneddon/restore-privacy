@@ -2,23 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!--
-	  Free monopin (Developer ID + notary) with residual Packet Tunnel registration.
-
-	  MAC_APP_DIRECT NE profiles authorize packet-tunnel-provider-systemextension
-	  (not bare packet-tunnel-provider). Bare NE under DevID without a matching
-	  profile is AMFI SIGKILL. Systemextension NE forbids Hardened Runtime
-	  *relaxation* entitlements (allow-jit / allow-unsigned-executable-memory /
-	  disable-library-validation) — Release Flutter is AOT and launches without them.
-
-	  Embed client_app/macos/Provisioning/DeveloperID/*.provisionprofile at sign time.
-	-->
+	<!-- Developer ID Packet Tunnel appex — matches MAC_APP_DIRECT NE profile. -->
 	<key>com.apple.application-identifier</key>
-	<string>SFCBP95595.com.restoreprivacy.restorePrivacyClient</string>
+	<string>SFCBP95595.com.restoreprivacy.restorePrivacyClient.PacketTunnel</string>
 	<key>com.apple.developer.team-identifier</key>
 	<string>SFCBP95595</string>
 	<key>com.apple.security.app-sandbox</key>
-	<false/>
+	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
 	<key>com.apple.security.network.server</key>

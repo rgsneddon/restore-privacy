@@ -23,7 +23,7 @@ Catalog packages (free download; Connect still needs trial or KEYGEN):
 |----------|---------|
 | Windows | `restore-privacy-client-1.1.7-windows-x64-setup.exe` |
 | Android | `restore-privacy-client-1.1.7-android.apk` |
-| macOS | `restore-privacy-client-1.1.7-macos.zip` (Developer ID / notarized when sealed) |
+| macOS | `restore-privacy-client-1.1.7-macos.zip` (Notarized Developer ID + residual Packet Tunnel host NE for first-use System VPN registration) |
 | iOS | `restore-privacy-client-1.1.7-ios.zip` (Team-signed sideload) |
 | Linux | `restore-privacy-client-1.1.7-linux-x64.tar.gz` |
 

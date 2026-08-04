@@ -292,9 +292,13 @@ def build_macos() -> Path | None:
     if not sign_script.is_file():
         print("sign_and_notarize_macos.py missing", file=sys.stderr)
         return None
-    # Fail closed: monopin must be Notarized Developer ID without host NE (openable).
+    # Free monopin: Notarized Developer ID + residual host NE when DevID NE
+    # profiles exist (systemextension tokens). Launch probe fail-closed.
     env = os.environ.copy()
-    env["RPT_MACOS_HOST_NE"] = "0"
+    # Prefer residual-capable free path; sign script auto-detects profiles.
+    # Explicit unset allows auto; only force 0 if operator sets RPT_MACOS_HOST_NE=0.
+    if "RPT_MACOS_HOST_NE" not in env:
+        env["RPT_MACOS_HOST_NE"] = "1"
     try:
         _run(
             [
@@ -347,13 +351,25 @@ def build_macos() -> Path | None:
     # Launch probe the notarized app still on disk (zip audit temp extract is gone).
     # sign_and_notarize_macos already probes before zip; re-check here fail-closed.
     try:
-        from apple_package_audit import launch_probe_app_alive  # noqa: WPS433
+        from apple_package_audit import (  # noqa: WPS433
+            host_app_has_packet_tunnel_provider,
+            launch_probe_app_alive,
+        )
 
         probe = launch_probe_app_alive(app)
         print(f"macos monopin launch_probe={probe}", flush=True)
         if not probe.get("ok"):
             print(
                 f"ERROR: monopin failed launch probe: {probe.get('error')}",
+                file=sys.stderr,
+            )
+            return None
+        has_ne = host_app_has_packet_tunnel_provider(app)
+        print(f"macos monopin host_packet_tunnel_ne={has_ne}", flush=True)
+        if env.get("RPT_MACOS_HOST_NE", "1") not in ("0", "false", "no", "off") and not has_ne:
+            print(
+                "ERROR: free monopin expected residual host NE for first-use VPN "
+                "registration but host lacks packet-tunnel-provider*",
                 file=sys.stderr,
             )
             return None

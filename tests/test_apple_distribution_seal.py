@@ -114,7 +114,8 @@ class TestLiveMonopinZipDistribution(unittest.TestCase):
         text = script.read_text(encoding="utf-8")
         self.assertIn("require_macos_zip_developer_id_distribution", text)
         self.assertIn("sign_and_notarize_macos.py", text)
-        self.assertIn('RPT_MACOS_HOST_NE"] = "0"', text)
+        # Free monopin prefers residual host NE for first-use System VPN registration.
+        self.assertIn('RPT_MACOS_HOST_NE"] = "1"', text)
         # Residual re-sign is best-effort side path only
         self.assertIn("require=False", text)
         self.assertNotIn(
