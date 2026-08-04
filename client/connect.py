@@ -280,6 +280,9 @@ def format_connect_failure(
             "If you just paid: enter the keygen from your fulfilment email "
             "(Settings → Payment entitlement / keygen, or the unlock dialog), "
             "then Connect again so this device is bound. "
+            "If you are on the free trial: Connect must register this device "
+            "with the status host first (retry Connect while online); without "
+            "that registration the node will not reply to residual HELLO. "
             "Also check internet, Windows Firewall/UDP, or that the node is online. "
             "On Windows, run AllowFirewall.bat (or reinstall) if residual is blocked."
         )

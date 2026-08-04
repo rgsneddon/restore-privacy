@@ -38,34 +38,44 @@ class TestLicenceGateStore(unittest.TestCase):
             self.assertEqual(msg, CONNECT_BLOCKED_LICENCE_MSG)
 
     def test_accept_unlocks_may_connect(self):
-        """Licence + active payment entitlement both required for Connect."""
+        """Licence + (KEYGEN **or** free trial) unlocks Connect."""
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "licence_acceptance.json"
             pay = Path(td) / "payment_entitlement.json"
+            trial = Path(td) / "device_trial.json"
             st = accept_licence(path, ts=1_700_000_000.0)
             self.assertTrue(st.accepted)
             self.assertEqual(st.licence_id, CURRENT_LICENCE_ID)
             self.assertTrue(has_accepted_licence(path))
-            # Licence alone is not enough under default payment require
             with mock.patch(
                 "client.payment_entitlement.default_entitlement_path",
                 return_value=pay,
+            ), mock.patch(
+                "client.device_trial.default_trial_path",
+                return_value=trial,
+            ), mock.patch(
+                "client.payment_entitlement.ensure_entitlement_for_connect",
+                return_value=None,
+            ), mock.patch(
+                # Isolate: no free trial → licence alone is not enough
+                "client.device_trial.trial_allows_residual_connect",
+                return_value=False,
+            ), mock.patch(
+                # assert_may_connect trial claim must not run network
+                "client.device_trial.ensure_remote_trial_for_node_hello",
+                return_value=(False, "no trial"),
             ):
-                with mock.patch(
-                    "client.payment_entitlement.ensure_entitlement_for_connect",
-                    return_value=None,
-                ):
-                    self.assertFalse(may_connect(path))
-                    # Active entitlement + keygen unlock required for Connect
-                    record_payment_success(
-                        "cs_test_licence",
-                        path=pay,
-                        keygen="RPT-KEY-TEST-LICE-NCE1",
-                    )
-                    self.assertTrue(may_connect(path))
-                    ok, msg = assert_may_connect(path)
-                    self.assertTrue(ok)
-                    self.assertEqual(msg, "")
+                self.assertFalse(may_connect(path))
+                # Active entitlement + keygen unlock required for Connect
+                record_payment_success(
+                    "cs_test_licence",
+                    path=pay,
+                    keygen="RPT-KEY-TEST-LICE-NCE1",
+                )
+                self.assertTrue(may_connect(path))
+                ok, msg = assert_may_connect(path)
+                self.assertTrue(ok)
+                self.assertEqual(msg, "")
             loaded = load_licence_acceptance(path)
             self.assertTrue(loaded.accepted)
             self.assertEqual(loaded.licence_id, CURRENT_LICENCE_ID)

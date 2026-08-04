@@ -63,11 +63,22 @@ if command -v systemctl >/dev/null 2>&1; then
   systemctl --no-pager --full status unbound.service || true
 fi
 
-echo "[rpt-dns] self-check (may fail until TUN is up)"
+echo "[rpt-dns] self-check (must succeed for a *tunnel client* source, not only localhost)"
+# Localhost dig can pass while 10.88.0.x clients are REFUSED (product residual bug).
+# Bind a temporary client address on the tunnel iface and dig with -b.
 if command -v dig >/dev/null 2>&1; then
-  dig @"$TUNNEL_DNS_ADDR" example.com +time=2 +tries=1 >/dev/null 2>&1 \
-    && echo "[rpt-dns] dig ok via ${TUNNEL_DNS_ADDR}" \
-    || echo "[rpt-dns] dig not ready yet — ensure rpt0 has ${TUNNEL_DNS_ADDR} and unbound is active"
+  PROBE_SRC="${TUNNEL_DNS_PROBE_SRC:-10.88.0.50}"
+  if ip link show "$TUN_IFACE" >/dev/null 2>&1; then
+    ip addr add "${PROBE_SRC}/24" dev "$TUN_IFACE" 2>/dev/null || true
+  fi
+  if dig @"$TUNNEL_DNS_ADDR" -b "$PROBE_SRC" example.com A +time=3 +tries=2 +short 2>/dev/null | grep -Eq '^[0-9]+\.'; then
+    echo "[rpt-dns] dig ok via ${TUNNEL_DNS_ADDR} from tunnel client ${PROBE_SRC}"
+  else
+    echo "[rpt-dns] FAIL: dig from tunnel client ${PROBE_SRC} to ${TUNNEL_DNS_ADDR} did not resolve" >&2
+    echo "[rpt-dns] residual clients will show Connected with no internet until this works" >&2
+    dig @"$TUNNEL_DNS_ADDR" -b "$PROBE_SRC" example.com A +time=3 +tries=1 2>&1 | tail -20 >&2 || true
+    exit 1
+  fi
 else
   echo "[rpt-dns] dig not installed; skip probe"
 fi

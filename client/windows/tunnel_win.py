@@ -574,6 +574,130 @@ def may_install_dual_slash1_catchalls(
     return True
 
 
+def residual_forward_path_smoke(
+    *,
+    host: str = "1.1.1.1",
+    port: int = 443,
+    timeout: float = 3.0,
+    connect_fn: Optional[Callable[..., object]] = None,
+) -> bool:
+    """True when general IPv4 can leave the host to a public IP (post dual /1).
+
+    Pure-IP TCP (no DNS) so a dead tunnel DNS resolver is not required. After dual
+    /1 + dataplane, a working residual path must reach a public address through
+    the tunnel NAT. Failure means dual /1 is a blackhole — callers must roll back
+    and must not claim residual Connected / protected.
+    """
+    import socket
+
+    open_tcp = connect_fn or socket.create_connection
+    try:
+        sock = open_tcp((host, int(port)), float(timeout))
+        try:
+            close = getattr(sock, "close", None)
+            if callable(close):
+                close()
+        except Exception:
+            pass
+        return True
+    except OSError:
+        return False
+    except Exception:
+        return False
+
+
+def residual_tunnel_dns_smoke(
+    *,
+    dns_host: str = "10.88.0.1",
+    qname: str = "example.com",
+    timeout: float = 3.0,
+    sock_factory: Optional[Callable[[], object]] = None,
+) -> bool:
+    """True when tunnel DNS (product default 10.88.0.1) answers an A query.
+
+    Dual /1 + live dataplane can still leave the user with “no internet” when
+    Unbound on the residual node refuses tunnel clients. Post-attach must not
+    claim residual capture without working tunnel DNS.
+    """
+    import socket
+    import struct
+
+    name = (qname or "example.com").strip().rstrip(".")
+    if not name or not (dns_host or "").strip():
+        return False
+    # Minimal recursive A query
+    tid = 0xA11C  # fixed non-zero transaction id
+    header = struct.pack("!HHHHHH", tid, 0x0100, 1, 0, 0, 0)
+    q = b""
+    for label in name.split("."):
+        try:
+            raw = label.encode("ascii")
+        except UnicodeEncodeError:
+            try:
+                raw = label.encode("idna")
+            except Exception:
+                return False
+        if not raw or len(raw) > 63:
+            return False
+        q += bytes([len(raw)]) + raw
+    q += b"\x00" + struct.pack("!HH", 1, 1)
+    packet = header + q
+    factory = sock_factory or (lambda: socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+    try:
+        s = factory()
+        try:
+            s.settimeout(float(timeout))
+            s.sendto(packet, (str(dns_host).strip(), 53))
+            data, _addr = s.recvfrom(512)
+        finally:
+            try:
+                s.close()
+            except Exception:
+                pass
+        if not data or len(data) < 12:
+            return False
+        # RCODE 0 = NOERROR; require at least one question echoed
+        rcode = data[3] & 0x0F
+        qd = int.from_bytes(data[4:6], "big")
+        an = int.from_bytes(data[6:8], "big")
+        return rcode == 0 and qd >= 1 and an >= 1
+    except OSError:
+        return False
+    except Exception:
+        return False
+
+
+def residual_post_attach_ready(
+    *,
+    routes_applied: bool,
+    dataplane_running: bool,
+    keepalive_ok: bool,
+    forward_path_ok: bool,
+    dns_ok: bool = True,
+    require_forward_smoke: bool = True,
+    require_dns_smoke: bool = True,
+) -> bool:
+    """Pure gate: residual capture may stay installed only when attach is healthy.
+
+    When dual /1 was applied, require live dataplane + successful residual
+    keepalive send + forward-path smoke + tunnel DNS smoke. Prevents UI
+    “Connected — residual public IP uses the VPN node” while the host has no
+    usable internet (blackhole routes or dead tunnel DNS).
+    """
+    if not routes_applied:
+        # Pin-only / session-only — not residual capture; health of dual /1 N/A
+        return True
+    if not dataplane_running:
+        return False
+    if not keepalive_ok:
+        return False
+    if require_forward_smoke and not forward_path_ok:
+        return False
+    if require_dns_smoke and not dns_ok:
+        return False
+    return True
+
+
 def residual_ip_capture_active(result: Optional[WindowsTunnelResult]) -> bool:
     """True only when device residual public IP can change via full tunnel.
 
@@ -1058,6 +1182,80 @@ def start_full_tunnel(
             applied,
             routes_applied=False,
         )
+
+    # Post dual /1 health: keepalive + pure-IP forward smoke. Without this the UI
+    # can claim residual Connected while dual /1 blackholes all host internet
+    # (dead dataplane forward, broken node NAT, or pin lost).
+    if routes_applied:
+        keepalive_ok = False
+        try:
+            keepalive_ok = bool(client.send_keepalive())
+        except Exception:
+            keepalive_ok = False
+        if not keepalive_ok:
+            # One short retry — first send can race Wintun address settle
+            time.sleep(0.25)
+            try:
+                keepalive_ok = bool(client.send_keepalive())
+            except Exception:
+                keepalive_ok = False
+        # Give dataplane a moment to move first frames before smoke TCP/DNS
+        time.sleep(0.35)
+        forward_ok = residual_forward_path_smoke(timeout=3.5)
+        dns_ok = residual_tunnel_dns_smoke(timeout=3.5)
+        if not residual_post_attach_ready(
+            routes_applied=True,
+            dataplane_running=dataplane_is_live(plane),
+            keepalive_ok=keepalive_ok,
+            forward_path_ok=forward_ok,
+            dns_ok=dns_ok,
+            require_forward_smoke=True,
+            require_dns_smoke=True,
+        ):
+            try:
+                restore_windows_residual_path(
+                    server_host=server_host,
+                    plan=plan,
+                    if_index=if_index,
+                    run_kill_switch_rollback=True,
+                    run_ipv6_rollback=True,
+                )
+            except Exception:
+                try:
+                    rollback_full_tunnel_routes(plan, server_host, if_index)
+                except Exception:
+                    pass
+            try:
+                plane.stop()
+            except Exception:
+                pass
+            try:
+                tun.close()
+            except Exception:
+                pass
+            why = []
+            if not keepalive_ok:
+                why.append("residual keepalive send failed")
+            if not forward_ok:
+                why.append("no IPv4 path through tunnel (forward smoke failed)")
+            if not dns_ok:
+                why.append("tunnel DNS 10.88.0.1 not resolving (node Unbound)")
+            if not dataplane_is_live(plane):
+                why.append("dataplane not live")
+            detail = "; ".join(why) if why else "post-attach health failed"
+            return WindowsTunnelResult(
+                False,
+                "residual capture rolled back after dual /1 — "
+                f"{detail} (prevents internet blackhole). {route_msg}",
+                applied,
+                routes_applied=False,
+                plan=plan,
+                server_host=server_host,
+                if_index=if_index,
+                ipv6_mitigation_applied=False,
+                kill_switch_applied=False,
+            )
+        route_msg = f"{route_msg}; post-attach health ok (keepalive+forward+dns)"
 
     msg = (
         f"TUN mode={tun.mode}; {route_msg}; dataplane running (sealed RPT DATA); "

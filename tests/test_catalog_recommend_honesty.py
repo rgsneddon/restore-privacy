@@ -101,13 +101,13 @@ class TestCatalogRecommendHonesty(unittest.TestCase):
             self.assertEqual(latest, "1.1.9")
             self.assertFalse(ut.upgrade_available(running="1.1.9"))
 
-    def test_monopin_stays_1_1_9(self) -> None:
+    def test_monopin_stays_1_2_0(self) -> None:
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "1.1.9")
+        self.assertEqual(ver, "1.2.0")
         from status_page.downloads import RELEASE_VERSION, RELEASE_TAG
 
-        self.assertEqual(RELEASE_VERSION, "1.1.9")
-        self.assertEqual(RELEASE_TAG, "1.1.9")
+        self.assertEqual(RELEASE_VERSION, "1.2.0")
+        self.assertEqual(RELEASE_TAG, "1.2.0")
 
     def test_remote_catalog_platform_ready_helper(self) -> None:
         from client.ui_theme import remote_catalog_platform_ready

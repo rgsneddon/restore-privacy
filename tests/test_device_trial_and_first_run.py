@@ -221,6 +221,10 @@ class TestFirstRunSurfacesWithTrial(unittest.TestCase):
         ), mock.patch(
             "client.payment_entitlement.connect_status_host_refresh_needed",
             return_value=False,
+        ), mock.patch(
+            # Host trial claim required for node HELLO (shipped path)
+            "client.device_trial.ensure_remote_trial_for_node_hello",
+            return_value=(True, ""),
         ):
             ok, msg = assert_may_connect(self.lic)
         self.assertTrue(ok, msg)

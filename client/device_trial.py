@@ -9,7 +9,11 @@ Product rule (Windows residual first-run step 2):
   require a KEYGEN (buy/pay link on step 2).
 
 Stored only on device under the product data dir (same family as licence /
-settings). No network required for remaining-time display.
+settings). Remaining-time display is local; **node residual HELLO** also needs
+a status-host trial row (see :func:`claim_remote_device_trial`) because fleet
+nodes gate HELLO via ``GET /api/device-entitlement`` (paid bind **or** active
+host trial). Without the remote claim, the node silent-drops HELLO and the
+client surfaces a UDP timeout — the free-trial “no reply from VPN node” bug.
 """
 
 from __future__ import annotations
@@ -17,6 +21,9 @@ from __future__ import annotations
 import json
 import os
 import time
+import urllib.error
+import urllib.request
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Optional
@@ -25,8 +32,25 @@ from typing import Any, Literal, Optional
 TRIAL_SECONDS = 72 * 3600
 TRIAL_FILENAME = "device_trial.json"
 KEY_FIRST_CONNECT_AT = "first_connect_at"
+# Durable install marker (anti-reinstall on status host). Same privacy class as
+# Flutter SharedPreferences install_id — not a KEYGEN, not PII.
+INSTALL_ID_FILENAME = "device_trial_install_id.txt"
+KEY_INSTALL_ID = "install_id"
 
 TrialPhase = Literal["not_started", "active", "expired"]
+
+# Clear copy when host trial cannot admit residual HELLO.
+REMOTE_TRIAL_CLAIM_FAILED_MSG = (
+    "Free trial could not register this device with the status host, so the "
+    "VPN node will not admit residual Connect. Check internet access to "
+    "restoreprivacy.online, try Connect again, or enter a KEYGEN from your "
+    "fulfilment email (Settings → Payment entitlement / keygen)."
+)
+REMOTE_TRIAL_EXHAUSTED_MSG = (
+    "Your free residual trial has ended on this device. Enter a KEYGEN from "
+    "your fulfilment email (Settings → Payment entitlement / keygen) or buy "
+    "a plan on restoreprivacy.online/pay."
+)
 
 
 @dataclass(frozen=True)
@@ -217,3 +241,153 @@ def trial_status_blurb(
     phase = trial_phase(st, now=now, path=path)
     rem = trial_remaining_sec(st, now=now, path=path)
     return format_trial_remaining(rem, phase=phase)
+
+
+def default_install_id_path() -> Path:
+    return trial_data_dir() / INSTALL_ID_FILENAME
+
+
+def ensure_device_trial_install_id(path: Optional[Path] = None) -> str:
+    """Return durable install marker (create once). Used for host anti-reinstall."""
+    p = path or default_install_id_path()
+    try:
+        if p.is_file():
+            raw = (p.read_text(encoding="utf-8") or "").strip().lower()
+            if 8 <= len(raw) <= 64:
+                return raw
+    except OSError:
+        pass
+    iid = uuid.uuid4().hex
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(iid + "\n", encoding="utf-8")
+    except OSError:
+        pass
+    return iid
+
+
+def claim_remote_device_trial(
+    *,
+    device_pub_hex: str | None = None,
+    install_id: str | None = None,
+    base_url: str | None = None,
+    timeout: float | None = None,
+    urlopen: Any | None = None,
+) -> dict[str, Any]:
+    """POST ``/api/device-trial/claim`` so residual HELLO is admitted without KEYGEN.
+
+    Fleet nodes call ``GET /api/device-entitlement?device_pub=…`` and silent-drop
+    CLIENT_HELLO when ``connect_allowed`` is false. Desktop must claim the host
+    trial before HELLO (Flutter already does). Local 72h clock still starts only
+    on first successful residual Connect via :func:`mark_first_successful_connect`.
+    """
+    pub = (device_pub_hex or "").strip().lower()
+    if not pub:
+        try:
+            from client.payment_entitlement import local_device_pub_hex
+
+            pub = (local_device_pub_hex() or "").strip().lower()
+        except Exception:  # noqa: BLE001
+            pub = ""
+    if len(pub) != 64:
+        return {
+            "ok": False,
+            "connect_allowed": False,
+            "error": "missing_device_pub",
+        }
+
+    base = (base_url or os.environ.get("RPT_PUBLIC_BASE_URL") or "").strip()
+    if not base:
+        base = "https://restoreprivacy.online"
+    base = base.rstrip("/")
+    try:
+        from client.payment_entitlement import status_host_timeout_s
+
+        default_to = float(status_host_timeout_s())
+    except Exception:  # noqa: BLE001
+        default_to = 12.0
+    to = float(timeout) if timeout is not None else default_to
+
+    iid = (install_id or "").strip().lower()
+    if not iid:
+        iid = ensure_device_trial_install_id()
+
+    url = f"{base}/api/device-trial/claim"
+    payload: dict[str, Any] = {"device_pub": pub}
+    if iid:
+        payload["install_id"] = iid
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "User-Agent": "RestorePrivacy-device-trial/1.1.9",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    open_url = urlopen or urllib.request.urlopen
+    try:
+        with open_url(req, timeout=to) as resp:  # noqa: S310
+            raw = resp.read().decode("utf-8", errors="replace")
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            # Normalise ok flag for callers
+            allowed = bool(data.get("connect_allowed")) or bool(data.get("ok"))
+            out = dict(data)
+            out["ok"] = allowed
+            out["connect_allowed"] = bool(data.get("connect_allowed", allowed))
+            return out
+    except (
+        urllib.error.URLError,
+        TimeoutError,
+        OSError,
+        json.JSONDecodeError,
+        ValueError,
+    ) as exc:
+        return {"ok": False, "connect_allowed": False, "error": str(exc)}
+    return {"ok": False, "connect_allowed": False, "error": "bad_response"}
+
+
+def ensure_remote_trial_for_node_hello(
+    *,
+    path: Optional[Path] = None,
+    base_url: str | None = None,
+    claim: Any | None = None,
+    device_pub_hex: str | None = None,
+) -> tuple[bool, str]:
+    """When local trial allows residual Connect, ensure status-host trial row.
+
+    Returns ``(True, \"\")`` when the host reports ``connect_allowed`` for trial
+    (create or reuse). Paid KEYGEN path is **not** handled here — callers that
+    already have payment entitlement should skip this.
+
+    Returns ``(False, message)`` when claim is exhausted or network fails so
+    Connect can fail closed with a clear message instead of a HELLO timeout.
+    """
+    if not trial_allows_residual_connect(path=path):
+        return False, REMOTE_TRIAL_EXHAUSTED_MSG
+
+    claim_fn = claim if callable(claim) else claim_remote_device_trial
+    try:
+        remote = claim_fn(device_pub_hex=device_pub_hex, base_url=base_url)
+    except Exception as exc:  # noqa: BLE001
+        return False, f"{REMOTE_TRIAL_CLAIM_FAILED_MSG} ({exc})"
+
+    if not isinstance(remote, dict):
+        return False, REMOTE_TRIAL_CLAIM_FAILED_MSG
+
+    if bool(remote.get("connect_allowed")) or bool(remote.get("ok")):
+        return True, ""
+
+    err = str(remote.get("error") or "").strip().lower()
+    if err in ("trial_exhausted", "exhausted") or str(
+        remote.get("status") or ""
+    ).strip().lower() in ("expired", "revoked"):
+        return False, REMOTE_TRIAL_EXHAUSTED_MSG
+
+    detail = str(remote.get("error") or remote.get("reason") or "").strip()
+    if detail:
+        return False, f"{REMOTE_TRIAL_CLAIM_FAILED_MSG} ({detail})"
+    return False, REMOTE_TRIAL_CLAIM_FAILED_MSG

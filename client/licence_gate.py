@@ -171,12 +171,20 @@ def may_connect(path: Optional[Path] = None, *, refresh_payment: bool = False) -
         ent = load_payment_entitlement()
         if is_payment_blocking_status(ent.status):
             return False
-        return trial_allows_residual_connect()
+        if not trial_allows_residual_connect():
+            return False
+        # Host trial row required for node HELLO (silent drop otherwise).
+        # Only when refresh_payment=True (Connect worker path — not UI polls).
+        from client.device_trial import ensure_remote_trial_for_node_hello
+
+        ok_trial, _ = ensure_remote_trial_for_node_hello()
+        return bool(ok_trial)
     if payment_allows_connect():
         return True
     ent = load_payment_entitlement()
     if is_payment_blocking_status(ent.status):
         return False
+    # Local trial gate only (no network). Remote claim is in assert_may_connect.
     return trial_allows_residual_connect()
 
 
@@ -211,9 +219,17 @@ def assert_may_connect(
     ent = load_payment_entitlement()
     if is_payment_blocking_status(ent.status):
         return False, pay_msg
-    if trial_allows_residual_connect():
+    if not trial_allows_residual_connect():
+        return False, pay_msg
+    # Local trial alone is not enough: fleet nodes gate residual HELLO on
+    # status-host device entitlement (paid bind **or** active host trial).
+    # Claim/reuse host trial now so HELLO is not silent-dropped as a timeout.
+    from client.device_trial import ensure_remote_trial_for_node_hello
+
+    ok_trial, trial_msg = ensure_remote_trial_for_node_hello()
+    if ok_trial:
         return True, ""
-    return False, pay_msg
+    return False, trial_msg or pay_msg
 
 
 def needs_licence_renewal(path: Optional[Path] = None) -> bool:
