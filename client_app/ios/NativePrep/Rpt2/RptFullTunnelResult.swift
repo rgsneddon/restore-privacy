@@ -4,19 +4,27 @@ import Foundation
 /// is active. Host-side RPT2 HELLO alone must never be reported as product success.
 public enum RptFullTunnelResult {
     /// System VPN did not come up — residual ISP IP is expected.
-    /// End-user Allow path first; Team residual re-sign is operator/dev guidance.
+    /// Free monopin residual-capable: Allow / System Settings first (not Team re-sign).
     public static let packetTunnelNotActiveMessage =
         "System VPN (Packet Tunnel) did not become active — residual public IP will not "
-        + "change. Allow VPN for Restore Privacy in System Settings → Network → VPN & Filters "
-        + "(and Login Items & Extensions if prompted). Settings opens when possible — then "
-        + "press Connect again. Residual Packet Tunnel needs a Team-signed host + appex with "
-        + "Network Extension (developers: scripts/sign_macos_residual_team.py)."
+        + "change. Open System Settings → Network → VPN & Filters, enable Restore Privacy, "
+        + "choose Allow if macOS asks (also check Login Items & Extensions), then press "
+        + "Connect again in the app. Do not add L2TP, Cisco IPsec, or IKEv2."
 
     /// Node HELLO succeeded but no system tunnel — residual IP unchanged.
+    /// Assigned node IP proves entitlement (trial/KEYGEN) is live — not trial expiry.
     public static let hostOnlyHelloNotFullTunnelMessage =
         "Node session was assigned but the system Packet Tunnel is not carrying traffic — "
         + "residual public IP is unchanged. Full-tunnel requires an active OS VPN extension. "
-        + "Approve VPN configuration in System Settings → Network → VPN & Filters, then Connect again."
+        + "Open System Settings → Network → VPN & Filters, enable Restore Privacy, Allow if "
+        + "prompted, then Connect again. This is not a trial or KEYGEN failure when a node "
+        + "IP was assigned."
+
+    /// True missing-host-NE builds only (not residual-capable free monopin).
+    public static let missingHostNeEntitlementMessage =
+        "This app build cannot register or activate Packet Tunnel: the host is missing the "
+        + "packet-tunnel-provider Network Extension entitlement. Re-download the latest free "
+        + "macOS package, or on a developer Mac re-sign with scripts/sign_macos_residual_team.py."
 
     /// Product residual success with IPv6 ISP leak mitigation installed in Packet Tunnel.
     public static let ipv6IspPathBlockedMessage =
@@ -153,7 +161,11 @@ public enum RptFullTunnelResult {
             let hasResidualHonesty =
                 detailLow.contains("residual public ip")
                 || detailLow.contains("did not become active")
+                || detailLow.contains("did not become connected")
                 || detailLow.contains("system vpn (packet tunnel)")
+                || detailLow.contains("packet tunnel did not")
+                || detailLow.contains("vpn & filters")
+            // Residual-capable: keep tunnel Allow detail; do not prepend Team re-sign tips.
             let base = hasResidualHonesty ? detail : "\(packetTunnelNotActiveMessage) \(detail)"
             if !node.isEmpty, !isRedundantNodeDiagnostic(node: node, detail: base) {
                 return "\(base) \(node)"

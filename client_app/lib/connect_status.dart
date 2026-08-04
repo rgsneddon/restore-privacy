@@ -263,20 +263,30 @@ const String kVpnPermissionDeniedMessage =
     'VPN permission denied — grant once for full tunnel';
 
 /// Honest full-tunnel failure: system VPN never came up (residual ISP IP expected).
-/// End-user path first (System Settings Allow); Team residual re-sign is operator/dev.
+///
+/// Free monopin residual-capable path: end-user Allow / System Settings first.
+/// Developer Team residual re-sign is **not** the primary story here (see
+/// [kMissingHostNeEntitlementMessage] for true missing-host-NE builds only).
 const String kPacketTunnelNotActiveMessage =
     'System VPN (Packet Tunnel) did not become active — residual public IP will not '
-    'change. Allow VPN for Restore Privacy in System Settings → Network → VPN & Filters '
-    '(and Login Items & Extensions if prompted). Settings opens when possible — then '
-    'press Connect again. Residual Packet Tunnel needs a Team-signed host + appex with '
-    'Network Extension (developers: scripts/sign_macos_residual_team.py).';
+    'change. Open System Settings → Network → VPN & Filters, enable Restore Privacy, '
+    'choose Allow if macOS asks (also check Login Items & Extensions), then press '
+    'Connect again in the app. Do not add L2TP, Cisco IPsec, or IKEv2.';
 
 /// Host-only RPT2 HELLO diagnostic (node reachable, but not a full-tunnel success).
+/// Node assigned IP proves residual entitlement (trial/KEYGEN) — not trial expiry.
 const String kHostOnlyHelloNotFullTunnelMessage =
     'Node session was assigned but the system Packet Tunnel is not carrying traffic — '
     'residual public IP is unchanged. Full-tunnel requires an active OS VPN extension. '
-    'Approve VPN configuration in System Settings → Network → VPN & Filters, then Connect again.';
+    'Open System Settings → Network → VPN & Filters, enable Restore Privacy, Allow if '
+    'prompted, then Connect again. This is not a trial or KEYGEN failure when a node '
+    'IP was assigned.';
 
+/// True missing-host-NE / non-residual-capable build (not free monopin residual path).
+const String kMissingHostNeEntitlementMessage =
+    'This app build cannot register or activate Packet Tunnel: the host is missing the '
+    'packet-tunnel-provider Network Extension entitlement. Re-download the latest free '
+    'macOS package, or on a developer Mac re-sign with scripts/sign_macos_residual_team.py.';
 /// Button / channel label when the user must Allow the OS VPN configuration.
 const String kOpenVpnSettingsLabel = 'Open VPN settings';
 
@@ -690,7 +700,6 @@ String composeConnectFailurePrimaryMessage({
   }
 
   // 3) Residual-capable: node HELLO/admission failure is primary over PT tips.
-  //    (kPacketTunnelNotActiveMessage mentions sign_macos_residual as a tip only.)
   if (node.isNotEmpty && isNodeHelloAdmissionFailure(node)) {
     return primaryNodeConnectFailureMessage(node);
   }
@@ -699,7 +708,12 @@ String composeConnectFailurePrimaryMessage({
   if (detail.isNotEmpty) {
     final hasResidualHonesty = detailLow.contains('residual public ip') ||
         detailLow.contains('did not become active') ||
-        detailLow.contains('system vpn (packet tunnel)');
+        detailLow.contains('did not become connected') ||
+        detailLow.contains('system vpn (packet tunnel)') ||
+        detailLow.contains('packet tunnel did not') ||
+        detailLow.contains('vpn & filters');
+    // Residual-capable free monopin: keep tunnel Allow guidance only — never
+    // prepend Team residual re-sign boilerplate over a live tunnel-fail detail.
     final base = hasResidualHonesty
         ? detail
         : '$kPacketTunnelNotActiveMessage $detail';
@@ -709,7 +723,6 @@ String composeConnectFailurePrimaryMessage({
     }
     return base;
   }
-
   if (node.isNotEmpty) {
     return primaryNodeConnectFailureMessage(node);
   }

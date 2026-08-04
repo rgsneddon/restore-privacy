@@ -462,18 +462,48 @@ enum RptVpnChannel {
     return opened
   }
 
-  /// Residual re-sign / missing host NE — Settings cannot enable residual alone.
-  /// Pure string classifier for tests and Settings auto-open gates.
+  /// True only for **actual** missing host NE / non-residual-capable builds.
+  ///
+  /// Must **not** match residual-capable free monopin Packet Tunnel tips that
+  /// only *mention* Team residual or `sign_macos_residual_team` as secondary
+  /// developer guidance — those are Allow / System Settings failures.
+  /// Mirrors Flutter `isMissingHostNeDetail` / residual-capable PT honesty.
   static func isTeamResidualOrMissingHostNeDetail(_ detail: String?) -> Bool {
     guard let d = detail?.lowercased(), !d.isEmpty else { return false }
-    return d.contains("packet-tunnel-provider")
-      || d.contains("sign_macos_residual")
-      || d.contains("team residual")
-      || d.contains("missing the packet-tunnel")
-      || d.contains("host is missing")
-      || d.contains("public developer id")
-      || d.contains("needs team residual")
-      || d.contains("host lacks packet-tunnel")
+    if d.contains("this app build cannot register or activate packet tunnel") {
+      return true
+    }
+    if d.contains("host is missing the packet-tunnel-provider") {
+      return true
+    }
+    if d.contains("public developer id downloads intentionally omit") {
+      return true
+    }
+    if d.contains("this build is missing the host packet-tunnel-provider") {
+      return true
+    }
+    if d.contains("needs team residual sign") || d.contains("needsteamresidualsign") {
+      return true
+    }
+    // Session type missing only when host truly lacks NE (not Allow failure).
+    if d.contains("netunnelprovidersession missing") {
+      return true
+    }
+    // Do NOT match bare "packet-tunnel-provider", "sign_macos_residual", or
+    // "team residual" — residual-capable monopin PT-not-Connected copy used those
+    // as tips and mis-routed free users into Team residual / host-only HELLO walls.
+    return false
+  }
+
+  /// Residual-capable free monopin: tunnel registered but not Connected (Allow path).
+  static func isPacketTunnelNotConnectedDetail(_ detail: String?) -> Bool {
+    guard let d = detail?.lowercased(), !d.isEmpty else { return false }
+    if isTeamResidualOrMissingHostNeDetail(d) { return false }
+    return d.contains("did not become connected")
+      || d.contains("did not become active")
+      || d.contains("packet tunnel still connecting")
+      || d.contains("not carrying traffic")
+      || (d.contains("status disconnected") && d.contains("packet tunnel"))
   }
 
   /// True only for user VPN-configuration authorization denial (not all NE errors).
@@ -654,7 +684,24 @@ enum RptVpnChannel {
         return
       }
       let detail = map["message"] as? String
-      // Permission / Team residual: stop — failover cannot fix NE entitlement.
+      let hostHasNe = (map["hostHasPacketTunnelEntitlement"] as? Bool)
+        ?? hostHasPacketTunnelNetworkExtensionEntitlement()
+      // Residual-capable free monopin: tunnel registered but not Connected.
+      // Keep Allow / System Settings path — do NOT rewrite via host-only HELLO
+      // (that swallowed openSettings and piled Team residual tips over a live
+      // entitlement HELLO that already assigned a node IP).
+      if hostHasNe, isPacketTunnelNotConnectedDetail(detail) {
+        var out = map
+        if out["needsVpnSystemSettingsApproval"] == nil {
+          out = annotateNeedsVpnSettings(out, openSettings: true)
+        } else if out["openedVpnSettings"] as? Bool != true {
+          out = annotateNeedsVpnSettings(out, openSettings: true)
+        }
+        out["hostHasPacketTunnelEntitlement"] = true
+        flutterResult(out)
+        return
+      }
+      // Permission / true missing host NE: stop — failover cannot fix NE entitlement.
       if isNePermissionFailureDetail(detail)
         || isTeamResidualOrMissingHostNeDetail(detail ?? "")
       {
@@ -662,9 +709,14 @@ enum RptVpnChannel {
           host: tryHost,
           port: port,
           detail: detail,
-          openVpnSettings: isNePermissionFailureDetail(detail)
+          openVpnSettings: isNePermissionFailureDetail(detail) || hostHasNe
         ) { diag in
-          flutterResult(diag)
+          var out = diag
+          out["hostHasPacketTunnelEntitlement"] = hostHasNe
+          if hostHasNe {
+            out = annotateNeedsVpnSettings(out, openSettings: true)
+          }
+          flutterResult(out)
         }
         return
       }
@@ -680,12 +732,18 @@ enum RptVpnChannel {
         )
         return
       }
-      // Other failure (secrets, etc.) — do not silently hop
+      // Other failure — surface tunnel fail with Settings open on residual-capable.
+      if hostHasNe {
+        var out = map
+        out["hostHasPacketTunnelEntitlement"] = true
+        flutterResult(annotateNeedsVpnSettings(out, openSettings: true))
+        return
+      }
       hostSideDiagnostic(
         host: tryHost,
         port: port,
         detail: detail,
-        openVpnSettings: false
+        openVpnSettings: true
       ) { diag in
         flutterResult(diag)
       }
@@ -1081,6 +1139,7 @@ enum RptVpnChannel {
     manager: NETunnelProviderManager,
     host: String,
     port: UInt16,
+    allowProfileRecreate: Bool = true,
     completion: @escaping ([String: Any]) -> Void
   ) {
     // startTunnel must run on main; Network settings toggle follows this session.
@@ -1088,14 +1147,20 @@ enum RptVpnChannel {
       do {
         let session = manager.connection as? NETunnelProviderSession
         guard let session else {
-          completion(
-            RptFullTunnelResult.productConnectMap(
-              packetTunnelActive: false,
-              detailMessage:
-                "NETunnelProviderSession missing — host build may lack Network Extension "
-                + "packet-tunnel-provider entitlement/profile (Team residual sign required)."
-            )
+          var map = RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: false,
+            detailMessage:
+              "NETunnelProviderSession missing — this build cannot start Packet Tunnel. "
+              + "Re-download the free macOS monopin (Developer ID + residual host NE), "
+              + "or on a developer Mac use scripts/sign_macos_residual_team.py."
           )
+          map["hostHasPacketTunnelEntitlement"] =
+            hostHasPacketTunnelNetworkExtensionEntitlement()
+          if map["hostHasPacketTunnelEntitlement"] as? Bool != true {
+            map["needsTeamResidualSign"] = true
+            map["message"] = hostMissingNeEntitlementMessage()
+          }
+          completion(map)
           return
         }
         // Already connected (re-entrant Connect) — treat as success.
@@ -1132,14 +1197,15 @@ enum RptVpnChannel {
               let stMsg =
                 "Packet Tunnel still connecting/failed (status "
                 + "\(statusName(manager.connection.status))). "
-                + "Press Connect again. If macOS has not Allowed VPN for Restore Privacy, "
-                + "use Open VPN settings once, Allow, then Connect."
-              completion(
-                RptFullTunnelResult.productConnectMap(
-                  packetTunnelActive: false,
-                  detailMessage: stMsg
-                )
+                + "Open System Settings → Network → VPN & Filters, enable Restore Privacy, "
+                + "Allow if prompted, then press Connect again."
+              var map = RptFullTunnelResult.productConnectMap(
+                packetTunnelActive: false,
+                detailMessage: stMsg
               )
+              map["hostHasPacketTunnelEntitlement"] =
+                hostHasPacketTunnelNetworkExtensionEntitlement()
+              completion(annotateNeedsVpnSettings(map, openSettings: true))
             }
           }
           return
@@ -1181,28 +1247,40 @@ enum RptVpnChannel {
             }
           } else {
             let st = manager.connection.status
+            let hostHasNe = hostHasPacketTunnelNetworkExtensionEntitlement()
+            // One-shot: remove stale VPN profile (e.g. residual-team DR mismatch)
+            // and recreate free monopin protocol, then startTunnel again.
+            if allowProfileRecreate, hostHasNe {
+              recreateProductVpnProfileAndStart(
+                stale: manager,
+                host: host,
+                port: port,
+                completion: completion
+              )
+              return
+            }
             let detail =
               "Packet Tunnel did not become Connected (status \(statusName(st))/\(st.rawValue)). "
-              + "Press Connect again after Allowing the OS VPN dialog if it appeared. "
-              + "Do not use L2TP/IKEv2. "
               + "Open System Settings → Network → VPN & Filters, enable Restore Privacy, "
-              + "Allow if prompted, then Connect again. "
-              + "If you previously used a Team residual build on this Mac, Connect once more "
-              + "so the free monopin can replace the old VPN profile signature."
-            let map = RptFullTunnelResult.productConnectMap(
+              + "choose Allow if macOS asks, then press Connect again. "
+              + "Do not add L2TP, Cisco IPsec, or IKEv2. "
+              + "A node IP was not required here — residual Connect needs the OS tunnel on."
+            var map = RptFullTunnelResult.productConnectMap(
               packetTunnelActive: false,
               detailMessage: detail
             )
-            // Host has NE but tunnel never Connected — user must Allow / toggle
-            // the System VPN row (common after DevID reinstall / residual-team→monopin).
+            map["hostHasPacketTunnelEntitlement"] = hostHasNe
+            // Residual-capable free monopin: Allow path, not Team residual re-sign.
             completion(annotateNeedsVpnSettings(map, openSettings: true))
           }
         }
       } catch {
-        let map = RptFullTunnelResult.productConnectMap(
+        var map = RptFullTunnelResult.productConnectMap(
           packetTunnelActive: false,
           detailMessage: describeNePreferencesError(error)
         )
+        map["hostHasPacketTunnelEntitlement"] =
+          hostHasPacketTunnelNetworkExtensionEntitlement()
         completion(
           annotateNeedsVpnSettings(map, openSettings: true)
         )
@@ -1212,6 +1290,57 @@ enum RptVpnChannel {
       work()
     } else {
       DispatchQueue.main.async(execute: work)
+    }
+  }
+
+  /// Remove a stale system VPN profile and re-register free monopin protocol once.
+  /// Fixes residual-team → monopin designated-requirement mismatches that leave
+  /// startTunnel in disconnected without a recoverable Allow dialog.
+  private static func recreateProductVpnProfileAndStart(
+    stale: NETunnelProviderManager,
+    host: String,
+    port: UInt16,
+    completion: @escaping ([String: Any]) -> Void
+  ) {
+    stale.removeFromPreferences { _ in
+      // Ignore remove errors — loadOrCreate still produces a fresh manager.
+      lastSuccessfulPrepareAt = nil
+      loadOrCreateManager(host: host, port: port) { manager, neError in
+        guard let manager else {
+          var map = RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: false,
+            detailMessage: neError
+              ?? "Could not re-register Packet Tunnel after profile refresh."
+          )
+          map["hostHasPacketTunnelEntitlement"] = true
+          completion(annotateNeedsVpnSettings(map, openSettings: true))
+          return
+        }
+        applyProductPacketTunnelProtocol(to: manager, host: host, port: port)
+        manager.isEnabled = true
+        manager.isOnDemandEnabled = false
+        manager.saveToPreferences { saveErr in
+          if let saveErr {
+            var map = RptFullTunnelResult.productConnectMap(
+              packetTunnelActive: false,
+              detailMessage: describeNePreferencesError(saveErr)
+            )
+            map["hostHasPacketTunnelEntitlement"] = true
+            completion(annotateNeedsVpnSettings(map, openSettings: true))
+            return
+          }
+          manager.loadFromPreferences { _ in
+            // No second recreate — avoid loops.
+            startTunnel(
+              manager: manager,
+              host: host,
+              port: port,
+              allowProfileRecreate: false,
+              completion: completion
+            )
+          }
+        }
+      }
     }
   }
 

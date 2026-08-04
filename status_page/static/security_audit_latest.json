@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-04T20:42:08Z",
+  "generated_at": "2026-08-04T21:22:07Z",
   "node_host": "Germany (DE)",
   "catalog_version": "1.1.9",
   "probe_schedule": [
@@ -177,7 +177,7 @@
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
         "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.1.9/restore-privacy-client-1.1.9-macos.zip",
-        "bytes": 27825370,
+        "bytes": 27833764,
         "relative_path": "1.1.9/restore-privacy-client-1.1.9-macos.zip",
         "search_roots": [
           "status_page/assets/1.1.9/",
@@ -199,7 +199,7 @@
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
         "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.1.9/restore-privacy-client-1.1.9-ios.zip",
-        "bytes": 13224873,
+        "bytes": 13224867,
         "relative_path": "1.1.9/restore-privacy-client-1.1.9-ios.zip",
         "search_roots": [
           "status_page/assets/1.1.9/",

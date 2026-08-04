@@ -179,9 +179,46 @@ void main() {
     test('packet tunnel not active message includes Settings then Connect', () {
       expect(kPacketTunnelNotActiveMessage, contains('VPN & Filters'));
       expect(kPacketTunnelNotActiveMessage, contains('Connect again'));
-      expect(kPacketTunnelNotActiveMessage, contains('sign_macos_residual_team'));
+      // Free monopin residual-capable: Allow path first — not Team residual primary.
+      expect(kPacketTunnelNotActiveMessage.contains('sign_macos_residual_team'), isFalse);
+      expect(kPacketTunnelNotActiveMessage.toLowerCase().contains('team-signed'), isFalse);
       expect(kHostOnlyHelloNotFullTunnelMessage, contains('System Settings'));
+      expect(kHostOnlyHelloNotFullTunnelMessage.toLowerCase(), contains('not a trial'));
       expect(kOpenVpnSettingsLabel.toLowerCase(), contains('vpn'));
+      // True missing-host-NE copy is separate (developer / wrong build).
+      expect(kMissingHostNeEntitlementMessage, contains('sign_macos_residual_team'));
+    });
+
+    test('host-only HELLO compose is not trial-expired copy', () {
+      final map = buildFullTunnelConnectResult(
+        packetTunnelActive: false,
+        vpnIp: '10.88.0.109',
+        hostOnlyHello: true,
+        detailMessage:
+            'Packet Tunnel did not become Connected (status disconnected/1). '
+            'Open System Settings → Network → VPN & Filters, enable Restore Privacy.',
+      );
+      expect(isConnectSuccess(map), isFalse);
+      final msg = mapConnectStatusMessage(map);
+      expect(msg.toLowerCase().contains('trial has ended'), isFalse);
+      expect(msg.toLowerCase().contains('subscription licence'), isFalse);
+      expect(msg, contains('10.88.0.109'));
+      expect(msg, contains('VPN & Filters'));
+      // Residual-capable: do not lead with Team residual re-sign.
+      expect(msg.contains('sign_macos_residual_team'), isFalse);
+    });
+
+    test('tunnel disconnected detail stays residual-capable Allow path', () {
+      final msg = composeConnectFailurePrimaryMessage(
+        hostOnlyHello: false,
+        detailMessage:
+            'Packet Tunnel did not become Connected (status disconnected/1). '
+            'Open System Settings → Network → VPN & Filters, enable Restore Privacy.',
+      );
+      expect(msg.contains('sign_macos_residual_team'), isFalse);
+      expect(msg.toLowerCase().contains('team-signed'), isFalse);
+      expect(msg, contains('did not become Connected'));
+      expect(msg, contains('VPN & Filters'));
     });
 
     test('prepare Packet Tunnel is product tunnel type never L2TP/IKEv2', () {

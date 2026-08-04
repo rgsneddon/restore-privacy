@@ -132,10 +132,12 @@ class TestMacosResidualTeamSign(unittest.TestCase):
         status = (ROOT / "client_app" / "lib" / "connect_status.dart").read_text(
             encoding="utf-8"
         )
+        # Shipped path: sequenced prepare + channel preparePacketTunnelConfiguration.
         self.assertIn("preparePacketTunnelConfiguration", vpn)
+        self.assertIn("preparePacketTunnelSequenced", vpn)
         self.assertIn("prepareVpn", vpn)
-        self.assertIn("_prepareMacosPacketTunnelBeforeConnect", main)
-        self.assertIn("preparePacketTunnelConfiguration", main)
+        self.assertIn("_prepareApplePacketTunnelBeforeConnect", main)
+        self.assertIn("preparePacketTunnelSequenced", main)
         self.assertIn("kProductVpnTunnelType", status)
         self.assertIn("packet-tunnel", status)
         self.assertIn("kProductVpnProviderBundleId", status)
@@ -150,8 +152,16 @@ class TestMacosResidualTeamSign(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("System VPN (Packet Tunnel) did not become active", dart)
+        # Free monopin residual-capable path: Allow first; Team residual only on
+        # explicit missing-host-NE copy (kMissingHostNeEntitlementMessage).
+        self.assertIn("kMissingHostNeEntitlementMessage", dart)
         self.assertIn("sign_macos_residual_team", dart)
         self.assertIn("VPN & Filters", dart)
+        # kPacketTunnelNotActiveMessage must not lead with Team residual re-sign.
+        start = dart.index("kPacketTunnelNotActiveMessage")
+        end = dart.index("kHostOnlyHelloNotFullTunnelMessage", start)
+        pt_msg = dart[start:end]
+        self.assertNotIn("sign_macos_residual_team", pt_msg)
         self.assertIn("shouldPromptOpenVpnSystemSettings", dart)
         self.assertIn("shouldShowOpenVpnSettingsControl", dart)
         self.assertIn("isNeVpnPermissionFailureMessage", dart)
@@ -173,8 +183,13 @@ class TestMacosResidualTeamSign(unittest.TestCase):
             / "Rpt2"
             / "RptFullTunnelResult.swift"
         ).read_text(encoding="utf-8")
+        # Missing-host-NE string keeps developer re-sign; residual-capable PT message does not.
+        self.assertIn("missingHostNeEntitlementMessage", swift)
         self.assertIn("sign_macos_residual_team", swift)
         self.assertIn("VPN & Filters", swift)
+        pt_start = swift.index("packetTunnelNotActiveMessage")
+        pt_end = swift.index("hostOnlyHelloNotFullTunnelMessage", pt_start)
+        self.assertNotIn("sign_macos_residual_team", swift[pt_start:pt_end])
 
     def test_open_vpn_settings_candidates_are_shipped_urls(self):
         """Shipped helper lists real macOS Settings deep-links (no live UI required)."""
