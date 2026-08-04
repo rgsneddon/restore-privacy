@@ -92,8 +92,9 @@ def suite_howto_parts_catalog() -> list[dict[str, str]]:
                 "Startup options, privacy extras, local log, leak test, and legal links."
             ),
             "how": (
-                "Defaults stay lean (startup and autoconnect off; shaping, obfuscation, "
-                "and multi-hop off). Turn on only what you need. Each control is below. "
+                "Defaults stay lean (startup, autoconnect, and auto-connect-if-idle "
+                "off; shaping, obfuscation, multi-hop, and kill-switch off). Turn on "
+                "only what you need — details for each control are listed below. "
                 "Updates are always a free manual download."
             ),
             "default": "Lean off until you opt in",
@@ -157,6 +158,18 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "body": (
                 "When ON, opening the app starts Connect automatically after licence "
                 "and KEYGEN unlock. Default OFF - Connect is manual. Unlock is never skipped."
+            ),
+        },
+        {
+            "id": "auto-connect-if-idle",
+            "title": "Auto connect if idle",
+            "default": "Off",
+            "body": (
+                "When ON, the VPN service tries to re-open protection if the tunnel "
+                "drops while you still wanted it (for example after a long idle gap "
+                "or a brief network blip). Retries use a gentle backoff so the phone "
+                "is not hammered. Default OFF. Disconnect, Quit, and system VPN "
+                "revocation still stop fully and do not re-connect."
             ),
         },
         {
@@ -258,6 +271,17 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "body": (
                 "Optional residual honesty checks from Settings (capture / DNS). "
                 "Local diagnostic only - not a third-party leak site."
+            ),
+        },
+        {
+            "id": "kill-switch-opt-in",
+            "title": "Kill switch (opt-in)",
+            "default": "Off",
+            "body": (
+                "Optional fail-closed behaviour if residual drops while you wanted "
+                "protection. Default OFF. Enabling requires an explicit confirm "
+                "step in Settings so it is never flipped by accident. Read the "
+                "in-app warning carefully before opting in."
             ),
         },
         {

@@ -1951,12 +1951,8 @@ def suite_product_submenu_links() -> list[tuple[str, str, str, str]]:
             "settings-guide",
             "How to use Restore Privacy and Settings",
         ),
-        (
-            "/how-to-buy",
-            "How to buy",
-            "how-to-buy",
-            "Plans, KEYGEN, and checkout",
-        ),
+        # How-to-buy is its own route (/how-to-buy); not linked from homepage
+        # storefront (public nav honesty: KEYGEN path is /pay + free CTA).
         (
             "/PRIVACY_POLICY.md",
             "Privacy policy",

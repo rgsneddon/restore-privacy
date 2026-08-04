@@ -1232,6 +1232,16 @@ ol{{padding-left:1.25rem;color:var(--rb-muted)}}
 {_escape(PRICE_LABEL)}/month or {_escape(PRICE_YEARLY_LABEL)}/year.
 No card needed for the trial.</p>
 
+<div class="card" id="how-to-buy-plans">
+<h2>Select your plan</h2>
+<ul>
+  <li><strong>Monthly VPN plan</strong> — {_escape(PRICE_LABEL)}/month KEYGEN</li>
+  <li><strong>Yearly VPN plan</strong> — {_escape(PRICE_YEARLY_LABEL)}/year KEYGEN</li>
+</ul>
+<p class="muted">Checkout opens on the site-hosted plan page
+  (<code>{_escape(SITE_PAY_PLAN_PATH)}</code>), not a third-party Payment Link.</p>
+</div>
+
 <div class="card" id="how-to-buy-steps">
 <h2>Steps</h2>
 <ol>

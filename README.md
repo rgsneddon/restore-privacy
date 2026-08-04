@@ -1,70 +1,55 @@
 # Restore Privacy
 
-**Version v1.1.9** — a dedicated virtual private network for residual traffic.
+**Version v1.1.9** — monorepo for the free residual VPN client and operator tooling.
 
-Restore Privacy protects residual traffic on your device. Download free, try three
-days with no card, then continue with a KEYGEN.
+Public storefront: [restoreprivacy.online](https://restoreprivacy.online).  
+Open Pages export: [rgsneddon.github.io/restore-privacy-suite](https://rgsneddon.github.io/restore-privacy-suite/).
 
-## What you get
+## Product (shipped)
 
-- Residual Connect (full-tunnel path where the OS allows it)
-- Free **3-day (72-hour)** device trial, then a paid **KEYGEN** (£3.00/month or yearly)
-- First-use: accept the end-user licence → paste KEYGEN **or** continue trial → main VPN
-- Return visits: trial remaining or KEYGEN required
-- **No username/password** sign-up or sign-in on the product path
-- System tray label: **`Privacy, Restored`**
-- **Quit** (lower-left on the main screen): disconnect residual, then fully exit
+Install free. Connect is unlocked by a **3-day device trial** or a paid **KEYGEN** (£3.00/month or yearly on `/pay`). There is no account username/password on the product path.
 
-## Platforms
+Once connected, residual captures device traffic on a full-tunnel path where the OS allows it. Minimize keeps the tunnel up; **Quit** (main screen lower-left) disconnects then fully exits. Tray chrome: **Privacy, Restored**.
 
-Catalog packages (free download; Connect still needs trial or KEYGEN):
+### Settings (defaults lean)
 
-| Platform | Package |
-|----------|---------|
-| Windows | `restore-privacy-client-1.1.9-windows-x64-setup.exe` |
+| Control | Default | Role |
+|---------|---------|------|
+| Run at device startup | Off | Open the app at sign-in (does not alone start VPN) |
+| Autoconnect on launch | Off | Start Connect when the UI opens after unlock |
+| **Auto connect if idle** | Off | Re-open residual after an unexpected drop (Android service backoff; Disconnect/Quit do not re-arm) |
+| Residual IPv4 | Always on | Full-tunnel IPv4 capture (not user-off) |
+| Residual IPv6 | On | Optional ISP IPv6 leak posture while residual is up |
+| Traffic shaping / outer obfs / multi-hop | Off | Privacy-scale extras |
+| Kill switch | Off | Opt-in fail-closed UI with explicit confirm |
+| Leak test / local log | On demand | Device-local honesty diagnostics |
+| Updates | Manual | Free re-download when a newer monopin is published |
+
+## Catalog packages
+
+| Platform | File |
+|----------|------|
+| Windows | `restore-privacy-client-1.1.9-windows-x64-setup.exe` (native PE from Windows host) |
 | Android | `restore-privacy-client-1.1.9-android.apk` |
-| macOS | `restore-privacy-client-1.1.9-macos.zip` (Notarized Developer ID + residual Packet Tunnel host NE for first-use System VPN registration) |
-| iOS | `restore-privacy-client-1.1.9-ios.zip` (Team-signed sideload) |
+| macOS | `restore-privacy-client-1.1.9-macos.zip` — Notarized Developer ID + residual Packet Tunnel **host NE** |
+| iOS | `restore-privacy-client-1.1.9-ios.zip` — distribution / sideload |
 | Linux | `restore-privacy-client-1.1.9-linux-x64.tar.gz` |
 
-Public storefront: [restoreprivacy.online](https://restoreprivacy.online).
-
-## Settings (lean)
-
-Defaults: run at startup off, autoconnect off, traffic shaping / outer obfuscation / multi-hop off by default until you opt in.
-
-- Residual leak posture honesty (no absolute zero-leak marketing)
-- Manual free-package updates when a new monopin is published
-- Appearance and residual privacy toggles as shipped in Settings
-
-## Build (operators)
-
-- **One-word full ship (Grok):** type `kyrusfables` or `/kyrusfables` — build all, Apple sign/notarize, NE tunnel assurances, commit+push, Helsinki deploy, docs
-- CLI skeleton: `scripts/kyrusfables.sh` (tests + `build_suite_<pin>`; use Grok skill for git/docs narrative)
+## Operator build
 
 - Pin: `client/VERSION` → `1.1.9`
 - Flutter client: `client_app/`
-- Five-platform stage script: `scripts/build_suite_1.1.9.py`
-- Windows / Linux handoff: `client/windows/WINDOWS_HANDOFF_1.1.9.md`
+- Stage script: `scripts/build_suite_1.1.9.py` (this Mac host skips Windows CF)
+- Full ship skill: type `kyrusfables` / `/kyrusfables`
+- Public static export: `python3 scripts/build_public_pages.py` → `public_site/`
 
-## Licence
+## Licence & support
 
-Proprietary full copyright — residual VPN client use only. See `LICENSE` and the
-in-app end-user licence scroll pane.
-
-## Install
-
-Download free from the shop, open the package for your OS, accept the licence, try residual Connect for three days, then enter a KEYGEN.
-
-
-## Documents
+Proprietary full copyright — see `LICENSE` and the in-app EULA scroll.  
+Contact: rus@restoreprivacy.online
 
 | Doc | |
 |-----|--|
 | Privacy | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | Licence | [LICENSE](LICENSE) |
 | Credits | [CREDITS.md](CREDITS.md) |
-
-## Support
-
-Contact: rus@restoreprivacy.online

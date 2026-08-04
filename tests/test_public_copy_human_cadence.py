@@ -179,5 +179,29 @@ class TestPublicCopyHumanCadence(unittest.TestCase):
         self.assertIn("install-run-howto-box", page)
         self.assertIn("suite-guide-intro", page)
 
+    def test_settings_catalog_includes_auto_connect_if_idle_and_kill_switch(self) -> None:
+        """Drive shipped settings_parts_catalog — v1.1.9 controls must be documented."""
+        from settings_explainer import settings_parts_catalog
+
+        parts = settings_parts_catalog()
+        by_id = {p["id"]: p for p in parts}
+        self.assertIn("auto-connect-if-idle", by_id)
+        idle = by_id["auto-connect-if-idle"]
+        self.assertEqual(idle["default"].lower(), "off")
+        low = f"{idle['title']} {idle['body']}".lower()
+        self.assertTrue(
+            "re-open" in low or "reconnect" in low or "reopen" in low,
+            msg=f"idle entry must describe reconnect: {idle!r}",
+        )
+        self.assertTrue(
+            "drop" in low or "idle" in low or "blip" in low,
+            msg=f"idle body should explain drop/reconnect: {idle['body']!r}",
+        )
+        self.assertIn("disconnect", low)
+        self.assertIn("kill-switch-opt-in", by_id)
+        ks = by_id["kill-switch-opt-in"]
+        self.assertEqual(ks["default"].lower(), "off")
+        self.assertIn("confirm", ks["body"].lower())
+
 if __name__ == "__main__":
     unittest.main()

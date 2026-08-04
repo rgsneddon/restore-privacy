@@ -273,6 +273,20 @@ def build_index() -> str:
       </ol>
     </section>
 
+    <section class="panel" id="app-capabilities" data-app-capabilities="1">
+      <h2>What the client does</h2>
+      <ul class="steps">
+        <li>Full-tunnel protection where the OS allows a system VPN (residual path).</li>
+        <li>Lean Settings by default — opt into privacy extras only when you want them.</li>
+        <li>Android: optional “auto connect if idle” reopens the tunnel after an unexpected drop (gentle backoff; Disconnect still wins).</li>
+        <li>Optional residual IPv6 leak posture, leak test, local connection log, and kill-switch opt-in with confirm.</li>
+        <li>macOS free monopin ships Notarized Developer ID with Packet Tunnel host NE so first-use System Settings registration can work.</li>
+        <li>Windows, Android, macOS, iOS, and Linux packages on the Downloads Map; Connect still needs trial or KEYGEN.</li>
+      </ul>
+      <p class="muted">Plain-language walkthrough of every Settings control:
+        <a href="https://restoreprivacy.online/settings-explainer">Settings guide</a>.</p>
+    </section>
+
 {static_site_footer(
         map_href="downloads-map.html",
         copyright_text=f"© Raskul - all rights reserved · {PUBLIC_BRAND_DISPLAY}",
