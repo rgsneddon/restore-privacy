@@ -191,18 +191,17 @@ def _package_app_ditto_zip(app: Path, dest: Path) -> None:
 
 
 def build_macos() -> Path | None:
-    """Build residual-capable macOS monopin zip (host Packet Tunnel NE + launch alive).
+    """Build Gatekeeper-openable Notarized Developer ID macOS monopin zip.
 
-    Catalog monopin basename is the **Team residual** app (host
-    packet-tunnel-provider + Mac Team NE profiles) so residual Connect /
-    VPN config registration works. DevID + host NE without a matching DevID
-    NE profile is AMFI-killed (exit 137) and must not ship.
+    Catalog monopin basename is **Developer ID + notary + staple** with host
+    packet-tunnel-provider **omitted** (default ``RPT_MACOS_HOST_NE=0``). Apple
+    Development residual-team seals cause Gatekeeper
+    \"Apple could not verify … free of malware\" and must **not** be the monopin
+    basename. DevID + host NE without a DevID NE profile is AMFI SIGKILL 137.
 
-    Packaging uses ``ditto`` (not Python zipfile) so nested framework
-    signatures stay intact. Seal is residual-honest: codesign valid + host NE
-    + launch probe — not Notarized Developer ID (Team residual is Apple
-    Development). Optional openable DevID (no host NE) can still be produced
-    as a side artifact when ``RPT_MACOS_ALSO_DEVID=1``.
+    Every build still best-effort produces ``*.residual-team.app`` (Team NE) as
+    a **side** artifact for residual Connect on this Mac — never the catalog zip.
+    Packaging uses ditto (via sign_and_notarize) so nested signatures stay intact.
     """
     app = (
         CLIENT_APP
@@ -228,124 +227,104 @@ def build_macos() -> Path | None:
         print(f"macos build failed: {e}", file=sys.stderr)
         return None
     if not app.is_dir():
-        # alternate product name
         products = CLIENT_APP / "build" / "macos" / "Build" / "Products" / "Release"
         apps = list(products.glob("*.app")) if products.is_dir() else []
         if not apps:
             return None
         app = apps[0]
 
-    # Every residual macOS catalog build: Team residual NE re-sign on a copy
-    # (host packet-tunnel-provider). This residual app *is* the monopin zip.
-    residual_app: Path | None = None
+    # Side path only: Team residual NE re-sign (not monopin basename).
     try:
         if str(ROOT / "scripts") not in sys.path:
             sys.path.insert(0, str(ROOT / "scripts"))
         import apple_ship_gates as _asg  # noqa: WPS433
 
-        r = _asg.run_residual_team_resign(app, require=True)
+        r = _asg.run_residual_team_resign(app, require=False)
         print(
-            f"residual_team_resign ok={r.get('ok')} skipped={r.get('skipped')} "
-            f"path={r.get('path')} err={r.get('error')}",
+            f"residual_team_resign (side, not monopin) ok={r.get('ok')} "
+            f"skipped={r.get('skipped')} path={r.get('path')} err={r.get('error')}",
             flush=True,
         )
-        if r.get("ok") and r.get("path") and not r.get("skipped"):
-            residual_app = Path(str(r["path"]))
-        elif r.get("skipped"):
+    except Exception as e:  # noqa: BLE001
+        print(f"residual_team_resign best-effort failed: {e}", flush=True)
+
+    dest = OUT / NAMES["macos"]
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    sign_script = ROOT / "scripts" / "sign_and_notarize_macos.py"
+    if not sign_script.is_file():
+        print("sign_and_notarize_macos.py missing", file=sys.stderr)
+        return None
+    # Fail closed: monopin must be Notarized Developer ID without host NE (openable).
+    env = os.environ.copy()
+    env["RPT_MACOS_HOST_NE"] = "0"
+    try:
+        _run(
+            [
+                sys.executable,
+                str(sign_script),
+                "--app",
+                str(app),
+                "--zip",
+                str(dest),
+            ],
+            cwd=ROOT,
+            env=env,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"macos DevID sign/notarize failed (monopin refuse): {e}", file=sys.stderr)
+        return None
+    if not dest.is_file() or dest.stat().st_size < 1_000_000:
+        print(f"macos sealed zip missing or too small: {dest}", file=sys.stderr)
+        return None
+
+    if str(ROOT / "status_page") not in sys.path:
+        sys.path.insert(0, str(ROOT / "status_page"))
+    try:
+        from apple_package_audit import (  # noqa: WPS433
+            launch_probe_app_alive,
+            require_macos_zip_developer_id_distribution,
+        )
+
+        report = require_macos_zip_developer_id_distribution(dest)
+        print(
+            f"macos distribution seal ok reason={report.get('reason')!r} "
+            f"spctl_notarized={report.get('spctl_notarized_developer_id')} "
+            f"leaf={report.get('leaf_authority')!r}",
+            flush=True,
+        )
+        # Refuse residual-as-monopin: leaf must be Developer ID Application
+        leaf = str(report.get("leaf_authority") or "")
+        if "Apple Development" in leaf or not report.get(
+            "is_developer_id_application"
+        ):
             print(
-                "ERROR: residual Team NE re-sign skipped (RPT_SKIP_RESIDUAL_TEAM) "
-                "but monopin requires residual host NE",
+                f"ERROR: monopin leaf is not Developer ID Application: {leaf!r}",
                 file=sys.stderr,
             )
             return None
     except Exception as e:  # noqa: BLE001
-        print(f"residual_team_resign failed (required for monopin): {e}", file=sys.stderr)
+        print(f"macos catalog DevID seal rejected: {e}", file=sys.stderr)
         return None
 
-    if residual_app is None or not residual_app.is_dir():
-        print("ERROR: residual-team.app missing after re-sign", file=sys.stderr)
-        return None
-
-    # Pre-zip gates: host NE present + launch stays alive (not AMFI 137)
-    if str(ROOT / "status_page") not in sys.path:
-        sys.path.insert(0, str(ROOT / "status_page"))
-    from apple_package_audit import (  # noqa: WPS433
-        host_app_has_packet_tunnel_provider,
-        launch_probe_app_alive,
-        require_macos_zip_residual_capable,
-    )
-
-    if not host_app_has_packet_tunnel_provider(residual_app):
-        print(
-            f"ERROR: residual app missing host packet-tunnel-provider: {residual_app}",
-            file=sys.stderr,
-        )
-        return None
-    probe = launch_probe_app_alive(residual_app)
-    print(f"residual launch_probe={probe}", flush=True)
-    if not probe.get("ok"):
-        print(
-            f"ERROR: residual app failed launch probe: {probe.get('error')}",
-            file=sys.stderr,
-        )
-        return None
-
-    dest = OUT / NAMES["macos"]
-    dest.parent.mkdir(parents=True, exist_ok=True)
+    # Launch probe the notarized app still on disk (zip audit temp extract is gone).
+    # sign_and_notarize_macos already probes before zip; re-check here fail-closed.
     try:
-        _package_app_ditto_zip(residual_app, dest)
-    except (subprocess.CalledProcessError, OSError) as e:
-        print(f"macos residual ditto-zip failed: {e}", file=sys.stderr)
-        return None
-    if not dest.is_file() or dest.stat().st_size < 1_000_000:
-        print(f"macos residual zip missing or too small: {dest}", file=sys.stderr)
-        return None
+        from apple_package_audit import launch_probe_app_alive  # noqa: WPS433
 
-    try:
-        report = require_macos_zip_residual_capable(dest)
-        print(
-            f"macos residual monopin seal ok reason={report.get('reason')!r} "
-            f"host_ne={report.get('host_packet_tunnel_provider')} "
-            f"launch_alive={report.get('launch_alive')} "
-            f"leaf={report.get('leaf_authority')!r}",
-            flush=True,
-        )
+        probe = launch_probe_app_alive(app)
+        print(f"macos monopin launch_probe={probe}", flush=True)
+        if not probe.get("ok"):
+            print(
+                f"ERROR: monopin failed launch probe: {probe.get('error')}",
+                file=sys.stderr,
+            )
+            return None
     except Exception as e:  # noqa: BLE001
-        print(f"macos residual monopin seal rejected: {e}", file=sys.stderr)
+        print(f"macos monopin launch probe error: {e}", file=sys.stderr)
         return None
-
-    # Optional side artifact: openable Notarized DevID without host NE
-    # (Gatekeeper-friendly download; residual Connect needs residual monopin).
-    if os.environ.get("RPT_MACOS_ALSO_DEVID", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    ):
-        sign_script = ROOT / "scripts" / "sign_and_notarize_macos.py"
-        devid_dest = OUT / NAMES["macos"].replace("-macos.zip", "-macos-devid.zip")
-        if sign_script.is_file():
-            try:
-                env = os.environ.copy()
-                env["RPT_MACOS_HOST_NE"] = "0"
-                _run(
-                    [
-                        sys.executable,
-                        str(sign_script),
-                        "--app",
-                        str(app),
-                        "--zip",
-                        str(devid_dest),
-                    ],
-                    cwd=ROOT,
-                    env=env,
-                )
-                print(f"optional DevID zip {devid_dest.name}", flush=True)
-            except subprocess.CalledProcessError as e:
-                print(f"optional DevID seal failed (non-fatal): {e}", flush=True)
 
     print(
-        f"staged {dest.name} residual-capable monopin "
+        f"staged {dest.name} Notarized Developer ID monopin "
         f"sha256={sha256_file(dest)[:16]}…",
         flush=True,
     )

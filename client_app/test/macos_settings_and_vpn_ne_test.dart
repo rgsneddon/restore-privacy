@@ -113,25 +113,27 @@ void main() {
     expect(src.contains('DeveloperIDResidual.entitlements'), isTrue);
   });
 
-  test('build_suite_1.1.7 packages residual-team as monopin (host NE + launch)',
+  test('build_suite_1.1.7 monopin is Notarized DevID (not residual-team)',
       () {
     final root = Directory.current.path;
     // flutter test cwd is client_app/
     final script = File('../scripts/build_suite_1.1.7.py');
     expect(script.existsSync(), isTrue, reason: 'from $root');
     final src = script.readAsStringSync();
+    // Residual re-sign is side path only (best-effort).
     expect(src.contains('run_residual_team_resign'), isTrue);
     expect(src.contains('apple_ship_gates'), isTrue);
-    // Catalog monopin is residual-capable, not unopenable DevID+host-NE.
-    expect(src.contains('require_macos_zip_residual_capable'), isTrue);
-    expect(src.contains('require=True'), isTrue);
-    expect(src.contains('host_app_has_packet_tunnel_provider'), isTrue);
-    expect(src.contains('launch_probe_app_alive'), isTrue);
-    // Must not require Notarized DevID for residual monopin seal.
+    expect(src.contains('require=False'), isTrue);
+    // Catalog monopin must be Gatekeeper-openable DevID + notary.
+    expect(src.contains('sign_and_notarize_macos.py'), isTrue);
+    expect(src.contains('require_macos_zip_developer_id_distribution'), isTrue);
+    expect(src.contains('RPT_MACOS_HOST_NE'), isTrue);
+    // Must not seal residual-team as monopin basename.
     expect(
-      src.contains('require_macos_zip_developer_id_distribution(dest)'),
+      src.contains('require_macos_zip_residual_capable(dest)'),
       isFalse,
-      reason: 'residual monopin uses residual seal, not DevID-only audit',
+      reason: 'monopin uses DevID distribution seal, not residual-only audit',
     );
+    expect(src.contains('Apple could not verify') || src.contains('Gatekeeper'), isTrue);
   });
 }

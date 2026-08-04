@@ -76,10 +76,10 @@ class TestSignScriptFailClosed(unittest.TestCase):
 
 
 class TestLiveMonopinZipDistribution(unittest.TestCase):
-    def test_monopin_macos_zip_is_residual_capable_when_present(self) -> None:
-        """Catalog monopin is Team residual (host NE + launch alive), not dead DevID+NE."""
+    def test_monopin_macos_zip_is_developer_id_when_present(self) -> None:
+        """Catalog monopin is Notarized Developer ID (Gatekeeper-openable)."""
         from apple_package_audit import (
-            assess_macos_zip_residual_capable,
+            assess_macos_catalog_zip_codesign,
             require_macos_zip_matches_monopin,
         )
         from downloads import RELEASE_VERSION
@@ -95,15 +95,34 @@ class TestLiveMonopinZipDistribution(unittest.TestCase):
         require_macos_zip_matches_monopin(path, pin)
         if sys.platform != "darwin":
             self.skipTest("codesign assess requires Darwin")
-        report = assess_macos_zip_residual_capable(path)
+        report = assess_macos_catalog_zip_codesign(path)
         self.assertTrue(
             report.get("ok"),
-            msg=f"catalog residual monopin must have host NE + launch alive: {report}",
+            msg=f"catalog monopin must be Notarized Developer ID: {report}",
         )
-        self.assertTrue(report.get("host_packet_tunnel_provider"))
-        self.assertTrue(report.get("launch_alive"))
+        self.assertTrue(report.get("is_developer_id_application"))
+        self.assertFalse(report.get("is_apple_development"))
+        self.assertTrue(
+            report.get("spctl_notarized_developer_id"),
+            msg=report.get("spctl_text"),
+        )
 
-    def test_residual_seal_helpers_pure_and_exported(self) -> None:
+    def test_build_suite_monopin_requires_devid_not_residual(self) -> None:
+        """Ship recipe must fail-closed for DevID monopin (not residual-team)."""
+        script = ROOT / "scripts" / "build_suite_1.1.7.py"
+        self.assertTrue(script.is_file())
+        text = script.read_text(encoding="utf-8")
+        self.assertIn("require_macos_zip_developer_id_distribution", text)
+        self.assertIn("sign_and_notarize_macos.py", text)
+        self.assertIn('RPT_MACOS_HOST_NE"] = "0"', text)
+        # Residual re-sign is best-effort side path only
+        self.assertIn("require=False", text)
+        self.assertNotIn(
+            "require_macos_zip_residual_capable(dest)",
+            text,
+        )
+
+    def test_residual_seal_helpers_still_exported(self) -> None:
         from apple_package_audit import (
             assess_macos_zip_residual_capable,
             host_app_has_packet_tunnel_provider,
