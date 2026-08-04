@@ -203,9 +203,31 @@ enum RptVpnChannel {
     ]
   }
 
-  /// True when this host process is signed with `packet-tunnel-provider`.
-  /// Public Developer ID packages omit host NE (AMFI); residual requires
-  /// Team residual re-sign (`scripts/sign_macos_residual_team.py`).
+  /// True when a Network Extension entitlement list authorizes product Packet Tunnel.
+  ///
+  /// Free monopin DevID ships ``packet-tunnel-provider-systemextension`` (MAC_APP_DIRECT
+  /// profile). Team residual ships bare ``packet-tunnel-provider``.
+  /// ``Array.contains(_:)`` is **exact equality** — do **not** use it alone for the bare
+  /// token or free monopin always looks like missing host NE.
+  static func networkExtensionListIncludesPacketTunnel(_ ne: [String]) -> Bool {
+    for token in ne {
+      // Exact product tokens (app extension + Developer ID systemextension).
+      if token == "packet-tunnel-provider"
+        || token == "packet-tunnel-provider-systemextension"
+      {
+        return true
+      }
+      // Defensive: any Apple token that embeds the packet-tunnel-provider family.
+      if token.contains("packet-tunnel-provider") {
+        return true
+      }
+    }
+    return false
+  }
+
+  /// True when this host process is signed with residual Packet Tunnel host NE.
+  /// Free Notarized Developer ID monopin uses systemextension NE + embedded
+  /// MAC_APP_DIRECT profile; Team residual uses bare packet-tunnel-provider.
   static func hostHasPacketTunnelNetworkExtensionEntitlement() -> Bool {
     var code: SecCode?
     guard SecCodeCopySelf([], &code) == errSecSuccess, let code else {
@@ -231,18 +253,19 @@ enum RptVpnChannel {
     else {
       return false
     }
-    return ne.contains("packet-tunnel-provider")
+    return networkExtensionListIncludesPacketTunnel(ne)
   }
 
   /// Actionable copy when host lacks Network Extension for NETunnelProviderManager.
   static func hostMissingNeEntitlementMessage() -> String {
     // Wording avoids bare allow-vpn phrasing so isNePermissionFailureDetail
     // does not mis-classify residual re-sign as a permission denial that opens Settings.
+    // Free monopin is residual-capable when signed with DevID systemextension NE;
+    // this path is for builds that truly lack host NE (not the normal free download).
     "Packet Tunnel was not registered in System Settings: this build is missing the "
       + "host packet-tunnel-provider Network Extension entitlement. "
-      + "Public Notarized Developer ID downloads omit host NE so Gatekeeper opens cleanly; "
-      + "residual VPN config requires a Team residual re-sign. "
-      + "On this Mac run: python3 scripts/sign_macos_residual_team.py "
+      + "Re-download the latest free macOS package (Notarized Developer ID with residual "
+      + "host NE), or on a developer Mac re-sign with: python3 scripts/sign_macos_residual_team.py "
       + "--app path/to/restore_privacy_client.app "
       + "(or open restore_privacy_client.residual-team.app from the same build), "
       + "then relaunch and press Connect so macOS can show Allow for VPN configuration. "
@@ -324,8 +347,8 @@ enum RptVpnChannel {
             completion(map)
             return
           }
-          // Catalog DevID omits host packet-tunnel-provider — OS will not apply
-          // residual NE config. Never claim prepared:true without host NE.
+          // Without host Packet Tunnel NE (bare or systemextension), OS will not
+          // apply residual config. Never claim prepared:true without host NE.
           if !hostHasNe {
             lastSuccessfulPrepareAt = nil
             var map: [String: Any] = [

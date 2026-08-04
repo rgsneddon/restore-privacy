@@ -180,4 +180,72 @@ void main() {
       isTrue,
     );
   });
+
+  test(
+    'hostHasPacketTunnel accepts free monopin systemextension NE token (not exact-only)',
+    () {
+      final src =
+          File('macos/NativePrep/RptVpnChannel.swift').readAsStringSync();
+      // Pure classifier used by hostHasPacketTunnelNetworkExtensionEntitlement.
+      expect(
+        src.contains('networkExtensionListIncludesPacketTunnel'),
+        isTrue,
+        reason: 'shipped pure NE list classifier required for free monopin',
+      );
+      expect(
+        src.contains('packet-tunnel-provider-systemextension'),
+        isTrue,
+        reason: 'must explicitly accept DevID free monopin host NE token',
+      );
+      // hostHas… must call the classifier (not exact Array.contains alone).
+      final hostFn = src.indexOf(
+        'static func hostHasPacketTunnelNetworkExtensionEntitlement',
+      );
+      expect(hostFn, greaterThanOrEqualTo(0));
+      final hostBody = src.substring(
+        hostFn,
+        src.indexOf('static func hostMissingNeEntitlementMessage', hostFn),
+      );
+      expect(
+        hostBody.contains('networkExtensionListIncludesPacketTunnel(ne)'),
+        isTrue,
+        reason: 'host probe must use classifier (systemextension free path)',
+      );
+      // Forbidden regression: exact-only contains on bare token as sole return.
+      expect(
+        RegExp(
+          r'return ne\.contains\("packet-tunnel-provider"\)\s*$',
+          multiLine: true,
+        ).hasMatch(hostBody),
+        isFalse,
+        reason:
+            'Array.contains exact match rejects packet-tunnel-provider-systemextension',
+      );
+
+      // Pure classifier body must treat systemextension as success.
+      final cls = src.indexOf('static func networkExtensionListIncludesPacketTunnel');
+      expect(cls, greaterThanOrEqualTo(0));
+      final clsEnd = src.indexOf(
+        'static func hostHasPacketTunnelNetworkExtensionEntitlement',
+        cls,
+      );
+      final clsBody = src.substring(cls, clsEnd > cls ? clsEnd : src.length);
+      expect(
+        clsBody.contains('packet-tunnel-provider-systemextension'),
+        isTrue,
+      );
+      expect(clsBody.contains('token == "packet-tunnel-provider"'), isTrue);
+      // prepare stamps prepared after save only when hostHasNe — free monopin
+      // must not force needsTeamResidualSign via false probe.
+      final prep = src.indexOf('private static func preparePacketTunnelConfiguration');
+      final prepEnd = src.indexOf('private static func devicePubHexMap', prep);
+      final prepBody = src.substring(
+        prep,
+        prepEnd > prep ? prepEnd : src.length,
+      );
+      expect(prepBody.contains('hostHasPacketTunnelNetworkExtensionEntitlement()'), isTrue);
+      expect(prepBody.contains('"prepared": true'), isTrue);
+      expect(prepBody.contains('if !hostHasNe'), isTrue);
+    },
+  );
 }
