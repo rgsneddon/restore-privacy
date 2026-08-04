@@ -177,6 +177,12 @@ STATIC_ROUTES: dict[str, str] = {
     # Public redesign: logo-aligned circuit / data-path motif
     "/static/data_path_motif.svg": "data_path_motif.svg",
     "/data_path_motif.svg": "data_path_motif.svg",
+    # Homepage storefront foot: silent free-download animation (under Learn more)
+    "/static/download_btn_anim.mp4": "download_btn_anim.mp4",
+    "/static/download_btn_anim.webm": "download_btn_anim.webm",
+    "/download_btn_anim.mp4": "download_btn_anim.mp4",
+    "/download_btn_anim.webm": "download_btn_anim.webm",
+    "/static/suite_storefront_download_anim.js": "suite_storefront_download_anim.js",
 }
 
 # Customer device-licence renew host (Stripe Checkout custom domain).

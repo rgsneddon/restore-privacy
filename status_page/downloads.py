@@ -1173,6 +1173,12 @@ def render_homepage_buy_form_html(
 
 # Suite storefront (homepage section above VPN #downloads)
 SUITE_SECTION_ID = "suite-storefront"
+# Foot animation under Learn more → platform free download (silent web media)
+SUITE_DOWNLOAD_ANIM_ID = "suite-storefront-download-anim"
+SUITE_DOWNLOAD_ANIM_LINK_ID = "suite-storefront-download-anim-link"
+SUITE_DOWNLOAD_ANIM_VIDEO_ID = "suite-storefront-download-anim-video"
+SUITE_DOWNLOAD_ANIM_MP4 = "/static/download_btn_anim.mp4"
+SUITE_DOWNLOAD_ANIM_WEBM = "/static/download_btn_anim.webm"
 SUITE_PRODUCT_TITLE = "Restore Privacy"
 # Storefront split: blurb = download action only; pay-hint = KEYGEN price only.
 # Trial/KEYGEN journey lives on homepage intro — not restated as a second lecture here.
@@ -2065,6 +2071,8 @@ def suite_storefront_css() -> str:
     .suite-storefront {
       width: 100%; text-align: center; box-sizing: border-box;
       margin: 0 0 1.25rem;
+      /* Column so foot animation can fill remaining height of the shop half */
+      display: flex; flex-direction: column; align-items: stretch;
       border: 1px solid rgba(174, 208, 234, 0.45);
       background:
         linear-gradient(165deg, rgba(30, 80, 140, 0.55) 0%, rgba(10, 22, 40, 0.92) 70%);
@@ -2128,6 +2136,51 @@ def suite_storefront_css() -> str:
     .suite-product-submenu-label {
       width: 100%; margin: 0 0 0.35rem; font-size: 0.72rem; font-weight: 700;
       letter-spacing: 0.06em; text-transform: uppercase; color: rgba(174,208,234,0.9);
+    }
+    /* Foot of left shop box: silent free-download animation under Learn more.
+       Fills leftover column height without forcing 1440px native media size. */
+    .suite-storefront-download-anim {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 5.5rem;
+      max-height: 14rem;
+      margin: 0.65rem 0 0;
+      padding: 0;
+      width: 100%;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    .suite-storefront-download-anim a,
+    a#suite-storefront-download-anim-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      max-height: 100%;
+      width: 100%;
+      max-width: 100%;
+      text-decoration: none;
+      outline: none;
+      cursor: pointer;
+    }
+    .suite-storefront-download-anim a:focus-visible {
+      box-shadow: 0 0 0 2px #00e5ff;
+      border-radius: 8px;
+    }
+    .suite-storefront-download-anim video,
+    video#suite-storefront-download-anim-video {
+      display: block;
+      height: 100%;
+      width: auto;
+      max-height: 100%;
+      max-width: 100%;
+      object-fit: contain;
+      object-position: center center;
+      margin: 0 auto;
+      pointer-events: none;
+      background: transparent;
     }
     /* Keep OBJECTIVE lowercase (wip) under label uppercase transform */
     .suite-product-submenu-label .suite-product-submenu-wip {
@@ -2488,6 +2541,74 @@ def render_suite_world_flags_html() -> str:
 """
 
 
+def render_suite_storefront_download_anim_html(
+    *,
+    default_platform: str = "",
+) -> str:
+    """Silent free-download animation under Learn more (foot of left shop box).
+
+    Click starts the same platform free_direct path as the FREE DOWNLOAD CTA
+    (UA-detected platform when known; Downloads Map fallback otherwise).
+    Client script refines href from navigator.userAgent after load.
+    """
+    def_plat = (default_platform or "").strip().lower()
+    known = {a.platform for a in available_downloads()}
+    if def_plat and def_plat not in known:
+        def_plat = ""
+    href = free_download_cta_href(default_platform=def_plat)
+    if def_plat:
+        title = platform_face_title(def_plat)
+        aria = (
+            f"Download Restore Privacy free for {title} "
+            f"(v{RELEASE_VERSION}, no payment)"
+        )
+        detect_attrs = (
+            f' data-platform="{_esc_html(def_plat)}"'
+            f' data-detected-platform="{_esc_html(def_plat)}"'
+        )
+        href_kind = "suite_free_direct"
+        free_direct = ' data-free-direct="1"'
+    else:
+        aria = (
+            f"Download Restore Privacy free — choose your platform "
+            f"(v{RELEASE_VERSION})"
+        )
+        detect_attrs = ' data-fallback-map="1"'
+        href_kind = "map"
+        free_direct = ""
+    mp4 = _esc_html(SUITE_DOWNLOAD_ANIM_MP4)
+    webm = _esc_html(SUITE_DOWNLOAD_ANIM_WEBM)
+    # External JS (CSP script-src 'self' — no inline scripts).
+    return f"""
+    <div class="suite-storefront-download-anim" id="{SUITE_DOWNLOAD_ANIM_ID}"
+         data-suite-download-anim="1" data-free-download="1"
+         data-catalog-version="{_esc_html(RELEASE_VERSION)}">
+      <a class="suite-storefront-download-anim-link"
+         id="{SUITE_DOWNLOAD_ANIM_LINK_ID}"
+         href="{_esc_html(href)}"
+         data-free-download-v1="1"
+         data-suite-download-anim-link="1"
+         data-href-kind="{href_kind}"
+         data-pay="0"{free_direct}{detect_attrs}
+         aria-label="{_esc_html(aria)}"
+         title="{_esc_html(aria)}">
+        <video id="{SUITE_DOWNLOAD_ANIM_VIDEO_ID}"
+               class="suite-storefront-download-anim-video"
+               autoplay muted loop playsinline
+               preload="metadata"
+               disablepictureinpicture
+               aria-hidden="true"
+               data-silent="1">
+          <source src="{webm}" type="video/webm"/>
+          <source src="{mp4}" type="video/mp4"/>
+        </video>
+      </a>
+    </div>
+    <script src="/static/suite_storefront_download_anim.js" defer
+            id="suite-storefront-download-anim-script"></script>
+"""
+
+
 def render_suite_storefront_html(
     assets: Iterable[DownloadAsset] | None = None,
     *,
@@ -2533,6 +2654,9 @@ def render_suite_storefront_html(
     detect_attr = (
         f' data-detected-platform="{_esc_html(def_plat)}"' if def_plat else ""
     )
+    anim_html = render_suite_storefront_download_anim_html(
+        default_platform=def_plat,
+    )
 
     return f"""
   <section class="suite-storefront panel-card" id="{SUITE_SECTION_ID}"
@@ -2550,6 +2674,7 @@ def render_suite_storefront_html(
       {SUITE_PAY_HINT_HTML}
     </p>
 {render_suite_product_submenu_html()}
+{anim_html}
   </section>
 """
 
