@@ -323,6 +323,7 @@ def upload_brand_packages(
                 user=user,
                 key_path=key_path,
                 skip_if_present=not force,
+                monopin=suite_ver,
             )
             if progress_cb:
                 progress_cb(fname, "done", 100)
@@ -999,8 +1000,22 @@ def _upload_one_installer_openssh(
     user: str,
     key_path: Path,
     skip_if_present: bool = True,
+    monopin: str | None = None,
 ) -> None:
     """Upload one installer with OpenSSH scp + size verify (fresh connections)."""
+    # Always gate Windows residual before any network write (stage-only was insufficient).
+    name = local.name.lower()
+    pin = (monopin or "").strip()
+    if not pin:
+        # Infer monopin from filename restore-privacy-client-{ver}-windows-...
+        for part in local.name.split("-"):
+            if part.count(".") >= 1 and all(
+                p.isdigit() for p in part.split(".") if p
+            ):
+                pin = part
+                break
+    if "windows" in name and name.endswith((".exe", ".msi")) and pin:
+        assert_windows_setup_matches_monopin(local, pin)
     expected = local.stat().st_size
     if skip_if_present:
         existing = _remote_size_openssh(
@@ -1036,12 +1051,34 @@ def _upload_one_installer_openssh(
             )
             if code != 0:
                 raise RuntimeError(f"size verify failed code={code}: {out}")
+            # Windows residual: refuse install of known 0.5.8 CF size; clear
+            # immutable seal only for monopin-gated native seals.
+            win_guard = ""
+            if "windows" in name and name.endswith((".exe", ".msi")):
+                win_guard = (
+                    f"NEW_SZ=$(stat -c%s {home_tmp}); "
+                    f"if [ \"$NEW_SZ\" = '38631642' ]; then "
+                    f"  echo REFUSE_CF_SIZE_$NEW_SZ; rm -f {home_tmp}; exit 9; fi; "
+                    f"if command -v chattr >/dev/null 2>&1; then "
+                    f"  chattr -i {remote_final} 2>/dev/null || true; fi; "
+                )
+            seal_cmd = ""
+            if "windows" in name and name.endswith((".exe", ".msi")) and pin:
+                seal_cmd = (
+                    f"echo {expected} $(sha256sum {remote_final} | awk '{{print $1}}') "
+                    f"native_residual_{pin} $(date -Iseconds) "
+                    f"> $(dirname {remote_final})/.windows_native_seal; "
+                    f"if command -v chattr >/dev/null 2>&1; then "
+                    f"  chattr +i {remote_final} 2>/dev/null || true; fi; "
+                )
             code, out = _ssh_run_openssh(
                 f"set -e; "
                 f"mkdir -p $(dirname {remote_final}); "
+                f"{win_guard}"
                 f"mv -f {home_tmp} {remote_final}; "
                 f"chmod 644 {remote_final}; "
                 f"chown root:root {remote_final} || true; "
+                f"{seal_cmd}"
                 f"stat -c%s {remote_final}",
                 host=host,
                 user=user,
@@ -1305,6 +1342,12 @@ def upload_packages(
             except (RuntimeError, FileNotFoundError, ValueError) as e:
                 print(f"ERROR: {e}", file=sys.stderr)
                 return 1
+        if p["platform"] == "windows":
+            try:
+                assert_windows_setup_matches_monopin(f, ver)
+            except (RuntimeError, FileNotFoundError, ValueError) as e:
+                print(f"ERROR: refusing Windows paid upload: {e}", file=sys.stderr)
+                return 1
 
     host, user, password, key_path = _ssh_target()
     use_openssh = (
@@ -1339,6 +1382,7 @@ def upload_packages(
                     user=user,
                     key_path=key_path,
                     skip_if_present=not force,
+                    monopin=ver,
                 )
             except Exception as e:  # noqa: BLE001
                 print(f"ERROR platform={p['platform']}: {e}", file=sys.stderr)
