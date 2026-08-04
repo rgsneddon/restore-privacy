@@ -146,11 +146,11 @@ void main() {
     expect(src.contains('keeping distribution profile'), isTrue);
   });
 
-  test('build_suite_1.1.10 monopin is Notarized DevID residual-capable free path',
+  test('build_suite_1.1.9 monopin is Notarized DevID residual-capable free path',
       () {
     final root = Directory.current.path;
     // flutter test cwd is client_app/
-    final script = File('../scripts/build_suite_1.1.10.py');
+    final script = File('../scripts/build_suite_1.1.9.py');
     expect(script.existsSync(), isTrue, reason: 'from $root');
     final src = script.readAsStringSync();
     // Residual re-sign is side path only (best-effort).
