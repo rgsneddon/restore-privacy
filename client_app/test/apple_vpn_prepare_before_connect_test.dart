@@ -100,4 +100,88 @@ void main() {
       isTrue,
     );
   });
+
+  test(
+    'preparePacketTunnelSequenced classification: iOS maps open Settings / ready',
+    () {
+      // Real decision path used by VpnController.preparePacketTunnelSequenced
+      // via macosVpnActionFromPrepareMap — iOS-shaped maps omit host NE key.
+      final iosSuccess = {
+        'ok': true,
+        'prepared': true,
+        'tunnelType': kProductVpnTunnelType,
+        'providerBundleId': kProductVpnProviderBundleId,
+        'message':
+            'Restore Privacy Packet Tunnel registered in VPN preferences. '
+            'If iOS asks to Allow VPN configuration, choose Allow.',
+      };
+      expect(isPrepareVpnSuccess(iosSuccess), isTrue);
+      expect(prepareMapExplicitlyMissingHostNe(iosSuccess), isFalse);
+      expect(
+        macosVpnActionFromPrepareMap(
+          iosSuccess,
+          prepared: isPrepareVpnSuccess(iosSuccess),
+        ),
+        MacosVpnAfterPrepareAction.readyForConnect,
+        reason: 'iOS ok+prepared without host NE key must be readyForConnect',
+      );
+
+      // iOS needsAllow (save failed / not allowed) — must open Settings, not hostMissing.
+      final iosNeedsAllow = {
+        'ok': false,
+        'prepared': false,
+        'tunnelType': kProductVpnTunnelType,
+        'providerBundleId': kProductVpnProviderBundleId,
+        'needsVpnSystemSettingsApproval': true,
+        'message':
+            'Could not pre-register Packet Tunnel VPN configuration: permission denied. '
+            'Allow VPN for Restore Privacy in iOS Settings if prompted, then Connect.',
+      };
+      expect(isPrepareVpnSuccess(iosNeedsAllow), isFalse);
+      expect(prepareMapExplicitlyMissingHostNe(iosNeedsAllow), isFalse);
+      final needsAllow = iosNeedsAllow['needsVpnSystemSettingsApproval'] == true;
+      expect(
+        macosVpnActionFromPrepareMap(
+          iosNeedsAllow,
+          prepared: isPrepareVpnSuccess(iosNeedsAllow),
+          needsVpnSystemSettingsApproval: needsAllow,
+        ),
+        MacosVpnAfterPrepareAction.openSystemSettingsThenConnect,
+        reason:
+            'iOS needsVpnSystemSettingsApproval must open Settings (not hostMissing)',
+      );
+
+      // Explicit host NE false (macOS catalog DevID) still routes to hostMissing.
+      final macDevIdMissingNe = {
+        'ok': false,
+        'prepared': false,
+        'hostHasPacketTunnelEntitlement': false,
+        'needsTeamResidualSign': true,
+        'needsVpnSystemSettingsApproval': true,
+        'tunnelType': kProductVpnTunnelType,
+        'message': 'missing host packet-tunnel-provider',
+      };
+      expect(
+        macosVpnActionFromPrepareMap(
+          macDevIdMissingNe,
+          prepared: isPrepareVpnSuccess(macDevIdMissingNe),
+          needsVpnSystemSettingsApproval: true,
+        ),
+        MacosVpnAfterPrepareAction.hostMissingNetworkExtension,
+      );
+
+      // vpn_controller must call macosVpnActionFromPrepareMap (not raw hasNe==true).
+      final vc = File('lib/vpn_controller.dart').readAsStringSync();
+      expect(vc.contains('macosVpnActionFromPrepareMap'), isTrue);
+      // Forbidden regression: treat missing key as !hasNe / force needsSign.
+      expect(
+        RegExp(
+          r"hostHasPacketTunnelEntitlement'\]\s*==\s*true",
+        ).hasMatch(vc),
+        isFalse,
+        reason:
+            'sequenced prepare must not require explicit true for host NE (kills iOS)',
+      );
+    },
+  );
 }

@@ -62,6 +62,11 @@ enum MacosVpnAfterPrepareAction {
 }
 
 /// Decide post-prepare action from native-style result fields.
+///
+/// [hostHasPacketTunnelEntitlement] defaults **true** (not applicable / present).
+/// Only an explicit `false` (catalog macOS DevID without host NE) routes to
+/// [MacosVpnAfterPrepareAction.hostMissingNetworkExtension]. Missing/null must
+/// **not** be treated as missing — iOS prepare maps omit the key entirely.
 MacosVpnAfterPrepareAction macosVpnActionAfterPrepare({
   required bool prepared,
   required bool ok,
@@ -79,6 +84,44 @@ MacosVpnAfterPrepareAction macosVpnActionAfterPrepare({
     return MacosVpnAfterPrepareAction.openSystemSettingsThenConnect;
   }
   return MacosVpnAfterPrepareAction.retryPrepare;
+}
+
+/// True only when native map **explicitly** reports host Packet Tunnel NE missing.
+///
+/// Matches [isPrepareVpnSuccess] honesty: `hostHasPacketTunnelEntitlement == false`
+/// rejects; null/absent means the field is not applicable (iOS, residual-capable).
+bool prepareMapExplicitlyMissingHostNe(Map? raw) {
+  if (raw == null) return false;
+  return raw['hostHasPacketTunnelEntitlement'] == false;
+}
+
+/// True when native map explicitly requires Team residual re-sign (macOS catalog).
+bool prepareMapNeedsTeamResidualSign(Map? raw) {
+  if (raw == null) return false;
+  return raw['needsTeamResidualSign'] == true;
+}
+
+/// Pure: classify a native prepareVpn channel map into the post-prepare action.
+///
+/// This is the real decision path used by [VpnController.preparePacketTunnelSequenced]
+/// — tests must feed iOS-shaped maps (no host NE key) and macOS DevID maps here.
+MacosVpnAfterPrepareAction macosVpnActionFromPrepareMap(
+  Map? raw, {
+  required bool prepared,
+  bool? needsVpnSystemSettingsApproval,
+}) {
+  final needsAllow = needsVpnSystemSettingsApproval ??
+      (raw?['needsVpnSystemSettingsApproval'] == true);
+  final needsSign = prepareMapNeedsTeamResidualSign(raw);
+  // Explicit false only — missing key is N/A (iOS), not host-NE failure.
+  final hostHasNe = !prepareMapExplicitlyMissingHostNe(raw);
+  return macosVpnActionAfterPrepare(
+    prepared: prepared,
+    ok: prepared,
+    needsVpnSystemSettingsApproval: needsAllow,
+    needsTeamResidualSign: needsSign,
+    hostHasPacketTunnelEntitlement: hostHasNe,
+  );
 }
 
 /// Whether native prepare should auto-open System Settings (product: **false**).

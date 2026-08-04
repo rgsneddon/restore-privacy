@@ -225,6 +225,10 @@ enum RptVpnChannel {
               "localizedDescription": productLocalizedDescription,
               "needsVpnSystemSettingsApproval": true,
               "openedVpnSettings": false,
+              // iOS residual host always carries Packet Tunnel NE capability when
+              // the app is residual-capable; never emit false (macOS catalog DevID).
+              "hostHasPacketTunnelEntitlement": true,
+              "needsTeamResidualSign": false,
               "message":
                 "Could not save Packet Tunnel VPN configuration: "
                 + "\(saveErr.localizedDescription). "
@@ -243,6 +247,8 @@ enum RptVpnChannel {
               manager.localizedDescription ?? productLocalizedDescription,
             "enabled": manager.isEnabled,
             "connectionStatus": statusName(manager.connection.status),
+            "hostHasPacketTunnelEntitlement": true,
+            "needsTeamResidualSign": false,
             "message":
               "Restore Privacy Packet Tunnel registered in VPN preferences. "
               + "If iOS asks to Allow VPN configuration, choose Allow — "
@@ -266,6 +272,9 @@ enum RptVpnChannel {
         "localizedDescription": productLocalizedDescription,
         "needsVpnSystemSettingsApproval": true,
         "openedVpnSettings": opened,
+        // Omitted false — Flutter treats only explicit false as host-NE missing.
+        "hostHasPacketTunnelEntitlement": true,
+        "needsTeamResidualSign": false,
         "message":
           "Could not pre-register Packet Tunnel VPN configuration: \(detail). "
           + "Allow VPN for Restore Privacy in iOS Settings if prompted, then Connect.",

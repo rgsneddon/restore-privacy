@@ -48,6 +48,11 @@ void main() {
     // openSettingsOnDenial default false (Flutter sequences Settings)
     expect(iosSrc.contains('openSettingsOnDenial'), isTrue);
     expect(iosSrc.contains('openSettingsOnDenial: Bool = false'), isTrue);
+    // Emit hostHasPacketTunnelEntitlement:true (never false) so Flutter does not
+    // classify iOS prepare as macOS catalog DevID missing-NE.
+    expect(iosSrc.contains('"hostHasPacketTunnelEntitlement": true'), isTrue);
+    expect(iosSrc.contains('"hostHasPacketTunnelEntitlement": false'), isFalse);
+    expect(iosSrc.contains('"needsTeamResidualSign": false'), isTrue);
   });
 
   test('iOS loadOrCreateManager loads preferences and saves enabled', () {

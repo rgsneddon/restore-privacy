@@ -150,15 +150,12 @@ class VpnController {
     final prepared = isPrepareVpnSuccess(raw);
     final needsAllow = shouldAutoOpenVpnSystemSettings(raw) ||
         (raw?['needsVpnSystemSettingsApproval'] == true);
-    final needsSign = raw?['needsTeamResidualSign'] == true;
-    // Explicit true only — null/missing must not imply host NE (catalog DevID).
-    final hasNe = raw?['hostHasPacketTunnelEntitlement'] == true;
-    final action = macosVpnActionAfterPrepare(
+    // Host NE: only explicit false is missing (macOS catalog DevID). Null/absent
+    // (iOS maps) is N/A — do not force hostMissingNetworkExtension / skip Settings.
+    final action = macosVpnActionFromPrepareMap(
+      raw,
       prepared: prepared,
-      ok: prepared,
       needsVpnSystemSettingsApproval: needsAllow,
-      needsTeamResidualSign: needsSign || !hasNe,
-      hostHasPacketTunnelEntitlement: hasNe,
     );
     final msg = mapPrepareVpnStatusMessage(raw);
     onStatus(msg);
