@@ -36,32 +36,16 @@ enum RptVpnChannel {
         queryProductSessionStatus { map in result(map) }
       case "prepareVpn", "preparePacketTunnel", "registerVpnConfiguration":
         // Pre-Connect: save Packet Tunnel into iOS VPN preferences (not L2TP/IKEv2).
+        // openSettingsOnDenial default false — Flutter sequences Settings after prepare.
         let args = call.arguments as? [String: Any] ?? [:]
         let ep = RptEndpoint.resolve(from: args)
-        loadOrCreateManager(host: ep.host, port: ep.port) { manager, neError in
-          if let manager {
-            result([
-              "ok": true,
-              "prepared": true,
-              "tunnelType": productTunnelType,
-              "providerBundleId": providerBundleId,
-              "localizedDescription": manager.localizedDescription ?? productLocalizedDescription,
-              "enabled": manager.isEnabled,
-              "message":
-                "Restore Privacy Packet Tunnel registered. "
-                + "If iOS asks to Allow VPN configuration, choose Allow, then Connect.",
-            ] as [String: Any])
-          } else {
-            result([
-              "ok": false,
-              "prepared": false,
-              "tunnelType": productTunnelType,
-              "providerBundleId": providerBundleId,
-              "message":
-                "Could not pre-register Packet Tunnel: \(neError ?? "unavailable"). "
-                + "Allow VPN for Restore Privacy in iOS Settings if prompted.",
-            ] as [String: Any])
-          }
+        let openOnDenial = (args["openSettingsOnDenial"] as? Bool) ?? false
+        preparePacketTunnelConfiguration(
+          host: ep.host,
+          port: ep.port,
+          openSettingsOnDenial: openOnDenial
+        ) { map in
+          result(map)
         }
       case "openVpnSettings", "openVpnSystemSettings":
         let opened = openVpnSystemSettings()
@@ -183,6 +167,15 @@ enum RptVpnChannel {
     )
   }
 
+  /// Identity of the product VPN manager saved to OS preferences (Packet Tunnel only).
+  static func productVpnIdentity() -> [String: String] {
+    [
+      "tunnelType": productTunnelType,
+      "providerBundleId": providerBundleId,
+      "localizedDescription": productLocalizedDescription,
+    ]
+  }
+
   /// Best-effort open Settings so the user can Allow VPN configuration.
   @discardableResult
   static func openVpnSystemSettings() -> Bool {
@@ -199,6 +192,87 @@ enum RptVpnChannel {
       return opened
     }
     return false
+  }
+
+  /// Pre-Connect: register Restore Privacy Packet Tunnel in iOS VPN preferences.
+  /// Does **not** start the tunnel. iOS may still show Allow — that is required.
+  /// Never configures L2TP, Cisco IPsec, or IKEv2.
+  ///
+  /// Success (prepared:true) only after load/create + isEnabled + saveToPreferences
+  /// succeed. Failed saves never claim prepared/ok.
+  private static func preparePacketTunnelConfiguration(
+    host: String,
+    port: UInt16,
+    openSettingsOnDenial: Bool = false,
+    completion: @escaping ([String: Any]) -> Void
+  ) {
+    // Always attempt loadOrCreateManager + save isEnabled=true so VPN prefs
+    // list Restore Privacy and can show Allow when required.
+    loadOrCreateManager(host: host, port: port) { manager, neError in
+      if let manager {
+        let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
+        let bid = proto?.providerBundleIdentifier ?? providerBundleId
+        // Re-assert enabled and re-save so registration is not a silent no-op.
+        manager.isEnabled = true
+        manager.isOnDemandEnabled = false
+        manager.saveToPreferences { saveErr in
+          if let saveErr {
+            var map: [String: Any] = [
+              "ok": false,
+              "prepared": false,
+              "tunnelType": productTunnelType,
+              "providerBundleId": bid,
+              "localizedDescription": productLocalizedDescription,
+              "needsVpnSystemSettingsApproval": true,
+              "openedVpnSettings": false,
+              "message":
+                "Could not save Packet Tunnel VPN configuration: "
+                + "\(saveErr.localizedDescription). "
+                + "Allow VPN for Restore Privacy in iOS Settings if prompted, then Connect again.",
+            ]
+            for (k, v) in productVpnIdentity() { map[k] = v }
+            completion(map)
+            return
+          }
+          var map: [String: Any] = [
+            "ok": true,
+            "prepared": true,
+            "tunnelType": productTunnelType,
+            "providerBundleId": bid,
+            "localizedDescription":
+              manager.localizedDescription ?? productLocalizedDescription,
+            "enabled": manager.isEnabled,
+            "connectionStatus": statusName(manager.connection.status),
+            "message":
+              "Restore Privacy Packet Tunnel registered in VPN preferences. "
+              + "If iOS asks to Allow VPN configuration, choose Allow — "
+              + "do not add L2TP, Cisco IPsec, or IKEv2. Then press Connect.",
+          ]
+          for (k, v) in productVpnIdentity() { map[k] = v }
+          completion(map)
+        }
+        return
+      }
+      let detail = neError ?? "NE preferences unavailable"
+      var opened = false
+      if openSettingsOnDenial {
+        opened = openVpnSystemSettings()
+      }
+      var map: [String: Any] = [
+        "ok": false,
+        "prepared": false,
+        "tunnelType": productTunnelType,
+        "providerBundleId": providerBundleId,
+        "localizedDescription": productLocalizedDescription,
+        "needsVpnSystemSettingsApproval": true,
+        "openedVpnSettings": opened,
+        "message":
+          "Could not pre-register Packet Tunnel VPN configuration: \(detail). "
+          + "Allow VPN for Restore Privacy in iOS Settings if prompted, then Connect.",
+      ]
+      for (k, v) in productVpnIdentity() { map[k] = v }
+      completion(map)
+    }
   }
 
   /// 64-char hex Ed25519 device public key for status-host bind-device-entitlement.
@@ -256,12 +330,17 @@ enum RptVpnChannel {
     loadOrCreateManager(host: host, port: port) { manager, neError in
       guard manager != nil else {
         let detail = neError ?? "NE preferences unavailable"
-        completion(
-          RptFullTunnelResult.productConnectMap(
-            packetTunnelActive: false,
-            detailMessage: "Could not enable system VPN for Connect: \(detail)"
-          )
+        let full = "Could not enable system VPN for Connect: \(detail)"
+        var map = RptFullTunnelResult.productConnectMap(
+          packetTunnelActive: false,
+          detailMessage: full
         )
+        // Surface Open VPN settings so the user can complete Allow.
+        map["needsVpnSystemSettingsApproval"] = true
+        map["openedVpnSettings"] = false
+        map["message"] = full
+          + " Allow VPN for Restore Privacy in iOS Settings if prompted, then Connect."
+        completion(map)
         return
       }
       // Host pre-seed: copy IS/RO/DE pubs into App Group so Packet Tunnel HELLO
@@ -328,6 +407,8 @@ enum RptVpnChannel {
   }
 
   /// Ensure preferences show enabled, then start tunnel (turns system VPN on).
+  /// Always save isEnabled=true so iOS VPN prefs list Restore Privacy and can
+  /// present the Allow configuration dialog when required.
   private static func ensureEnabledThenStartTunnel(
     manager: NETunnelProviderManager,
     host: String,
@@ -337,42 +418,45 @@ enum RptVpnChannel {
     let start = {
       startTunnel(manager: manager, host: host, port: port, completion: completion)
     }
-    if manager.isEnabled, manager.connection.status != .invalid {
-      start()
-      return
-    }
+    // Always re-apply protocol + isEnabled and save (do not short-circuit on
+    // already-enabled — user may have deleted/re-denied prefs between prepares).
     applyProductPacketTunnelProtocol(to: manager, host: host, port: port)
     manager.isEnabled = true
     manager.isOnDemandEnabled = false
     manager.saveToPreferences { saveErr in
       if let saveErr {
-        completion(
-          RptFullTunnelResult.productConnectMap(
-            packetTunnelActive: false,
-            detailMessage: saveErr.localizedDescription
-          )
+        // If already enabled, still attempt startTunnel (profile may already be allowed).
+        if manager.isEnabled, manager.connection.status != .invalid {
+          start()
+          return
+        }
+        var map = RptFullTunnelResult.productConnectMap(
+          packetTunnelActive: false,
+          detailMessage: saveErr.localizedDescription
         )
+        map["needsVpnSystemSettingsApproval"] = true
+        completion(map)
         return
       }
       manager.loadFromPreferences { loadErr in
         if let loadErr {
-          completion(
-            RptFullTunnelResult.productConnectMap(
-              packetTunnelActive: false,
-              detailMessage: loadErr.localizedDescription
-            )
+          var map = RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: false,
+            detailMessage: loadErr.localizedDescription
           )
+          map["needsVpnSystemSettingsApproval"] = true
+          completion(map)
           return
         }
         if !manager.isEnabled {
-          completion(
-            RptFullTunnelResult.productConnectMap(
-              packetTunnelActive: false,
-              detailMessage:
-                "System VPN profile is present but still disabled. "
-                + "Allow VPN for Restore Privacy if iOS prompts, then press Connect."
-            )
+          var map = RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: false,
+            detailMessage:
+              "System VPN profile is present but still disabled. "
+              + "Allow VPN for Restore Privacy if iOS prompts, then press Connect."
           )
+          map["needsVpnSystemSettingsApproval"] = true
+          completion(map)
           return
         }
         start()

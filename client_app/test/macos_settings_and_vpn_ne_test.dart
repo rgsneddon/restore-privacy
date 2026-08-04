@@ -57,7 +57,12 @@ void main() {
     // No early return before loadOrCreateManager on missing host NE alone.
     final prepareIdx = src.indexOf('private static func preparePacketTunnelConfiguration');
     expect(prepareIdx, greaterThanOrEqualTo(0));
-    final endIdx = src.indexOf('private static func vpnSystemSettingsURLCandidates', prepareIdx);
+    // End at next private static after prepare (name may vary).
+    final after = src.substring(prepareIdx + 10);
+    final nextFn = RegExp(r'\n  private static func \w+').firstMatch(after);
+    final endIdx = nextFn != null
+        ? prepareIdx + 10 + nextFn.start
+        : src.indexOf('private static func vpnSystemSettingsURLCandidates', prepareIdx);
     final body = src.substring(prepareIdx, endIdx > prepareIdx ? endIdx : src.length);
     expect(body.contains('loadOrCreateManager'), isTrue);
     // Forbidden short-circuit pattern: if !hostHas... { completion; return } before load

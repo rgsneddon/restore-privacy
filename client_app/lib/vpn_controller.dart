@@ -211,9 +211,9 @@ class VpnController {
     }
 
     try {
-      // macOS: register Packet Tunnel in System VPN prefs before start so the
-      // OS can show Allow / install the configuration (not a silent no-op).
-      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+      // Apple (macOS + iOS): register Packet Tunnel in system VPN prefs before
+      // start so the OS can show Allow / install the configuration.
+      if (applePlatformNeedsVpnPrepare()) {
         await preparePacketTunnelSequenced();
       }
       // Push dual-stack + privacy-scale prefs before native tunnel starts.

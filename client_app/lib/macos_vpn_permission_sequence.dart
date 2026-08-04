@@ -1,9 +1,24 @@
-/// Pure macOS residual VPN permission sequencing (no simultaneous popup burst).
+/// Pure Apple residual VPN permission sequencing (no simultaneous popup burst).
 ///
 /// Product bug: prepare + auto-open System Settings + Connect re-register all
 /// raced OS dialogs so the Packet Tunnel → System Settings allow step was missed.
 /// This module defines an ordered plan so callers await each step distinctly.
+///
+/// Used on **macOS and iOS** (both register Packet Tunnel NE before Connect).
 library;
+
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
+
+/// True when the shared client must run native prepare before Connect.
+///
+/// macOS and iOS both save product Packet Tunnel into system VPN preferences.
+/// Other platforms use different tunnels (Android VpnService, Windows, etc.).
+bool applePlatformNeedsVpnPrepare([TargetPlatform? platform]) {
+  if (kIsWeb) return false;
+  final p = platform ?? defaultTargetPlatform;
+  return p == TargetPlatform.macOS || p == TargetPlatform.iOS;
+}
 
 /// Ordered steps for macOS VPN profile allow / System Settings.
 enum MacosVpnPermissionStep {

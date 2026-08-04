@@ -1,8 +1,9 @@
-/// macOS VPN permission prompts must be sequential, not a simultaneous burst.
+/// macOS / Apple VPN permission prompts must be sequential, not a simultaneous burst.
 library;
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show TargetPlatform;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/macos_vpn_permission_sequence.dart';
 
@@ -83,4 +84,11 @@ void main() {
       isTrue,
     );
   });
+
+  test('applePlatformNeedsVpnPrepare covers macOS and iOS', () {
+    expect(applePlatformNeedsVpnPrepare(TargetPlatform.macOS), isTrue);
+    expect(applePlatformNeedsVpnPrepare(TargetPlatform.iOS), isTrue);
+    expect(applePlatformNeedsVpnPrepare(TargetPlatform.android), isFalse);
+  });
 }
+

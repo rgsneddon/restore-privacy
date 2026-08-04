@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,6 +16,7 @@ import 'entry_access.dart';
 import 'keygen_field.dart';
 import 'leak_posture.dart';
 import 'licence_gate.dart';
+import 'macos_vpn_permission_sequence.dart';
 import 'macos_window.dart';
 import 'prefs_backend.dart';
 import 'registration_copy.dart';
@@ -290,9 +293,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       }
       // Single post-licence unlock entry (never from Accept button too — double sheet).
       await _promptPaymentUnlockIfNeeded();
-      // macOS: register Packet Tunnel NE profile in OS VPN prefs before Connect
-      // (not L2TP / Cisco IPsec / IKEv2 — those are manual System Settings types).
-      await _prepareMacosPacketTunnelBeforeConnect();
+      // Apple (macOS + iOS): register Packet Tunnel NE profile in OS VPN prefs
+      // before Connect (not L2TP / Cisco IPsec / IKEv2).
+      await _prepareApplePacketTunnelBeforeConnect();
       await _maybeAutoconnect();
     });
   }
@@ -313,11 +316,12 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
 
   /// First-run / post-install style prep: save product Packet Tunnel to OS prefs.
   ///
-  /// Uses the sequenced prepare path so System Settings is not opened in the
-  /// same tick as the NE Allow dialog (missed VPN allow popup fix).
-  Future<void> _prepareMacosPacketTunnelBeforeConnect() async {
-    if (!MacWindowController.isSupported) return;
+  /// Runs on **macOS and iOS**. Uses the sequenced prepare path so Settings is
+  /// not opened in the same tick as the NE Allow dialog.
+  Future<void> _prepareApplePacketTunnelBeforeConnect() async {
+    if (!applePlatformNeedsVpnPrepare()) return;
     if (!mounted) return;
+    final onIos = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
     _append(
       'Preparing system VPN profile (Restore Privacy Packet Tunnel)…',
     );
@@ -325,8 +329,11 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     if (!mounted) return;
     if (outcome.prepared) {
       _append(
-        'Packet Tunnel configuration ready — Allow if macOS asks, then Connect. '
-        'Do not add L2TP, Cisco IPsec, or IKEv2.',
+        onIos
+            ? 'Packet Tunnel configuration ready — Allow if iOS asks, then Connect. '
+                'Do not add L2TP, Cisco IPsec, or IKEv2.'
+            : 'Packet Tunnel configuration ready — Allow if macOS asks, then Connect. '
+                'Do not add L2TP, Cisco IPsec, or IKEv2.',
       );
       // Prefer prepared guidance on the card when still disconnected.
       if (!_connected &&
@@ -347,11 +354,18 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         })) {
       setState(() => _needsVpnSystemSettingsApproval = true);
       _append(
-        'Allow Restore Privacy under System Settings → Network → VPN & Filters '
-        '(Packet Tunnel), then Connect. Do not choose L2TP / IKEv2 manually.',
+        onIos
+            ? 'Allow VPN for Restore Privacy in iOS Settings (Packet Tunnel), '
+                'then Connect. Do not choose L2TP / IKEv2 manually.'
+            : 'Allow Restore Privacy under System Settings → Network → VPN & Filters '
+                '(Packet Tunnel), then Connect. Do not choose L2TP / IKEv2 manually.',
       );
     }
   }
+
+  /// Legacy name — Apple prepare path (macOS + iOS).
+  Future<void> _prepareMacosPacketTunnelBeforeConnect() =>
+      _prepareApplePacketTunnelBeforeConnect();
 
   Future<void> _initSettings() async {
     if (widget.settingsStore != null) {
@@ -797,7 +811,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       });
       _append('Keygen unlocked.');
       // Sheet is fully closed — safe to register Packet Tunnel / open Settings.
-      await _prepareMacosPacketTunnelBeforeConnect();
+      await _prepareApplePacketTunnelBeforeConnect();
       // Dedicated residual VPN: never show Suite username/password after KEYGEN.
       // (shouldOfferSuiteAccountPrompt is hard-false; prompt path removed.)
     }
