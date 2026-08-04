@@ -381,6 +381,38 @@ def _assert_macos_cfbundle(path: Path, monopin: str) -> None:
     print(f"macos CFBundleShortVersionString={ver} matches monopin {monopin}")
 
 
+def assert_windows_setup_matches_monopin(path: Path, monopin: str) -> None:
+    """Refuse Windows residual setups that are renamed historical 0.5.8 carry-forwards.
+
+    Free/paid downloads must not re-host a PE that still freezes ``0.5.8`` under a
+    current monopin filename. Pure check: size + string markers (no network).
+    """
+    pin = (monopin or "").strip().lstrip("vV")
+    if not pin:
+        raise ValueError("monopin required")
+    p = Path(path)
+    if not p.is_file():
+        raise FileNotFoundError(f"Windows setup missing: {p}")
+    size = p.stat().st_size
+    if size <= 0:
+        raise RuntimeError(f"Windows setup empty: {p}")
+    # Repeated stale carry that kept reappearing as paid 1.1.x windows setup
+    if size == 38_631_642 and pin != "0.5.8":
+        raise RuntimeError(
+            f"refusing Windows setup size {size} (historical 0.5.8 carry-forward) "
+            f"for monopin {pin}: {p}"
+        )
+    data = p.read_bytes()
+    if pin != "0.5.8" and b"0.5.8" in data:
+        raise RuntimeError(
+            f"refusing Windows setup that still embeds 0.5.8 while monopin is {pin}: {p}"
+        )
+    if pin.encode("ascii", errors="ignore") not in data:
+        raise RuntimeError(
+            f"Windows setup missing monopin string {pin!r} (not a native seal?): {p}"
+        )
+
+
 def stage_packages(
     *,
     version: str | None = None,
@@ -419,6 +451,8 @@ def stage_packages(
             shutil.copy2(src, dst)
         if p["platform"] == "macos":
             _assert_macos_cfbundle(dst, ver)
+        if p["platform"] == "windows":
+            assert_windows_setup_matches_monopin(dst, ver)
         staged.append(dst)
         print(f"staged platform={p['platform']} {dst} ({dst.stat().st_size} bytes)")
     if not staged:

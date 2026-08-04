@@ -128,15 +128,46 @@ class ConnectionLogEvent:
 
 
 def product_client_version() -> str:
-    """Shipped client VERSION string (no network)."""
+    """Shipped client VERSION string (no network).
+
+    Resolves monorepo ``client/VERSION`` and frozen PyInstaller layouts so
+    support exports never report a stale historical pin (e.g. 0.5.8) when the
+    freeze baked a current monopin next to the package.
+    """
+    candidates: list[Path] = []
+    here = Path(__file__).resolve().parent
+    candidates.append(here / "VERSION")
+    mei = getattr(sys, "_MEIPASS", None)
+    if mei:
+        mei_p = Path(str(mei))
+        candidates.extend(
+            [
+                mei_p / "client" / "VERSION",
+                mei_p / "VERSION",
+                mei_p / "payload" / "client" / "VERSION",
+                mei_p / "_internal" / "client" / "VERSION",
+            ]
+        )
     try:
-        p = Path(__file__).resolve().parent / "VERSION"
-        if p.is_file():
-            v = p.read_text(encoding="utf-8").strip().splitlines()[0].strip()
-            if v:
-                return v
+        exe_dir = Path(sys.executable).resolve().parent
+        candidates.extend(
+            [
+                exe_dir / "client" / "VERSION",
+                exe_dir / "VERSION",
+                exe_dir / "_internal" / "client" / "VERSION",
+            ]
+        )
     except OSError:
         pass
+    for p in candidates:
+        try:
+            if not p.is_file():
+                continue
+            v = p.read_text(encoding="utf-8").strip().splitlines()[0].strip()
+            if v:
+                return v.lstrip("vV")
+        except OSError:
+            continue
     return "unknown"
 
 

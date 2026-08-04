@@ -351,8 +351,19 @@ def version_file_candidates() -> list[Path]:
 def embedded_package_version() -> str:
     """Version shipped next to this package module (repo / onedir data)."""
     v = _read_version_text(Path(__file__).resolve().parent / "VERSION")
-    # Fallback matches monorepo catalog pin — never a stale prior ship
-    return v or "0.3.6"
+    if v:
+        return v
+    # Prefer support-log resolver (frozen MEIPASS / install tree)
+    try:
+        from client.connection_log import product_client_version
+
+        pv = (product_client_version() or "").strip()
+        if pv and pv not in ("unknown", "0.5.8"):
+            return pv
+    except Exception:  # noqa: BLE001
+        pass
+    # Last resort: never invent 0.5.8
+    return "0.0.0"
 
 
 def read_running_version(version_file: Path | None = None) -> str:
@@ -378,7 +389,7 @@ def read_running_version(version_file: Path | None = None) -> str:
     if emb:
         found.append(emb)
     if not found:
-        return "0.3.6"
+        return "0.0.0"
     # Highest product pin wins (stale VERSION files lose)
     return max(found, key=version_tuple)
 
