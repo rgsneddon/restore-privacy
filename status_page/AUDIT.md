@@ -301,3 +301,15 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 | Code baseline | Catalog **1.1.10** + node **Germany (DE)** |
 | Pass date | **4 August 2026** |
 | Machine JSON | `status_page/static/security_audit_latest.json` (when `--write`) |
+
+---
+
+## Client structural notes (catalog 1.1.10)
+
+| Area | Honesty |
+|------|---------|
+| **First-use** | `AppEntryRoot` → `FirstRunPortal`: **Step 1 of 2** licence accept, **Step 2 of 2** KEYGEN or free trial before residual shell. |
+| **Settings open** | Main Settings control is **not** disabled while Connect is busy (macOS NE prepare could leave UI looking stuck). |
+| **macOS NE protocol** | Free monopin (Developer ID + systemextension NE) recreates `NETunnelProviderProtocol` on prepare/Connect so residual-team (Development) → monopin upgrades do not keep a stale provider designated requirement (logs: signature check failed / tunnel stays disconnected). |
+| **KEYGEN persistence** | Sandboxed macOS store: `Library/Containers/.../Preferences` (`flutter.payment_entitlement_*`, `flutter.licence_accepted`). Non-container prefs may diverge if both paths were used. |
+
