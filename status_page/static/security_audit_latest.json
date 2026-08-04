@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-04T23:04:23Z",
+  "generated_at": "2026-08-04T23:05:20Z",
   "node_host": "Germany (DE)",
   "catalog_version": "1.2.0",
   "probe_schedule": [
@@ -86,8 +86,7 @@
       "tests.test_audit_package_rag",
       "tests.test_oracle_no_user_data",
       "tests.test_oracle_suite_architecture"
-    ],
-    "error": "missing_cryptography"
+    ]
   },
   "tcp_status": {
     "host": "Germany (DE)",
