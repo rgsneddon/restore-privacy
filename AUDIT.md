@@ -7,7 +7,7 @@
 | **Public catalog version** | **1.1.9** |
 | **Default residual entry** | **Germany (DE)** (product default on all clients; RO monopin retired) |
 | **Live probe peer** | **Germany (DE):44044** (UDP); status UI TCP **8080** |
-| **Audit generated** | **4 August 2026** (`2026-08-04T20:35:56Z`) |
+| **Audit generated** | **4 August 2026** (`2026-08-04T20:42:08Z`) |
 | **Cadence** | Automated security pass (~**every 1 day** + **jitter** on privacy-hardened node timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE** + **section B privacy probes** + **multihop node structure** |
 | **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B + multihop structure (no firewall scan) |
@@ -93,8 +93,8 @@ system capture) stays required. This table helps users set latency expectations.
 - **Live** RTT where probes succeeded from **this audit host** to product
   **entry** `Iceland (IS)` (Iceland)
   and **exit** `Germany (DE)` (Germany).
-- Entry probe: **58 ms** via `tcp` (shared base across rows).
-- Exit probe: **79 ms** via `tcp` (shared base for multi-hop rows).
+- Entry probe: **63 ms** via `tcp` (shared base across rows).
+- Exit probe: **73 ms** via `tcp` (shared base for multi-hop rows).
 - Live ms are from **this host's path**, not guaranteed London UK RTT.
 - Traffic shaping **feel** may add a small band on top of live base
   (+0–5 ms labeled); outer obfs ~0 ms RTT.
@@ -106,14 +106,14 @@ system capture) stays required. This table helps users set latency expectations.
 
 | Shape | Outer obfs | Multi-hop | UK→entry (live) | UK→exit (live) | AVG | RAG | Notes |
 |-------|------------|-----------|-------------------|------------------|-----|-----|-------|
-| on | on | on | 58–63 ms (live base + shape feel) | 79–84 ms (live base + shape feel) | 71 ms | 🟥 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 71.0 ms → red |
-| on | on | off | 58–63 ms (live base + shape feel) | n/a (multi-hop off) | 60.5 ms | 🟧 | single-hop residual → entry; shape on; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 60.5 ms → amber |
-| on | off | on | 58–63 ms (live base + shape feel) | 79–84 ms (live base + shape feel) | 71 ms | 🟥 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 71.0 ms → red |
-| on | off | off | 58–63 ms (live base + shape feel) | n/a (multi-hop off) | 60.5 ms | 🟧 | single-hop residual → entry; shape on; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 60.5 ms → amber |
-| off | on | on | 58 ms (live) | 79 ms (live) | 68.5 ms | 🟧 | residual dials exit when multi-hop on; shape off leaner; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 68.5 ms → amber |
-| off | on | off | 58 ms (live) | n/a (multi-hop off) | 58 ms | 🟧 | single-hop residual → entry; shape off (faster feel); outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 58.0 ms → amber |
-| off | off | on | 58 ms (live) | 79 ms (live) | 68.5 ms | 🟧 | residual dials exit when multi-hop on; shape off leaner; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 68.5 ms → amber |
-| off | off | off | 58 ms (live) | n/a (multi-hop off) | 58 ms | 🟧 | single-hop residual → entry; shape off (faster feel); outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 58.0 ms → amber |
+| on | on | on | 63–68 ms (live base + shape feel) | 73–78 ms (live base + shape feel) | 70.5 ms | 🟥 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 70.5 ms → red |
+| on | on | off | 63–68 ms (live base + shape feel) | n/a (multi-hop off) | 65.5 ms | 🟧 | single-hop residual → entry; shape on; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 65.5 ms → amber |
+| on | off | on | 63–68 ms (live base + shape feel) | 73–78 ms (live base + shape feel) | 70.5 ms | 🟥 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 70.5 ms → red |
+| on | off | off | 63–68 ms (live base + shape feel) | n/a (multi-hop off) | 65.5 ms | 🟧 | single-hop residual → entry; shape on; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 65.5 ms → amber |
+| off | on | on | 63 ms (live) | 73 ms (live) | 68 ms | 🟧 | residual dials exit when multi-hop on; shape off leaner; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 68.0 ms → amber |
+| off | on | off | 63 ms (live) | n/a (multi-hop off) | 63 ms | 🟧 | single-hop residual → entry; shape off (faster feel); outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 63.0 ms → amber |
+| off | off | on | 63 ms (live) | 73 ms (live) | 68 ms | 🟧 | residual dials exit when multi-hop on; shape off leaner; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 68.0 ms → amber |
+| off | off | off | 63 ms (live) | n/a (multi-hop off) | 63 ms | 🟧 | single-hop residual → entry; shape off (faster feel); outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 63.0 ms → amber |
 
 **Product defaults:** shape **off**, outer obfs **off**, multi-hop **off**
 (lean single-hop entry). Turn shape/obfs **on** for stronger residual defenses;
@@ -222,7 +222,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Severity | Finding | Status |
 |----------|---------|--------|
-| **Info** | Automated pass at `2026-08-04T20:35:56Z` | Recorded |
+| **Info** | Automated pass at `2026-08-04T20:42:08Z` | Recorded |
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
 | **Low** | Unit suite failure | OPEN — see suite log |
@@ -274,7 +274,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **2026-08-04T20:35:56Z** against node **Germany (DE)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **2026-08-04T20:42:08Z** against node **Germany (DE)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 
@@ -306,9 +306,8 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 
 | Area | Honesty |
 |------|---------|
-| **First-use** | `AppEntryRoot` / `FirstRunPortal`: **Step 1 of 2** licence accept, **Step 2 of 2** KEYGEN or free trial before residual Connect. |
-| **Settings** | In-app Settings is always openable (not gated by Connect `_busy`). |
-| **macOS NE protocol** | Free monopin (Developer ID + systemextension NE) recreates `NETunnelProviderProtocol` on prepare/Connect so residual-team (Development) → monopin designated-requirement mismatches do not leave a stale VPN profile that fails signature check. |
-| **macOS Connect fail path** | When tunnel is not Connected after HELLO, open VPN Settings guidance rather than silent disconnect-only. |
+| **First-use** | `AppEntryRoot` / `FirstRunPortal`: **Step 1 of 2** licence accept, **Step 2 of 2** KEYGEN or free trial before residual Connect. Licence missing always returns to Step 1 (KEYGEN alone does not unlock). |
+| **Settings** | In-app Settings is always openable (not gated by Connect `_busy`). Open path uses `resolveSettingsStoreForOpen` + root navigator; surfaces `Settings could not open` on failure (never silent no-op). |
+| **macOS NE protocol** | Free monopin (Developer ID + systemextension NE) always assigns a **fresh** `NETunnelProviderProtocol()` on prepare/Connect (preserves providerConfiguration keys only) so residual-team (Development) → monopin designated-requirement mismatches do not leave a stale VPN profile that fails signature check. |
+| **macOS Connect fail path** | Prepare-before-connect on Apple (`preparePacketTunnelSequenced`); when tunnel is not Connected after HELLO, actionable VPN System Settings guidance rather than silent disconnect-only. |
 | **Android** | Optional **Auto connect if idle** (`auto_connect_if_idle`) with service reconnect backoff. |
-
