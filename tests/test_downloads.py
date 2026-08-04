@@ -208,9 +208,10 @@ class TestDownloadCatalog(unittest.TestCase):
         frag = payment_connect_disclaimer_html()
         self.assertIn('id="dl-payment-disclaimer"', frag)
         self.assertIn("STRONG DISCLAIMER", frag)
-        self.assertIn("subscription cancellation", frag.lower())
-        self.assertIn("subscription period", frag.lower())
-        self.assertIn("Connect with the Restore Privacy app is cancelled", frag)
+        # Product copy: trial then paid KEYGEN/sub; Connect cancelled if sub ends
+        self.assertIn("subscription ends", frag.lower())
+        self.assertIn("connect is cancelled", frag.lower())
+        self.assertIn("paid KEYGEN or active subscription", frag)
 
         html = render_download_section_html()
         # Homepage redesign: no strong-disclaimer banner in shop section

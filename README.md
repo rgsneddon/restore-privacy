@@ -13,6 +13,8 @@ Once connected, residual captures device traffic on a full-tunnel path where the
 
 ### Settings (defaults lean)
 
+Traffic shaping, outer obfuscation, multi-hop extras, and kill switch are **off by default** (opt-in). Residual Connect does not arm them on first launch.
+
 | Control | Default | Role |
 |---------|---------|------|
 | Run at device startup | Off | Open the app at sign-in (does not alone start VPN) |
@@ -32,7 +34,7 @@ Once connected, residual captures device traffic on a full-tunnel path where the
 | Windows | `restore-privacy-client-1.2.0-windows-x64-setup.exe` (native PE from Windows host) |
 | Android | `restore-privacy-client-1.2.0-android.apk` |
 | macOS | `restore-privacy-client-1.2.0-macos.zip` — Notarized Developer ID + residual Packet Tunnel **host NE** |
-| iOS | `restore-privacy-client-1.2.0-ios.zip` — distribution / sideload |
+| iOS | `restore-privacy-client-1.2.0-ios.zip` — Apple Distribution **Team-signed** Runner.app (sideload) |
 | Linux | `restore-privacy-client-1.2.0-linux-x64.tar.gz` |
 
 ## Operator build
@@ -46,6 +48,7 @@ Once connected, residual captures device traffic on a full-tunnel path where the
 ## Licence & support
 
 Proprietary full copyright — see `LICENSE` and the in-app EULA scroll.  
+Operator source is **private**; installers ship from the public storefront only.  
 Contact: rus@restoreprivacy.online
 
 | Doc | |
