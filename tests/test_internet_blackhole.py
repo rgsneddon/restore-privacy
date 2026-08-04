@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import socket
 import sys
 import unittest
@@ -23,6 +24,7 @@ from client.full_tunnel import (  # noqa: E402
 )
 from client.windows.tunnel_win import (  # noqa: E402
     apply_routes_for_adapter,
+    may_install_dual_slash1_catchalls,
     start_full_tunnel,
 )
 from client.connect import complete_server_hello, build_authorized_client_hello  # noqa: E402
@@ -42,6 +44,17 @@ from node.routing import (  # noqa: E402
 
 
 class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
+    def setUp(self) -> None:
+        # HELLO admission must not inherit shell RPT_REQUIRE_PAYMENT_ENTITLEMENT
+        # from other test suites / operator env.
+        self._saved_req = os.environ.pop("RPT_REQUIRE_PAYMENT_ENTITLEMENT", None)
+
+    def tearDown(self) -> None:
+        if self._saved_req is not None:
+            os.environ["RPT_REQUIRE_PAYMENT_ENTITLEMENT"] = self._saved_req
+        else:
+            os.environ.pop("RPT_REQUIRE_PAYMENT_ENTITLEMENT", None)
+
     def test_route_plan_pins_server_before_catchall_and_uses_if_index(self):
         plan = build_full_tunnel_plan("10.88.0.5", tunnel_iface="RPT")
         server = "82.221.101.241"
@@ -78,6 +91,49 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
                 system_capture=True, apply_default_routes=True
             )
         )
+
+    def test_may_install_dual_slash1_requires_live_dataplane(self):
+        """Dual /1 must not install when dataplane is not running (blackhole)."""
+        self.assertFalse(
+            may_install_dual_slash1_catchalls(
+                dataplane_running=False,
+                system_capture=True,
+                if_index=12,
+                want_ipv4_catchall=True,
+            )
+        )
+        self.assertTrue(
+            may_install_dual_slash1_catchalls(
+                dataplane_running=True,
+                system_capture=True,
+                if_index=12,
+                want_ipv4_catchall=True,
+            )
+        )
+        self.assertFalse(
+            may_install_dual_slash1_catchalls(
+                dataplane_running=True,
+                system_capture=True,
+                if_index=None,
+                want_ipv4_catchall=True,
+            )
+        )
+
+    def test_start_full_tunnel_source_is_dataplane_first(self):
+        src = (
+            ROOT / "client" / "windows" / "tunnel_win.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("CRITICAL ORDER", src)
+        self.assertIn("may_install_dual_slash1_catchalls", src)
+        # Call sites inside start_full_tunnel body: plane.start then allow gate
+        # (function *def* of may_install appears earlier in the module).
+        i_start_fn = src.find("def start_full_tunnel")
+        self.assertGreater(i_start_fn, 0)
+        body = src[i_start_fn:]
+        i_plane = body.find("plane.start(")
+        i_allow = body.find("may_install_dual_slash1_catchalls(")
+        self.assertGreater(i_plane, 0)
+        self.assertGreater(i_allow, i_plane)
 
     def test_queue_tun_does_not_claim_full_tunnel_routes(self):
         """force_queue path must not install dual /1 (would blackhole)."""
@@ -150,13 +206,16 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
         catch_b = "route add 128.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17 metric 5"
         ran: list[str] = []
 
-        def fake_run(cmd, shell=True, capture_output=True, text=True):
+        def fake_shell(cmd, timeout=30.0, text=True):
             ran.append(cmd)
             # pin fails; catchalls must never be attempted
             if "mask 255.255.255.255" in cmd and "route add" in cmd:
-                return mock.Mock(returncode=1, stderr="pin failed: network unreachable", stdout="")
+                return mock.Mock(
+                    returncode=1,
+                    stderr="pin failed: network unreachable",
+                    stdout="",
+                )
             if "mask 128.0.0.0" in cmd:
-                # Should not be reached — fail test if it is
                 return mock.Mock(returncode=0, stderr="", stdout="")
             return mock.Mock(returncode=0, stderr="", stdout="")
 
@@ -164,8 +223,8 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
             "client.windows.tunnel_win.physical_default_gateway",
             return_value="192.168.1.1",
         ), mock.patch(
-            "client.windows.tunnel_win.subprocess.run",
-            side_effect=fake_run,
+            "client.windows.tunnel_win.residual_shell_run",
+            side_effect=fake_shell,
         ), mock.patch(
             "client.windows.tunnel_win.rollback_full_tunnel_routes",
             return_value=[],

@@ -396,26 +396,65 @@ def read_running_version(version_file: Path | None = None) -> str:
 
 # Process-lifetime cache for remote monopin (avoids hammering status host).
 _REMOTE_CATALOG_VERSION_CACHE: str | None = None
+_REMOTE_CATALOG_INFO_CACHE: dict | None = None
 _REMOTE_CATALOG_FETCHED: bool = False
 
 PUBLIC_STATUS_BASE_URL = "https://restoreprivacy.online"
 CATALOG_VERSION_API_PATH = "/api/catalog-version"
 
 
-def fetch_remote_catalog_version(
+def client_platform_key() -> str:
+    """Platform key for catalog readiness (windows / macos / linux / …)."""
+    import sys
+
+    env = (os.environ.get("RPT_CLIENT_PLATFORM") or "").strip().lower()
+    if env:
+        return env
+    if sys.platform == "win32":
+        return "windows"
+    if sys.platform == "darwin":
+        return "macos"
+    return "linux"
+
+
+def remote_catalog_platform_ready(
+    info: dict | None,
+    *,
+    platform: str | None = None,
+) -> bool | None:
+    """Whether remote catalog payload marks *platform* package as deployed.
+
+    Returns:
+      True  — host explicitly says this platform package is ready
+      False — host explicitly says not ready (or platforms_ready omits it as false)
+      None  — payload has no readiness signal (legacy API)
+    """
+    if not isinstance(info, dict):
+        return None
+    plat = (platform or client_platform_key()).strip().lower()
+    # Explicit single-key shortcuts
+    for key in (f"{plat}_ready", "windows_ready" if plat == "windows" else ""):
+        if key and key in info:
+            return bool(info.get(key))
+    ready_map = info.get("platforms_ready") or info.get("platform_ready")
+    if isinstance(ready_map, dict):
+        if plat in ready_map:
+            return bool(ready_map.get(plat))
+        # map present but platform missing → not ready for this client
+        return False
+    return None
+
+
+def fetch_remote_catalog_info(
     *,
     base_url: str | None = None,
     timeout: float = 2.0,
     force: bool = False,
-) -> str | None:
-    """GET public ``/api/catalog-version`` for live monopin (fail-soft).
-
-    Lets older frozen builds learn about a newer catalog pin without shipping
-    a new ``status_page.downloads`` module. Returns None on any network/parse error.
-    """
-    global _REMOTE_CATALOG_VERSION_CACHE, _REMOTE_CATALOG_FETCHED
+) -> dict | None:
+    """GET public ``/api/catalog-version`` JSON (fail-soft)."""
+    global _REMOTE_CATALOG_VERSION_CACHE, _REMOTE_CATALOG_INFO_CACHE, _REMOTE_CATALOG_FETCHED
     if _REMOTE_CATALOG_FETCHED and not force:
-        return _REMOTE_CATALOG_VERSION_CACHE
+        return _REMOTE_CATALOG_INFO_CACHE
     base = (base_url or PUBLIC_STATUS_BASE_URL).rstrip("/")
     url = f"{base}{CATALOG_VERSION_API_PATH}"
     try:
@@ -430,41 +469,117 @@ def fetch_remote_catalog_version(
         with urllib.request.urlopen(req, timeout=float(timeout)) as resp:  # noqa: S310
             raw = resp.read().decode("utf-8", errors="replace")
         data = json.loads(raw)
+        if not isinstance(data, dict):
+            data = {}
         ver = str((data or {}).get("catalog_version") or "").strip().lstrip("vV")
         if ver and ver[0].isdigit():
             _REMOTE_CATALOG_VERSION_CACHE = ver
-            _REMOTE_CATALOG_FETCHED = True
-            return ver
+        _REMOTE_CATALOG_INFO_CACHE = data
+        _REMOTE_CATALOG_FETCHED = True
+        return data
     except Exception:  # noqa: BLE001
         pass
     _REMOTE_CATALOG_FETCHED = True
+    return _REMOTE_CATALOG_INFO_CACHE
+
+
+def fetch_remote_catalog_version(
+    *,
+    base_url: str | None = None,
+    timeout: float = 2.0,
+    force: bool = False,
+) -> str | None:
+    """GET public catalog monopin string only (fail-soft)."""
+    info = fetch_remote_catalog_info(
+        base_url=base_url, timeout=timeout, force=force
+    )
+    if not info:
+        return _REMOTE_CATALOG_VERSION_CACHE
+    ver = str((info or {}).get("catalog_version") or "").strip().lstrip("vV")
+    if ver and ver[0].isdigit():
+        return ver
     return _REMOTE_CATALOG_VERSION_CACHE
 
 
-def catalog_latest_version(*, prefer_remote: bool = True) -> str:
-    """Latest published product monopin (remote status host, then local catalog)."""
-    if prefer_remote:
-        remote = fetch_remote_catalog_version()
-        if remote:
-            return remote
+def local_catalog_version() -> str:
+    """Monorepo / frozen local catalog pin (never invents a future monopin)."""
     try:
         from status_page.downloads import RELEASE_VERSION
 
-        return str(RELEASE_VERSION).strip()
+        v = str(RELEASE_VERSION).strip().lstrip("vV")
+        if v:
+            return v
     except Exception:
-        # Frozen clients may lack status_page — treat package version as catalog
-        return embedded_package_version()
+        pass
+    return embedded_package_version()
 
 
-def upgrade_available(running: str | None = None, latest: str | None = None) -> bool:
+def catalog_latest_version(
+    *,
+    prefer_remote: bool = True,
+    platform: str | None = None,
+) -> str:
+    """Latest **honest** product monopin for upgrade UX.
+
+    Remote pin is used only when it is not ahead of the running package **or**
+    the host explicitly marks this client platform package as deployed
+    (``platforms_ready`` / ``windows_ready``). Phantom Mac-only bumps
+    (e.g. remote 1.1.10 without Windows PE) must not surface as “latest”.
+    """
+    emb = embedded_package_version()
+    local = local_catalog_version() or emb
+    plat = platform or client_platform_key()
+    if prefer_remote:
+        info = fetch_remote_catalog_info()
+        remote = None
+        if info:
+            remote = str((info or {}).get("catalog_version") or "").strip().lstrip(
+                "vV"
+            )
+        if remote and remote[0].isdigit():
+            # Remote not newer than what we already ship → fine to report
+            if not version_is_behind(emb, remote) and not version_is_behind(
+                local, remote
+            ):
+                return remote
+            # Remote is ahead — only trust if this platform package is ready
+            ready = remote_catalog_platform_ready(info, platform=plat)
+            if ready is True:
+                return remote
+            # ready False or None (legacy API without readiness) → do not
+            # recommend undeployed / phantom monopin; stay on local pin
+            return local or emb
+    return local or emb
+
+
+def upgrade_available(
+    running: str | None = None,
+    latest: str | None = None,
+    *,
+    platform: str | None = None,
+) -> bool:
+    """True only when latest is honestly ahead of running for this platform."""
     run = running if running is not None else read_running_version()
-    lat = latest if latest is not None else catalog_latest_version()
+    lat = (
+        latest
+        if latest is not None
+        else catalog_latest_version(platform=platform)
+    )
     # Unknown/placeholder must not force a false "update available"
     if not run or run in ("0.0.0", "0", "unknown"):
         run = embedded_package_version()
     if not lat or lat in ("0.0.0", "0", "unknown"):
         lat = embedded_package_version()
-    return version_is_behind(run, lat)
+    if not version_is_behind(run, lat):
+        return False
+    # Belt: if latest came from remote and platform not ready, refuse
+    if latest is None:
+        info = _REMOTE_CATALOG_INFO_CACHE
+        ready = remote_catalog_platform_ready(info, platform=platform)
+        if ready is False:
+            return False
+        # Legacy API (ready is None) already filtered in catalog_latest_version
+    return True
 
 
 def _public_status_base_url() -> str:
@@ -656,6 +771,8 @@ def upgrade_banner_text(running: str | None = None, latest: str | None = None) -
     """Human message when upgrade is available; None if current.
 
     Wording includes **New version available** so all shells share a clear prompt.
+    Uses platform-honest :func:`catalog_latest_version` so phantom monopin
+    bumps without a Windows PE never appear.
     """
     run = running if running is not None else read_running_version()
     lat = latest if latest is not None else catalog_latest_version()
@@ -663,7 +780,7 @@ def upgrade_banner_text(running: str | None = None, latest: str | None = None) -
         run = embedded_package_version()
     if not lat or lat in ("0.0.0", "0", "unknown"):
         lat = embedded_package_version()
-    if not version_is_behind(run, lat):
+    if not upgrade_available(running=run, latest=lat):
         return None
     return f"New version available: you have v{run}, latest is v{lat}"
 

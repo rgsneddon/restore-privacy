@@ -194,7 +194,7 @@ if not "%~1"=="" if /I not "%~1"=="/quiet" set "NODE=%~1"
 net session >nul 2>&1
 if errorlevel 1 (
   echo Requesting Administrator for Restore Internet (network + uninstall)...
-  powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -ArgumentList '/quiet' -Verb RunAs -Wait"
+  powershell -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -ArgumentList '/quiet' -Verb RunAs -Wait"
   exit /b %ERRORLEVEL%
 )
 
@@ -212,7 +212,7 @@ route delete 128.0.0.0 mask 128.0.0.0 0.0.0.0 >nul 2>&1
 route delete %NODE% mask 255.255.255.255 >nul 2>&1
 
 echo [2/4] Clearing RPT kill-switch / profile Block and re-enabling IPv6...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+powershell -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command ^
   "$ErrorActionPreference='Continue';" ^
   "Get-NetFirewallRule -EA SilentlyContinue | Where-Object { $_.DisplayName -like 'RPT-KS-*' -or $_.DisplayName -like 'RPT-FW-*' } | Remove-NetFirewallRule -EA SilentlyContinue;" ^
   "$sp=Join-Path $env:ProgramData 'RestorePrivacy\ks-outbound-state.json';" ^
@@ -260,7 +260,7 @@ if exist "%INSTALL%" (
 
 if exist "%~dp0RestorePrivacy.exe" (
   echo Portable package detected — scheduling full tree removal...
-  start "" /min powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 2; if (Test-Path -LiteralPath '%PORTABLE%') { Remove-Item -LiteralPath '%PORTABLE%' -Recurse -Force -ErrorAction SilentlyContinue }"
+  start "" /min powershell -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 2; if (Test-Path -LiteralPath '%PORTABLE%') { Remove-Item -LiteralPath '%PORTABLE%' -Recurse -Force -ErrorAction SilentlyContinue }"
 )
 
 if exist "%~dp0RestorePrivacy.exe" del /f /q "%~dp0RestorePrivacy.exe" 2>nul
@@ -425,7 +425,10 @@ def _copy_tree(src: Path, dst: Path) -> None:
                 "/XD",
                 "__pycache__",
             ]
-            # DEVNULL avoids rare communicate() edge cases under test/CI pipes
+            # DEVNULL + CREATE_NO_WINDOW: no console flash on install robocopy
+            _cf = 0
+            if sys.platform == "win32":
+                _cf = 0x08000000  # CREATE_NO_WINDOW
             r = subprocess.run(
                 cmd,
                 check=False,
@@ -433,6 +436,7 @@ def _copy_tree(src: Path, dst: Path) -> None:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=300,
+                creationflags=_cf,
             )
             # robocopy: 0-7 = success with optional extras; ≥8 = failure
             if r.returncode < 8 and dst.is_dir() and any(dst.iterdir()):
@@ -698,12 +702,31 @@ def _create_shortcuts_batch(
                 f"[System.IO.File]::WriteAllBytes($p, $b) }}"
             )
     ps = "; ".join(parts)
+    # Hidden PowerShell host — no console flash while creating .lnk shortcuts
+    _cf = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
+    _si = None
+    if sys.platform == "win32":
+        _si = subprocess.STARTUPINFO()
+        _si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        _si.wShowWindow = 0  # SW_HIDE
     subprocess.run(
-        ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+        [
+            "powershell",
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
+            "-Command",
+            ps,
+        ],
         check=False,
         capture_output=True,
         text=True,
         timeout=45,
+        stdin=subprocess.DEVNULL,
+        creationflags=_cf,
+        startupinfo=_si,
     )
 
 
@@ -1038,6 +1061,7 @@ def install(
         if sys.platform == "win32":
             creation = getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
             creation |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+            creation |= 0x08000000  # CREATE_NO_WINDOW
         try:
             subprocess.Popen(
                 [str(installed_exe)],

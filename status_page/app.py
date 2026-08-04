@@ -1455,20 +1455,46 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path in ("/api/catalog-version", "/catalog-version"):
             # Public monopin for in-app "new version available" (not a client count).
+            # platforms_ready: only claim a platform is deployable when the
+            # catalog filename is present under status_page/assets/{ver}/.
+            # Clients must not recommend a pin without that platform package.
             try:
-                from downloads import current_catalog_version
+                from downloads import (
+                    current_catalog_version,
+                    list_catalog_platform_packages,
+                )
             except ImportError:  # pragma: no cover
-                from status_page.downloads import current_catalog_version  # type: ignore
+                from status_page.downloads import (  # type: ignore
+                    current_catalog_version,
+                    list_catalog_platform_packages,
+                )
             try:
                 from payments import DEFAULT_PRODUCTION_PUBLIC_BASE_URL
             except ImportError:  # pragma: no cover
                 DEFAULT_PRODUCTION_PUBLIC_BASE_URL = "https://restoreprivacy.online"
             ver = current_catalog_version()
+            platforms_ready: dict[str, bool] = {}
+            try:
+                from pathlib import Path as _Path
+
+                assets_dir = _Path(__file__).resolve().parent / "assets" / str(ver)
+                for row in list_catalog_platform_packages():
+                    plat = str(row.get("platform") or "").strip().lower()
+                    fname = str(row.get("filename") or "").strip()
+                    if not plat:
+                        continue
+                    platforms_ready[plat] = bool(
+                        fname and (assets_dir / fname).is_file()
+                    )
+            except Exception:
+                platforms_ready = {}
             payload = {
                 "catalog_version": ver,
                 "downloads_url": f"{DEFAULT_PRODUCTION_PUBLIC_BASE_URL.rstrip('/')}/#downloads",
                 # Platform-matched upgrade entry (not /pay) — clients mint with keygen.
                 "upgrade_download_path": "/upgrade-download",
+                "platforms_ready": platforms_ready,
+                "windows_ready": bool(platforms_ready.get("windows")),
             }
             self._send(
                 200,

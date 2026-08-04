@@ -147,24 +147,37 @@ def clear_licence_acceptance(path: Optional[Path] = None) -> None:
 
 
 def may_connect(path: Optional[Path] = None, *, refresh_payment: bool = False) -> bool:
-    """Product Connect gate: licence accepted **and** payment entitlement allows.
+    """Product Connect gate: licence + (paid KEYGEN **or** free trial window).
 
-    Payment failure / revoked entitlement always blocks Connect (see
-    :mod:`client.payment_entitlement`). UI badges use local cache only
-    (``refresh_payment=False``). The Connect entry path uses
-    :func:`assert_may_connect`, which refreshes remote entitlement.
+    Payment **failed / revoked / unpaid** always blocks Connect — free trial
+    does **not** override a blocking entitlement status. Free trial only
+    covers “no KEYGEN yet” (unknown/empty/session-only), with the 72h clock
+    from first successful residual Connect (see :mod:`client.device_trial`).
     """
     if not has_accepted_licence(path):
         return False
+    from client.device_trial import trial_allows_residual_connect
     from client.payment_entitlement import (
         assert_payment_may_connect,
+        is_payment_blocking_status,
+        load_payment_entitlement,
         payment_allows_connect,
     )
 
     if refresh_payment:
         ok, _ = assert_payment_may_connect(refresh=True)
-        return ok
-    return payment_allows_connect()
+        if ok:
+            return True
+        ent = load_payment_entitlement()
+        if is_payment_blocking_status(ent.status):
+            return False
+        return trial_allows_residual_connect()
+    if payment_allows_connect():
+        return True
+    ent = load_payment_entitlement()
+    if is_payment_blocking_status(ent.status):
+        return False
+    return trial_allows_residual_connect()
 
 
 def assert_may_connect(
@@ -177,16 +190,30 @@ def assert_may_connect(
     Payment entitlement: remote refresh when needed for cold path / near
     expiry (see :func:`client.payment_entitlement.connect_status_host_refresh_needed`).
     Pass ``refresh=True`` to force status-host re-check (e.g. Settings verify).
+
+    Free trial (72h from first successful residual Connect) allows Connect
+    without KEYGEN **only when payment is not failed/revoked/unpaid**.
     """
     if not has_accepted_licence(path):
         return False, CONNECT_BLOCKED_LICENCE_MSG
-    from client.payment_entitlement import assert_payment_may_connect
+    from client.device_trial import trial_allows_residual_connect
+    from client.payment_entitlement import (
+        assert_payment_may_connect,
+        is_payment_blocking_status,
+        load_payment_entitlement,
+    )
 
     # Payment store is always the product entitlement path (not licence path).
     ok_pay, pay_msg = assert_payment_may_connect(refresh=refresh)
-    if not ok_pay:
+    if ok_pay:
+        return True, ""
+    # Revoked / failed / unpaid: never fall through to free trial
+    ent = load_payment_entitlement()
+    if is_payment_blocking_status(ent.status):
         return False, pay_msg
-    return True, ""
+    if trial_allows_residual_connect():
+        return True, ""
+    return False, pay_msg
 
 
 def needs_licence_renewal(path: Optional[Path] = None) -> bool:
@@ -220,39 +247,44 @@ def needs_licence_renewal(path: Optional[Path] = None) -> bool:
 
 
 def needs_keygen_unlock(path: Optional[Path] = None) -> bool:
-    """True when licence is accepted but a keygen entry is still required.
+    """True when KEYGEN is **mandatory** (trial expired / no free residual left).
 
-    Used by Windows (and other) UI to force a keygen entry surface before
-    residual Connect — not Settings-only.
+    Used by Windows UI to refuse dismissing step 2 without a KEYGEN and to
+    block residual Connect after trial end.
 
-    Local-only (no network): true when licence is accepted,
-    subscription is **not** EXPIRED (see :func:`needs_licence_renewal`), and
-    :func:`client.payment_entitlement.payment_allows_connect` is false —
-    including active session/thank-you file **without** a ``RPT-KEY-…``
-    keygen unlock on file.
+    Local-only (no network):
+    - False when licence not accepted (licence surface first)
+    - False when payment is blocking (renew surface — see
+      :func:`needs_licence_renewal`)
+    - False when durable ``RPT-KEY-…`` unlock is on file
+    - False while free trial is not_started or active (Continue trial OK)
+    - True only when free trial is **expired** and no KEYGEN unlock
 
-    Returns **False** when payment is blocking (failed/revoked/unpaid) so the
-    UI shows the renew-licence surface instead of the keygen modal.
+    Step 2 may still be *shown* while trial is available (time-left + optional
+    KEYGEN) — that is :func:`client.first_run_flow.needs_step2_trial_keygen_surface`,
+    not this helper.
 
     **Upgrade rollover:** package version / ``client/VERSION`` is never read
     here. Durable ``licence_acceptance.json`` + ``payment_entitlement.json``
     under the product data dir survive install-over-install; an active keygen
     on file continues to unlock without re-accept or re-paste after upgrade.
 
-    ``path`` is the **licence** acceptance path only (same as
-    :func:`has_accepted_licence`). Payment entitlement is always read from the
-    product entitlement path — do not pass the licence file into
-    :func:`~client.payment_entitlement.payment_allows_connect`.
+    ``path`` is the **licence** acceptance path only.
     """
     if not has_accepted_licence(path):
         return False
     if needs_licence_renewal(path):
         return False
-    from client.payment_entitlement import payment_allows_connect
+    from client.payment_entitlement import has_keygen_unlock, payment_allows_connect
 
-    # Durable product-data entitlement path (not install tree) — version bump
-    # does not clear keygen; payment_allows_connect reads that store only.
-    return not payment_allows_connect()
+    if payment_allows_connect() or has_keygen_unlock():
+        return False
+    from client.device_trial import trial_allows_residual_connect
+
+    # Free trial still open → KEYGEN not mandatory
+    if trial_allows_residual_connect():
+        return False
+    return True
 
 
 def licence_url() -> str:

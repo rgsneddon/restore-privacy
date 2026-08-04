@@ -1178,57 +1178,36 @@ class TunnelClientApp:
         ).pack(side=tk.LEFT, padx=(8, 0))
 
     def _present_post_keygen_surface(self, next_s: str) -> None:
-        """After valid keygen: open next first-run surface and keep it in front.
+        """After valid keygen: open main Connect (or renew) — not blocking Settings.
 
         Does **not** restart the process. Closes only the keygen modal; main
-        shell stays alive. Raises Settings/renew/main so the transition is not
-        buried under other apps.
+        shell stays alive and is raised to the front.
         """
-        surface = (next_s or "").strip().lower() or "settings"
+        surface = (next_s or "").strip().lower() or "main"
         try:
             self._bring_shell_forward(force_visible=True)
         except Exception:
             pass
-        if surface == "settings":
-            try:
-                self._open_settings(first_run=True)
-            except Exception as exc:  # noqa: BLE001
-                self._log(f"Post-keygen Settings open failed: {exc}")
-            # Settings open may create a new Toplevel — force it forward again
-            # (immediate + one idle tick for grab/map settle).
-            def _raise_settings() -> None:
-                try:
-                    sw = getattr(self, "_settings_win", None)
-                    if sw is not None and sw.winfo_exists():
-                        self._bring_window_forward(sw, force_visible=True)
-                except Exception:
-                    pass
-
-            _raise_settings()
-            try:
-                self.root.after(50, _raise_settings)
-            except Exception:
-                pass
-            return
         if surface == "renew":
             try:
                 self._show_renew_licence_prompt()
             except Exception as exc:  # noqa: BLE001
                 self._log(f"Post-keygen renew open failed: {exc}")
             return
-        # main (or unknown): keep main Connect shell visible in front
+        # settings/main/unknown: lean path → main Connect shell
         try:
             self._bring_shell_forward(force_visible=True)
         except Exception:
             pass
 
     def _show_keygen_prompt(self) -> None:
-        """Forced modal: enter fulfilment keygen to unlock install (not Settings-only).
+        """Step 2: free 72h trial (Continue trial) + KEYGEN entry + buy link.
 
-        Demands a valid RPT-KEY-… before the window can be dismissed. After a
-        successful unlock, presents first-run Settings (OK binds → main Connect).
+        While trial is not expired, user may Continue trial into main Connect
+        without KEYGEN. After trial expiry, KEYGEN is mandatory (dismiss refused).
+        Successful KEYGEN opens main Connect (not blocking first-run Settings).
         """
-        # EXPIRED installs must renew — never show keygen in place of renew.
+        # EXPIRED paid installs must renew — never show keygen in place of renew.
         if needs_licence_renewal():
             self._show_renew_licence_prompt()
             return
@@ -1245,9 +1224,15 @@ class TunnelClientApp:
         except Exception:
             pass
 
+        from client.device_trial import (
+            trial_allows_residual_connect,
+            trial_status_blurb,
+        )
+        from client.payment_entitlement import renew_licence_url
+
         win = tk.Toplevel(self.root)
         self._keygen_prompt_win = win
-        win.title("Enter licence keygen")
+        win.title("Free trial & KEYGEN")
         win.configure(bg=CHROME_BG)
         apply_centered_window(win, surface="keygen")
         win.transient(self.root)
@@ -1260,26 +1245,46 @@ class TunnelClientApp:
         except Exception:
             pass
 
+        trial_ok = trial_allows_residual_connect()
+        trial_blurb = trial_status_blurb()
         status_var = tk.StringVar(
-            value="Keygen is required to unlock this install before Settings and Connect."
+            value=(
+                "Continue your free trial, or paste a KEYGEN from /pay."
+                if trial_ok
+                else "Trial ended — enter a KEYGEN to unlock Connect and Settings."
+            )
         )
+        trial_time_var = tk.StringVar(value=trial_blurb)
+
+        def _close_modal() -> None:
+            try:
+                try:
+                    win.grab_release()
+                except Exception:
+                    pass
+                win.destroy()
+            except Exception:
+                pass
+            self._keygen_prompt_win = None
 
         def _on_demand_close() -> None:
-            # Demand keygen: refuse dismiss while unlock still required.
+            # Refuse dismiss only when KEYGEN is mandatory (trial expired).
             if needs_keygen_unlock():
                 status_var.set(
-                    "Enter the keygen from your fulfilment email to unlock this install."
+                    "Trial ended. Enter a KEYGEN from your fulfilment email, "
+                    "or open Buy KEYGEN."
                 )
                 try:
                     self._bring_window_forward(win, force_visible=True)
                 except Exception:
                     pass
                 return
+            # Trial still available: dismiss returns to main shell
+            _close_modal()
             try:
-                win.destroy()
+                self._bring_shell_forward(force_visible=True)
             except Exception:
                 pass
-            self._keygen_prompt_win = None
 
         win.protocol("WM_DELETE_WINDOW", _on_demand_close)
 
@@ -1289,19 +1294,29 @@ class TunnelClientApp:
         card_outer.pack(fill=tk.BOTH, expand=True)
         tk.Label(
             pad,
-            text="Enter licence keygen",
+            text="Free trial & KEYGEN",
             bg=PANEL_BG,
             fg=PRIMARY_DARK,
             font=("Segoe UI", 14, "bold"),
             anchor="w",
+        ).pack(fill=tk.X, pady=(0, 6))
+        tk.Label(
+            pad,
+            textvariable=trial_time_var,
+            bg=PANEL_BG,
+            fg=PRIMARY,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+            wraplength=500,
+            justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 8))
         tk.Label(
             pad,
             text=(
-                "Your fulfilment email includes a keygen with the text "
-                "USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY "
-                "(format RPT-KEY-…). Paste it below to unlock this installation. "
-                "Download alone does not unlock residual VPN."
+                "Residual Connect includes a free 3-day (72-hour) trial on this device. "
+                "The timer starts on your first successful Connect to a VPN node. "
+                "Or unlock permanently with a KEYGEN from your fulfilment email "
+                "(USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY — format RPT-KEY-…)."
             ),
             bg=PANEL_BG,
             fg=TEXT,
@@ -1310,16 +1325,6 @@ class TunnelClientApp:
             wraplength=500,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 8))
-        tk.Label(
-            pad,
-            text=CONNECT_BLOCKED_KEYGEN_MSG,
-            bg=PANEL_BG,
-            fg=TEXT_MUTED,
-            font=("Segoe UI", 8),
-            anchor="w",
-            wraplength=500,
-            justify=tk.LEFT,
-        ).pack(fill=tk.X, pady=(0, 10))
         key_var = tk.StringVar()
         entry = tk.Entry(
             pad,
@@ -1350,6 +1355,32 @@ class TunnelClientApp:
         ).pack(fill=tk.X, pady=(0, 8))
         btn_row = tk.Frame(pad, bg=PANEL_BG)
         btn_row.pack(fill=tk.X, pady=(8, 0))
+
+        def _continue_trial() -> None:
+            if not trial_allows_residual_connect():
+                status_var.set(
+                    "Trial ended. Enter a KEYGEN or open Buy KEYGEN to continue."
+                )
+                return
+            _close_modal()
+            self.detail_var.set(
+                "Free trial — press Connect. Timer starts on first successful Connect."
+            )
+            try:
+                self._bring_shell_forward(force_visible=True)
+            except Exception:
+                pass
+            self._log("Continue trial — main Connect ready (clock starts on Connect).")
+
+        def _buy_keygen() -> None:
+            try:
+                import webbrowser
+
+                url = renew_licence_url("windows")
+                webbrowser.open(url)
+                status_var.set("Opened buy page — paste your KEYGEN here when ready.")
+            except Exception as exc:  # noqa: BLE001
+                status_var.set(f"Could not open buy page: {exc}")
 
         def _unlock() -> None:
             raw = (key_var.get() or "").strip()
@@ -1382,21 +1413,9 @@ class TunnelClientApp:
                     self._refresh_licence_badge()
                     if ok:
                         self.detail_var.set(
-                            "Keygen verified. Review Settings, then OK to open Connect."
+                            "Keygen verified — ready. Press Connect for residual protection."
                         )
-                        # Close keygen modal, then open next surface *immediately*
-                        # with a real raise. A delayed after(200) left a gap where
-                        # the modal vanished and Settings/main opened buried —
-                        # users read that as “app closed and restarted behind”.
-                        try:
-                            try:
-                                win.grab_release()
-                            except Exception:
-                                pass
-                            win.destroy()
-                        except Exception:
-                            pass
-                        self._keygen_prompt_win = None
+                        _close_modal()
                         try:
                             self._bring_shell_forward(force_visible=True)
                         except Exception:
@@ -1418,24 +1437,40 @@ class TunnelClientApp:
 
             threading.Thread(target=work, daemon=True).start()
 
+        if trial_ok:
+            cont_btn = tk.Button(
+                btn_row,
+                text="Continue trial",
+                command=_continue_trial,
+                bg=PRIMARY,
+                fg=WHITE,
+                relief=tk.FLAT,
+                font=("Segoe UI", 9, "bold"),
+                padx=12,
+                pady=6,
+                cursor="hand2",
+            )
+            style_primary_button(cont_btn)
+            cont_btn.pack(side=tk.LEFT)
         unlock_btn = tk.Button(
             btn_row,
-            text="Unlock installation",
+            text="Unlock with KEYGEN",
             command=_unlock,
-            bg=PRIMARY,
-            fg=WHITE,
+            bg=PRIMARY if not trial_ok else PANEL_BG,
+            fg=WHITE if not trial_ok else TEXT,
             relief=tk.FLAT,
             font=("Segoe UI", 9, "bold"),
             padx=12,
             pady=6,
             cursor="hand2",
         )
-        style_primary_button(unlock_btn)
-        unlock_btn.pack(side=tk.LEFT)
+        if not trial_ok:
+            style_primary_button(unlock_btn)
+        unlock_btn.pack(side=tk.LEFT, padx=(8 if trial_ok else 0, 0))
         tk.Button(
             btn_row,
-            text="Cancel",
-            command=_on_demand_close,
+            text="Buy KEYGEN",
+            command=_buy_keygen,
             bg=PANEL_BG,
             fg=TEXT,
             relief=tk.FLAT,
@@ -2087,6 +2122,15 @@ class TunnelClientApp:
                         self._user_requested_disconnect = False
                         self._idle_reconnect_attempts = 0
                         self._idle_reconnect_inflight = False
+                        # 72h free trial clock starts on first successful Connect
+                        try:
+                            from client.device_trial import (
+                                mark_first_successful_connect,
+                            )
+
+                            mark_first_successful_connect()
+                        except Exception:
+                            pass
                         self._apply_control(connected=True, busy=False)
                         self._set_status(
                             "connected",
@@ -2112,6 +2156,8 @@ class TunnelClientApp:
                         self._user_requested_disconnect = False
                         self._idle_reconnect_attempts = 0
                         self._idle_reconnect_inflight = False
+                        # Session-only (residual IPv4 OFF): do **not** start
+                        # the 72h trial clock — that is residual Connect only.
                         self._apply_control(connected=True, busy=False)
                         self._set_status(
                             "connected",

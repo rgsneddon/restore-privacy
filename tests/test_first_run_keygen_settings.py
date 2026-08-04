@@ -32,8 +32,8 @@ class TestFirstRunNextSurface(unittest.TestCase):
         clear_licence_acceptance(self.lic)
         self.assertEqual(first_run_next_surface(licence_path=self.lic), "licence")
 
-    def test_licence_accepted_without_keygen_demands_keygen(self) -> None:
-        """Core product rule: unlock-absent after licence → keygen surface."""
+    def test_licence_accepted_without_keygen_shows_step2(self) -> None:
+        """After licence: step 2 (trial/KEYGEN). KEYGEN not mandatory while trial open."""
         from client.first_run_flow import (
             first_run_demands_keygen,
             first_run_next_surface,
@@ -44,50 +44,57 @@ class TestFirstRunNextSurface(unittest.TestCase):
             payment_allows_connect,
             save_payment_entitlement,
         )
+        from client.device_trial import clear_device_trial
 
         accept_licence(self.lic)
         save_payment_entitlement(PaymentEntitlement(), path=self.pay)
+        trial_path = Path(self._td.name) / "device_trial.json"
+        clear_device_trial(trial_path)
         with mock.patch(
             "client.payment_entitlement.default_entitlement_path",
             return_value=self.pay,
+        ), mock.patch(
+            "client.device_trial.default_trial_path",
+            return_value=trial_path,
         ):
             self.assertFalse(payment_allows_connect(path=self.pay, require=True))
-            self.assertTrue(needs_keygen_unlock(self.lic))
+            # Trial not expired → KEYGEN not mandatory
+            self.assertFalse(needs_keygen_unlock(self.lic))
+            # Still land on step 2 surface
             self.assertTrue(first_run_demands_keygen(licence_path=self.lic))
             self.assertEqual(
                 first_run_next_surface(licence_path=self.lic), "keygen"
             )
 
-    def test_session_only_active_still_demands_keygen(self) -> None:
+    def test_session_only_active_still_shows_step2(self) -> None:
         from client.first_run_flow import first_run_next_surface
-        from client.licence_gate import accept_licence, needs_keygen_unlock
+        from client.licence_gate import accept_licence
         from client.payment_entitlement import record_payment_success
+        from client.device_trial import clear_device_trial
 
         accept_licence(self.lic)
         record_payment_success("cs_session_only", path=self.pay, platform="windows")
+        trial_path = Path(self._td.name) / "device_trial.json"
+        clear_device_trial(trial_path)
         with mock.patch(
             "client.payment_entitlement.default_entitlement_path",
             return_value=self.pay,
+        ), mock.patch(
+            "client.device_trial.default_trial_path",
+            return_value=trial_path,
         ):
-            self.assertTrue(needs_keygen_unlock(self.lic))
             self.assertEqual(
                 first_run_next_surface(licence_path=self.lic), "keygen"
             )
 
-    def test_keygen_unlock_then_settings_then_main(self) -> None:
-        """Post-keygen: settings until OK; after mark complete → main."""
+    def test_keygen_unlock_goes_straight_to_main(self) -> None:
+        """Post-keygen: lean residual path opens main Connect (not blocking Settings)."""
         from client.first_run_flow import (
             first_run_next_surface,
-            mark_first_run_settings_completed,
             post_keygen_next_surface,
         )
         from client.licence_gate import accept_licence, needs_keygen_unlock
         from client.payment_entitlement import import_keygen_and_verify
-        from client.windows.settings_store import (
-            ProductSettings,
-            load_settings,
-            save_settings,
-        )
 
         accept_licence(self.lic)
 
@@ -110,51 +117,47 @@ class TestFirstRunNextSurface(unittest.TestCase):
                 bind_device=False,
             )
             self.assertFalse(needs_keygen_unlock(self.lic))
-            # No settings OK yet → settings surface
-            save_settings(ProductSettings(), path=self.settings)
-            self.assertEqual(
-                first_run_next_surface(
-                    licence_path=self.lic, settings_path=self.settings
-                ),
-                "settings",
-            )
-            self.assertEqual(
-                post_keygen_next_surface(
-                    licence_path=self.lic, settings_path=self.settings
-                ),
-                "settings",
-            )
-            # User presses OK — bind settings complete
-            mark_first_run_settings_completed(path=self.settings)
-            loaded = load_settings(path=self.settings)
-            self.assertTrue(loaded.first_run_settings_completed)
             self.assertEqual(
                 first_run_next_surface(
                     licence_path=self.lic, settings_path=self.settings
                 ),
                 "main",
             )
+            self.assertEqual(
+                post_keygen_next_surface(
+                    licence_path=self.lic, settings_path=self.settings
+                ),
+                "main",
+            )
 
-    def test_connect_blocked_without_keygen_message(self) -> None:
+    def test_connect_allowed_on_free_trial_without_keygen(self) -> None:
+        """Trial window allows Connect without KEYGEN (clock starts on first Connect)."""
         from client.licence_gate import accept_licence, assert_may_connect
         from client.payment_entitlement import (
-            CONNECT_BLOCKED_KEYGEN_MSG,
             PaymentEntitlement,
             save_payment_entitlement,
         )
+        from client.device_trial import clear_device_trial, default_trial_path
 
         accept_licence(self.lic)
         save_payment_entitlement(PaymentEntitlement(), path=self.pay)
+        trial_path = Path(self._td.name) / "device_trial.json"
+        clear_device_trial(trial_path)
         with mock.patch(
             "client.payment_entitlement.default_entitlement_path",
             return_value=self.pay,
         ), mock.patch(
+            "client.device_trial.default_trial_path",
+            return_value=trial_path,
+        ), mock.patch(
             "client.payment_entitlement.ensure_entitlement_for_connect",
             side_effect=lambda **kw: PaymentEntitlement(),
+        ), mock.patch(
+            "client.payment_entitlement.connect_status_host_refresh_needed",
+            return_value=False,
         ):
             ok, msg = assert_may_connect(self.lic)
-        self.assertFalse(ok)
-        self.assertEqual(msg, CONNECT_BLOCKED_KEYGEN_MSG)
+        self.assertTrue(ok, msg)
 
 
 class TestFirstRunWindowsEntryStructural(unittest.TestCase):
@@ -164,16 +167,18 @@ class TestFirstRunWindowsEntryStructural(unittest.TestCase):
         self.assertIn("_present_first_run_surface", src)
         self.assertIn("_open_settings(first_run=True)", src)
         self.assertIn("post_keygen_next_surface", src)
-        self.assertIn("Unlock installation", src)
+        self.assertIn("Unlock with KEYGEN", src)
+        self.assertIn("Continue trial", src)
         # Must not gate cold-start solely on may_connect (that skipped keygen)
         self.assertIn("_cold_start_first_run", src)
         self.assertNotIn(
             "elif not may_connect():",
             src,
         )
-        # Demand keygen — refuse dismiss while unlock required
+        # Demand KEYGEN when trial expired; continue trial when open
         self.assertIn("needs_keygen_unlock()", src)
-        self.assertIn("Enter the keygen from your fulfilment email", src)
+        self.assertIn("fulfilment email", src)
+        self.assertIn("Buy KEYGEN", src)
 
     def test_settings_ok_and_geometry(self) -> None:
         from client.first_run_flow import (
