@@ -39,6 +39,9 @@ Defaults: run at startup off, autoconnect off, traffic shaping / outer obfuscati
 
 ## Build (operators)
 
+- **One-word full ship (Grok):** type `kyrusfables` or `/kyrusfables` — build all, Apple sign/notarize, NE tunnel assurances, commit+push, Helsinki deploy, docs
+- CLI skeleton: `scripts/kyrusfables.sh` (tests + `build_suite_<pin>`; use Grok skill for git/docs narrative)
+
 - Pin: `client/VERSION` → `1.1.7`
 - Flutter client: `client_app/`
 - Five-platform stage script: `scripts/build_suite_1.1.7.py`
