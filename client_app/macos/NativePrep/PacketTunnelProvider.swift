@@ -280,14 +280,30 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
   }
 
+  /// Lean RPT2 KEEPALIVE period (seconds). Must stay under node idle prune (~60s).
+  /// Mirrors client residual_keepalive_policy.RESIDUAL_KEEPALIVE_INTERVAL_SEC.
+  static let residualKeepaliveIntervalSec: TimeInterval = 25
+
   private func startKeepalive() {
+    // Cancel any prior timer so reconnect does not stack keep-alives.
+    keepaliveTimer?.cancel()
+    keepaliveTimer = nil
+    let interval = Self.residualKeepaliveIntervalSec
     let timer = DispatchSource.makeTimerSource(queue: pathQueue)
-    timer.schedule(deadline: .now() + 30, repeating: 30)
+    // First fire soon after tunnel up, then lean multi-second period (not cover).
+    timer.schedule(
+      deadline: .now() + interval,
+      repeating: interval,
+      leeway: .seconds(2)
+    )
     timer.setEventHandler { [weak self] in
-      guard let self, let engine = self.engine else { return }
+      // Keep refreshing node last_seen while tunnel is running — even with no TUN data.
+      guard let self, self.running, let engine = self.engine else { return }
       do {
         try engine.sendKeepalive()
-      } catch {}
+      } catch {
+        // Transient send errors: leave timer running so idle does not starve forever.
+      }
     }
     timer.resume()
     keepaliveTimer = timer

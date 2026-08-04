@@ -119,7 +119,13 @@ class RptDataPlane:
         last_keepalive = 0.0
         last_cover = 0.0
         last_activity = time.time()
-        keepalive_every = 30.0  # keep node session alive (routing / idle prune)
+        # Lean RPT2 KEEPALIVE — must stay under node DEFAULT_SESSION_IDLE_SEC (~60s)
+        try:
+            from client.residual_keepalive_policy import residual_keepalive_interval_sec
+
+            keepalive_every = float(residual_keepalive_interval_sec())
+        except Exception:  # noqa: BLE001
+            keepalive_every = 25.0
         # Adaptive select timeout: busy 50ms, idle backoff up to 400ms (P1 drain).
         idle_select_s = 0.05
         idle_select_max_s = 0.40

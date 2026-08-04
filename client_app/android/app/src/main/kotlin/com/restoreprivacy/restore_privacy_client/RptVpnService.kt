@@ -465,9 +465,26 @@ class RptVpnService : VpnService() {
                         }
                     }
                 }
+                // Lean RPT2 KEEPALIVE while tunnel is up — independent of TUN data
+                // and independent of traffic-shape cover (node idle prune ~60s).
+                val keepaliveThread = thread(name = "rpt-keepalive", isDaemon = true) {
+                    val intervalMs = KEEPALIVE_INTERVAL_MS
+                    while (running.get()) {
+                        try {
+                            Thread.sleep(intervalMs)
+                            if (!running.get()) break
+                            val wire = engine.sealAndWrapKeepalive()
+                            dataSock.send(DatagramPacket(wire, wire.size))
+                        } catch (_: Exception) {
+                            // Transient send errors: keep timer alive; do not exit loop.
+                            if (!running.get()) break
+                        }
+                    }
+                }
                 tunToUdp.join(Long.MAX_VALUE)
                 udpToTun.join(2_000)
                 coverThread.join(500)
+                keepaliveThread.join(500)
                 try {
                     inTun.close()
                 } catch (_: Exception) {
@@ -675,6 +692,12 @@ class RptVpnService : VpnService() {
         const val RESULT_OK = 0
         const val RESULT_ERR = 1
         private const val NOTIFICATION_ID = 0x5250
+        /**
+         * Lean RPT2 KEEPALIVE period while residual tunnel is up.
+         * Must stay under node DEFAULT_SESSION_IDLE_SEC (~60s). Not cover traffic.
+         * Mirrors client residual_keepalive_policy.RESIDUAL_KEEPALIVE_INTERVAL_SEC.
+         */
+        const val KEEPALIVE_INTERVAL_MS: Long = 25_000L
 
         /** UI rehydrate after minimize — true while TUN session is up. */
         @Volatile

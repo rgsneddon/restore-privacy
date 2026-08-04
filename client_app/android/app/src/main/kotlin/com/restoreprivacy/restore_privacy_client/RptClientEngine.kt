@@ -160,6 +160,20 @@ class RptClientEngine(
     fun sealAndWrapCover(): ByteArray =
         RptObfuscation.maybeWrap(sealCoverFrame())
 
+    /**
+     * RPT2 KEEPALIVE (type 0x04) — small session-touch frame for node idle prune.
+     * Independent of TUN data and traffic-shape cover. Python: pack_keepalive.
+     */
+    fun packKeepalive(): ByteArray {
+        val sid = sessionId ?: error("no session")
+        require(sid.size == 8) { "session_id must be 8 bytes" }
+        return byteArrayOf(0x52, 0x50, 0x54, 0x32, 0x04) + sid
+    }
+
+    /** Outer-wrap KEEPALIVE when product outer obfs is ON (same path as DATA). */
+    fun sealAndWrapKeepalive(): ByteArray =
+        RptObfuscation.maybeWrap(packKeepalive())
+
     /** Product residual UDP recv: outer-unwrap then open DATA (null = cover). */
     fun unwrapAndOpen(udpPayload: ByteArray): ByteArray? {
         val inner = RptObfuscation.maybeUnwrap(udpPayload)
