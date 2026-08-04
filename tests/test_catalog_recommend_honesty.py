@@ -45,19 +45,19 @@ class TestCatalogRecommendHonesty(unittest.TestCase):
                 "windows_ready": False,
             },
         ), mock.patch.object(
-            ut, "embedded_package_version", return_value="1.1.9"
+            ut, "embedded_package_version", return_value="1.2.0"
         ), mock.patch.object(
-            ut, "local_catalog_version", return_value="1.1.9"
+            ut, "local_catalog_version", return_value="1.2.0"
         ), mock.patch.object(
             ut, "client_platform_key", return_value="windows"
         ):
             latest = ut.catalog_latest_version(prefer_remote=True)
-            self.assertEqual(latest, "1.1.9")
+            self.assertEqual(latest, "1.2.0")
             self.assertFalse(
-                ut.upgrade_available(running="1.1.9", latest=latest)
+                ut.upgrade_available(running="1.2.0", latest=latest)
             )
             self.assertIsNone(
-                ut.upgrade_banner_text(running="1.1.9", latest=latest)
+                ut.upgrade_banner_text(running="1.2.0", latest=latest)
             )
 
     def test_remote_ahead_with_windows_ready_allows_upgrade(self) -> None:
@@ -72,15 +72,15 @@ class TestCatalogRecommendHonesty(unittest.TestCase):
                 "windows_ready": True,
             },
         ), mock.patch.object(
-            ut, "embedded_package_version", return_value="1.1.9"
+            ut, "embedded_package_version", return_value="1.2.0"
         ), mock.patch.object(
-            ut, "local_catalog_version", return_value="1.1.9"
+            ut, "local_catalog_version", return_value="1.2.0"
         ), mock.patch.object(
             ut, "client_platform_key", return_value="windows"
         ):
             latest = ut.catalog_latest_version(prefer_remote=True)
             self.assertEqual(latest, "1.1.11")
-            self.assertTrue(ut.upgrade_available(running="1.1.9", latest=latest))
+            self.assertTrue(ut.upgrade_available(running="1.2.0", latest=latest))
 
     def test_legacy_api_remote_ahead_no_ready_field_no_phantom_upgrade(self) -> None:
         """Legacy API (only catalog_version) ahead of emb → do not recommend."""
@@ -91,15 +91,15 @@ class TestCatalogRecommendHonesty(unittest.TestCase):
             "fetch_remote_catalog_info",
             return_value={"catalog_version": "1.1.10"},
         ), mock.patch.object(
-            ut, "embedded_package_version", return_value="1.1.9"
+            ut, "embedded_package_version", return_value="1.2.0"
         ), mock.patch.object(
-            ut, "local_catalog_version", return_value="1.1.9"
+            ut, "local_catalog_version", return_value="1.2.0"
         ), mock.patch.object(
             ut, "client_platform_key", return_value="windows"
         ):
             latest = ut.catalog_latest_version(prefer_remote=True)
-            self.assertEqual(latest, "1.1.9")
-            self.assertFalse(ut.upgrade_available(running="1.1.9"))
+            self.assertEqual(latest, "1.2.0")
+            self.assertFalse(ut.upgrade_available(running="1.2.0"))
 
     def test_monopin_stays_1_2_0(self) -> None:
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()

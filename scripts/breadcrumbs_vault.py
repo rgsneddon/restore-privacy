@@ -211,7 +211,7 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
         "observe_vpn_only_shell_no_evolve_wallet_rpai_chrome",
         "observe_quit_lower_left_disconnect_then_exit",
         "observe_tray_text_privacy_comma_restored",
-        # Parity with macOS 1.1.9 dual device-key bug (host HELLO vs tunnel identity)
+        # Parity with macOS 1.2.0 dual device-key bug (host HELLO vs tunnel identity)
         "observe_single_device_ed25519_across_home_and_localappdata_secrets",
         "observe_full_tunnel_not_host_only_hello_after_node_ip_assigned",
         "report_dual_identity_hashes_if_connect_fails_with_node_ip",
@@ -267,7 +267,7 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
             "then-exit; tray text exactly Privacy, Restored; residual IS+DE; "
             "manual free-DL updates only (no UPDATE_PUSH); then native PE seal + "
             f"upload paid_assets/{pin}/",
-            "8. Windows machine OBSERVE (macOS 1.1.9 dual-identity parity): after "
+            "8. Windows machine OBSERVE (macOS 1.2.0 dual-identity parity): after "
             "KEYGEN/trial Connect, hash client_ed25519.priv under "
             "%USERPROFILE%\\.restore-privacy\\secrets and "
             "%LOCALAPPDATA%\\Programs\\RestorePrivacy\\secrets — they must match. "
@@ -279,7 +279,7 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
             "schema": "rpt.windows_residual_identity_observe.v1",
             "monopin": pin,
             "reason": (
-                "macOS 1.1.9 Connect failed when host HELLO used one "
+                "macOS 1.2.0 Connect failed when host HELLO used one "
                 "client_ed25519.priv (often ~/.restore-privacy, KEYGEN-bound) "
                 "while Packet Tunnel used a different App Group key — node IP "
                 "assigned but full tunnel stayed disconnected. Windows may have "

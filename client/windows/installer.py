@@ -33,7 +33,7 @@ from client.install_paths import (
 APP_NAME = "RestorePrivacy"
 # Baked by scripts/build_release_*.py write_version_files (monopin). Never use a
 # stale historical pin as the only identity when client/VERSION is missing.
-PRODUCT_VERSION_EMBEDDED = "1.1.9"
+PRODUCT_VERSION_EMBEDDED = "1.2.0"
 
 
 def _product_version_pin() -> str:

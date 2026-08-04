@@ -180,7 +180,7 @@ class TestPublicCopyHumanCadence(unittest.TestCase):
         self.assertIn("suite-guide-intro", page)
 
     def test_settings_catalog_includes_auto_connect_if_idle_and_kill_switch(self) -> None:
-        """Drive shipped settings_parts_catalog — v1.1.9 controls must be documented."""
+        """Drive shipped settings_parts_catalog — v1.2.0 controls must be documented."""
         from settings_explainer import settings_parts_catalog
 
         parts = settings_parts_catalog()

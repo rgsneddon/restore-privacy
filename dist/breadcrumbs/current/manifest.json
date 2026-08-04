@@ -1,7 +1,7 @@
 {
   "schema": "rpt.breadcrumbs.v1",
-  "monopin": "1.1.7",
-  "generated_at": "2026-08-03T22:56:42Z",
+  "monopin": "1.2.0",
+  "generated_at": "2026-08-04T22:28:17Z",
   "source_of_truth": "helsinki_breadcrumbs_vault",
   "github_breadcrumb_flow": "deprecated",
   "github_note": "Do not use private GitHub APPLE_HANDOFF pull as the primary Mac task queue. Fetch this vault instead. Source code may still live in the private repo.",
@@ -10,28 +10,28 @@
   "platforms": {
     "macos": {
       "platform": "macos",
-      "monopin": "1.1.7",
+      "monopin": "1.2.0",
       "package_present": true,
-      "bundle_version": "1.1.7",
+      "bundle_version": "1.2.0",
       "status": "native_monopin",
       "needs_work": false,
-      "notes": "CFBundle/marketing version 1.1.7 matches monopin 1.1.7.",
-      "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.1.7/restore-privacy-client-1.1.7-macos.zip",
-      "size": 27813194,
+      "notes": "CFBundle/marketing version 1.2.0 matches monopin 1.2.0.",
+      "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.0/restore-privacy-client-1.2.0-macos.zip",
+      "size": 27859044,
       "plist_paths": [
         "restore_privacy_client.app/Contents/Info.plist"
       ]
     },
     "ios": {
       "platform": "ios",
-      "monopin": "1.1.7",
+      "monopin": "1.2.0",
       "package_present": true,
-      "bundle_version": "1.1.7",
+      "bundle_version": "1.2.0",
       "status": "native_monopin",
       "needs_work": false,
-      "notes": "CFBundle/marketing version 1.1.7 matches monopin 1.1.7.",
-      "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.1.7/restore-privacy-client-1.1.7-ios.zip",
-      "size": 13220837,
+      "notes": "CFBundle/marketing version 1.2.0 matches monopin 1.2.0.",
+      "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.0/restore-privacy-client-1.2.0-ios.zip",
+      "size": 13225448,
       "plist_paths": [
         "Runner.app/Info.plist"
       ]
@@ -43,12 +43,15 @@
   "windows_actions": [
     "mirror_monorepo_and_brand_assets_to_large_drive",
     "rebuild_windows_native_pe_seal",
-    "upload_paid_assets_1.1.7",
+    "upload_paid_assets_1.2.0",
     "observe_first_run_licence_keygen_or_trial_before_vpn",
     "observe_72h_keygen_free_trial_then_pay",
     "observe_vpn_only_shell_no_evolve_wallet_rpai_chrome",
     "observe_quit_lower_left_disconnect_then_exit",
-    "observe_tray_text_privacy_comma_restored"
+    "observe_tray_text_privacy_comma_restored",
+    "observe_single_device_ed25519_across_home_and_localappdata_secrets",
+    "observe_full_tunnel_not_host_only_hello_after_node_ip_assigned",
+    "report_dual_identity_hashes_if_connect_fails_with_node_ip"
   ],
   "windows_brand_mirror": {
     "schema": "rpt.windows_brand_mirror.v1",
@@ -63,32 +66,32 @@
       "rpos_app",
       "suite_client"
     ],
-    "present_source_count": 5,
-    "missing_source_count": 30,
+    "present_source_count": 4,
+    "missing_source_count": 31,
     "dest_root": "{RPT_WINDOWS_DRIVE}",
     "dest_configured": false,
     "repo_dest": "{RPT_WINDOWS_DRIVE}/restore-privacy",
     "native_pe_build": {
       "required": true,
       "script": "scripts/build_windows_multihop.py",
-      "output": "releases/1.1.7/restore-privacy-client-1.1.7-windows-x64-setup.exe",
-      "upload": "paid_assets/1.1.7/"
+      "output": "releases/1.2.0/restore-privacy-client-1.2.0-windows-x64-setup.exe",
+      "upload": "paid_assets/1.2.0/"
     },
     "brand_filenames": [
-      "restore-privacy-client-1.1.7-windows-x64-setup.exe",
-      "restore-privacy-client-1.1.7-android.apk",
-      "restore-privacy-client-1.1.7-macos.zip",
-      "restore-privacy-client-1.1.7-ios.zip",
-      "restore-privacy-client-1.1.7-linux-x64.tar.gz",
-      "restore-privacy-browser-extension-1.1.7.zip",
-      "restore-privacy-rx-browser-1.1.7.zip",
-      "restore-privacy-rx-browser-1.1.7-macos.zip",
-      "restore-privacy-rx-browser-1.1.7-windows.zip",
-      "restore-privacy-rx-browser-1.1.7-linux-x86_64.tar.gz",
-      "restore-privacy-rx-browser-1.1.7-linux-aarch64.tar.gz",
-      "restore-privacy-rx-browser-1.1.7-linux-x86_64.zip",
-      "restore-privacy-rx-browser-1.1.7-ios.zip",
-      "restore-privacy-rx-browser-1.1.7-android.zip",
+      "restore-privacy-client-1.2.0-windows-x64-setup.exe",
+      "restore-privacy-client-1.2.0-android.apk",
+      "restore-privacy-client-1.2.0-macos.zip",
+      "restore-privacy-client-1.2.0-ios.zip",
+      "restore-privacy-client-1.2.0-linux-x64.tar.gz",
+      "restore-privacy-browser-extension-1.2.0.zip",
+      "restore-privacy-rx-browser-1.2.0.zip",
+      "restore-privacy-rx-browser-1.2.0-macos.zip",
+      "restore-privacy-rx-browser-1.2.0-windows.zip",
+      "restore-privacy-rx-browser-1.2.0-linux-x86_64.tar.gz",
+      "restore-privacy-rx-browser-1.2.0-linux-aarch64.tar.gz",
+      "restore-privacy-rx-browser-1.2.0-linux-x86_64.zip",
+      "restore-privacy-rx-browser-1.2.0-ios.zip",
+      "restore-privacy-rx-browser-1.2.0-android.zip",
       "rpos-0.2.1-windows-x64.zip",
       "rpos-0.2.1-macos.zip",
       "rpos-0.2.1-linux-x86_64.tar.gz",
@@ -116,15 +119,35 @@
   "needs_any_apple_work": false,
   "handoff_file": null,
   "checklist": [
-    "BUILT (this build monopin 1.1.7): Windows setup.exe, Linux tar.gz, Android APK as restore-privacy-client-1.1.7-* (this host). Apple packages not sealed here \u2014 Mac rebuild/sign required.",
-    "UPDATE THESE DOCS to monopin 1.1.7: client_app/APPLE_HANDOFF_1.1.7.md, scripts/RELEASE_NOTES_1.1.7.md, PRIVACY_POLICY.md, AUDIT.md, status_page/settings_explainer.py (Settings guide), status_page/downloads.py RELEASE_VERSION, client/VERSION.",
-    "PUBLISH ALL to the version number of this build (1.1.7): stage/upload every platform package under paid_assets/1.1.7/ and status_page/assets/1.1.7/ (Windows + Linux + Android already built; macOS + iOS after native seal). No separate commit/version guess \u2014 use monopin 1.1.7 everywhere.",
+    "BUILT (this build monopin 1.2.0): Windows setup.exe, Linux tar.gz, Android APK as restore-privacy-client-1.2.0-* (this host). Apple packages not sealed here \u2014 Mac rebuild/sign required.",
+    "UPDATE THESE DOCS to monopin 1.2.0: client_app/APPLE_HANDOFF_1.2.0.md, scripts/RELEASE_NOTES_1.2.0.md, PRIVACY_POLICY.md, AUDIT.md, status_page/settings_explainer.py (Settings guide), status_page/downloads.py RELEASE_VERSION, client/VERSION.",
+    "PUBLISH ALL to the version number of this build (1.2.0): stage/upload every platform package under paid_assets/1.2.0/ and status_page/assets/1.2.0/ (Windows + Linux + Android already built; macOS + iOS after native seal). No separate commit/version guess \u2014 use monopin 1.2.0 everywhere.",
     "1. Fetch vault: breadcrumbs_vault.py check --fetch",
     "2. If macos needs_work: flutter build macos + notarize per APPLE_HANDOFF",
     "3. If ios needs_work: flutter build ios + Team-sign per APPLE_HANDOFF",
-    "4. Stage/upload paid assets for 1.1.7 (Helsinki), then re-publish breadcrumbs",
+    "4. Stage/upload paid assets for 1.2.0 (Helsinki), then re-publish breadcrumbs",
     "5. Re-run check until needs_any_apple_work is false",
     "6. Windows machine: set RPT_WINDOWS_DRIVE to the large drive; python scripts/windows_brand_mirror.py apply \u2014 monorepo + all brand installer slots (35 packages); then native PE seal + upload",
-    "7. Windows machine: open client/windows/WINDOWS_HANDOFF_1.1.7.md \u2014 full product map: first-run licence (scroll-to-bottom) \u2192 KEYGEN or continue 72h trial (no username/password/seed); residual VPN-only shell (no Evolve/%/rpAI/Backup chrome); Quit lower-left disconnect-then-exit; tray text exactly Privacy, Restored; residual IS+DE; manual free-DL updates only (no UPDATE_PUSH); then native PE seal + upload paid_assets/1.1.7/"
-  ]
+    "7. Windows machine: open client/windows/WINDOWS_HANDOFF_1.2.0.md \u2014 full product map: first-run licence (scroll-to-bottom) \u2192 KEYGEN or continue 72h trial (no username/password/seed); residual VPN-only shell (no Evolve/%/rpAI/Backup chrome); Quit lower-left disconnect-then-exit; tray text exactly Privacy, Restored; residual IS+DE; manual free-DL updates only (no UPDATE_PUSH); then native PE seal + upload paid_assets/1.2.0/",
+    "8. Windows machine OBSERVE (macOS 1.2.0 dual-identity parity): after KEYGEN/trial Connect, hash client_ed25519.priv under %USERPROFILE%\\.restore-privacy\\secrets and %LOCALAPPDATA%\\Programs\\RestorePrivacy\\secrets \u2014 they must match. If Connect log shows node assigned 10.88.x but residual/Wintun not active, report both hash prefixes + log excerpt (not trial-expired when node IP was assigned). See WINDOWS_HANDOFF section 0b."
+  ],
+  "windows_observe_residual_identity": {
+    "schema": "rpt.windows_residual_identity_observe.v1",
+    "monopin": "1.2.0",
+    "reason": "macOS 1.2.0 Connect failed when host HELLO used one client_ed25519.priv (often ~/.restore-privacy, KEYGEN-bound) while Packet Tunnel used a different App Group key \u2014 node IP assigned but full tunnel stayed disconnected. Windows may have the same multi-directory secrets search (secrets_loader).",
+    "symptom_not_trial_expired": "Node assigned 10.88.0.x proves residual HELLO admission; do not treat as trial-expired / buy KEYGEN as primary.",
+    "paths_to_hash": [
+      "%USERPROFILE%\\.restore-privacy\\secrets\\client_ed25519.priv",
+      "%LOCALAPPDATA%\\Programs\\RestorePrivacy\\secrets\\client_ed25519.priv"
+    ],
+    "pass_criteria": "At most one active 32-byte device priv; all trusted stores match; product Connected only with residual capture / Wintun active.",
+    "fail_report": [
+      "sha256_prefix_home",
+      "sha256_prefix_localappdata",
+      "node_ip_if_any",
+      "connection_log_excerpt",
+      "client_version"
+    ],
+    "handoff": "client/windows/WINDOWS_HANDOFF_1.2.0.md section 0b"
+  }
 }

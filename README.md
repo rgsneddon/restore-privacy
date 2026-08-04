@@ -1,6 +1,6 @@
 # Restore Privacy
 
-**Version v1.1.9** — monorepo for the free residual VPN client and operator tooling.
+**Version v1.2.0** — monorepo for the free residual VPN client and operator tooling.
 
 Public storefront: [restoreprivacy.online](https://restoreprivacy.online).  
 Open Pages export: [rgsneddon.github.io/restore-privacy-suite](https://rgsneddon.github.io/restore-privacy-suite/).
@@ -29,17 +29,17 @@ Once connected, residual captures device traffic on a full-tunnel path where the
 
 | Platform | File |
 |----------|------|
-| Windows | `restore-privacy-client-1.1.9-windows-x64-setup.exe` (native PE from Windows host) |
-| Android | `restore-privacy-client-1.1.9-android.apk` |
-| macOS | `restore-privacy-client-1.1.9-macos.zip` — Notarized Developer ID + residual Packet Tunnel **host NE** |
-| iOS | `restore-privacy-client-1.1.9-ios.zip` — distribution / sideload |
-| Linux | `restore-privacy-client-1.1.9-linux-x64.tar.gz` |
+| Windows | `restore-privacy-client-1.2.0-windows-x64-setup.exe` (native PE from Windows host) |
+| Android | `restore-privacy-client-1.2.0-android.apk` |
+| macOS | `restore-privacy-client-1.2.0-macos.zip` — Notarized Developer ID + residual Packet Tunnel **host NE** |
+| iOS | `restore-privacy-client-1.2.0-ios.zip` — distribution / sideload |
+| Linux | `restore-privacy-client-1.2.0-linux-x64.tar.gz` |
 
 ## Operator build
 
-- Pin: `client/VERSION` → `1.1.9`
+- Pin: `client/VERSION` → `1.2.0`
 - Flutter client: `client_app/`
-- Stage script: `scripts/build_suite_1.1.9.py` (this Mac host skips Windows CF)
+- Stage script: `scripts/build_suite_1.2.0.py` (this Mac host skips Windows CF)
 - Full ship skill: type `kyrusfables` / `/kyrusfables`
 - Public static export: `python3 scripts/build_public_pages.py` → `public_site/`
 

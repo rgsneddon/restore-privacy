@@ -1,6 +1,6 @@
 # Restore Privacy
 
-**Catalog v1.1.9** — free VPN client for everyday residual traffic.
+**Catalog v1.2.0** — free VPN client for everyday residual traffic.
 
 | | |
 |--|--|
@@ -36,11 +36,11 @@ Settings start lean so nothing surprising is on after install:
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-1.1.9-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-1.1.9-android.apk` |
-| macOS | `restore-privacy-client-1.1.9-macos.zip` (allow Packet Tunnel in System Settings if asked) |
-| iOS | `restore-privacy-client-1.1.9-ios.zip` |
-| Linux | `restore-privacy-client-1.1.9-linux-x64.tar.gz` |
+| Windows | `restore-privacy-client-1.2.0-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-1.2.0-android.apk` |
+| macOS | `restore-privacy-client-1.2.0-macos.zip` (allow Packet Tunnel in System Settings if asked) |
+| iOS | `restore-privacy-client-1.2.0-ios.zip` |
+| Linux | `restore-privacy-client-1.2.0-linux-x64.tar.gz` |
 
 ### Short install notes
 

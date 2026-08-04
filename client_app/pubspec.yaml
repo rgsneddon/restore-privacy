@@ -4,7 +4,7 @@ description: "Restore Privacy residual VPN client."
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-# Restore Privacy residual VPN v 1.1.9 monopin.
+# Restore Privacy residual VPN v 1.2.0 monopin.
 version: 1.2.0+120
 
 environment:
