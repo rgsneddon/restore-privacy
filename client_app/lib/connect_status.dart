@@ -346,10 +346,30 @@ String mapPrepareVpnStatusMessage(dynamic result) {
 ///
 /// A failed NE save must report prepared:false. Debounce may return prepared:true
 /// only after a prior successful save (native lastSuccessfulPrepareAt).
+///
+/// When [hostHasPacketTunnelEntitlement] is explicitly false (catalog DevID),
+/// prepared must not be treated as success — System Settings will not apply
+/// residual Packet Tunnel without host NE.
 bool isPrepareVpnSuccess(dynamic result) {
   if (result is! Map) return false;
   if (result['ok'] != true) return false;
   if (result['prepared'] != true) return false;
+  if (result['hostHasPacketTunnelEntitlement'] == false) return false;
+  if (result['needsTeamResidualSign'] == true) return false;
+  return true;
+}
+
+/// Pure: whether a prepare channel map may stamp prepared/debounce success.
+///
+/// Used by tests to lock the residual-honest contract without NE I/O.
+bool prepareMapAllowsPreparedSuccess({
+  required bool saveSucceeded,
+  required bool hostHasPacketTunnelEntitlement,
+  bool needsTeamResidualSign = false,
+}) {
+  if (!saveSucceeded) return false;
+  if (!hostHasPacketTunnelEntitlement) return false;
+  if (needsTeamResidualSign) return false;
   return true;
 }
 

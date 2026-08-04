@@ -233,7 +233,10 @@ def build_macos() -> Path | None:
             return None
         app = apps[0]
 
-    # Side path only: Team residual NE re-sign (not monopin basename).
+    # Side path: Team residual NE re-sign (host packet-tunnel-provider) so
+    # System Settings can list Restore Privacy VPN. Never the monopin basename
+    # (Apple Development fails Gatekeeper). Packaged as *-macos-residual-team.zip.
+    residual_app: Path | None = None
     try:
         if str(ROOT / "scripts") not in sys.path:
             sys.path.insert(0, str(ROOT / "scripts"))
@@ -245,8 +248,43 @@ def build_macos() -> Path | None:
             f"skipped={r.get('skipped')} path={r.get('path')} err={r.get('error')}",
             flush=True,
         )
+        if r.get("ok") and r.get("path") and not r.get("skipped"):
+            residual_app = Path(str(r["path"]))
     except Exception as e:  # noqa: BLE001
         print(f"residual_team_resign best-effort failed: {e}", flush=True)
+
+    if residual_app is not None and residual_app.is_dir():
+        residual_zip = OUT / NAMES["macos"].replace(
+            "-macos.zip", "-macos-residual-team.zip"
+        )
+        try:
+            if str(ROOT / "status_page") not in sys.path:
+                sys.path.insert(0, str(ROOT / "status_page"))
+            from apple_package_audit import (  # noqa: WPS433
+                host_app_has_packet_tunnel_provider,
+                launch_probe_app_alive,
+            )
+
+            if host_app_has_packet_tunnel_provider(residual_app):
+                probe = launch_probe_app_alive(residual_app)
+                print(f"residual-team launch_probe={probe}", flush=True)
+                if probe.get("ok"):
+                    _package_app_ditto_zip(residual_app, residual_zip)
+                    print(
+                        f"staged residual-team side zip {residual_zip.name} "
+                        f"(host NE for System VPN registration; not monopin)",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        f"residual-team launch probe failed (side zip skipped): "
+                        f"{probe.get('error')}",
+                        flush=True,
+                    )
+            else:
+                print("residual-team missing host NE (side zip skipped)", flush=True)
+        except Exception as e:  # noqa: BLE001
+            print(f"residual-team side zip failed (non-fatal): {e}", flush=True)
 
     dest = OUT / NAMES["macos"]
     dest.parent.mkdir(parents=True, exist_ok=True)

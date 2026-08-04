@@ -71,6 +71,18 @@ void main() {
     );
     expect(body.contains('isEnabled = true'), isTrue);
     expect(body.contains('saveToPreferences'), isTrue);
+    // Save errors must not be ignored; success stamp only after save OK + host NE.
+    expect(body.contains('if let saveErr'), isTrue);
+    expect(body.contains('lastSuccessfulPrepareAt = Date()'), isTrue);
+    expect(body.contains('lastSuccessfulPrepareAt = nil'), isTrue);
+    // Debounce only when host NE present (not catalog DevID false prepared).
+    expect(body.contains('if hostHasNe,'), isTrue);
+    // prepared:true requires host NE
+    expect(
+      body.contains('if !hostHasNe'),
+      isTrue,
+      reason: 'must refuse prepared without host packet-tunnel-provider',
+    );
   });
 
   test('loadOrCreateManager always calls loadAllFromPreferences (no host-NE gate)',

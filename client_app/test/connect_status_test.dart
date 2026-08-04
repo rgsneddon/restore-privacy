@@ -191,6 +191,7 @@ void main() {
         'tunnelType': kProductVpnTunnelType,
         'providerBundleId': kProductVpnProviderBundleId,
         'localizedDescription': kProductVpnLocalizedDescription,
+        'hostHasPacketTunnelEntitlement': true,
         'message': kPacketTunnelPreparedMessage,
       };
       expect(isProductPacketTunnelPrepareResult(prepared), isTrue);
@@ -284,12 +285,13 @@ void main() {
           ),
           isTrue,
         );
-        // Honest re-attempt after user Allowed: real success.
+        // Honest re-attempt after user Allowed: real success (host NE present).
         final honestRetryOk = {
           'ok': true,
           'prepared': true,
           'tunnelType': kProductVpnTunnelType,
           'providerBundleId': kProductVpnProviderBundleId,
+          'hostHasPacketTunnelEntitlement': true,
           'message': kPacketTunnelPreparedMessage,
         };
         expect(isPrepareVpnSuccess(honestRetryOk), isTrue);
@@ -308,10 +310,41 @@ void main() {
               'ok': true,
               'prepared': true,
               'debounced': true,
+              'hostHasPacketTunnelEntitlement': true,
               'tunnelType': kProductVpnTunnelType,
             },
           ),
           isTrue,
+        );
+        // Catalog DevID: never treat prepared without host NE as success.
+        final devidNoNe = {
+          'ok': true,
+          'prepared': true,
+          'hostHasPacketTunnelEntitlement': false,
+          'needsTeamResidualSign': true,
+          'message': 'missing packet-tunnel-provider',
+        };
+        expect(isPrepareVpnSuccess(devidNoNe), isFalse);
+        expect(
+          prepareMapAllowsPreparedSuccess(
+            saveSucceeded: true,
+            hostHasPacketTunnelEntitlement: false,
+          ),
+          isFalse,
+        );
+        expect(
+          prepareMapAllowsPreparedSuccess(
+            saveSucceeded: true,
+            hostHasPacketTunnelEntitlement: true,
+          ),
+          isTrue,
+        );
+        expect(
+          prepareMapAllowsPreparedSuccess(
+            saveSucceeded: false,
+            hostHasPacketTunnelEntitlement: true,
+          ),
+          isFalse,
         );
         // mapPrepareVpnStatusMessage must not treat ok:false as prepared success.
         expect(

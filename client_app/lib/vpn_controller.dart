@@ -151,12 +151,13 @@ class VpnController {
     final needsAllow = shouldAutoOpenVpnSystemSettings(raw) ||
         (raw?['needsVpnSystemSettingsApproval'] == true);
     final needsSign = raw?['needsTeamResidualSign'] == true;
-    final hasNe = raw?['hostHasPacketTunnelEntitlement'] != false;
+    // Explicit true only — null/missing must not imply host NE (catalog DevID).
+    final hasNe = raw?['hostHasPacketTunnelEntitlement'] == true;
     final action = macosVpnActionAfterPrepare(
       prepared: prepared,
       ok: prepared,
       needsVpnSystemSettingsApproval: needsAllow,
-      needsTeamResidualSign: needsSign,
+      needsTeamResidualSign: needsSign || !hasNe,
       hostHasPacketTunnelEntitlement: hasNe,
     );
     final msg = mapPrepareVpnStatusMessage(raw);
