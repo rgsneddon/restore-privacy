@@ -5,7 +5,7 @@ description: "Restore Privacy residual VPN client."
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
 # Restore Privacy residual VPN v 1.1.7 monopin.
-version: 1.1.7+117
+version: 1.1.8+118
 
 environment:
   sdk: '>=3.2.0 <4.0.0'

@@ -79,7 +79,7 @@ void main() {
   test('suite version monopin labels for Restore Privacy residual VPN', () {
     // Monopin string is owned by suite_version.dart / catalog pin.
     expect(kSuiteVersion, isNotEmpty);
-    expect(kSuiteVersion, '1.1.7');
+    expect(kSuiteVersion, '1.1.8');
     expect(kSuiteProductName.toLowerCase(), contains('privacy'));
     expect(kSuiteDisplayVersion, contains(kSuiteVersion));
     expect(kSuiteTabVpn, 'VPN');
