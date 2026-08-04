@@ -1,20 +1,86 @@
 {
-  "generated_at": "2026-08-03T23:27:13Z",
-  "node_host": "127.0.0.1",
-  "catalog_version": "0.3.6",
+  "generated_at": "2026-08-04T20:15:17Z",
+  "node_host": "Germany (DE)",
+  "catalog_version": "1.1.10",
+  "probe_schedule": [
+    {
+      "code": "IS",
+      "label": "Iceland (IS)",
+      "status_port": 8080,
+      "udp_port": 44044
+    },
+    {
+      "code": "DE",
+      "label": "Germany (DE)",
+      "status_port": 8080,
+      "udp_port": 44044
+    }
+  ],
+  "live_node_probes": [
+    {
+      "code": "IS",
+      "label": "Iceland (IS)",
+      "status_port": 8080,
+      "udp_port": 44044,
+      "tcp_status": {
+        "ok": true,
+        "error": null,
+        "port": 8080
+      },
+      "http_status": {
+        "ok": true,
+        "status_code": 200,
+        "body": {
+          "title": "RESTORE PRIVACY"
+        },
+        "error": null
+      },
+      "udp": {
+        "sent": true,
+        "error": null,
+        "port": 44044
+      },
+      "ok": true
+    },
+    {
+      "code": "DE",
+      "label": "Germany (DE)",
+      "status_port": 8080,
+      "udp_port": 44044,
+      "tcp_status": {
+        "ok": true,
+        "error": null,
+        "port": 8080
+      },
+      "http_status": {
+        "ok": true,
+        "status_code": 200,
+        "body": {
+          "title": "RESTORE PRIVACY"
+        },
+        "error": null
+      },
+      "udp": {
+        "sent": true,
+        "error": null,
+        "port": 44044
+      },
+      "ok": true
+    }
+  ],
   "unit_suite": {
     "ran": false,
     "ok": true,
     "reason": "skipped"
   },
   "tcp_status": {
-    "host": "127.0.0.1",
+    "host": "Germany (DE)",
     "port": 8080,
     "ok": true,
     "error": null
   },
   "http_status": {
-    "url": "http://127.0.0.1:8080/status",
+    "url": "http://Germany (DE)/status",
     "ok": true,
     "status_code": 200,
     "body": {
@@ -23,7 +89,7 @@
     "error": null
   },
   "udp": {
-    "host": "127.0.0.1",
+    "host": "Germany (DE)",
     "port": 44044,
     "sent": true,
     "error": null
@@ -31,116 +97,135 @@
   "no_priv": {
     "ok": true,
     "hits": [],
-    "scanned_roots": 9,
+    "scanned_roots": 6,
     "warn": false,
     "skipped": false,
     "reasons": [
-      "scanned_roots=9",
+      "scanned_roots=6",
       "hits=0"
     ]
   },
   "package_rag": {
-    "catalog_version": "0.3.6",
+    "catalog_version": "1.1.10",
     "pin": "1b126abfae737c66ce99670b730e123f2831ce5beb2868d7865324f391280bbe",
-    "exit_pin": "a36a3f38066ece7b33abfab6a57942fb998919b4a753ee0d9e9ec9c97c1c7352",
+    "exit_pin": "ea0c7fa338612386cbe666a0ca64a6a69e3471b03db1848e7df4be2ed6823b18",
     "packages": [
       {
         "platform": "windows",
         "label": "Windows",
-        "filename": "restore-privacy-client-0.3.6-windows-x64-setup.exe",
+        "filename": "restore-privacy-client-1.1.10-windows-x64-setup.exe",
         "state": "Red",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.3.6-windows-x64-setup.exe / relative_path 0.3.6/restore-privacy-client-0.3.6-windows-x64-setup.exe under status_page/assets/0.3.6/, releases/0.3.6/, paid_assets/0.3.6/, dist/0.3.6/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "catalog monopin asset not staged (looked for restore-privacy-client-1.1.10-windows-x64-setup.exe / relative_path 1.1.10/restore-privacy-client-1.1.10-windows-x64-setup.exe under status_page/assets/1.1.10/, releases/1.1.10/, /opt/restore-privacy/paid_assets/1.1.10/, dist/1.1.10/, status_page/assets/, https://135.181.152.10.sslip.io/paid-assets/1.1.10/; default paid store is Helsinki https://135.181.152.10.sslip.io/paid-assets/ \u2014 set RPT_ASSET_FETCH_TOKEN to probe, or stage under paid_assets/1.1.10/)"
         ],
         "path": null,
         "search_roots": [
-          "status_page/assets/0.3.6/",
-          "releases/0.3.6/",
-          "paid_assets/0.3.6/",
-          "dist/0.3.6/",
-          "status_page/assets/"
+          "status_page/assets/1.1.10/",
+          "releases/1.1.10/",
+          "/opt/restore-privacy/paid_assets/1.1.10/",
+          "dist/1.1.10/",
+          "status_page/assets/",
+          "https://135.181.152.10.sslip.io/paid-assets/1.1.10/"
         ],
-        "relative_path": "0.3.6/restore-privacy-client-0.3.6-windows-x64-setup.exe"
-      },
-      {
-        "platform": "linux",
-        "label": "Linux",
-        "filename": "restore-privacy-client-0.3.6-linux-x64.tar.gz",
-        "state": "Red",
-        "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.3.6-linux-x64.tar.gz / relative_path 0.3.6/restore-privacy-client-0.3.6-linux-x64.tar.gz under status_page/assets/0.3.6/, releases/0.3.6/, paid_assets/0.3.6/, dist/0.3.6/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
-        ],
-        "path": null,
-        "search_roots": [
-          "status_page/assets/0.3.6/",
-          "releases/0.3.6/",
-          "paid_assets/0.3.6/",
-          "dist/0.3.6/",
-          "status_page/assets/"
-        ],
-        "relative_path": "0.3.6/restore-privacy-client-0.3.6-linux-x64.tar.gz"
-      },
-      {
-        "platform": "macos",
-        "label": "macOS",
-        "filename": "restore-privacy-client-0.3.6-macos.zip",
-        "state": "Red",
-        "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.3.6-macos.zip / relative_path 0.3.6/restore-privacy-client-0.3.6-macos.zip under status_page/assets/0.3.6/, releases/0.3.6/, paid_assets/0.3.6/, dist/0.3.6/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
-        ],
-        "path": null,
-        "search_roots": [
-          "status_page/assets/0.3.6/",
-          "releases/0.3.6/",
-          "paid_assets/0.3.6/",
-          "dist/0.3.6/",
-          "status_page/assets/"
-        ],
-        "relative_path": "0.3.6/restore-privacy-client-0.3.6-macos.zip"
-      },
-      {
-        "platform": "ios",
-        "label": "iOS",
-        "filename": "restore-privacy-client-0.3.6-ios.zip",
-        "state": "Red",
-        "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.3.6-ios.zip / relative_path 0.3.6/restore-privacy-client-0.3.6-ios.zip under status_page/assets/0.3.6/, releases/0.3.6/, paid_assets/0.3.6/, dist/0.3.6/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
-        ],
-        "path": null,
-        "search_roots": [
-          "status_page/assets/0.3.6/",
-          "releases/0.3.6/",
-          "paid_assets/0.3.6/",
-          "dist/0.3.6/",
-          "status_page/assets/"
-        ],
-        "relative_path": "0.3.6/restore-privacy-client-0.3.6-ios.zip"
+        "relative_path": "1.1.10/restore-privacy-client-1.1.10-windows-x64-setup.exe"
       },
       {
         "platform": "android",
         "label": "Android",
-        "filename": "restore-privacy-client-0.3.6-android.apk",
-        "state": "Red",
+        "filename": "restore-privacy-client-1.1.10-android.apk",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.3.6-android.apk / relative_path 0.3.6/restore-privacy-client-0.3.6-android.apk under status_page/assets/0.3.6/, releases/0.3.6/, paid_assets/0.3.6/, dist/0.3.6/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "node_elgamal.pub pin matches product monopin",
+          "Android residual wire (PFS + outer obfs) present",
+          "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": null,
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.1.10/restore-privacy-client-1.1.10-android.apk",
+        "bytes": 85322790,
+        "relative_path": "1.1.10/restore-privacy-client-1.1.10-android.apk",
         "search_roots": [
-          "status_page/assets/0.3.6/",
-          "releases/0.3.6/",
-          "paid_assets/0.3.6/",
-          "dist/0.3.6/",
-          "status_page/assets/"
+          "status_page/assets/1.1.10/",
+          "releases/1.1.10/",
+          "/opt/restore-privacy/paid_assets/1.1.10/",
+          "dist/1.1.10/",
+          "status_page/assets/",
+          "https://135.181.152.10.sslip.io/paid-assets/1.1.10/"
+        ]
+      },
+      {
+        "platform": "macos",
+        "label": "macOS",
+        "filename": "restore-privacy-client-1.1.10-macos.zip",
+        "state": "Green",
+        "reasons": [
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)",
+          "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "relative_path": "0.3.6/restore-privacy-client-0.3.6-android.apk"
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.1.10/restore-privacy-client-1.1.10-macos.zip",
+        "bytes": 27825135,
+        "relative_path": "1.1.10/restore-privacy-client-1.1.10-macos.zip",
+        "search_roots": [
+          "status_page/assets/1.1.10/",
+          "releases/1.1.10/",
+          "/opt/restore-privacy/paid_assets/1.1.10/",
+          "dist/1.1.10/",
+          "status_page/assets/",
+          "https://135.181.152.10.sslip.io/paid-assets/1.1.10/"
+        ]
+      },
+      {
+        "platform": "ios",
+        "label": "iOS",
+        "filename": "restore-privacy-client-1.1.10-ios.zip",
+        "state": "Green",
+        "reasons": [
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)",
+          "exit_node_elgamal.pub present (multihop exit pin)"
+        ],
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.1.10/restore-privacy-client-1.1.10-ios.zip",
+        "bytes": 13224884,
+        "relative_path": "1.1.10/restore-privacy-client-1.1.10-ios.zip",
+        "search_roots": [
+          "status_page/assets/1.1.10/",
+          "releases/1.1.10/",
+          "/opt/restore-privacy/paid_assets/1.1.10/",
+          "dist/1.1.10/",
+          "status_page/assets/",
+          "https://135.181.152.10.sslip.io/paid-assets/1.1.10/"
+        ]
+      },
+      {
+        "platform": "linux",
+        "label": "Linux",
+        "filename": "restore-privacy-client-1.1.10-linux-x64.tar.gz",
+        "state": "Green",
+        "reasons": [
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)",
+          "exit_node_elgamal.pub present (multihop exit pin)"
+        ],
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.1.10/restore-privacy-client-1.1.10-linux-x64.tar.gz",
+        "bytes": 14667758,
+        "relative_path": "1.1.10/restore-privacy-client-1.1.10-linux-x64.tar.gz",
+        "search_roots": [
+          "status_page/assets/1.1.10/",
+          "releases/1.1.10/",
+          "/opt/restore-privacy/paid_assets/1.1.10/",
+          "dist/1.1.10/",
+          "status_page/assets/",
+          "https://135.181.152.10.sslip.io/paid-assets/1.1.10/"
+        ]
       }
     ],
-    "staged_count": 0,
+    "staged_count": 4,
+    "helsinki_remote_count": 0,
+    "helsinki_paid_asset_base": "https://135.181.152.10.sslip.io/paid-assets",
     "overall": "Red",
     "legend": {
-      "Green": "Present, no *.priv, product node pub pin match, platform structural gate pass (Windows multihop markers when PE)",
+      "Green": "Present (local monorepo/releases/paid_assets or Helsinki paid store), no *.priv when scanned, product node pub pin match when scanned, platform structural gate pass (Windows multihop markers when PE scanned)",
       "Amber": "Present but pin/structural check incomplete or soft warning",
-      "Red": "Missing from local releases/assets tree, embeds *.priv, pin mismatch, or failed structural gate"
+      "Red": "Missing from local trees and Helsinki paid store, embeds *.priv, pin mismatch, or failed structural gate"
     }
   },
   "section_b": {
@@ -148,11 +233,10 @@
       "nolog_journald": {
         "ok": true,
         "warn": false,
-        "skipped": false,
+        "skipped": true,
         "reasons": [
-          "config ok: rpt-node.json",
-          "unit checks via readable fixture rpt-node.service",
-          "unit StandardOutput=null present"
+          "rpt-node.json/conf not present (non-node host)",
+          "rpt-node.service unit not on this host"
         ],
         "directives": [
           "StandardOutput=null",
@@ -166,11 +250,11 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "scanned_roots=9",
+          "scanned_roots=6",
           "hits=0"
         ],
         "hits": [],
-        "scanned_roots": 9
+        "scanned_roots": 6
       },
       "kill_switch_default_off": {
         "ok": true,
@@ -179,9 +263,11 @@
         "reasons": [
           "default_empty_env_enabled=False",
           "current_env_enabled=False",
+          "parked=False",
           "kill-switch default off (product residual)"
         ],
-        "operator_opt_in": false
+        "operator_opt_in": false,
+        "parked": false
       },
       "title_only_status": {
         "ok": true,
@@ -196,37 +282,38 @@
       "host_privacy_drift": {
         "ok": true,
         "warn": false,
-        "skipped": false,
+        "skipped": true,
         "reasons": [
-          "journald drop-in present (short retention)",
-          "unit not logging StandardOutput to journal",
-          "install_host_privacy.sh recipe present in tree"
+          "journald drop-in 99-rpt-privacy.conf absent",
+          "rpt-node.service unit not on this host",
+          "install_host_privacy.sh recipe present in tree",
+          "non-node host (no unit/drop-in/log-dir artifacts)"
         ],
-        "unit_present": true,
-        "dropin_present": true
+        "unit_present": false,
+        "dropin_present": false
       },
       "disk_wipe_readiness": {
         "ok": true,
         "warn": false,
         "skipped": false,
         "reasons": [
-          "cryptsetup present: /usr/sbin/cryptsetup",
+          "cryptsetup not found (FDE tooling absent)",
           "install_disk_encryption.sh present",
           "install_zram_luks.sh present (node-only ram volume)",
           "shutdown wipe script present",
-          "rpt-node-shutdown-wipe.service present",
-          "node unit unreadable (PermissionError); skip wipe-wire check",
-          "status-only: no LUKS format attempted"
+          "wipe unit not wired (optional on non-node hosts)",
+          "status-only: no LUKS format attempted",
+          "cryptsetup not on PATH; disk/zram recipes present (status-only PASS)"
         ],
-        "cryptsetup": "/usr/sbin/cryptsetup",
-        "wipe_wired": true
+        "cryptsetup": null,
+        "wipe_wired": false
       },
       "ephemeral_dry_run": {
         "ok": true,
         "warn": false,
         "skipped": false,
         "reasons": [
-          "ephemeral_node.py present (/opt/restore-privacy/scripts/ephemeral_node.py)",
+          "ephemeral_node.py present (/Users/russellsneddon/restore-privacy/scripts/ephemeral_node.py)",
           "dry-run mode available",
           "dry-run exit=0",
           "dry-run completed"
@@ -243,25 +330,30 @@
       }
     },
     "ok": true,
-    "all_in_scope_pass": true,
+    "all_in_scope_pass": false,
     "firewall_excluded": true,
     "section": "B"
   },
   "multihop_structure": {
     "probes": {
       "multihop_module_flags": {
-        "ok": false,
+        "ok": true,
         "warn": false,
         "skipped": false,
         "reasons": [
           "MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit)",
-          "entry host 82.221.101.241:44044 (Iceland monopin)",
-          "exit host '178.105.187.178' != product Romania pin 185.146.232.107"
+          "Iceland peer Iceland (IS) (IS monopin)",
+          "Germany peer Germany (DE) (DE monopin / RO replacement)",
+          "live catalog peers IS+DE only (United States residual peer retired)",
+          "DEFAULT_ENTRY_COUNTRY=DE (product default residual entry = Germany)"
         ],
-        "entry_host": "82.221.101.241",
-        "exit_host": "178.105.187.178",
+        "entry_host": "Iceland (IS)",
+        "exit_host": "Germany (DE)",
+        "us_host": "5.161.242.85",
+        "de_host": "Germany (DE)",
         "entry_port": 44044,
         "exit_port": 44044,
+        "us_port": 44044,
         "routing_implemented": true
       },
       "multihop_product_pubs": {
@@ -269,21 +361,23 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "entry pub present (/opt/restore-privacy/product/node_elgamal.pub) sha=1b126abfae737c66\u2026",
-          "exit pub present (/opt/restore-privacy/product/exit_node_elgamal.pub) sha=a36a3f38066ece7b\u2026",
-          "entry and exit pubs are distinct"
+          "IS pub present (/Users/russellsneddon/restore-privacy/product/node_elgamal.pub) sha=1b126abfae737c66\u2026",
+          "exit/DE pub present (/Users/russellsneddon/restore-privacy/product/exit_node_elgamal.pub) sha=ea0c7fa338612386\u2026",
+          "US pub present (/Users/russellsneddon/restore-privacy/product/us_node_elgamal.pub) sha=9864211dc29e8b21\u2026",
+          "IS/exit-DE/US pubs present and pairwise distinct"
         ],
-        "entry_pub": "/opt/restore-privacy/product/node_elgamal.pub",
-        "exit_pub": "/opt/restore-privacy/product/exit_node_elgamal.pub"
+        "entry_pub": "/Users/russellsneddon/restore-privacy/product/node_elgamal.pub",
+        "exit_pub": "/Users/russellsneddon/restore-privacy/product/exit_node_elgamal.pub",
+        "us_pub": "/Users/russellsneddon/restore-privacy/product/us_node_elgamal.pub"
       },
       "multihop_residual_via_exit": {
         "ok": true,
         "warn": false,
         "skipped": false,
         "reasons": [
-          "is_multihop_active=True for entry\u2192exit path",
-          "residual_endpoint dials exit 178.105.187.178:44044 (residual-via-exit)",
-          "multi-hop disabled residual stays entry 82.221.101.241 (default single-hop)",
+          "is_multihop_active=True for IS\u2192DE entry\u2192exit path",
+          "residual_endpoint dials exit Germany (DE) (residual-via-exit)",
+          "multi-hop disabled residual stays entry Germany (DE) (default single-hop DE)",
           "status text: multi-hop active (2 hops): Iceland (IS) \u2192 Germany (DE) (residual via Germany (DE))"
         ],
         "status_text": "multi-hop active (2 hops): Iceland (IS) \u2192 Germany (DE) (residual via Germany (DE))"
@@ -293,30 +387,33 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "present: /opt/restore-privacy/node/install_zram_luks.sh",
-          "present: /opt/restore-privacy/node/install_host_privacy.sh",
+          "present: /Users/russellsneddon/restore-privacy/node/install_zram_luks.sh",
+          "present: /Users/russellsneddon/restore-privacy/node/install_host_privacy.sh",
           "node-only: clients never install LUKS/zram"
         ]
       }
     },
-    "ok": false,
+    "ok": true,
     "section": "multihop_node_structure",
-    "honesty": "residual-via-exit when multi-hop enabled; not full intermediate onion encapsulation; default single-hop Iceland entry"
+    "honesty": "residual-via-exit when multi-hop enabled; not full intermediate onion encapsulation; default single-hop Germany (DE) entry (RO replaced)"
   },
   "audit_privacy": {
-    "localhost_required": true,
-    "outbound_allowed": false,
-    "probe_host_loopback": true,
+    "localhost_required": false,
+    "outbound_allowed": true,
+    "probe_host_loopback": false,
+    "multi_node_schedule": true,
+    "probe_peer_count": 2,
     "no_network_exfil": true,
     "section_b": true,
     "multihop_structure": true,
     "firewall_probe_excluded": true
   },
-  "overall_ok": false,
+  "overall_ok": true,
   "privacy": {
     "redacted": true,
     "no_suite_tails": true,
     "no_network_exfil": true,
-    "note": "Audit artifacts are local-only; timer does not git-push or upload"
+    "multi_node_probes": true,
+    "note": "Audit artifacts written locally on --write; optional --publish / RPT_AUDIT_PUBLISH pushes AUDIT + JSON to status-host deploy surface"
   }
 }

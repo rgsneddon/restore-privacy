@@ -39,6 +39,18 @@ void main() {
     expect(src.contains('resolveSettingsStoreForOpen'), isTrue);
     expect(src.contains('Settings could not open'), isTrue);
     expect(src.contains('product_settings_screen'), isTrue);
+    // Settings must stay openable during Connect (not gated by _busy).
+    expect(
+      src.contains("onPressed: () => unawaited(_openSettings())"),
+      isTrue,
+      reason: 'Settings button must not disable while _busy',
+    );
+    expect(
+      src.contains(
+        "onPressed: _busy ? null : () => unawaited(_openSettings())",
+      ),
+      isFalse,
+    );
     // Extract _openSettings body and forbid silent null-store return.
     final start = src.indexOf('Future<void> _openSettings()');
     expect(start, greaterThanOrEqualTo(0));
@@ -134,11 +146,11 @@ void main() {
     expect(src.contains('keeping distribution profile'), isTrue);
   });
 
-  test('build_suite_1.1.9 monopin is Notarized DevID residual-capable free path',
+  test('build_suite_1.1.10 monopin is Notarized DevID residual-capable free path',
       () {
     final root = Directory.current.path;
     // flutter test cwd is client_app/
-    final script = File('../scripts/build_suite_1.1.9.py');
+    final script = File('../scripts/build_suite_1.1.10.py');
     expect(script.existsSync(), isTrue, reason: 'from $root');
     final src = script.readAsStringSync();
     // Residual re-sign is side path only (best-effort).

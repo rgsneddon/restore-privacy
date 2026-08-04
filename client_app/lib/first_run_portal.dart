@@ -404,11 +404,13 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
       ),
       const SizedBox(height: 8),
       Text(
-        'Step ${_stepIndex(step)} of 2',
+        _stepHeadline(step),
+        key: Key('first_run_step_label_${_stepIndex(step)}'),
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.6),
-          fontSize: 12,
+          color: Colors.white.withValues(alpha: 0.85),
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
         ),
       ),
       const SizedBox(height: 24),
@@ -483,6 +485,18 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
         return 2;
       case FirstRunStep.complete:
         return 2;
+    }
+  }
+
+  /// Visible first-use step chrome (Step 1 = licence, Step 2 = KEYGEN/trial).
+  String _stepHeadline(FirstRunStep s) {
+    switch (s) {
+      case FirstRunStep.licence:
+        return 'Step 1 of 2 — Accept the end-user licence';
+      case FirstRunStep.keygenOrTrial:
+        return 'Step 2 of 2 — KEYGEN or free trial';
+      case FirstRunStep.complete:
+        return 'Step 2 of 2 — Ready';
     }
   }
 

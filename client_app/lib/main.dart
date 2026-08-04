@@ -1419,7 +1419,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   IconButton(
                     key: const Key('main_settings_button'),
                     tooltip: 'Settings',
-                    onPressed: _busy ? null : () => unawaited(_openSettings()),
+                    // Always openable — never disable Settings while Connect is busy
+                    // (macOS: long NE prepare left Settings looking dead).
+                    onPressed: () => unawaited(_openSettings()),
                     icon: Icon(Icons.settings, color: suitePrimaryOf(context)),
                   ),
                 ],

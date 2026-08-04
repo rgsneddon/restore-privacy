@@ -7,19 +7,19 @@ import 'package:restore_privacy_client/suite_version.dart';
 void main() {
   test('RptConfig product monopin matches residual catalog pin', () {
     expect(RptConfig.productVersion, kSuiteVersion);
-    expect(kSuiteVersion, '1.1.9');
+    expect(kSuiteVersion, '1.1.10');
     expect(kSuiteDisplayVersion.contains(kSuiteVersion), isTrue);
     expect(kSuiteDisplayVersion.toLowerCase(), contains('privacy'));
     // Residual VPN product — not multi-product Suite chrome.
     expect(kSuiteDisplayVersion.toLowerCase().contains('suite'), isFalse);
   });
 
-  test('pubspec and client/VERSION pin monopin 1.1.9', () {
+  test('pubspec and client/VERSION pin monopin 1.1.10', () {
     final pubspec = File('pubspec.yaml').readAsStringSync();
-    expect(pubspec.contains('version: 1.1.9'), isTrue);
+    expect(pubspec.contains('version: 1.1.10'), isTrue);
 
     final versionFile = File('../client/VERSION').readAsStringSync().trim();
-    expect(versionFile, '1.1.9');
+    expect(versionFile, '1.1.10');
     expect(versionFile, kSuiteVersion);
   });
 

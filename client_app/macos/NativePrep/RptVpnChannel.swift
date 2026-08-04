@@ -902,6 +902,10 @@ enum RptVpnChannel {
   }
 
   /// Prefer our saved manager; never reuse an unrelated VPN config.
+  ///
+  /// Always returns a manager we will re-apply a **fresh** protocol onto
+  /// (see [applyProductPacketTunnelProtocol]) so residual-team → monopin
+  /// upgrades do not keep a Development designated requirement.
   private static func selectOrCreateManager(
     from managers: [NETunnelProviderManager]?
   ) -> NETunnelProviderManager {
@@ -926,28 +930,29 @@ enum RptVpnChannel {
 
   /// Apply product Packet Tunnel protocol identity (shared by prepare + Connect).
   ///
-  /// **Seamless upgrade:** reuse an existing product ``NETunnelProviderProtocol``
-  /// when present (same provider bundle id). Replacing the protocol object on
-  /// every prepare/Connect after an app upgrade can leave System VPN prefs
-  /// unable to reconfigure the tunnel (reported 0.5.7→0.5.8 macOS failure).
+  /// Always constructs a **fresh** ``NETunnelProviderProtocol``. Reusing a
+  /// saved protocol after residual-team (Apple Development) → free monopin
+  /// (Developer ID) upgrades leaves a stale provider designated requirement;
+  /// Network Extension then fails with “code failed to satisfy specified
+  /// code requirement(s)” and the tunnel never reaches Connected.
   private static func applyProductPacketTunnelProtocol(
     to manager: NETunnelProviderManager,
     host: String,
     port: UInt16
   ) {
-    let proto: NETunnelProviderProtocol
+    // Preserve providerConfiguration keys we own; never keep the old protocol
+    // object (stale designated requirement / signing identity).
+    var priorCfg: [String: Any] = [:]
     if let existing = manager.protocolConfiguration as? NETunnelProviderProtocol,
-       (existing.providerBundleIdentifier ?? "").isEmpty
-         || existing.providerBundleIdentifier == providerBundleId {
-      proto = existing
-    } else {
-      proto = NETunnelProviderProtocol()
+       let old = existing.providerConfiguration {
+      priorCfg = old
     }
+    let proto = NETunnelProviderProtocol()
     proto.providerBundleIdentifier = providerBundleId
     proto.serverAddress = "\(host):\(port)"
     // DisconnectOnSleep false so residual session survives lid close while allowed by OS.
     proto.disconnectOnSleep = false
-    var cfg = (proto.providerConfiguration as? [String: Any]) ?? [:]
+    var cfg = priorCfg
     cfg["host"] = host
     cfg["port"] = Int(port)
     cfg["fullTunnel"] = true
@@ -1179,16 +1184,18 @@ enum RptVpnChannel {
             let detail =
               "Packet Tunnel did not become Connected (status \(statusName(st))/\(st.rawValue)). "
               + "Press Connect again after Allowing the OS VPN dialog if it appeared. "
-              + "Do not use L2TP/IKEv2. Developers: scripts/sign_macos_residual_team.py "
-              + "if host lacks packet-tunnel-provider. "
-              + "If residual HELLO timed out (~15s): check network/UDP 44044, "
-              + "keygen unlock, and Team residual Network Extension signing."
+              + "Do not use L2TP/IKEv2. "
+              + "Open System Settings → Network → VPN & Filters, enable Restore Privacy, "
+              + "Allow if prompted, then Connect again. "
+              + "If you previously used a Team residual build on this Mac, Connect once more "
+              + "so the free monopin can replace the old VPN profile signature."
             let map = RptFullTunnelResult.productConnectMap(
               packetTunnelActive: false,
               detailMessage: detail
             )
-            // Do not auto-open Network Settings — residual-honest status only.
-            completion(map)
+            // Host has NE but tunnel never Connected — user must Allow / toggle
+            // the System VPN row (common after DevID reinstall / residual-team→monopin).
+            completion(annotateNeedsVpnSettings(map, openSettings: true))
           }
         }
       } catch {
@@ -1197,7 +1204,7 @@ enum RptVpnChannel {
           detailMessage: describeNePreferencesError(error)
         )
         completion(
-          annotateNeedsVpnSettings(map, openSettings: isNePermissionFailure(error))
+          annotateNeedsVpnSettings(map, openSettings: true)
         )
       }
     }
