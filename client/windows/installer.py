@@ -33,7 +33,7 @@ from client.install_paths import (
 APP_NAME = "RestorePrivacy"
 # Baked by scripts/build_release_*.py write_version_files (monopin). Never use a
 # stale historical pin as the only identity when client/VERSION is missing.
-PRODUCT_VERSION_EMBEDDED = "1.1.7"
+PRODUCT_VERSION_EMBEDDED = "1.1.9"
 
 
 def _product_version_pin() -> str:
@@ -86,6 +86,199 @@ def _product_version_pin() -> str:
 
 
 VERSION = _product_version_pin()
+
+
+def _restore_internet_source_candidates(filename: str = "Restore Internet.bat") -> list[Path]:
+    """Locate shipped failsafe sources (dev tree, frozen MEIPASS, payload)."""
+    cands: list[Path] = []
+    try:
+        here = Path(__file__).resolve().parent
+        cands.append(here / filename)
+        # Alias without space
+        if filename == "Restore Internet.bat":
+            cands.append(here / "RestoreInternet.bat")
+    except Exception:
+        pass
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        try:
+            mei = Path(sys._MEIPASS)  # type: ignore[attr-defined]
+            for base in (
+                mei,
+                mei / "client" / "windows",
+                mei / "payload",
+                mei / "payload" / "client" / "windows",
+                mei / "_internal" / "client" / "windows",
+            ):
+                cands.append(base / filename)
+                if filename == "Restore Internet.bat":
+                    cands.append(base / "RestoreInternet.bat")
+        except Exception:
+            pass
+    return cands
+
+
+def load_full_restore_internet_bat_text() -> str:
+    """Return the full Restore Internet failsafe body (never the rmdir-only stub).
+
+    Prefers on-disk source next to this module / frozen datas. Falls back to an
+    embedded full failsafe that restores routes, clears RPT-KS/RPT-FW, removes
+    product trees and shortcuts.
+    """
+    for cand in _restore_internet_source_candidates("Restore Internet.bat"):
+        try:
+            if not cand.is_file():
+                continue
+            text = cand.read_text(encoding="utf-8", errors="replace")
+            if is_full_restore_internet_failsafe(text):
+                return text if text.endswith("\n") else text + "\n"
+        except OSError:
+            continue
+    return FULL_RESTORE_INTERNET_BAT_EMBEDDED
+
+
+def is_full_restore_internet_failsafe(text: str) -> bool:
+    """True when *text* is the full residual restore + product removal failsafe."""
+    if not text or len(text) < 200:
+        return False
+    low = text.lower()
+    # Must restore dual /1 residual routes
+    if "0.0.0.0" not in text or "128.0.0.0" not in text:
+        return False
+    # Must clear product firewall (KS and/or FW rules)
+    if "rpt-ks" not in low and "rpt-fw" not in low:
+        return False
+    # Must remove product install tree (not only route deletes)
+    if "restoreprivacy" not in low and "localappdata" not in low:
+        return False
+    # Reject historical three-line stub (route delete x3 + rmdir only, no KS)
+    if "remove-netfirewallrule" not in low and "rpt-ks" not in low:
+        return False
+    return True
+
+
+def ship_restore_internet_failsafe(install_dir: Path | str) -> Path:
+    """Write full Restore Internet.bat (+ alias) under *install_dir*. Returns primary path."""
+    root = Path(install_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    body = load_full_restore_internet_bat_text()
+    if not is_full_restore_internet_failsafe(body):
+        body = FULL_RESTORE_INTERNET_BAT_EMBEDDED
+    # Normalize CRLF for Windows cmd
+    body = body.replace("\r\n", "\n").replace("\n", "\r\n")
+    if not body.endswith("\r\n"):
+        body += "\r\n"
+    primary = root / "Restore Internet.bat"
+    alias = root / "RestoreInternet.bat"
+    primary.write_text(body, encoding="utf-8")
+    alias.write_text(body, encoding="utf-8")
+    return primary
+
+
+# Embedded full failsafe — used when source .bat is not next to frozen installer.
+# Keep in sync with client/windows/Restore Internet.bat (residual + KS + uninstall).
+FULL_RESTORE_INTERNET_BAT_EMBEDDED = r"""@echo off
+REM =============================================================================
+REM Restore Internet — failsafe residual restore + complete product removal
+REM =============================================================================
+setlocal EnableExtensions
+cd /d "%~dp0"
+
+set "QUIET=0"
+set "NODE=82.221.101.241"
+set "APPNAME=RestorePrivacy"
+set "DISPLAY=Privacy Restored"
+if /I "%~1"=="/quiet" set "QUIET=1"
+if /I "%~2"=="/quiet" set "QUIET=1"
+if not "%~1"=="" if /I not "%~1"=="/quiet" set "NODE=%~1"
+
+net session >nul 2>&1
+if errorlevel 1 (
+  echo Requesting Administrator for Restore Internet (network + uninstall)...
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -ArgumentList '/quiet' -Verb RunAs -Wait"
+  exit /b %ERRORLEVEL%
+)
+
+title Restore Internet — Restore Privacy failsafe
+echo.
+echo === Restore Internet ===
+echo Restoring normal internet, then removing Restore Privacy from this PC...
+echo.
+
+echo [1/4] Removing residual dual /1 routes and server pin...
+route delete 0.0.0.0 mask 128.0.0.0 >nul 2>&1
+route delete 128.0.0.0 mask 128.0.0.0 >nul 2>&1
+route delete 0.0.0.0 mask 128.0.0.0 0.0.0.0 >nul 2>&1
+route delete 128.0.0.0 mask 128.0.0.0 0.0.0.0 >nul 2>&1
+route delete %NODE% mask 255.255.255.255 >nul 2>&1
+
+echo [2/4] Clearing RPT kill-switch / profile Block and re-enabling IPv6...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$ErrorActionPreference='Continue';" ^
+  "Get-NetFirewallRule -EA SilentlyContinue | Where-Object { $_.DisplayName -like 'RPT-KS-*' -or $_.DisplayName -like 'RPT-FW-*' } | Remove-NetFirewallRule -EA SilentlyContinue;" ^
+  "$sp=Join-Path $env:ProgramData 'RestorePrivacy\ks-outbound-state.json';" ^
+  "if (Test-Path $sp) { try { $p=Get-Content $sp -Raw|ConvertFrom-Json; foreach($n in @('Domain','Private','Public')){ $v=$p.$n; if(-not $v){$v='Allow'}; Set-NetFirewallProfile -Name $n -DefaultOutboundAction $v -EA SilentlyContinue }; Remove-Item $sp -Force -EA SilentlyContinue } catch { foreach($n in @('Domain','Private','Public')){ Set-NetFirewallProfile -Name $n -DefaultOutboundAction Allow -EA SilentlyContinue } } } else { foreach($n in @('Domain','Private','Public')){ Set-NetFirewallProfile -Name $n -DefaultOutboundAction Allow -EA SilentlyContinue } };" ^
+  "Get-NetAdapter -EA SilentlyContinue | ForEach-Object { Enable-NetAdapterBinding -Name $_.Name -ComponentID ms_tcpip6 -Confirm:$false -EA SilentlyContinue };" ^
+  "netsh interface teredo set state default | Out-Null;" ^
+  "Write-Output RPT_RESTORE_INTERNET_NET_OK"
+
+echo [3/4] Stopping product process...
+taskkill /F /IM RestorePrivacy.exe >nul 2>&1
+taskkill /F /IM "Restore Privacy.exe" >nul 2>&1
+timeout /t 1 /nobreak >nul 2>&1
+
+echo [4/4] Removing product tree, shortcuts, secrets...
+set "PORTABLE=%~dp0"
+if "%PORTABLE:~-1%"=="\" set "PORTABLE=%PORTABLE:~0,-1%"
+set "INSTALL=%LOCALAPPDATA%\Programs\%APPNAME%"
+
+if exist "%APPDATA%\Microsoft\Windows\Start Menu\Programs\%APPNAME%" (
+  rmdir /s /q "%APPDATA%\Microsoft\Windows\Start Menu\Programs\%APPNAME%" 2>nul
+)
+del /q "%USERPROFILE%\Desktop\%DISPLAY%.lnk" 2>nul
+del /q "%USERPROFILE%\Desktop\Privacy, Restored.lnk" 2>nul
+del /q "%USERPROFILE%\Desktop\%APPNAME%.lnk" 2>nul
+del /q "%USERPROFILE%\Desktop\Restore Internet.lnk" 2>nul
+del /q "%APPDATA%\Microsoft\Windows\Start Menu\Programs\%DISPLAY%.lnk" 2>nul
+del /q "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Restore Internet.lnk" 2>nul
+
+if exist "%USERPROFILE%\.restore-privacy" (
+  rmdir /s /q "%USERPROFILE%\.restore-privacy" 2>nul
+)
+if exist "%ProgramData%\RestorePrivacy" (
+  rmdir /s /q "%ProgramData%\RestorePrivacy" 2>nul
+)
+if exist "%LOCALAPPDATA%\RestorePrivacy" (
+  rmdir /s /q "%LOCALAPPDATA%\RestorePrivacy" 2>nul
+)
+
+if exist "%INSTALL%\RestorePrivacy.exe" (
+  rmdir /s /q "%INSTALL%" 2>nul
+)
+if exist "%INSTALL%" (
+  rmdir /s /q "%INSTALL%" 2>nul
+)
+
+if exist "%~dp0RestorePrivacy.exe" (
+  echo Portable package detected — scheduling full tree removal...
+  start "" /min powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 2; if (Test-Path -LiteralPath '%PORTABLE%') { Remove-Item -LiteralPath '%PORTABLE%' -Recurse -Force -ErrorAction SilentlyContinue }"
+)
+
+if exist "%~dp0RestorePrivacy.exe" del /f /q "%~dp0RestorePrivacy.exe" 2>nul
+if exist "%~dp0run.bat" del /f /q "%~dp0run.bat" 2>nul
+if exist "%~dp0AllowFirewall.bat" del /f /q "%~dp0AllowFirewall.bat" 2>nul
+if exist "%~dp0_internal" rmdir /s /q "%~dp0_internal" 2>nul
+if exist "%~dp0client" rmdir /s /q "%~dp0client" 2>nul
+if exist "%~dp0product" rmdir /s /q "%~dp0product" 2>nul
+if exist "%~dp0secrets" rmdir /s /q "%~dp0secrets" 2>nul
+
+echo.
+echo Restore Internet complete.
+if "%QUIET%"=="1" exit /b 0
+pause
+exit /b 0
+"""
+
+
 # User-facing shortcut name (Start Menu + Desktop). Tray hover text is rpT0.
 SHORTCUT_DISPLAY_NAME = "Privacy, Restored"
 # Default: Program Files\Restore Privacy (see client.install_paths).
@@ -693,34 +886,28 @@ def install(
 
     icon = resolve_shortcut_icon(INSTALL_DIR, installed_exe)
 
-    # Restore Internet failsafe (network restore + full uninstall) + FW allow helper
+    # Restore Internet failsafe (network restore + full uninstall) + FW allow helper.
+    # ALWAYS ship the full failsafe (routes + RPT-KS/RPT-FW cleanup + tree remove).
+    # Never write the historical three-line rmdir-only stub.
     restore_bat = INSTALL_DIR / "Restore Internet.bat"
     restore_alias = INSTALL_DIR / "RestoreInternet.bat"
     allow_bat = INSTALL_DIR / "AllowFirewall.bat"
     try:
+        ship_restore_internet_failsafe(INSTALL_DIR)
+        # AllowFirewall is optional helper (best-effort copy)
         here = Path(__file__).resolve().parent
-        for name, dest in (
-            ("Restore Internet.bat", restore_bat),
-            ("RestoreInternet.bat", restore_alias),
-            ("AllowFirewall.bat", allow_bat),
-        ):
-            src_bat = here / name
-            if src_bat.is_file():
-                shutil.copy2(src_bat, dest)
+        for cand in _restore_internet_source_candidates("AllowFirewall.bat"):
+            if cand.is_file():
+                shutil.copy2(cand, allow_bat)
+                break
         if not restore_bat.is_file() and restore_alias.is_file():
             shutil.copy2(restore_alias, restore_bat)
-        if not restore_bat.is_file():
-            # Failsafe removes this install tree (Program Files or per-user)
-            restore_bat.write_text(
-                "@echo off\r\n"
-                "route delete 0.0.0.0 mask 128.0.0.0\r\n"
-                "route delete 128.0.0.0 mask 128.0.0.0\r\n"
-                "route delete 82.221.101.241 mask 255.255.255.255\r\n"
-                f'rmdir /s /q "{INSTALL_DIR}"\r\n',
-                encoding="utf-8",
-            )
     except Exception:
-        pass
+        # Last resort: still try to write full body (never stub)
+        try:
+            ship_restore_internet_failsafe(INSTALL_DIR)
+        except Exception:
+            pass
     # Assert client + Restore Internet co-bundle (honest install inventory)
     inv = inventory_install_bundle(INSTALL_DIR, platform="win32")
     if not inv.restore_internet_entry and restore_bat.is_file():

@@ -67,13 +67,20 @@ class TestWindowsFwAllowBuilders(unittest.TestCase):
         self.assertTrue(any("Block" in x for x in v), msg=v)
 
     def test_kill_switch_default_still_off(self):
-        from client.kill_switch import product_kill_switch_parked
+        from client.kill_switch import (
+            product_kill_switch_parked,
+            set_kill_switch_settings_opt_in_reader,
+        )
 
-        self.assertTrue(product_kill_switch_parked())
-        self.assertFalse(product_kill_switch_enabled({}))
-        self.assertFalse(product_kill_switch_enabled({"RPT_KILL_SWITCH": "0"}))
-        # Parked: RPT_KILL_SWITCH=1 does not enable product residual KS
-        self.assertFalse(product_kill_switch_enabled({"RPT_KILL_SWITCH": "1"}))
+        # Un-parked opt-in: default off; env=1 enables; FW allow script is separate
+        self.assertFalse(product_kill_switch_parked())
+        set_kill_switch_settings_opt_in_reader(lambda: False)
+        try:
+            self.assertFalse(product_kill_switch_enabled({}))
+            self.assertFalse(product_kill_switch_enabled({"RPT_KILL_SWITCH": "0"}))
+            self.assertTrue(product_kill_switch_enabled({"RPT_KILL_SWITCH": "1"}))
+        finally:
+            set_kill_switch_settings_opt_in_reader(None)
         # Allow script must not embed KS apply body
         body = windows_fw_allow_script()
         ks = windows_ks_apply_script(
@@ -94,7 +101,9 @@ class TestWindowsFwAllowBuilders(unittest.TestCase):
         self.assertIn("AllowFirewall", hint)
 
     def test_apply_runs_encoded_command(self):
-        with mock.patch("subprocess.run") as spr:
+        with mock.patch(
+            "client.windows.hidden_subprocess.residual_shell_run"
+        ) as spr:
             spr.return_value = mock.Mock(
                 returncode=0, stdout="RPT_FW_ALLOW_OK\n", stderr=""
             )
@@ -103,7 +112,9 @@ class TestWindowsFwAllowBuilders(unittest.TestCase):
         self.assertEqual(errs, [])
         self.assertTrue(ran)
         self.assertTrue(spr.called)
-        self.assertIn("-EncodedCommand", spr.call_args[0][0])
+        # residual_shell_run(cmd, timeout=..., text=...)
+        first = spr.call_args[0][0] if spr.call_args[0] else spr.call_args.kwargs.get("cmd")
+        self.assertIn("-EncodedCommand", str(first))
 
 
 class TestWindowsFwWiring(unittest.TestCase):

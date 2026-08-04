@@ -13,7 +13,6 @@ There is **no** fully unprivileged residual path that stays residual-honest.
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -86,18 +85,19 @@ def residual_helper_installed() -> bool:
     """True when the one-time residual Connect scheduled task is registered."""
     if sys.platform != "win32":
         return False
+    from client.windows.hidden_subprocess import run_hidden
+
     for name in residual_helper_task_names():
         try:
-            r = subprocess.run(
+            r = run_hidden(
                 ["schtasks", "/Query", "/TN", name],
-                capture_output=True,
                 text=True,
                 timeout=15,
                 check=False,
             )
             if r.returncode == 0:
                 return True
-        except (OSError, subprocess.TimeoutExpired):
+        except (OSError, Exception):
             continue
     return False
 
@@ -235,15 +235,16 @@ def install_residual_helper(*, dry_run: bool = False) -> dict[str, Any]:
             "command": cmd,
             "task": RESIDUAL_HELPER_TASK,
         }
+    from client.windows.hidden_subprocess import run_hidden
+
     try:
-        r = subprocess.run(
+        r = run_hidden(
             cmd,
-            capture_output=True,
             text=True,
             timeout=60,
             check=False,
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except (OSError, Exception) as exc:
         return {"ok": False, "error": "schtasks_failed", "detail": str(exc), "command": cmd}
     ok = r.returncode == 0
     return {
@@ -264,17 +265,18 @@ def run_residual_helper_connect() -> dict[str, Any]:
         return {"ok": False, "error": "not_windows"}
     if not residual_helper_installed():
         return {"ok": False, "error": "helper_not_installed", "message": MSG_HELPER_MISSING}
+    from client.windows.hidden_subprocess import run_hidden
+
     last_err = ""
     for name in residual_helper_task_names():
         try:
-            r = subprocess.run(
+            r = run_hidden(
                 ["schtasks", "/Run", "/TN", name],
-                capture_output=True,
                 text=True,
                 timeout=30,
                 check=False,
             )
-        except (OSError, subprocess.TimeoutExpired) as exc:
+        except (OSError, Exception) as exc:
             last_err = str(exc)
             continue
         if r.returncode == 0:

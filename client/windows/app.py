@@ -355,6 +355,10 @@ class TunnelClientApp:
         self._busy = False
         self._tunnel = None
         self._connect_gen: int = 0
+        # Idle auto-reconnect (Settings ``auto_connect_if_idle``): default off path.
+        self._user_requested_disconnect: bool = True  # no reconnect until user Connects
+        self._idle_reconnect_inflight: bool = False
+        self._idle_reconnect_attempts: int = 0
         self._tray: WindowsSystemTray | None = None
         # Last status headline colour (theme re-apply must not wipe Connected teal)
         self._status_headline_fg: str = TEXT
@@ -1719,10 +1723,12 @@ class TunnelClientApp:
         else:
             self._start_connect()
 
-    def _start_connect(self) -> None:
+    def _start_connect(self, *, force_reconnect: bool = False) -> None:
         # Durable Settings is residual truth. Do **not** rewrite settings from a
         # stale main-shell Iceland label (first-run Settings OK race). Align the
         # picker to disk, then dial the configured entry country.
+        # force_reconnect=True: idle auto-reconnect after liveness drop so
+        # RptClient.connect cannot short-circuit as already-CONNECTED.
         try:
             entry_code = self._sync_main_entry_from_settings()
         except Exception:
@@ -1964,7 +1970,11 @@ class TunnelClientApp:
             residual_ready = residual_ip_capture_active(prior)
             with ThreadPoolExecutor(max_workers=1) as pool:
                 gw_fut = pool.submit(physical_default_gateway)
-                result = self.client.connect(timeout=20.0)
+                # Idle auto-reconnect passes force_reconnect so a stale
+                # CONNECTED session never short-circuits re-HELLO.
+                result = self.client.connect(
+                    timeout=20.0, force_reconnect=bool(force_reconnect)
+                )
                 try:
                     phys_gw = gw_fut.result(timeout=8)
                 except Exception:
@@ -2022,6 +2032,7 @@ class TunnelClientApp:
             try:
                 # Product residual path: Wintun + dual /1 only (never on UI thread)
                 # prior= reuses residual routes when already applied for this session
+                # Idle timeout drop → optional auto-reconnect (Settings).
                 tun_res = start_full_tunnel(
                     self.client,
                     result.tunnel_plan,
@@ -2030,6 +2041,9 @@ class TunnelClientApp:
                     require_system_capture=True,
                     prior=prior if residual_ready else None,
                     physical_gw=phys_gw,
+                    on_idle_session_drop=lambda: self.root.after(
+                        0, self._on_idle_session_drop
+                    ),
                 )
             except Exception as exc:
                 err = f"Tunnel attach error: {exc}"
@@ -2070,6 +2084,9 @@ class TunnelClientApp:
                             f"(ipv6_protected={v6};{entry_bit})",
                         )
                         # Apply control first so _connected is True, then status+tray
+                        self._user_requested_disconnect = False
+                        self._idle_reconnect_attempts = 0
+                        self._idle_reconnect_inflight = False
                         self._apply_control(connected=True, busy=False)
                         self._set_status(
                             "connected",
@@ -2092,6 +2109,9 @@ class TunnelClientApp:
                             KIND_CONNECT,
                             "Connected — session only (residual IPv4 off in Settings)",
                         )
+                        self._user_requested_disconnect = False
+                        self._idle_reconnect_attempts = 0
+                        self._idle_reconnect_inflight = False
                         self._apply_control(connected=True, busy=False)
                         self._set_status(
                             "connected",
@@ -2139,7 +2159,151 @@ class TunnelClientApp:
         self._tunnel = None
         disconnect_full_tunnel(tunnel, self.client)
 
+    def _on_idle_session_drop(self) -> None:
+        """Dataplane idle/timeout liveness lost — maybe auto-reconnect (Settings).
+
+        Called on Tk thread after dual /1 restore so host internet is already back.
+
+        Always tears down dead residual (dataplane/Wintun) + RPT session **before**
+        any reconnect. Otherwise ``RptClient.connect`` short-circuits on
+        ``ConnectState.CONNECTED`` and auto-reconnect is a false success with no
+        re-HELLO after node idle prune.
+        """
+        from client.windows.idle_auto_reconnect import (
+            idle_reconnect_backoff_s,
+            may_auto_reconnect_after_idle_drop,
+            perform_idle_drop_session_teardown,
+        )
+        from client.windows.settings_store import load_settings
+
+        try:
+            pref = bool(getattr(load_settings(), "auto_connect_if_idle", False))
+        except Exception:
+            pref = False
+        app_open = True
+        try:
+            if getattr(self, "_quitting", False):
+                app_open = False
+            elif not self.root.winfo_exists():
+                app_open = False
+        except Exception:
+            app_open = False
+
+        # Always drop the dead residual handle first so Connect cannot reuse it.
+        tunnel = self._tunnel
+        self._tunnel = None
+
+        decision = may_auto_reconnect_after_idle_drop(
+            pref_on=pref,
+            app_open=app_open,
+            user_requested_disconnect=bool(
+                getattr(self, "_user_requested_disconnect", True)
+            ),
+            drop_was_idle_timeout=True,
+            already_reconnecting=bool(
+                getattr(self, "_idle_reconnect_inflight", False)
+            ),
+            attempt_count=int(getattr(self, "_idle_reconnect_attempts", 0)),
+        )
+
+        delay_ms = 0
+        if decision.allow:
+            attempt = int(getattr(self, "_idle_reconnect_attempts", 0))
+            delay_ms = int(idle_reconnect_backoff_s(attempt) * 1000)
+            self._idle_reconnect_inflight = True
+            self._idle_reconnect_attempts = attempt + 1
+            self._log(
+                f"Residual idle drop — tearing down dead residual, then "
+                f"auto-reconnect in {delay_ms}ms "
+                f"(attempt {self._idle_reconnect_attempts})"
+            )
+            self._connection_log(
+                KIND_CONNECT,
+                f"Auto-reconnect after idle drop "
+                f"(attempt {self._idle_reconnect_attempts})",
+            )
+            try:
+                self._set_status(
+                    "connecting",
+                    detail="Tunnel dropped after idle — reconnecting…",
+                )
+            except Exception:
+                pass
+        else:
+            self._log(
+                f"Residual idle drop — no auto-reconnect ({decision.reason}); "
+                "clearing dead residual session"
+            )
+            try:
+                if not self._busy:
+                    self._apply_control(connected=False, busy=False)
+                    self._set_status(
+                        "disconnected",
+                        detail=(
+                            "Tunnel dropped after idle. Press Connect to resume."
+                        ),
+                    )
+            except Exception:
+                pass
+
+        # Teardown off the UI thread (route/dataplane stop can block).
+        schedule_reconnect = bool(decision.allow)
+
+        def work() -> None:
+            try:
+                perform_idle_drop_session_teardown(
+                    tunnel=tunnel,
+                    client=self.client,
+                    disconnect_full_tunnel_fn=disconnect_full_tunnel,
+                )
+            except Exception as exc:
+                try:
+                    self._log(f"Idle-drop residual teardown: {exc}")
+                except Exception:
+                    pass
+            if not schedule_reconnect:
+                return
+
+            def _schedule() -> None:
+                def _go() -> None:
+                    self._idle_reconnect_inflight = False
+                    if getattr(self, "_user_requested_disconnect", True):
+                        return
+                    if getattr(self, "_quitting", False):
+                        return
+                    if self._busy:
+                        # Try once more shortly if Connect/Disconnect mid-flight
+                        try:
+                            self.root.after(1500, _go)
+                        except Exception:
+                            pass
+                        return
+                    try:
+                        # force_reconnect: re-HELLO even if client still CONNECTED
+                        self._start_connect(force_reconnect=True)
+                    except Exception as exc:
+                        self._log(f"Auto-reconnect failed to start: {exc}")
+
+                try:
+                    self.root.after(delay_ms, _go)
+                except Exception:
+                    self._idle_reconnect_inflight = False
+
+            try:
+                self.root.after(0, _schedule)
+            except Exception:
+                self._idle_reconnect_inflight = False
+
+        threading.Thread(
+            target=work,
+            name="rpt-idle-drop-teardown",
+            daemon=True,
+        ).start()
+
     def _start_disconnect(self) -> None:
+        # User intent: never fight with idle auto-reconnect
+        self._user_requested_disconnect = True
+        self._idle_reconnect_inflight = False
         # Invalidate any in-flight Connect worker (cancel before / during attach)
         self._connect_gen = int(getattr(self, "_connect_gen", 0)) + 1
         self._apply_control(connected=True, busy=True)
@@ -2455,11 +2619,18 @@ class TunnelClientApp:
         self._settings = cur
         run_var = tk.BooleanVar(value=cur.run_at_startup)
         auto_var = tk.BooleanVar(value=cur.autoconnect_on_launch)
+        idle_auto_var = tk.BooleanVar(
+            value=bool(getattr(cur, "auto_connect_if_idle", False))
+        )
         shape_var = tk.BooleanVar(value=cur.privacy_traffic_shape)
         obfs_var = tk.BooleanVar(value=cur.privacy_outer_obfuscation)
         multihop_var = tk.BooleanVar(value=cur.privacy_multihop)
         # Residual IPv4 is always ON (no user switch). IPv6 remains adjustable.
         ipv6_var = tk.BooleanVar(value=bool(getattr(cur, "residual_ipv6", True)))
+        # Kill-switch opt-in (default OFF; enable requires typed KILLSWITCH).
+        ks_var = tk.BooleanVar(
+            value=bool(getattr(cur, "kill_switch_opt_in", False))
+        )
         entry_country_var = tk.StringVar(
             value=option_label_for_code(
                 normalize_entry_country(getattr(cur, "entry_country", "IS"))
@@ -2555,6 +2726,8 @@ class TunnelClientApp:
                 first_run_settings_completed=prev_done,
                 ui_mode=mode,
                 check_breadcrumbs=False,  # push-receive removed — manual update only
+                kill_switch_opt_in=bool(ks_var.get()),
+                auto_connect_if_idle=bool(idle_auto_var.get()),
             )
 
         def _save_run() -> None:
@@ -2676,7 +2849,102 @@ class TunnelClientApp:
         )
         tk.Frame(card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
 
+        def _save_idle_auto() -> None:
+            from client.windows.settings_store import (
+                AUTO_CONNECT_IF_IDLE_LABEL,
+            )
+
+            s = _current_settings()
+            save_settings(s)
+            self._settings = s
+            if s.auto_connect_if_idle:
+                note_var.set(
+                    f"{AUTO_CONNECT_IF_IDLE_LABEL}: ON — "
+                    "reconnects residual if idle/timeout drops the tunnel while the app is open."
+                )
+            else:
+                note_var.set(
+                    f"{AUTO_CONNECT_IF_IDLE_LABEL}: OFF — "
+                    "after a drop, press Connect yourself."
+                )
+            self._log(
+                f"Settings: auto_connect_if_idle={s.auto_connect_if_idle}"
+            )
+
+        from client.windows.settings_store import (
+            AUTO_CONNECT_IF_IDLE_BLURB,
+            AUTO_CONNECT_IF_IDLE_LABEL,
+        )
+
+        _row(
+            card,
+            AUTO_CONNECT_IF_IDLE_LABEL,
+            AUTO_CONNECT_IF_IDLE_BLURB,
+            idle_auto_var,
+            _save_idle_auto,
+        )
+        tk.Frame(card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+
         # CHECK BREADCRUMBS / residual push-receive removed — manual update only.
+
+        # --- Kill switch (opt-in, default OFF; enable requires typed KILLSWITCH) ---
+        from client.kill_switch_confirm import (
+            KILL_SWITCH_ENABLE_SWITCH_LABEL,
+            KILL_SWITCH_SETTINGS_BODY,
+            KILL_SWITCH_SETTINGS_LABEL,
+            KILL_SWITCH_WARNING_TITLE,
+        )
+
+        ks_card, ks_outer = make_neon_card(pad, padx=12, pady=10)
+        ks_outer.pack(fill=tk.X, pady=(14, 0))
+        ks_warn = tk.Frame(ks_card, bg="#3A1014", padx=10, pady=8)
+        ks_warn.pack(fill=tk.X)
+        try:
+            # Red border frame (visual parity with Flutter warning box)
+            ks_outer.configure(highlightbackground="#E53935", highlightthickness=1)
+        except Exception:
+            pass
+        # High-contrast white body/labels on dark red (theme text washes out on #3A1014).
+        _KS_PANEL_BG = "#3A1014"
+        _KS_FG_WHITE = "#FFFFFF"
+        _KS_FG_TITLE = "#FF8A80"  # light red accent for WARNING/KILL SWITCH titles
+        tk.Label(
+            ks_warn,
+            text=KILL_SWITCH_WARNING_TITLE,
+            bg=_KS_PANEL_BG,
+            fg=_KS_FG_TITLE,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X)
+        tk.Label(
+            ks_warn,
+            text=KILL_SWITCH_SETTINGS_LABEL,
+            bg=_KS_PANEL_BG,
+            fg=_KS_FG_TITLE,
+            font=("Segoe UI", 11, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(2, 4))
+        tk.Label(
+            ks_warn,
+            text=KILL_SWITCH_SETTINGS_BODY,
+            bg=_KS_PANEL_BG,
+            fg=_KS_FG_WHITE,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 6))
+        # _row uses panel_bg; place switch row inside warning frame
+        ks_row = tk.Frame(ks_warn, bg=_KS_PANEL_BG)
+        ks_row.pack(fill=tk.X, pady=(4, 0))
+        tk.Label(
+            ks_row,
+            text=KILL_SWITCH_ENABLE_SWITCH_LABEL,
+            bg=_KS_PANEL_BG,
+            fg=_KS_FG_WHITE,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         def _save_residual_stack() -> None:
             s = _current_settings()
@@ -2696,6 +2964,194 @@ class TunnelClientApp:
                 f"Settings: residual_ipv4=always_on "
                 f"residual_ipv6={s.residual_ipv6}"
             )
+
+        def _prompt_kill_switch_enable_token() -> tuple[bool, str]:
+            """Modal ARE YOU SURE? + typed KILLSWITCH. Returns (ok, typed_text)."""
+            from client.kill_switch_confirm import (
+                KILL_SWITCH_CONFIRM_ACTION_LABEL,
+                KILL_SWITCH_CONFIRM_CANCEL_LABEL,
+                KILL_SWITCH_CONFIRM_FIELD_HINT,
+                KILL_SWITCH_CONFIRM_RISK_BODY,
+                KILL_SWITCH_CONFIRM_TITLE,
+            )
+
+            result: dict[str, object] = {"ok": False, "text": ""}
+            dlg = tk.Toplevel(win)
+            dlg.title(KILL_SWITCH_CONFIRM_TITLE)
+            dlg.configure(bg=t["chrome_bg"])
+            dlg.transient(win)
+            try:
+                dlg.grab_set()
+            except Exception:
+                pass
+            try:
+                self._bring_window_forward(dlg, force_visible=True)
+            except Exception:
+                pass
+            body = tk.Frame(dlg, bg=t["chrome_bg"], padx=16, pady=14)
+            body.pack(fill=tk.BOTH, expand=True)
+            tk.Label(
+                body,
+                text=KILL_SWITCH_CONFIRM_TITLE,
+                bg=t["chrome_bg"],
+                fg="#E53935",
+                font=("Segoe UI", 13, "bold"),
+                anchor="w",
+            ).pack(fill=tk.X, pady=(0, 8))
+            tk.Label(
+                body,
+                text=KILL_SWITCH_CONFIRM_RISK_BODY,
+                bg=t["chrome_bg"],
+                fg=t["text"],
+                font=("Segoe UI", 9),
+                anchor="w",
+                wraplength=420,
+                justify=tk.LEFT,
+            ).pack(fill=tk.X, pady=(0, 10))
+            token_var = tk.StringVar(value="")
+            err_var = tk.StringVar(value="")
+            tk.Label(
+                body,
+                text=KILL_SWITCH_CONFIRM_FIELD_HINT,
+                bg=t["chrome_bg"],
+                fg=t["text_muted"],
+                font=("Segoe UI", 8),
+                anchor="w",
+            ).pack(fill=tk.X)
+            entry = tk.Entry(
+                body,
+                textvariable=token_var,
+                font=("Segoe UI", 11),
+                bg=WHITE,
+                fg=TEXT,
+            )
+            entry.pack(fill=tk.X, pady=(4, 6))
+            tk.Label(
+                body,
+                textvariable=err_var,
+                bg=t["chrome_bg"],
+                fg="#E53935",
+                font=("Segoe UI", 8),
+                anchor="w",
+            ).pack(fill=tk.X)
+            btns = tk.Frame(body, bg=t["chrome_bg"])
+            btns.pack(fill=tk.X, pady=(12, 0))
+
+            def _cancel() -> None:
+                result["ok"] = False
+                result["text"] = token_var.get()
+                try:
+                    dlg.destroy()
+                except Exception:
+                    pass
+
+            def _enable() -> None:
+                from client.kill_switch_confirm import evaluate_kill_switch_confirm
+
+                typed = token_var.get()
+                decision = evaluate_kill_switch_confirm(
+                    desired_on=True, confirm_text=typed
+                )
+                if not decision.allow_persist:
+                    err_var.set("Type exactly KILLSWITCH to enable.")
+                    return
+                result["ok"] = True
+                result["text"] = typed
+                try:
+                    dlg.destroy()
+                except Exception:
+                    pass
+
+            tk.Button(
+                btns,
+                text=KILL_SWITCH_CONFIRM_CANCEL_LABEL,
+                command=_cancel,
+                bg=t["panel_bg"],
+                fg=t["text"],
+                relief=tk.FLAT,
+                padx=12,
+                pady=6,
+            ).pack(side=tk.RIGHT, padx=(8, 0))
+            tk.Button(
+                btns,
+                text=KILL_SWITCH_CONFIRM_ACTION_LABEL,
+                command=_enable,
+                bg="#E53935",
+                fg=WHITE,
+                relief=tk.FLAT,
+                padx=12,
+                pady=6,
+            ).pack(side=tk.RIGHT)
+            dlg.protocol("WM_DELETE_WINDOW", _cancel)
+            try:
+                entry.focus_set()
+            except Exception:
+                pass
+            try:
+                dlg.wait_window()
+            except Exception:
+                pass
+            return bool(result.get("ok")), str(result.get("text") or "")
+
+        def _save_kill_switch() -> None:
+            """Persist kill-switch opt-in; ON requires typed KILLSWITCH confirm."""
+            from client.kill_switch_confirm import evaluate_kill_switch_confirm
+
+            desired = bool(ks_var.get())
+            if not desired:
+                decision = evaluate_kill_switch_confirm(desired_on=False)
+                assert decision.allow_persist
+                s = _current_settings()
+                s.kill_switch_opt_in = False
+                ks_var.set(False)
+                save_settings(s)
+                self._settings = s
+                note_var.set(
+                    "Kill switch OFF. Residual Connect will not arm fail-closed firewall."
+                )
+                self._log("Settings: kill_switch_opt_in=False")
+                return
+
+            # Switch was flipped ON — gate with confirm dialog.
+            ok, typed = _prompt_kill_switch_enable_token()
+            decision = evaluate_kill_switch_confirm(
+                desired_on=True,
+                confirm_text=typed if ok else None,
+                cancelled=not ok,
+            )
+            if not decision.allow_persist or not decision.next_opt_in:
+                # Wrong/cancel → leave OFF
+                ks_var.set(False)
+                s = _current_settings()
+                s.kill_switch_opt_in = False
+                save_settings(s)
+                self._settings = s
+                note_var.set(
+                    "Kill switch left OFF "
+                    f"({decision.reason or 'confirm required'})."
+                )
+                self._log(
+                    f"Settings: kill_switch_opt_in refused ({decision.reason})"
+                )
+                return
+            s = _current_settings()
+            s.kill_switch_opt_in = True
+            ks_var.set(True)
+            save_settings(s)
+            self._settings = s
+            note_var.set(
+                "Kill switch ON. Takes effect on next residual Connect "
+                "(profile fail-closed + scoped allows). Disconnect rolls it back."
+            )
+            self._log("Settings: kill_switch_opt_in=True")
+
+        # Kill-switch switch control (placed in warning card built above).
+        SwitchToggle(
+            ks_row,
+            ks_var,
+            command=_save_kill_switch,
+            bg="#3A1014",
+        ).pack(side=tk.RIGHT, padx=(12, 0))
 
         # Free 3.3.3: no user-amendable privacy-scale (locked lean Iceland).
         _free_locked = False
@@ -3726,6 +4182,9 @@ class TunnelClientApp:
             pass
 
     def _quit_app(self) -> None:
+        # User Quit — never auto-reconnect after residual teardown.
+        self._user_requested_disconnect = True
+        self._idle_reconnect_inflight = False
         """Explicit quit: show status, tear down residual off UI thread, then exit.
 
         Residual disconnect/restore previously ran **synchronously** on the button

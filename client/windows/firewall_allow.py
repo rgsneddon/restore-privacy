@@ -6,7 +6,8 @@ to the product node so Connect times out while the node is healthy.
 Product policy:
   - Emit **scoped allows only** (program path + node RemoteAddress/UDP port).
   - Never unscoped ``Action=Block`` and never remote allow-any without Program.
-  - Product kill-switch remains **opt-in** (``RPT_KILL_SWITCH=1``) in kill_switch.py.
+  - Product kill-switch remains **opt-in** (Settings after ``KILLSWITCH`` confirm,
+    or ``RPT_KILL_SWITCH=1``) in kill_switch.py — default OFF.
   - Rule names use ``RPT-FW-*`` so KS rollback (``RPT-KS-*``) does not remove them.
 
 Builders are pure (PowerShell bodies / EncodedCommand); apply is best-effort when elevated.
@@ -16,7 +17,6 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -277,15 +277,12 @@ def apply_windows_fw_allows(
     ran: list[str] = []
     errors: list[str] = []
     ok = False
+    from client.windows.hidden_subprocess import residual_shell_run
+
     for cmd in cmds:
         try:
-            r = subprocess.run(
-                cmd,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
+            # No console flash — Defender allow must not pop PowerShell UI.
+            r = residual_shell_run(cmd, timeout=timeout, text=True)
             ran.append(cmd)
             out = (r.stdout or "") + (r.stderr or "")
             if r.returncode == 0 and "RPT_FW_ALLOW_OK" in out:

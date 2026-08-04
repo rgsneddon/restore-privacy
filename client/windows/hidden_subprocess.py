@@ -56,7 +56,12 @@ def run_hidden(
     cwd: Optional[str] = None,
     **extra: Any,
 ) -> subprocess.CompletedProcess:
-    """``subprocess.run`` with a hidden window on Windows (quick, no flash)."""
+    """``subprocess.run`` with a hidden window on Windows (quick, no flash).
+
+    Residual Connect/Disconnect/restore **must** use this (or
+    :func:`check_output_hidden`) for route/netsh/PowerShell/schtasks — never bare
+    ``subprocess.run`` without no-window flags.
+    """
     kw: dict[str, Any] = {
         "args": args,
         "shell": shell,
@@ -77,3 +82,47 @@ def run_hidden(
             continue  # do not allow re-showing the console
         kw[k] = v
     return subprocess.run(**kw)
+
+
+def check_output_hidden(
+    args: Union[str, Sequence[str]],
+    *,
+    shell: bool = False,
+    timeout: Optional[float] = None,
+    text: bool = True,
+    env: Optional[Mapping[str, str]] = None,
+    cwd: Optional[str] = None,
+    **extra: Any,
+) -> str:
+    """Hidden equivalent of ``subprocess.check_output`` (stdout only, raises on fail)."""
+    r = run_hidden(
+        args,
+        shell=shell,
+        timeout=timeout,
+        text=text,
+        check=False,
+        env=env,
+        cwd=cwd,
+        **extra,
+    )
+    if r.returncode != 0:
+        err = (r.stderr or r.stdout or f"exit {r.returncode}").strip()
+        raise subprocess.CalledProcessError(
+            r.returncode, args, output=r.stdout, stderr=r.stderr
+        )
+    out = r.stdout if r.stdout is not None else ""
+    return out if text else out  # type: ignore[return-value]
+
+
+def residual_shell_run(
+    cmd: str,
+    *,
+    timeout: Optional[float] = 30.0,
+    text: bool = True,
+) -> subprocess.CompletedProcess:
+    """Run a residual shell string (``route`` / ``netsh`` / encoded PS) hidden.
+
+    Convenience for residual Connect paths that still build one-line shell cmds.
+    Always ``shell=True`` + no-window on Windows.
+    """
+    return run_hidden(cmd, shell=True, timeout=timeout, text=text)

@@ -35,6 +35,18 @@ KEY_UI_MODE = "ui_mode"
 # Opt-in: CHECK BREADCRUMBS self-update path (Helsinki vault). Default off.
 KEY_CHECK_BREADCRUMBS = "check_breadcrumbs"
 CHECK_BREADCRUMBS_LABEL = "CHECK BREADCRUMBS"
+# Kill-switch opt-in (default OFF). Enable only after typed KILLSWITCH confirm.
+KEY_KILL_SWITCH_OPT_IN = "kill_switch_opt_in"
+# Auto-reconnect residual if idle/timeout drops tunnel while app stays open (default OFF).
+KEY_AUTO_CONNECT_IF_IDLE = "auto_connect_if_idle"
+AUTO_CONNECT_IF_IDLE_LABEL = "auto connect if idle"
+AUTO_CONNECT_IF_IDLE_BLURB = (
+    "When ON, if residual drops after idle or a timeout while this app stays open, "
+    "Privacy, Restored tries to reconnect automatically. "
+    "OFF (default): after a drop, press Connect yourself. "
+    "Does not reconnect after you Disconnect or Quit. "
+    "Different from “Autoconnect on launch” (cold start only)."
+)
 
 
 def normalize_entry_country(code: str | None) -> str:
@@ -73,6 +85,10 @@ class ProductSettings:
     ui_mode: str = "light"
     # Opt-in Helsinki breadcrumbs → monopin self-update (Settings CHECK BREADCRUMBS).
     check_breadcrumbs: bool = False
+    # Kill-switch fail-closed firewall while residual connected (default OFF).
+    kill_switch_opt_in: bool = False
+    # Auto-reconnect residual after idle/timeout drop while app open (default OFF).
+    auto_connect_if_idle: bool = False
 
 
 def settings_dir() -> Path:
@@ -100,6 +116,8 @@ def default_settings() -> ProductSettings:
         first_run_settings_completed=False,
         ui_mode="light",
         check_breadcrumbs=False,
+        kill_switch_opt_in=False,
+        auto_connect_if_idle=False,
     )
 
 
@@ -137,6 +155,9 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
             ),
             ui_mode=normalize_ui_mode(data.get(KEY_UI_MODE, "light")),
             check_breadcrumbs=bool(data.get(KEY_CHECK_BREADCRUMBS, False)),
+            # Missing key → OFF (product default; never inherit accidental true).
+            kill_switch_opt_in=bool(data.get(KEY_KILL_SWITCH_OPT_IN, False)),
+            auto_connect_if_idle=bool(data.get(KEY_AUTO_CONNECT_IF_IDLE, False)),
         )
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return default_settings()
@@ -166,6 +187,12 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
         KEY_UI_MODE: normalize_ui_mode(getattr(settings, "ui_mode", "light")),
         KEY_CHECK_BREADCRUMBS: bool(
             getattr(settings, "check_breadcrumbs", False)
+        ),
+        KEY_KILL_SWITCH_OPT_IN: bool(
+            getattr(settings, "kill_switch_opt_in", False)
+        ),
+        KEY_AUTO_CONNECT_IF_IDLE: bool(
+            getattr(settings, "auto_connect_if_idle", False)
         ),
     }
     p.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

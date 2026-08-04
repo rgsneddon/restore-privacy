@@ -958,23 +958,32 @@ class RptClient:
         aad = sid + struct.pack("!Q", counter)
         return self.session.crypto.open_allow_cover(nonce, sealed, aad=aad)
 
-    def send_keepalive(self) -> None:
+    def send_keepalive(self) -> bool:
         """Send KEEPALIVE only — never recv on the residual socket here.
 
         NODE_STATUS replies are consumed on the dataplane UDP path (peek type)
         or via private HTTP node-state poll. A blocking recvfrom here would
         leave the shared sock timed-out/blocking and could drop DATA frames.
+
+        Returns True when a keepalive datagram was handed to the OS (UDP send
+        accepted). False if there is no session/socket or send failed — callers
+        must not treat False as session refresh (node idle prune / NAT may die).
         """
         if not self.session or not self._sock:
-            return
+            return False
+        if self.endpoint is None:
+            return False
         wire = maybe_wrap(
             pack_keepalive(self.session.session_id),
             enabled=_outer_obfs_enabled(),
         )
         try:
-            self._sock.sendto(wire, self.endpoint.address)
+            n = self._sock.sendto(wire, self.endpoint.address)
+            return n is None or int(n) > 0
         except OSError:
-            return
+            return False
+        except Exception:
+            return False
 
     def disconnect(self) -> None:
         self._stop.set()

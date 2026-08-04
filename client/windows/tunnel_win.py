@@ -9,9 +9,9 @@ Anti-blackhole:
 
 from __future__ import annotations
 
-import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Optional
 
@@ -25,6 +25,11 @@ from client.full_tunnel import (
     windows_ipv6_leak_rollback_commands,
     windows_route_commands,
     windows_route_delete_commands,
+)
+from client.windows.hidden_subprocess import (
+    check_output_hidden,
+    residual_shell_run,
+    run_hidden,
 )
 from client.windows.tun_win import (
     WindowsTun,
@@ -139,10 +144,9 @@ def wait_for_wintun_if_index(
 def physical_default_gateway() -> Optional[str]:
     """Return the physical LAN default gateway (not the RPT tunnel GW)."""
     try:
-        out = subprocess.check_output(
+        out = check_output_hidden(
             ["route", "print", "0.0.0.0"],
             text=True,
-            stderr=subprocess.DEVNULL,
             timeout=10,
         )
     except Exception:
@@ -196,7 +200,7 @@ def _run_cmds(cmds: list[str]) -> tuple[list[str], list[str]]:
         if "PHYSICAL_GW" in cmd:
             errors.append("physical gateway not substituted")
             continue
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        r = residual_shell_run(cmd, timeout=30.0, text=True)
         applied.append(cmd)
         if not _route_cmd_succeeded(
             r.returncode, r.stderr or "", r.stdout or ""
@@ -269,7 +273,7 @@ def apply_routes_for_adapter(
             # Do not run this or further catch-alls
             continue
 
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        r = residual_shell_run(cmd, timeout=30.0, text=True)
         applied.append(cmd)
         ok = _route_cmd_succeeded(r.returncode, r.stderr or "", r.stdout or "")
         if not ok:
@@ -392,12 +396,7 @@ def restore_windows_residual_path(
 
             for cmd in windows_kill_switch_rollback_commands():
                 try:
-                    subprocess.run(
-                        cmd,
-                        shell=True,
-                        capture_output=True,
-                        timeout=cmd_timeout,
-                    )
+                    residual_shell_run(cmd, timeout=cmd_timeout, text=True)
                     applied.append(cmd)
                 except Exception:
                     pass
@@ -542,21 +541,62 @@ def product_tunnel_attach_active(result: Optional[WindowsTunnelResult]) -> bool:
         return True
 
 
+def dataplane_is_live(plane: Optional[RptDataPlane]) -> bool:
+    """True when residual dataplane object exists and reports running."""
+    if plane is None:
+        return False
+    try:
+        return bool(plane.is_running())
+    except Exception:
+        return False
+
+
+def may_install_dual_slash1_catchalls(
+    *,
+    dataplane_running: bool,
+    system_capture: bool,
+    if_index: Optional[int],
+    want_ipv4_catchall: bool,
+) -> bool:
+    """Pure gate: dual /1 only when live dataplane can forward + IF-bound capture.
+
+    Installing dual /1 *before* the dataplane runs blackholes all host traffic into
+    a TUN with no packet processor — the classic post-Connect “no internet” bug.
+    """
+    if not want_ipv4_catchall:
+        return False
+    if not dataplane_running:
+        return False
+    if not system_capture:
+        return False
+    if routes_would_blackhole_without_if_index(if_index, True):
+        return False
+    return True
+
+
 def residual_ip_capture_active(result: Optional[WindowsTunnelResult]) -> bool:
     """True only when device residual public IP can change via full tunnel.
 
-    Requires system-capture TUN + dual /1 routes applied + dataplane — not
-    handshake-only, pin-only, or Settings residual IPv4 OFF sessions.
+    Requires system-capture TUN + dual /1 routes applied + **live** dataplane —
+    not handshake-only, pin-only, stopped plane, liveness-lost idle death, or
+    Settings residual IPv4 OFF.
     """
     if result is None:
         return False
+    plane = result.dataplane
+    if plane is not None:
+        try:
+            if bool(getattr(plane.stats, "session_liveness_lost", False)):
+                return False
+        except Exception:
+            pass
     from client.residual_stack import residual_ip_capture_from_fields
 
     return residual_ip_capture_from_fields(
         ok=bool(result.ok),
         routes_applied=bool(result.routes_applied),
         system_capture=bool(result.system_capture),
-        has_dataplane=result.dataplane is not None,
+        has_dataplane=dataplane_is_live(plane),
         plan=getattr(result, "plan", None),
     )
 
@@ -574,9 +614,30 @@ def session_ok_without_residual_capture(
 
     return session_only_from_fields(
         ok=bool(result.ok),
-        has_dataplane=result.dataplane is not None,
+        has_dataplane=dataplane_is_live(result.dataplane),
         plan=getattr(result, "plan", None),
     )
+
+
+def reassert_server_pin_command(server_host: str, physical_gw: str) -> str:
+    """route add for server pin (re-assert after dual /1 so UDP never loops into TUN)."""
+    host = (server_host or "").strip()
+    gw = (physical_gw or "").strip()
+    return f"route add {host} mask 255.255.255.255 {gw} metric 1"
+
+
+def reassert_server_pin(
+    server_host: str,
+    physical_gw: Optional[str] = None,
+) -> tuple[list[str], bool]:
+    """Best-effort re-add server pin after dual /1 (idempotent if already present)."""
+    gw = (physical_gw or physical_default_gateway() or "").strip()
+    if not gw or not (server_host or "").strip():
+        return [], False
+    cmd = reassert_server_pin_command(server_host, gw)
+    r = residual_shell_run(cmd, timeout=30.0, text=True)
+    ok = _route_cmd_succeeded(r.returncode, r.stderr or "", r.stdout or "")
+    return [cmd], bool(ok)
 
 
 def ipv6_residual_protected(result: Optional[WindowsTunnelResult]) -> bool:
@@ -619,7 +680,7 @@ def apply_ipv6_leak_mitigation(plan: FullTunnelPlan) -> tuple[list[str], bool]:
     successful: list[str] = []
     critical_ok = False
     for cmd in cmds:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        r = residual_shell_run(cmd, timeout=45.0, text=True)
         is_critical = cmd.strip() == critical_ps.strip() or (
             "Disable-NetAdapterBinding" in cmd and "RPT_IPV6_DISABLED" in cmd
         )
@@ -644,7 +705,7 @@ def rollback_ipv6_leak_mitigation(plan: Optional[FullTunnelPlan] = None) -> list
     cmds = windows_ipv6_leak_rollback_commands(tunnel_iface=iface)
     successful: list[str] = []
     for cmd in cmds:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        r = residual_shell_run(cmd, timeout=45.0, text=True)
         if _cmd_exit_ok(r.returncode, r.stderr or "", r.stdout or ""):
             successful.append(cmd)
     return successful
@@ -661,6 +722,7 @@ def start_full_tunnel(
     require_system_capture: bool = False,
     prior: Optional[WindowsTunnelResult] = None,
     physical_gw: Optional[str] = None,
+    on_idle_session_drop: Optional[Callable[[], None]] = None,
 ) -> WindowsTunnelResult:
     """Create OS TUN (Wintun), install safe full-tunnel routes, start DATA plane.
 
@@ -794,6 +856,86 @@ def start_full_tunnel(
     if capture:
         if_index = wait_for_wintun_if_index(tun)
 
+    # ------------------------------------------------------------------
+    # CRITICAL ORDER: start residual dataplane *before* dual /1 catch-alls.
+    # Dual /1 without a live packet processor blackholes all host internet
+    # while the UI may still claim "connected" (user: no internet after fulfill).
+    # ------------------------------------------------------------------
+    from client.product_policy import product_dataplane_traffic_shape
+
+    # Mutable context for idle liveness-loss restore (filled after dual /1 apply).
+    # If keepalives fail repeatedly (node prune / dead UDP), roll back dual /1 so
+    # long idle never leaves the host with no internet.
+    residual_liveness_ctx: dict = {
+        "server_host": server_host,
+        "plan": plan,
+        "if_index": None,
+        "routes_applied": False,
+    }
+
+    def _on_residual_liveness_lost() -> None:
+        if not residual_liveness_ctx.get("routes_applied"):
+            # Still notify idle-drop so Settings auto-reconnect can act
+            # even if routes were already cleared.
+            cb = residual_liveness_ctx.get("on_idle_session_drop")
+            if callable(cb):
+                try:
+                    cb()
+                except Exception:
+                    pass
+            return
+        residual_liveness_ctx["routes_applied"] = False
+        try:
+            restore_windows_residual_path(
+                server_host=residual_liveness_ctx.get("server_host") or server_host,
+                plan=residual_liveness_ctx.get("plan") or plan,
+                if_index=residual_liveness_ctx.get("if_index"),
+                run_kill_switch_rollback=True,
+                run_ipv6_rollback=True,
+            )
+        except Exception:
+            try:
+                rollback_full_tunnel_routes(
+                    residual_liveness_ctx.get("plan") or plan,
+                    residual_liveness_ctx.get("server_host") or server_host,
+                    residual_liveness_ctx.get("if_index"),
+                )
+            except Exception:
+                pass
+        # After dual /1 restore: optional app hook (auto-reconnect if idle).
+        cb = residual_liveness_ctx.get("on_idle_session_drop")
+        if callable(cb):
+            try:
+                cb()
+            except Exception:
+                pass
+
+    residual_liveness_ctx["on_idle_session_drop"] = on_idle_session_drop
+
+    plane = RptDataPlane(
+        client,
+        traffic_shape=product_dataplane_traffic_shape(),
+        on_liveness_lost=_on_residual_liveness_lost,
+    )
+    try:
+        plane.start(tun)
+    except Exception as exc:
+        tun.close()
+        return WindowsTunnelResult(
+            False, f"dataplane start failed: {exc}", applied, routes_applied=False
+        )
+
+    if not dataplane_enabled(tun) or not plane.is_running():
+        plane.stop()
+        tun.close()
+        return WindowsTunnelResult(
+            False,
+            "dataplane failed — dual /1 not installed (prevents blackhole)",
+            applied,
+            tun=None,
+            routes_applied=False,
+        )
+
     route_msg = "routes skipped"
     routes_applied = False
 
@@ -801,9 +943,24 @@ def start_full_tunnel(
 
     # Settings residual IPv4 OFF → never install dual /1 (even with valid IF).
     want_ipv4_catchall = plan_wants_ipv4_catchall(plan)
+    plane_live = dataplane_is_live(plane)
+
+    # Server pin alone is safe before dual /1 (keeps UDP to node on physical path).
+    # Dual /1 only when may_install_dual_slash1_catchalls says so.
+    allow_catchall = may_install_dual_slash1_catchalls(
+        dataplane_running=plane_live,
+        system_capture=bool(capture),
+        if_index=if_index,
+        want_ipv4_catchall=want_ipv4_catchall,
+    )
 
     if routes_would_blackhole_without_system_capture(capture, True):
         route_msg = "no OS TUN capture — full-tunnel routes NOT applied (prevents blackhole)"
+    elif want_ipv4_catchall and not plane_live:
+        route_msg = (
+            "refused dual /1: dataplane not live (would blackhole internet into TUN)"
+        )
+        routes_applied = False
     elif want_ipv4_catchall and routes_would_blackhole_without_if_index(if_index, True):
         # Server pin only (keep UDP path); no dual /1
         if is_admin():
@@ -820,34 +977,62 @@ def start_full_tunnel(
             "session up but not full-tunnel — check adapter name / admin"
         )
         routes_applied = False
-    elif is_admin() and capture and if_index is not None:
+    elif is_admin() and capture and if_index is not None and allow_catchall:
         cmds, errs, full_ok = apply_routes_for_adapter(
             plan,
             server_host,
             if_index=if_index,
-            include_catchall=want_ipv4_catchall,
+            include_catchall=True,
             physical_gw=physical_gw,
         )
         applied.extend(cmds)
         if full_ok:
-            # residual capture only when dual /1 was requested and applied
-            routes_applied = bool(want_ipv4_catchall)
-            if want_ipv4_catchall:
-                route_msg = f"full-tunnel routes applied (IF={if_index}, server pinned)"
-            else:
+            # Re-assert server pin after dual /1 so UDP never loops into TUN.
+            pin_cmds, pin_ok = reassert_server_pin(
+                server_host, physical_gw=physical_gw
+            )
+            applied.extend(pin_cmds)
+            if not pin_ok:
+                # Pin lost after catchalls → recursive UDP blackhole; roll back.
+                rollback_full_tunnel_routes(plan, server_host, if_index)
+                routes_applied = False
                 route_msg = (
-                    f"server pin only (Settings residual IPv4 off; IF={if_index})"
+                    "server pin re-assert failed after dual /1 — "
+                    "routes rolled back (prevents blackhole)"
                 )
-            # Non-critical netsh warnings only
-            warns = [e for e in errs if e.startswith("setup warn:")]
-            if warns:
-                route_msg += f" ({len(warns)} warn)"
+            else:
+                # residual capture only when dual /1 was requested and applied
+                routes_applied = True
+                residual_liveness_ctx["if_index"] = if_index
+                residual_liveness_ctx["routes_applied"] = True
+                residual_liveness_ctx["server_host"] = server_host
+                residual_liveness_ctx["plan"] = plan
+                route_msg = (
+                    f"full-tunnel routes applied (IF={if_index}, server pinned; "
+                    f"dataplane-first)"
+                )
+                warns = [e for e in errs if e.startswith("setup warn:")]
+                if warns:
+                    route_msg += f" ({len(warns)} warn)"
         else:
             routes_applied = False
+            residual_liveness_ctx["routes_applied"] = False
             route_msg = "routes refused (pin/catchall failed; rolled back): " + (
                 "; ".join(errs) if errs else "unknown"
             )
             # apply_routes_for_adapter already rolls back on full_ok=False
+    elif is_admin() and capture and if_index is not None and not want_ipv4_catchall:
+        # Settings residual IPv4 OFF: pin only, no dual /1
+        cmds, errs, _pin_ok = apply_routes_for_adapter(
+            plan,
+            server_host,
+            if_index=if_index,
+            include_catchall=False,
+            physical_gw=physical_gw,
+        )
+        applied.extend(cmds)
+        routes_applied = False
+        route_msg = f"server pin only (Settings residual IPv4 off; IF={if_index})"
     elif is_admin():
         route_msg = "admin but no OS TUN — routes not applied (would blackhole)"
     else:
@@ -856,29 +1041,21 @@ def start_full_tunnel(
             "(session + dataplane start without Administrator)"
         )
 
-    from client.product_policy import product_dataplane_traffic_shape
-
-    plane = RptDataPlane(client, traffic_shape=product_dataplane_traffic_shape())
-    try:
-        plane.start(tun)
-    except Exception as exc:
-        if routes_applied:
-            rollback_full_tunnel_routes(plan, server_host, if_index)
-        tun.close()
-        return WindowsTunnelResult(
-            False, f"dataplane start failed: {exc}", applied, routes_applied=False
-        )
-
-    if not dataplane_enabled(tun) or not plane.is_running():
-        plane.stop()
-        if routes_applied:
-            rollback_full_tunnel_routes(plan, server_host, if_index)
-        tun.close()
+    # Dual /1 installed but plane died mid-apply → always roll back catch-alls.
+    if routes_applied and not dataplane_is_live(plane):
+        rollback_full_tunnel_routes(plan, server_host, if_index)
+        try:
+            plane.stop()
+        except Exception:
+            pass
+        try:
+            tun.close()
+        except Exception:
+            pass
         return WindowsTunnelResult(
             False,
-            "dataplane failed — full-tunnel routes rolled back (prevents blackhole)",
+            "dataplane stopped after dual /1 — routes rolled back (prevents blackhole)",
             applied,
-            tun=None,
             routes_applied=False,
         )
 
@@ -889,14 +1066,17 @@ def start_full_tunnel(
         f"{wintun_note}"
     )
     if routes_applied and (
-        not capture or routes_would_blackhole_without_if_index(if_index, True)
+        not capture
+        or routes_would_blackhole_without_if_index(if_index, True)
+        or not dataplane_is_live(plane)
     ):
         plane.stop()
         rollback_full_tunnel_routes(plan, server_host, if_index)
         tun.close()
         return WindowsTunnelResult(
             False,
-            "refused: full-tunnel routes without IF-bound capture would blackhole internet",
+            "refused: full-tunnel routes without IF-bound live dataplane "
+            "would blackhole internet",
             applied,
             routes_applied=False,
         )
@@ -948,7 +1128,7 @@ def start_full_tunnel(
             ok=bool(result.ok),
             routes_applied=bool(result.routes_applied),
             system_capture=bool(result.system_capture),
-            has_dataplane=result.dataplane is not None,
+            has_dataplane=dataplane_is_live(result.dataplane),
             plan=plan,
         )
         if attach == ResidualAttachOutcome.SESSION_ONLY_OK:
@@ -999,8 +1179,9 @@ def start_full_tunnel(
             )
         # RESIDUAL_OK: fall through to kill-switch path
 
-    # Kill-switch: PARKED for this build stage (product_kill_switch_enabled is
-    # always False). Block retained for later un-park; never arms residual KS now.
+    # Kill-switch: opt-in only (Settings kill_switch_opt_in or RPT_KILL_SWITCH=1).
+    # Default off — product_kill_switch_enabled() is False unless user opted in.
+    # Arm only after residual capture is proven (routes + system capture + dataplane).
     ks_applied = False
     if routes_applied and capture and residual_ip_capture_active(result):
         try:
@@ -1010,7 +1191,7 @@ def start_full_tunnel(
                 run_kill_switch_commands,
             )
 
-            if product_kill_switch_enabled():  # always False while parked
+            if product_kill_switch_enabled():
                 ks = build_kill_switch_plan(
                     "windows",
                     server_host=server_host,
@@ -1038,21 +1219,85 @@ def start_full_tunnel(
                     result.message = (
                         (result.message or msg) + f"; kill-switch incomplete ({detail})"
                     )
-                    # Incomplete KS may leave profiles blocked — roll back
+                    # Incomplete KS may leave profiles blocked — roll back KS only
+                    # (keep residual dual /1; do not blackhole by tearing residual).
                     try:
-                        restore_windows_residual_path(
-                            server_host=server_host,
-                            plan=plan,
-                            if_index=if_index,
-                            run_kill_switch_rollback=True,
-                            run_ipv6_rollback=False,
-                        )
+                        from client.kill_switch import windows_kill_switch_rollback_commands
+
+                        for cmd in windows_kill_switch_rollback_commands():
+                            try:
+                                residual_shell_run(
+                                    cmd,
+                                    timeout=residual_restore_cmd_timeout_s(),
+                                    text=True,
+                                )
+                            except Exception:
+                                pass
+                        result.kill_switch_applied = False
+                        ks_applied = False
                     except Exception:
-                        pass
+                        # Last resort: full residual restore so host internet works
+                        try:
+                            restore_windows_residual_path(
+                                server_host=server_host,
+                                plan=plan,
+                                if_index=if_index,
+                                run_kill_switch_rollback=True,
+                                run_ipv6_rollback=False,
+                            )
+                            result.routes_applied = False
+                            result.kill_switch_applied = False
+                            ks_applied = False
+                        except Exception:
+                            pass
         except Exception as exc:
             result.message = (result.message or msg) + f"; kill-switch incomplete: {exc}"
             ks_applied = False
             result.kill_switch_applied = False
+
+    # Final honesty: never claim residual capture if dual /1 is not applied.
+    # (Guards any path that may have rolled routes back after provisional success.)
+    if result.routes_applied and not residual_ip_capture_active(result):
+        result.routes_applied = False
+    if (
+        result.ok
+        and require_system_capture
+        and not residual_ip_capture_active(result)
+        and not session_ok_without_residual_capture(result)
+    ):
+        # Should have been torn down earlier; ensure host internet is restored.
+        try:
+            restore_windows_residual_path(
+                server_host=server_host,
+                plan=plan,
+                if_index=if_index,
+                run_kill_switch_rollback=True,
+                run_ipv6_rollback=True,
+            )
+        except Exception:
+            pass
+        try:
+            if result.dataplane is not None:
+                result.dataplane.stop()
+        except Exception:
+            pass
+        try:
+            if result.tun is not None:
+                result.tun.close()
+        except Exception:
+            pass
+        return WindowsTunnelResult(
+            False,
+            "residual capture incomplete — routes rolled back "
+            f"(prevents internet blackhole). {result.message or msg}",
+            list(result.applied_commands or applied),
+            routes_applied=False,
+            plan=plan,
+            server_host=server_host,
+            if_index=if_index,
+            ipv6_mitigation_applied=False,
+            kill_switch_applied=False,
+        )
 
     return result
 

@@ -1,14 +1,17 @@
 """Optional kill switch: block non-tunnel egress while full tunnel is expected.
 
-**PARKED for this stage of the build** — :func:`product_kill_switch_enabled`
-always returns **False** so residual Connect never arms profile Block / KS
-rules. Implementation (builders, apply, rollback) is kept for later feature
-work; only the product gate is hard-off.
+Product residual default is **OFF**. Opt-in paths (any one enables):
 
-When un-parked later, opt-in will use ``RPT_KILL_SWITCH=1`` again. Apply is
-fail-closed when enabled; disconnect always rolls back.
+  1. Durable Settings ``kill_switch_opt_in`` (Windows/Linux Settings UI after
+     typed ``KILLSWITCH`` confirm — see :mod:`client.kill_switch_confirm`)
+  2. Env ``RPT_KILL_SWITCH=1`` (automation / operators)
 
-Windows (critical) — design when un-parked:
+:data:`PRODUCT_KILL_SWITCH_PARKED` is **False** (feature un-parked). When True,
+:func:`product_kill_switch_enabled` always returns False.
+
+Apply is fail-closed when enabled; disconnect always rolls back.
+
+Windows (critical):
   Explicit unscoped ``Action=Block`` rules **defeat** scoped allows (Defender
   Firewall evaluates block before allow). So we **never** create a global
   outbound block rule. Instead:
@@ -37,8 +40,9 @@ import base64
 import os
 import re
 import subprocess
+import sys
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Callable, Optional
 
 # Named rules so rollback is exact
 WIN_RULE_PREFIX = "RPT-KS"
@@ -52,14 +56,16 @@ WIN_PROFILE_DEFAULT_OUTBOUND_BLOCK = "DefaultOutboundAction Block"
 # PowerShell expression for state file (must be double-quoted in script body)
 WIN_KS_STATE_PATH_PS = '"$env:ProgramData\\RestorePrivacy\\ks-outbound-state.json"'
 
-# Product residual: hard-park kill-switch (do not arm on Connect). Flip to False
-# when the feature is ready for opt-in ``RPT_KILL_SWITCH=1`` again.
-PRODUCT_KILL_SWITCH_PARKED = True
+# Un-parked: Settings opt-in + env may arm KS on residual Connect (default still off).
+PRODUCT_KILL_SWITCH_PARKED = False
+
+# Optional injectable reader for durable Settings opt-in (tests / non-std hosts).
+_settings_opt_in_reader: Optional[Callable[[], bool]] = None
 
 
 @dataclass(frozen=True)
 class KillSwitchPolicy:
-    """Kill-switch policy — product residual default is **disabled** (parked)."""
+    """Kill-switch policy — product residual default is **disabled** (opt-in)."""
 
     enabled: bool = False
     block_non_tunnel_ipv4: bool = True
@@ -69,27 +75,68 @@ class KillSwitchPolicy:
 
 
 def product_kill_switch_parked() -> bool:
-    """True while product residual must never arm kill-switch (this build stage)."""
+    """True while product residual must never arm kill-switch (emergency park)."""
     return bool(PRODUCT_KILL_SWITCH_PARKED)
+
+
+def set_kill_switch_settings_opt_in_reader(
+    reader: Optional[Callable[[], bool]],
+) -> None:
+    """Install/clear a callable that returns durable Settings kill-switch opt-in.
+
+    Used by tests and by hosts that load prefs outside Windows/Linux stores.
+    """
+    global _settings_opt_in_reader
+    _settings_opt_in_reader = reader
+
+
+def durable_kill_switch_opt_in() -> bool:
+    """Read durable Settings kill-switch opt-in (default False).
+
+    Order: injected reader → Windows settings_store → Linux settings_store → False.
+    """
+    if _settings_opt_in_reader is not None:
+        try:
+            return bool(_settings_opt_in_reader())
+        except Exception:
+            return False
+    try:
+        if sys.platform == "win32":
+            from client.windows.settings_store import load_settings
+
+            return bool(getattr(load_settings(), "kill_switch_opt_in", False))
+        if sys.platform.startswith("linux"):
+            from client.linux.settings_store import load_settings
+
+            return bool(getattr(load_settings(), "kill_switch_opt_in", False))
+    except Exception:
+        return False
+    return False
 
 
 def product_kill_switch_enabled(env: Optional[dict] = None) -> bool:
     """Whether product residual may apply kill-switch.
 
-    **Parked:** always ``False`` so residual Connect never sets profile Block /
-    RPT-KS rules (env ``RPT_KILL_SWITCH`` is ignored while parked). Builders and
-    rollback remain available for later feature work.
+    **Default off.** When not parked, opt-in is either:
 
-    When :data:`PRODUCT_KILL_SWITCH_PARKED` is False, opt-in is
-    ``RPT_KILL_SWITCH=1`` only (unset / 0 / false / off stays disabled).
+    - ``RPT_KILL_SWITCH=1`` (env), or
+    - durable Settings ``kill_switch_opt_in`` (after typed confirm in UI).
+
+    When *env* is an explicit dict (probes/tests), only that mapping is used —
+    durable Settings are **not** read (avoids host prefs skewing empty-env checks).
+    When *env* is ``None`` (live process), consult ``os.environ`` then Settings.
+
+    When :data:`PRODUCT_KILL_SWITCH_PARKED` is True, always ``False``.
     """
     if product_kill_switch_parked():
         return False
-    e = env if env is not None else os.environ
-    raw = str(e.get("RPT_KILL_SWITCH", "0")).strip().lower()
+    if env is not None:
+        raw = str(env.get("RPT_KILL_SWITCH", "0")).strip().lower()
+        return raw in ("1", "true", "on", "yes", "enabled")
+    raw = str(os.environ.get("RPT_KILL_SWITCH", "0")).strip().lower()
     if raw in ("1", "true", "on", "yes", "enabled"):
         return True
-    return False
+    return bool(durable_kill_switch_opt_in())
 
 
 def default_kill_switch_policy() -> KillSwitchPolicy:
@@ -442,12 +489,21 @@ def parse_powershell_script(script_body: str) -> list[str]:
         if not cand:
             continue
         try:
-            # Probe
-            r = subprocess.run(
-                [cand, "-NoProfile", "-Command", "exit 0"],
-                capture_output=True,
-                timeout=10,
-            )
+            # Probe — hide window on Windows (dev/tests may call this)
+            if sys.platform == "win32":
+                from client.windows.hidden_subprocess import run_hidden
+
+                r = run_hidden(
+                    [cand, "-NoProfile", "-Command", "exit 0"],
+                    timeout=10,
+                    text=True,
+                )
+            else:
+                r = subprocess.run(
+                    [cand, "-NoProfile", "-Command", "exit 0"],
+                    capture_output=True,
+                    timeout=10,
+                )
             if r.returncode == 0:
                 ps = cand
                 break
@@ -481,12 +537,21 @@ def parse_powershell_script(script_body: str) -> list[str]:
             "$e | ForEach-Object { $_.ToString() }; exit 2 } "
             "else { exit 0 }"
         )
-        r = subprocess.run(
-            [ps, "-NoProfile", "-NonInteractive", "-Command", parse_cmd],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        if sys.platform == "win32":
+            from client.windows.hidden_subprocess import run_hidden
+
+            r = run_hidden(
+                [ps, "-NoProfile", "-NonInteractive", "-Command", parse_cmd],
+                text=True,
+                timeout=30,
+            )
+        else:
+            r = subprocess.run(
+                [ps, "-NoProfile", "-NonInteractive", "-Command", parse_cmd],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
         if r.returncode != 0:
             msg = (r.stdout or r.stderr or "").strip() or f"parse exit {r.returncode}"
             for line in msg.splitlines():
@@ -636,15 +701,31 @@ def run_kill_switch_commands(
     errors: list[str] = []
     saw_ok_marker = False
     any_zero = False
+    plat = (platform or "").lower().strip()
+    use_hidden = plat in ("windows", "win32", "win") and sys.platform == "win32"
     for cmd in cmds:
         try:
-            r = subprocess.run(
-                cmd,
-                shell=shell,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
+            if use_hidden:
+                # Residual KS apply/rollback: never flash console on Windows.
+                from client.windows.hidden_subprocess import residual_shell_run, run_hidden
+
+                if shell or isinstance(cmd, str):
+                    r = residual_shell_run(str(cmd), timeout=timeout, text=True)
+                else:
+                    r = run_hidden(
+                        list(cmd),
+                        shell=False,
+                        timeout=timeout,
+                        text=True,
+                    )
+            else:
+                r = subprocess.run(
+                    cmd,
+                    shell=shell,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
             out = (r.stdout or "") + (r.stderr or "")
             if r.returncode == 0:
                 applied.append(cmd)

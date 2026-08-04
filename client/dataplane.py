@@ -2,6 +2,11 @@
 
 This is the real traffic path: every packet through seal_packet / open_packet
 on the shipped RptClient session (not raw IP over UDP).
+
+Idle residual liveness: protocol KEEPALIVE is sent on a fixed lean interval
+strictly under the node session idle prune window so long user-browsing idle
+does not drop the session (and leave dual /1 blackholing internet). Keepalive
+does **not** require cover/pad traffic.
 """
 
 from __future__ import annotations
@@ -16,6 +21,7 @@ from typing import Callable, Optional, Protocol
 
 from node.crypto_session import CoverFrame
 from node.protocol import MsgType, pack_data, peek_type
+from node.sessions import DEFAULT_SESSION_IDLE_SEC
 from node.traffic_shape import (
     DEFAULT_TRAFFIC_SHAPE,
     TrafficShapePolicy,
@@ -24,6 +30,51 @@ from node.traffic_shape import (
 from node.obfuscation import maybe_unwrap, product_obfuscation_enabled
 
 from .connect import RptClient
+
+# Consecutive failed keepalives before residual session is treated as dead.
+KEEPALIVE_FAIL_THRESHOLD = 3
+# Idle select/sleep backoff caps (seconds) — no busy spin.
+IDLE_SELECT_MIN_S = 0.05
+IDLE_SELECT_MAX_S = 0.40
+
+
+def residual_keepalive_interval_s(
+    node_idle_sec: float | None = None,
+) -> float:
+    """Protocol keepalive interval for residual dataplane (pure).
+
+    Must stay **strictly less than** node :data:`DEFAULT_SESSION_IDLE_SEC` so
+    idle prune cannot fire solely because the user is not browsing. Also short
+    enough to refresh typical NAT/UDP mappings without high-rate cover traffic.
+
+    Returns a value in ``[10, 25]`` seconds and ``< node_idle_sec``.
+    """
+    idle = float(
+        node_idle_sec if node_idle_sec is not None else DEFAULT_SESSION_IDLE_SEC
+    )
+    if idle <= 0:
+        idle = DEFAULT_SESSION_IDLE_SEC
+    # ~1/3 of node idle, clamped — default 60s → 20s.
+    interval = max(10.0, min(25.0, idle / 3.0))
+    if interval >= idle:
+        interval = max(5.0, idle * 0.4)
+    return float(interval)
+
+
+def residual_idle_select_max_s() -> float:
+    """Max select/sleep wait while residual is quiet (resource bound)."""
+    return float(IDLE_SELECT_MAX_S)
+
+
+def residual_keepalive_under_node_idle(
+    keepalive_s: float,
+    node_idle_sec: float | None = None,
+) -> bool:
+    """True when *keepalive_s* is a safe residual interval vs node prune."""
+    idle = float(
+        node_idle_sec if node_idle_sec is not None else DEFAULT_SESSION_IDLE_SEC
+    )
+    return keepalive_s > 0 and keepalive_s < idle
 
 
 class TunIO(Protocol):
@@ -47,6 +98,10 @@ class DataPlaneStats:
     errors: int = 0
     cover_sent: int = 0
     cover_recv: int = 0
+    keepalives_sent: int = 0
+    keepalives_failed: int = 0
+    consecutive_keepalive_failures: int = 0
+    session_liveness_lost: bool = False
     started: bool = False
     stopped: bool = False
 
@@ -59,6 +114,8 @@ class RptDataPlane:
         client: RptClient,
         *,
         traffic_shape: TrafficShapePolicy | None = None,
+        on_liveness_lost: Optional[Callable[[], None]] = None,
+        keepalive_interval_s: float | None = None,
     ):
         if not client.session or not client._sock:
             raise RuntimeError("RptDataPlane requires connected RptClient with socket")
@@ -72,6 +129,15 @@ class RptDataPlane:
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._tun: Optional[TunIO] = None
+        self._on_liveness_lost = on_liveness_lost
+        self._keepalive_interval_s = (
+            float(keepalive_interval_s)
+            if keepalive_interval_s is not None
+            else residual_keepalive_interval_s()
+        )
+        # Defensive: never schedule slower than node idle.
+        if not residual_keepalive_under_node_idle(self._keepalive_interval_s):
+            self._keepalive_interval_s = residual_keepalive_interval_s()
 
     def apply_traffic_shape(self, policy: TrafficShapePolicy | None) -> TrafficShapePolicy:
         """Hot-apply traffic shape to the live residual DATA plane + session crypto.
@@ -119,16 +185,11 @@ class RptDataPlane:
         last_keepalive = 0.0
         last_cover = 0.0
         last_activity = time.time()
-        # Lean RPT2 KEEPALIVE — must stay under node DEFAULT_SESSION_IDLE_SEC (~60s)
-        try:
-            from client.residual_keepalive_policy import residual_keepalive_interval_sec
-
-            keepalive_every = float(residual_keepalive_interval_sec())
-        except Exception:  # noqa: BLE001
-            keepalive_every = 25.0
-        # Adaptive select timeout: busy 50ms, idle backoff up to 400ms (P1 drain).
-        idle_select_s = 0.05
-        idle_select_max_s = 0.40
+        # Lean protocol keepalive — independent of TUN browsing traffic / cover.
+        keepalive_every = float(self._keepalive_interval_s)
+        idle_select_s = IDLE_SELECT_MIN_S
+        idle_select_max_s = residual_idle_select_max_s()
+        liveness_notified = False
         while not self._stop.is_set():
             try:
                 rlist = [sock]
@@ -145,7 +206,7 @@ class RptDataPlane:
             try:
                 data, _addr = sock.recvfrom(65535)
                 last_activity = time.time()
-                idle_select_s = 0.05
+                idle_select_s = IDLE_SELECT_MIN_S
                 try:
                     try:
                         from client.product_policy import (
@@ -190,7 +251,7 @@ class RptDataPlane:
                 pkt = tun.read_packet()
                 if pkt:
                     last_activity = time.time()
-                    idle_select_s = 0.05
+                    idle_select_s = IDLE_SELECT_MIN_S
                     if self.traffic_shape.jitter_ms_max > 0:
                         apply_send_jitter(self.traffic_shape.jitter_ms_max)
                     frame = self.client.seal_packet(pkt)
@@ -199,7 +260,7 @@ class RptDataPlane:
             except Exception:
                 self.stats.errors += 1
 
-            # Optional cover traffic (dummy sealed frames)
+            # Optional cover traffic (dummy sealed frames) — not required for liveness
             now = time.time()
             if (
                 self.traffic_shape.cover_traffic
@@ -214,24 +275,58 @@ class RptDataPlane:
                 last_cover = now
                 last_activity = now
 
-            # Periodic KEEPALIVE so idle tunnels are not pruned on the node
+            # Periodic KEEPALIVE so idle tunnels are not pruned (node + NAT/UDP).
+            # Independent of TUN browsing traffic. Only advance timer on success.
             if (now - last_keepalive) >= keepalive_every:
+                ok = False
                 try:
-                    self.client.send_keepalive()
+                    ok = bool(self.client.send_keepalive())
                 except Exception:
+                    ok = False
                     self.stats.errors += 1
-                last_keepalive = now
+                if ok:
+                    last_keepalive = now
+                    self.stats.keepalives_sent += 1
+                    self.stats.consecutive_keepalive_failures = 0
+                    # Keepalive is residual activity (NAT refresh) — reset idle select.
+                    last_activity = now
+                    idle_select_s = IDLE_SELECT_MIN_S
+                else:
+                    self.stats.keepalives_failed += 1
+                    self.stats.consecutive_keepalive_failures += 1
+                    self.stats.errors += 1
+                    # Retry sooner after failure (half interval) without busy loop.
+                    last_keepalive = now - (keepalive_every * 0.5)
+                    if (
+                        self.stats.consecutive_keepalive_failures
+                        >= KEEPALIVE_FAIL_THRESHOLD
+                        and not self.stats.session_liveness_lost
+                    ):
+                        self.stats.session_liveness_lost = True
+                        if not liveness_notified:
+                            liveness_notified = True
+                            self._notify_liveness_lost()
 
             # Idle backoff: when no TUN/UDP activity, lengthen select wait (battery).
             quiet_s = now - last_activity
             if quiet_s >= 0.5:
                 idle_select_s = min(
                     idle_select_max_s,
-                    0.05 + min(quiet_s, 2.0) * 0.15,
+                    IDLE_SELECT_MIN_S + min(quiet_s, 2.0) * 0.15,
                 )
             if fd < 0:
-                time.sleep(min(0.05, idle_select_s))
+                # Wintun poll-only: honour idle backoff (was capped at 50ms always).
+                time.sleep(idle_select_s)
 
+    def _notify_liveness_lost(self) -> None:
+        """Best-effort callback when residual session cannot be kept alive."""
+        cb = self._on_liveness_lost
+        if not callable(cb):
+            return
+        try:
+            cb()
+        except Exception:
+            pass
     def seal_from_tun_once(self, tun: TunIO) -> bytes:
         """Read one TUN packet and seal it via RptClient.seal_packet (tests + manual pump)."""
         pkt = tun.read_packet()
