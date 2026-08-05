@@ -81,26 +81,23 @@ const MethodChannel kAppQuitChannel = MethodChannel('restore_privacy/vpn');
 /// Android channel method: finish activity + remove task + kill process.
 const String kAndroidFullExitMethod = 'fullExit';
 
-/// Grace period after native [kAndroidFullExitMethod] before dart:io backup exit.
-///
-/// MainActivity replies, then finishAndRemoveTask, then deferred killProcess.
-/// Immediate [exit] after the channel reply races native and can leave a blank
-/// task window. Keep this above [androidFullExitKillDelayMs].
-const Duration kAndroidFullExitBackupDelay = Duration(milliseconds: 600);
+/// Grace before dart:io backup exit if native [kAndroidFullExitMethod] did not
+/// kill the process (channel missing / tests). Native kill is immediate after
+/// task removal — this is only a short fallback, not the primary teardown.
+const Duration kAndroidFullExitBackupDelay = Duration(milliseconds: 250);
 
-/// Mirrors MainActivity.FULL_EXIT_KILL_DELAY_MS (native deferred kill).
-const int androidFullExitKillDelayMs = 150;
+/// Native kill is immediate (0). Kept for tests/docs parity with MainActivity.
+const int androidFullExitKillDelayMs = 0;
 
 /// Fully terminate the host process (not hide-to-tray / minimize).
 ///
 /// Call only after [performQuitSequence]'s tunnel stop has completed.
 ///
 /// On Android, [SystemNavigator.pop] alone only finishes the activity and can
-/// leave a blank/idle shell. We **await** native [kAndroidFullExitMethod]
-/// (`finishAffinity` + `finishAndRemoveTask` + deferred `Process.killProcess`).
-/// Immediate dart:io [exit] right after the channel reply races native task
-/// removal and is the blank-window bug — wait [kAndroidFullExitBackupDelay]
-/// before any backup exit.
+/// leave a disconnected shell in the background. We **await** native
+/// [kAndroidFullExitMethod], which force-stops the VPN service, removes all
+/// app tasks, and immediately killProcess/System.exit/halt. A short backup
+/// [exit] runs only if the process somehow still lives.
 ///
 /// Non-Android: SystemNavigator.pop then dart:io exit.
 Future<void> exitAppProcess({
@@ -115,14 +112,13 @@ Future<void> exitAppProcess({
   final wait = delay ?? Future<void>.delayed;
 
   if (android) {
-    // Await channel so fullExit is delivered. Native replies then tears down
-    // the task and kills the process (deferred). Do not exit(0) immediately.
+    // Deliver fullExit so native can stop VPN FGS, remove tasks, and kill.
     try {
       await ch.invokeMethod<dynamic>(kAndroidFullExitMethod);
     } catch (_) {
-      // Channel missing / already tearing down — still grace then hard exit.
+      // Channel missing / already dying — fall through to backup exit.
     }
-    // Backup only if still alive after native teardown window.
+    // If native killProcess ran we never reach here. Backup for test/failure.
     await wait(kAndroidFullExitBackupDelay);
     doExit(0);
     return;
@@ -140,8 +136,10 @@ Future<void> exitAppProcess({
 List<String> androidFullExitSteps() {
   return const [
     'await_fullExit_channel',
+    'force_stop_vpn_service',
+    'remove_all_app_tasks',
     'finishAffinity',
     'finishAndRemoveTask',
-    'deferred_process_kill',
+    'immediate_process_kill',
   ];
 }

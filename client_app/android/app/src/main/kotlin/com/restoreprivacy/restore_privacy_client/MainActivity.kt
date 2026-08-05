@@ -1,6 +1,8 @@
 ﻿package com.restoreprivacy.restore_privacy_client
 
 import android.app.Activity
+import android.app.ActivityManager
+import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
@@ -168,11 +170,12 @@ class MainActivity : FlutterActivity() {
                         )
                     }
                     "fullExit" -> {
-                        // Quit: residual already stopped in Dart. Fully remove task + kill
-                        // process (SystemNavigator.pop alone leaves blank/idle shell).
-                        // Reply first so awaiting Dart invokeMethod completes; teardown
-                        // runs on the main looper. Dart must NOT immediate-exit(0) after
-                        // the reply (that races finishAndRemoveTask → blank recents window).
+                        // Quit: residual should already be stopped in Dart. Fully tear down:
+                        // force-stop VPN service, remove every app task, kill the process.
+                        // SystemNavigator.pop / finish alone leave a disconnected shell in
+                        // recents. Reply first so Dart await can complete; always post
+                        // teardown to the next main-loop message so the channel reply
+                        // flushes before killProcess (same-stack kill aborts the reply).
                         result.success(mapOf("ok" to true, "message" to "full_exit"))
                         Handler(Looper.getMainLooper()).post {
                             fullProcessExit()
@@ -184,21 +187,20 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * Full process takedown for main-screen Quit.
+     * Full process takedown for main-screen Quit — no leftover background window.
      *
      * Order:
-     * 1. Best-effort disconnect residual (Dart usually already did this)
-     * 2. finishAffinity + finishAndRemoveTask so the task is gone from recents
-     * 3. Deferred killProcess/System.exit so (2) can apply — immediate kill after
-     *    finishAndRemoveTask is a common OEM race that leaves a **blank window**
-     *    in the task switcher.
+     * 1. Force residual VPN service stop (ACTION_DISCONNECT + stopService) so
+     *    START_STICKY cannot revive the process after kill.
+     * 2. Finish **all** app tasks via [ActivityManager.AppTask.finishAndRemoveTask]
+     *    plus finishAffinity / finishAndRemoveTask on this activity.
+     * 3. **Immediate** killProcess + System.exit + Runtime.halt (no postDelayed —
+     *    deferred kill was unreliable after activity teardown and left a
+     *    disconnected shell in recents).
      */
     private fun fullProcessExit() {
-        try {
-            sendDisconnect()
-        } catch (_: Exception) {
-            // Best-effort; tunnel may already be stopped by Flutter.
-        }
+        forceStopVpnService()
+        removeAllAppTasks()
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
                 finishAffinity()
@@ -209,6 +211,7 @@ class MainActivity : FlutterActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 finishAndRemoveTask()
             } else {
+                @Suppress("DEPRECATION")
                 finish()
             }
         } catch (_: Exception) {
@@ -217,22 +220,55 @@ class MainActivity : FlutterActivity() {
             } catch (_: Exception) {
             }
         }
-        // Defer process death so the system can drop the task (blank-window fix).
-        Handler(Looper.getMainLooper()).postDelayed({
-            try {
-                android.os.Process.killProcess(android.os.Process.myPid())
-            } catch (_: Exception) {
+        // Immediate hard kill — process must not idle with a leftover task.
+        try {
+            android.os.Process.killProcess(android.os.Process.myPid())
+        } catch (_: Exception) {
+        }
+        try {
+            System.exit(0)
+        } catch (_: Exception) {
+        }
+        try {
+            Runtime.getRuntime().halt(0)
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Stop residual VPN so FGS / sticky restart cannot keep a shell alive after Quit. */
+    private fun forceStopVpnService() {
+        try {
+            sendDisconnect()
+        } catch (_: Exception) {
+        }
+        try {
+            stopService(Intent(this, RptVpnService::class.java))
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Remove every task for this app from the recents/task switcher. */
+    private fun removeAllAppTasks() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return
+        try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            for (task in am.appTasks) {
+                try {
+                    task.finishAndRemoveTask()
+                } catch (_: Exception) {
+                }
             }
-            try {
-                System.exit(0)
-            } catch (_: Exception) {
-            }
-        }, FULL_EXIT_KILL_DELAY_MS)
+        } catch (_: Exception) {
+        }
     }
 
     companion object {
-        /** Delay before killProcess after finishAndRemoveTask (ms). */
-        const val FULL_EXIT_KILL_DELAY_MS: Long = 150L
+        /**
+         * Historical deferred-kill delay (no longer used for kill — teardown is
+         * immediate). Kept so structural tests / docs can cite the constant era;
+         * production kill is synchronous after task removal.
+         */
+        const val FULL_EXIT_KILL_DELAY_MS: Long = 0L
     }
 
     /** True when node public key is available (device Ed25519 is generated on connect). */
@@ -287,7 +323,16 @@ class MainActivity : FlutterActivity() {
             val i = Intent(this, RptVpnService::class.java).apply {
                 action = RptVpnService.ACTION_DISCONNECT
             }
-            startService(i)
+            // Prefer explicit start so ACTION_DISCONNECT is delivered even if already running.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                try {
+                    startForegroundService(i)
+                } catch (_: Exception) {
+                    startService(i)
+                }
+            } else {
+                startService(i)
+            }
         } catch (_: Exception) {
             try {
                 stopService(Intent(this, RptVpnService::class.java))
