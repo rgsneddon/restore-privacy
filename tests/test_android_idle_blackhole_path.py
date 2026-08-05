@@ -1,8 +1,8 @@
-"""Structural proof: Android residual idle blackhole path (shipped sources).
+"""Structural proof: Android residual idle liveness tear (shipped sources).
 
-Root cause under investigation (analysis goal): TUN remains up with full routes
-while RPT session/UDP is dead; KA tear is gated on Auto-connect-if-idle (default
-off). These tests read real product sources — not reimplemented policy.
+Product contract: consecutive KEEPALIVE send failures always close the TUN
+(clear full-tunnel routes) so the device is not blackholed. Auto-connect-if-idle
+(default off) only gates re-HELLO after that clean tear — not the tear itself.
 """
 
 from __future__ import annotations
@@ -89,17 +89,26 @@ class TestAndroidIdleBlackholePath(unittest.TestCase):
         self.assertIn("fun packKeepalive", self.eng)
         self.assertIn("0x04", self.eng)
 
-    def test_ka_fail_tears_tun_only_when_idle_auto_reconnect(self) -> None:
-        """Primary product gap: default-off idle-auto leaves TUN up on KA failure."""
+    def test_ka_fail_streak_always_tears_tun(self) -> None:
+        """Liveness loss must close TUN even when Auto-connect-if-idle is off."""
         self.assertIn("KEEPALIVE_FAIL_STREAK_RECONNECT", self.svc)
-        # Exact gate from shipped Kotlin
-        self.assertIn(
+        # Tear gate must NOT require wantsIdleAutoReconnect (that was the blackhole bug).
+        self.assertNotIn(
             "fails >= KEEPALIVE_FAIL_STREAK_RECONNECT && wantsIdleAutoReconnect()",
             self.svc,
         )
-        # wantsIdleAutoReconnect requires Settings switch
-        self.assertIn("autoConnectIfIdleEnabled", self.svc)
-        # Defaults OFF — dual stack Kotlin + Flutter
+        self.assertIn(
+            "if (fails >= KEEPALIVE_FAIL_STREAK_RECONNECT) {",
+            self.svc,
+        )
+        # Within the KA fail branch, running is cleared and PFD closed.
+        ka_idx = self.svc.index("rpt-keepalive")
+        ka_body = self.svc[ka_idx : ka_idx + 1200]
+        fail_idx = ka_body.index("KEEPALIVE_FAIL_STREAK_RECONNECT")
+        tear_window = ka_body[fail_idx : fail_idx + 350]
+        self.assertIn("running.set(false)", tear_window)
+        self.assertIn("pfd.close()", tear_window)
+        # Idle-auto remains default OFF
         self.assertIn(
             "dualStackPref(context, KEY_AUTO_CONNECT_IF_IDLE, default = false)",
             self.prefs,
@@ -110,14 +119,18 @@ class TestAndroidIdleBlackholePath(unittest.TestCase):
         )
 
     def test_idle_auto_reconnect_is_separate_from_teardown_gate(self) -> None:
-        """Reconnect scheduler exists but is only used when wantsIdleAutoReconnect."""
+        """Reconnect after tear is still gated on wantsIdleAutoReconnect only."""
         self.assertIn("fun scheduleIdleReconnect", self.svc)
         self.assertIn("rpt-idle-reconnect", self.svc)
-        # finally branch: idle-auto → schedule; else clear desired
         self.assertIn("scheduleIdleReconnect(", self.svc)
+        # Worker finally: idle-auto → schedule re-HELLO; else clear desired + stop
         idx = self.svc.index("wantsIdleAutoReconnect() -> {")
-        window = self.svc[idx : idx + 400]
+        window = self.svc[idx : idx + 500]
         self.assertIn("scheduleIdleReconnect", window)
+        else_idx = self.svc.index("else -> {", idx)
+        else_window = self.svc[else_idx : else_idx + 550]
+        self.assertIn("setDesiredConnected", else_window)
+        self.assertIn("stopSelf()", else_window)
 
     def test_post_establish_protect_still_required(self) -> None:
         """Protect is necessary but not sufficient for idle blackhole after session death."""

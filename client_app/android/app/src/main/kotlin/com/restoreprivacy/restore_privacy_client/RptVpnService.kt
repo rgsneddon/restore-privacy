@@ -632,11 +632,13 @@ class RptVpnService : VpnService() {
                             dataSock.send(DatagramPacket(wire, wire.size))
                             kaFailStreak.set(0)
                         } catch (_: Exception) {
-                            // Sustained KA send failure while user still wants residual
-                            // → tear TUN so idle auto-reconnect can re-HELLO.
+                            // Sustained KA send failure = session liveness lost.
+                            // Always tear TUN/routes so traffic is not blackholed into a
+                            // dead residual. Idle-auto only decides re-HELLO after tear
+                            // (worker finally → scheduleIdleReconnect).
                             val fails = kaFailStreak.incrementAndGet()
                             if (!running.get()) break
-                            if (fails >= KEEPALIVE_FAIL_STREAK_RECONNECT && wantsIdleAutoReconnect()) {
+                            if (fails >= KEEPALIVE_FAIL_STREAK_RECONNECT) {
                                 running.set(false)
                                 try {
                                     pfd.close()
@@ -916,8 +918,9 @@ class RptVpnService : VpnService() {
         const val KEEPALIVE_INTERVAL_MS: Long = 25_000L
 
         /**
-         * Consecutive KEEPALIVE send failures before tearing the TUN so idle
-         * auto-reconnect can re-HELLO (only when that Settings switch is on).
+         * Consecutive KEEPALIVE send failures before tearing the TUN (always —
+         * clears full-tunnel routes so the device is not blackholed). Re-HELLO
+         * after tear is separate and only runs when Auto-connect-if-idle is on.
          */
         const val KEEPALIVE_FAIL_STREAK_RECONNECT: Long = 3L
 
