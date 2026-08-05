@@ -7,7 +7,7 @@
 | **Public catalog version** | **1.2.0** |
 | **Default residual entry** | **Germany (DE)** (product default on all clients; RO monopin retired) |
 | **Live probe peer** | **Germany (DE):44044** (UDP); status UI TCP **8080** |
-| **Audit generated** | **4 August 2026** (`2026-08-04T23:08:55Z`) |
+| **Audit generated** | **5 August 2026** (`2026-08-05T15:21:10Z`) |
 | **Cadence** | Automated security pass (~**every 1 day** + **jitter** on privacy-hardened node timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE** + **section B privacy probes** + **multihop node structure** |
 | **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B + multihop structure (no firewall scan) |
@@ -93,8 +93,8 @@ system capture) stays required. This table helps users set latency expectations.
 - **Live** RTT where probes succeeded from **this audit host** to product
   **entry** `Iceland (IS)` (Iceland)
   and **exit** `Germany (DE)` (Germany).
-- Entry probe: **123 ms** via `tcp` (shared base across rows).
-- Exit probe: **79 ms** via `tcp` (shared base for multi-hop rows).
+- Entry probe: **55 ms** via `tcp` (shared base across rows).
+- Exit probe: **72 ms** via `tcp` (shared base for multi-hop rows).
 - Live ms are from **this host's path**, not guaranteed London UK RTT.
 - Traffic shaping **feel** may add a small band on top of live base
   (+0–5 ms labeled); outer obfs ~0 ms RTT.
@@ -106,14 +106,14 @@ system capture) stays required. This table helps users set latency expectations.
 
 | Shape | Outer obfs | Multi-hop | UK→entry (live) | UK→exit (live) | AVG | RAG | Notes |
 |-------|------------|-----------|-------------------|------------------|-----|-----|-------|
-| on | on | on | 123–128 ms (live base + shape feel) | 79–84 ms (live base + shape feel) | 103.5 ms | 🟥 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 103.5 ms → red |
-| on | on | off | 123–128 ms (live base + shape feel) | n/a (multi-hop off) | 125.5 ms | 🟥 | single-hop residual → entry; shape on; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 125.5 ms → red |
-| on | off | on | 123–128 ms (live base + shape feel) | 79–84 ms (live base + shape feel) | 103.5 ms | 🟥 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 103.5 ms → red |
-| on | off | off | 123–128 ms (live base + shape feel) | n/a (multi-hop off) | 125.5 ms | 🟥 | single-hop residual → entry; shape on; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 125.5 ms → red |
-| off | on | on | 123 ms (live) | 79 ms (live) | 101 ms | 🟥 | residual dials exit when multi-hop on; shape off leaner; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 101.0 ms → red |
-| off | on | off | 123 ms (live) | n/a (multi-hop off) | 123 ms | 🟥 | single-hop residual → entry; shape off (faster feel); outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 123.0 ms → red |
-| off | off | on | 123 ms (live) | 79 ms (live) | 101 ms | 🟥 | residual dials exit when multi-hop on; shape off leaner; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 101.0 ms → red |
-| off | off | off | 123 ms (live) | n/a (multi-hop off) | 123 ms | 🟥 | single-hop residual → entry; shape off (faster feel); outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 123.0 ms → red |
+| on | on | on | 55–60 ms (live base + shape feel) | 72–77 ms (live base + shape feel) | 66 ms | 🟧 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 66.0 ms → amber |
+| on | on | off | 55–60 ms (live base + shape feel) | n/a (multi-hop off) | 57.5 ms | 🟧 | single-hop residual → entry; shape on; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 57.5 ms → amber |
+| on | off | on | 55–60 ms (live base + shape feel) | 72–77 ms (live base + shape feel) | 66 ms | 🟧 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 66.0 ms → amber |
+| on | off | off | 55–60 ms (live base + shape feel) | n/a (multi-hop off) | 57.5 ms | 🟧 | single-hop residual → entry; shape on; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 57.5 ms → amber |
+| off | on | on | 55 ms (live) | 72 ms (live) | 63.5 ms | 🟧 | residual dials exit when multi-hop on; shape off leaner; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 63.5 ms → amber |
+| off | on | off | 55 ms (live) | n/a (multi-hop off) | 55 ms | 🟧 | single-hop residual → entry; shape off (faster feel); outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 55.0 ms → amber |
+| off | off | on | 55 ms (live) | 72 ms (live) | 63.5 ms | 🟧 | residual dials exit when multi-hop on; shape off leaner; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 63.5 ms → amber |
+| off | off | off | 55 ms (live) | n/a (multi-hop off) | 55 ms | 🟧 | single-hop residual → entry; shape off (faster feel); outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 55.0 ms → amber |
 
 **Product defaults:** shape **off**, outer obfs **off**, multi-hop **off**
 (lean single-hop entry). Turn shape/obfs **on** for stronger residual defenses;
@@ -222,7 +222,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Severity | Finding | Status |
 |----------|---------|--------|
-| **Info** | Automated pass at `2026-08-04T23:08:55Z` | Recorded |
+| **Info** | Automated pass at `2026-08-05T15:21:10Z` | Recorded |
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
 | **Low** | Unit suite failure | N/A |
@@ -230,7 +230,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ---
 
-## 6. Automated checks (this pass — 4 August 2026)
+## 6. Automated checks (this pass — 5 August 2026)
 
 **Modules:** `tests.test_legal_links`, `tests.test_legal_docs`, `tests.test_no_public_client_count`, `tests.test_connect_no_phones_home`, `tests.test_obfuscation`, `tests.test_kill_switch_leaks`, `tests.test_product_node_key`, `tests.test_pfs_product_require`, `tests.test_downloads`, `tests.test_multihop`, `tests.test_audit_package_rag`, `tests.test_oracle_no_user_data`, `tests.test_oracle_suite_architecture`
 
@@ -274,7 +274,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **2026-08-04T23:08:55Z** against node **Germany (DE)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **2026-08-05T15:21:10Z** against node **Germany (DE)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 
@@ -299,5 +299,5 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 | Output | `AUDIT.md` (repo root); served as `/AUDIT.md` and `/audit.md` on VPN APP Shop |
 | Related | `PRIVACY_POLICY.md`, `README.md`, `scripts/run_security_audit.py` |
 | Code baseline | Catalog **1.2.0** + node **Germany (DE)** |
-| Pass date | **4 August 2026** |
+| Pass date | **5 August 2026** |
 | Machine JSON | `status_page/static/security_audit_latest.json` (when `--write`) |
