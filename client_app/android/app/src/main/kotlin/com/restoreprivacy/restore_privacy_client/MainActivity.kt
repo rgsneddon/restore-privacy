@@ -168,10 +168,11 @@ class MainActivity : FlutterActivity() {
                         )
                     }
                     "fullExit" -> {
-                        // Quit: stop residual already done in Dart; fully kill process.
-                        // SystemNavigator.pop alone leaves an idle process — not product Quit.
-                        // Reply first so awaiting Dart invokeMethod can complete; then kill
-                        // on next main-loop tick (immediate kill can abort the reply).
+                        // Quit: residual already stopped in Dart. Fully remove task + kill
+                        // process (SystemNavigator.pop alone leaves blank/idle shell).
+                        // Reply first so awaiting Dart invokeMethod completes; teardown
+                        // runs on the main looper. Dart must NOT immediate-exit(0) after
+                        // the reply (that races finishAndRemoveTask → blank recents window).
                         result.success(mapOf("ok" to true, "message" to "full_exit"))
                         Handler(Looper.getMainLooper()).post {
                             fullProcessExit()
@@ -184,14 +185,25 @@ class MainActivity : FlutterActivity() {
 
     /**
      * Full process takedown for main-screen Quit.
-     * Order: finishAndRemoveTask (API 21+) then killProcess so the app does not
-     * remain idle/backgrounded after the activity finishes.
+     *
+     * Order:
+     * 1. Best-effort disconnect residual (Dart usually already did this)
+     * 2. finishAffinity + finishAndRemoveTask so the task is gone from recents
+     * 3. Deferred killProcess/System.exit so (2) can apply — immediate kill after
+     *    finishAndRemoveTask is a common OEM race that leaves a **blank window**
+     *    in the task switcher.
      */
     private fun fullProcessExit() {
         try {
             sendDisconnect()
         } catch (_: Exception) {
             // Best-effort; tunnel may already be stopped by Flutter.
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                finishAffinity()
+            }
+        } catch (_: Exception) {
         }
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -205,15 +217,22 @@ class MainActivity : FlutterActivity() {
             } catch (_: Exception) {
             }
         }
-        // Ensure the process does not idle after activity teardown.
-        try {
-            android.os.Process.killProcess(android.os.Process.myPid())
-        } catch (_: Exception) {
-        }
-        try {
-            System.exit(0)
-        } catch (_: Exception) {
-        }
+        // Defer process death so the system can drop the task (blank-window fix).
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                android.os.Process.killProcess(android.os.Process.myPid())
+            } catch (_: Exception) {
+            }
+            try {
+                System.exit(0)
+            } catch (_: Exception) {
+            }
+        }, FULL_EXIT_KILL_DELAY_MS)
+    }
+
+    companion object {
+        /** Delay before killProcess after finishAndRemoveTask (ms). */
+        const val FULL_EXIT_KILL_DELAY_MS: Long = 150L
     }
 
     /** True when node public key is available (device Ed25519 is generated on connect). */

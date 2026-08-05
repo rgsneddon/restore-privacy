@@ -134,18 +134,23 @@ void main() {
   });
 
   group('Android full process exit', () {
-    test('exit planner requires await channel then finishAndRemoveTask', () {
+    test('exit planner requires channel, task remove, deferred kill', () {
       final steps = androidFullExitSteps();
       expect(steps, contains('await_fullExit_channel'));
+      expect(steps, contains('finishAffinity'));
       expect(steps, contains('finishAndRemoveTask'));
-      expect(steps, contains('process_killProcess'));
+      expect(steps, contains('deferred_process_kill'));
       expect(
         steps.indexOf('await_fullExit_channel'),
         lessThan(steps.indexOf('finishAndRemoveTask')),
       );
+      expect(
+        steps.indexOf('finishAndRemoveTask'),
+        lessThan(steps.indexOf('deferred_process_kill')),
+      );
     });
 
-    test('exitAppProcess awaits fullExit channel before dart exit', () async {
+    test('exitAppProcess awaits fullExit then grace before dart exit', () async {
       final order = <String>[];
       final messenger =
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -153,7 +158,6 @@ void main() {
       messenger.setMockMethodCallHandler(channel, (call) async {
         expect(call.method, kAndroidFullExitMethod);
         order.add('native_fullExit');
-        // Simulate slow native path — must complete before exitFn.
         await Future<void>.delayed(const Duration(milliseconds: 10));
         order.add('native_done');
         return {'ok': true};
@@ -165,6 +169,9 @@ void main() {
       await exitAppProcess(
         channel: channel,
         isAndroid: true,
+        delay: (d) async {
+          order.add('grace_${d.inMilliseconds}');
+        },
         exitFn: (code) {
           order.add('dart_exit_$code');
         },
@@ -172,24 +179,34 @@ void main() {
 
       expect(
         order,
-        ['native_fullExit', 'native_done', 'dart_exit_0'],
-        reason: 'native fullExit must finish before dart:io exit backup',
+        [
+          'native_fullExit',
+          'native_done',
+          'grace_${kAndroidFullExitBackupDelay.inMilliseconds}',
+          'dart_exit_0',
+        ],
+        reason:
+            'native fullExit then grace (not immediate exit) before dart backup',
+      );
+      expect(
+        kAndroidFullExitBackupDelay.inMilliseconds,
+        greaterThan(androidFullExitKillDelayMs),
+        reason: 'backup delay must outlast native deferred kill',
       );
     });
 
-    test('app_quit.dart Android path awaits invokeMethod not fire-and-forget',
-        () {
+    test('app_quit.dart Android path awaits invokeMethod and grace delay', () {
       final src = File('lib/app_quit.dart').readAsStringSync();
       expect(src.contains('kAndroidFullExitMethod'), isTrue);
       expect(src.contains("'fullExit'"), isTrue);
-      // Critical: must await channel before any exit backup.
       expect(src.contains('await ch.invokeMethod'), isTrue);
+      expect(src.contains('kAndroidFullExitBackupDelay'), isTrue);
+      expect(src.contains('await wait(kAndroidFullExitBackupDelay)'), isTrue);
       expect(
         src.contains('Fire-and-forget'),
         isFalse,
         reason: 'fire-and-forget path was the idle-process bug',
       );
-      // performQuitSequence must await exitApp
       expect(src.contains('await exitApp()'), isTrue);
       expect(src.contains('Future<void> Function() exitApp'), isTrue);
     });
@@ -198,30 +215,42 @@ void main() {
       final src = File('lib/main.dart').readAsStringSync();
       expect(src.contains('await exitAppProcess()'), isTrue);
       expect(src.contains('exitApp: () async'), isTrue);
+      // Minimize must not call fullExit
+      expect(src.contains('Minimize / background does **not** stop'), isTrue);
     });
 
-    test('MainActivity implements fullExit with finishAndRemoveTask + killProcess',
-        () {
+    test('MainActivity fullExit: task remove then deferred killProcess', () {
       final kt = File(
         'android/app/src/main/kotlin/com/restoreprivacy/restore_privacy_client/MainActivity.kt',
       ).readAsStringSync();
       expect(kt.contains('"fullExit"'), isTrue);
       expect(kt.contains('fullProcessExit'), isTrue);
+      expect(kt.contains('finishAffinity'), isTrue);
       expect(kt.contains('finishAndRemoveTask'), isTrue);
       expect(kt.contains('killProcess'), isTrue);
       expect(kt.contains('System.exit'), isTrue);
-      // Reply success before kill so awaiting Dart can complete invokeMethod.
+      expect(kt.contains('postDelayed'), isTrue);
+      expect(kt.contains('FULL_EXIT_KILL_DELAY_MS'), isTrue);
+      // Reply success before scheduling teardown so awaiting Dart can complete.
       final fullExitIdx = kt.indexOf('"fullExit"');
       expect(fullExitIdx, greaterThanOrEqualTo(0));
       final block = kt.substring(
         fullExitIdx,
-        (fullExitIdx + 600).clamp(0, kt.length),
+        (fullExitIdx + 700).clamp(0, kt.length),
       );
       expect(block.contains('result.success'), isTrue);
       expect(block.contains('fullProcessExit()'), isTrue);
       expect(
         block.indexOf('result.success'),
         lessThan(block.indexOf('fullProcessExit()')),
+      );
+      // Kill must not be immediate after finishAndRemoveTask (blank-window race).
+      final fnIdx = kt.indexOf('private fun fullProcessExit');
+      final fnBody = kt.substring(fnIdx, (fnIdx + 1200).clamp(0, kt.length));
+      expect(fnBody.contains('postDelayed'), isTrue);
+      expect(
+        fnBody.indexOf('finishAndRemoveTask'),
+        lessThan(fnBody.indexOf('postDelayed')),
       );
     });
   });

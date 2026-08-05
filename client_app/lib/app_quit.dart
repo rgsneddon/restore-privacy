@@ -81,35 +81,49 @@ const MethodChannel kAppQuitChannel = MethodChannel('restore_privacy/vpn');
 /// Android channel method: finish activity + remove task + kill process.
 const String kAndroidFullExitMethod = 'fullExit';
 
+/// Grace period after native [kAndroidFullExitMethod] before dart:io backup exit.
+///
+/// MainActivity replies, then finishAndRemoveTask, then deferred killProcess.
+/// Immediate [exit] after the channel reply races native and can leave a blank
+/// task window. Keep this above [androidFullExitKillDelayMs].
+const Duration kAndroidFullExitBackupDelay = Duration(milliseconds: 600);
+
+/// Mirrors MainActivity.FULL_EXIT_KILL_DELAY_MS (native deferred kill).
+const int androidFullExitKillDelayMs = 150;
+
 /// Fully terminate the host process (not hide-to-tray / minimize).
 ///
 /// Call only after [performQuitSequence]'s tunnel stop has completed.
 ///
 /// On Android, [SystemNavigator.pop] alone only finishes the activity and can
-/// leave the process idle. We **await** native [kAndroidFullExitMethod]
-/// (`finishAndRemoveTask` + `Process.killProcess`) so the channel message is
-/// delivered and native runs before any dart:io exit. Immediate exit(0) after
-/// a fire-and-forget invokeMethod aborts the channel and leaves an idle process.
+/// leave a blank/idle shell. We **await** native [kAndroidFullExitMethod]
+/// (`finishAffinity` + `finishAndRemoveTask` + deferred `Process.killProcess`).
+/// Immediate dart:io [exit] right after the channel reply races native task
+/// removal and is the blank-window bug — wait [kAndroidFullExitBackupDelay]
+/// before any backup exit.
 ///
 /// Non-Android: SystemNavigator.pop then dart:io exit.
 Future<void> exitAppProcess({
   MethodChannel? channel,
   bool? isAndroid,
   void Function(int code)? exitFn,
+  Future<void> Function(Duration duration)? delay,
 }) async {
   final android = isAndroid ?? (!kIsWeb && Platform.isAndroid);
   final ch = channel ?? kAppQuitChannel;
   final doExit = exitFn ?? exit;
+  final wait = delay ?? Future<void>.delayed;
 
   if (android) {
-    // Await native full process takedown. MainActivity replies success then
-    // runs finishAndRemoveTask + killProcess; if that succeeds we never return.
+    // Await channel so fullExit is delivered. Native replies then tears down
+    // the task and kills the process (deferred). Do not exit(0) immediately.
     try {
       await ch.invokeMethod<dynamic>(kAndroidFullExitMethod);
     } catch (_) {
-      // Channel missing / already tearing down — fall through to hard exit.
+      // Channel missing / already tearing down — still grace then hard exit.
     }
-    // Backup only if native did not kill us (e.g. test channel or failure).
+    // Backup only if still alive after native teardown window.
+    await wait(kAndroidFullExitBackupDelay);
     doExit(0);
     return;
   }
@@ -122,11 +136,12 @@ Future<void> exitAppProcess({
 
 /// Testable Android exit path planner (pure): which steps the platform must run.
 ///
-/// Production Android native implements the same order in MainActivity.fullExit.
+/// Production Android native implements the same order in MainActivity.
 List<String> androidFullExitSteps() {
   return const [
     'await_fullExit_channel',
+    'finishAffinity',
     'finishAndRemoveTask',
-    'process_killProcess',
+    'deferred_process_kill',
   ];
 }
