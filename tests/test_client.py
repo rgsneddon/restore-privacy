@@ -85,6 +85,7 @@ class TestFullTunnel(unittest.TestCase):
         cmds = "\n".join(windows_route_commands(plan, "82.221.101.241", if_index=9))
         self.assertIn("0.0.0.0 mask 128.0.0.0 0.0.0.0 IF 9", cmds)
         self.assertIn("128.0.0.0 mask 128.0.0.0 0.0.0.0 IF 9", cmds)
+        self.assertIn("10.88.0.1 mask 255.255.255.255 0.0.0.0 IF 9", cmds)
         self.assertIn("IF 9", cmds)
         self.assertIn("82.221.101.241", cmds)
         self.assertNotIn("mask 128.0.0.0 10.88.0.1", cmds)

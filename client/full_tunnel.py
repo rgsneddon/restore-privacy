@@ -26,6 +26,19 @@ def default_tunnel_dns_servers() -> list[str]:
     return list(DEFAULT_TUNNEL_DNS_SERVERS)
 
 
+def _windows_tunnel_dns_dest(plan: "FullTunnelPlan | None") -> str:
+    """Tunnel-resolver IPv4 used as an on-link dest (never a dual /1 gateway)."""
+    if plan is not None:
+        for raw in list(plan.dns_servers or []):
+            s = str(raw or "").strip()
+            if s:
+                return s
+        gw = str(getattr(plan, "tunnel_gateway", "") or "").strip()
+        if gw:
+            return gw
+    return DEFAULT_TUNNEL_GATEWAY
+
+
 # Product residual full tunnel must address IPv6 ISP leaks (IPv4 dual /1 alone is not enough).
 IPV6_LEAK_POLICY_BLOCK_ISP = "block_isp"
 # User Settings IPv6 OFF — residual session does not install ISP IPv6 block.
@@ -130,6 +143,14 @@ def windows_route_commands(
         # On-link dual /1 into the TUN adapter (WireGuard/Wintun-style)
         cmds.append(f"route add 0.0.0.0 mask 128.0.0.0 0.0.0.0 IF {idx} metric 5")
         cmds.append(f"route add 128.0.0.0 mask 128.0.0.0 0.0.0.0 IF {idx} metric 5")
+        # Dest-on-link /32 to the tunnel resolver. This is NOT a dual /1 next-hop
+        # (never ``mask 128.0.0.0 10.88.0.1``). Wintun cannot ARP 10.88.0.1, so
+        # a more-specific IF-bound dest route lets UDP/53 enter the TUN.
+        dns_gw = _windows_tunnel_dns_dest(plan)
+        if dns_gw:
+            cmds.append(
+                f"route add {dns_gw} mask 255.255.255.255 0.0.0.0 IF {idx} metric 1"
+            )
     # else: intentionally omit catch-alls (Settings IPv4 off or ARP blackhole guard)
 
     for i, dns in enumerate(plan.dns_servers, start=1):
@@ -160,6 +181,7 @@ def windows_route_delete_commands(
     _ = plan  # plan reserved for future iface-scoped cleanup
     _ = if_index
     host = (server_host or "").strip()
+    dns_gw = _windows_tunnel_dns_dest(plan)
     cmds = [
         # Dual /1 catch-alls first (blackhole if left after TUN close)
         "route delete 0.0.0.0 mask 128.0.0.0",
@@ -168,6 +190,8 @@ def windows_route_delete_commands(
         "route delete 0.0.0.0 mask 128.0.0.0 0.0.0.0",
         "route delete 128.0.0.0 mask 128.0.0.0 0.0.0.0",
     ]
+    if dns_gw:
+        cmds.append(f"route delete {dns_gw} mask 255.255.255.255")
     if host:
         cmds.append(f"route delete {host} mask 255.255.255.255")
     return cmds

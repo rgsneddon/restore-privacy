@@ -192,6 +192,18 @@ def _is_catchall_cmd(cmd: str) -> bool:
     return "route add" in cmd and "mask 128.0.0.0" in cmd
 
 
+def _is_tunnel_dns_dest_cmd(cmd: str, server_host: str) -> bool:
+    """True for dest-on-link ``10.88.0.1/32 IF n`` (not the physical server pin)."""
+    if "route add" not in cmd or "mask 255.255.255.255" not in cmd:
+        return False
+    if "IF " not in cmd:
+        return False
+    host = (server_host or "").strip()
+    if host and host in cmd:
+        return False
+    return True
+
+
 def _run_cmds(cmds: list[str]) -> tuple[list[str], list[str]]:
     """Run shell cmds; treat 'already exists' as success for route add."""
     applied: list[str] = []
@@ -263,9 +275,10 @@ def apply_routes_for_adapter(
 
         is_pin = _is_server_pin_cmd(cmd, server_host)
         is_catch = _is_catchall_cmd(cmd)
+        is_dns_dest = _is_tunnel_dns_dest_cmd(cmd, server_host)
 
-        # Never install dual /1 unless server pin already succeeded
-        if is_catch and not pin_ok:
+        # Never install dual /1 / tunnel-DNS dest unless server pin already succeeded
+        if (is_catch or is_dns_dest) and not pin_ok:
             errors.append(
                 "server pin failed or missing — refusing dual /1 "
                 "(would blackhole UDP to node via TUN)"
@@ -574,12 +587,36 @@ def may_install_dual_slash1_catchalls(
     return True
 
 
+def apply_windows_unicast_if(sock: object, if_index: Optional[int]) -> bool:
+    """Bind *sock* to a Windows IF index (IP_UNICAST_IF). False if not applied."""
+    if if_index is None:
+        return False
+    try:
+        idx = int(if_index)
+    except (TypeError, ValueError):
+        return False
+    if idx <= 0:
+        return False
+    import socket
+    import struct
+
+    opt = getattr(socket, "IP_UNICAST_IF", 31)
+    try:
+        sock.setsockopt(socket.IPPROTO_IP, opt, struct.pack("!I", idx))  # type: ignore[attr-defined]
+        return True
+    except Exception:
+        return False
+
+
 def residual_forward_path_smoke(
     *,
     host: str = "1.1.1.1",
     port: int = 443,
     timeout: float = 3.0,
     connect_fn: Optional[Callable[..., object]] = None,
+    bind_ip: Optional[str] = None,
+    if_index: Optional[int] = None,
+    socket_cls: Optional[Callable[..., object]] = None,
 ) -> bool:
     """True when general IPv4 can leave the host to a public IP (post dual /1).
 
@@ -587,19 +624,45 @@ def residual_forward_path_smoke(
     /1 + dataplane, a working residual path must reach a public address through
     the tunnel NAT. Failure means dual /1 is a blackhole — callers must roll back
     and must not claim residual Connected / protected.
+
+    When *bind_ip* / *if_index* are set, the probe is sourced on the Wintun
+    address so node ``on_tun`` can map the reply to the residual session
+    (unbound ``create_connection`` often uses the physical NIC source on a /32).
     """
     import socket
 
-    open_tcp = connect_fn or socket.create_connection
-    try:
-        sock = open_tcp((host, int(port)), float(timeout))
+    if connect_fn is not None:
+        open_tcp = connect_fn
         try:
-            close = getattr(sock, "close", None)
-            if callable(close):
-                close()
+            sock = open_tcp((host, int(port)), float(timeout))
+            try:
+                close = getattr(sock, "close", None)
+                if callable(close):
+                    close()
+            except Exception:
+                pass
+            return True
+        except OSError:
+            return False
         except Exception:
-            pass
-        return True
+            return False
+
+    factory = socket_cls or socket.socket
+    try:
+        sock = factory(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            apply_windows_unicast_if(sock, if_index)
+            bip = (bind_ip or "").strip()
+            if bip:
+                sock.bind((bip, 0))
+            sock.settimeout(float(timeout))
+            sock.connect((str(host), int(port)))
+            return True
+        finally:
+            try:
+                sock.close()
+            except Exception:
+                pass
     except OSError:
         return False
     except Exception:
@@ -612,6 +675,8 @@ def residual_tunnel_dns_smoke(
     qname: str = "example.com",
     timeout: float = 3.0,
     sock_factory: Optional[Callable[[], object]] = None,
+    bind_ip: Optional[str] = None,
+    if_index: Optional[int] = None,
 ) -> bool:
     """True when tunnel DNS (product default 10.88.0.1) answers an A query.
 
@@ -646,6 +711,10 @@ def residual_tunnel_dns_smoke(
     try:
         s = factory()
         try:
+            apply_windows_unicast_if(s, if_index)
+            bip = (bind_ip or "").strip()
+            if bip:
+                s.bind((bip, 0))
             s.settimeout(float(timeout))
             s.sendto(packet, (str(dns_host).strip(), 53))
             data, _addr = s.recvfrom(512)
@@ -696,6 +765,66 @@ def residual_post_attach_ready(
     if require_dns_smoke and not dns_ok:
         return False
     return True
+
+
+def residual_run_post_attach_smokes(
+    *,
+    bind_ip: Optional[str] = None,
+    if_index: Optional[int] = None,
+    dns_host: str = "10.88.0.1",
+    timeout: float = 2.5,
+    attempts: int = 3,
+    gap_s: float = 0.4,
+    sleep_fn: Optional[Callable[[float], None]] = None,
+    forward_fn: Optional[Callable[[], bool]] = None,
+    dns_fn: Optional[Callable[[], bool]] = None,
+    dataplane_running: bool = True,
+    keepalive_ok: bool = True,
+) -> tuple[bool, bool, bool]:
+    """Retry forward + tunnel-DNS smokes after dual /1 settle.
+
+    Returns ``(ready, forward_ok, dns_ok)``. Still fail-closed when the last
+    attempt has a dead forward or DNS path.
+    """
+    sleeper = time.sleep if sleep_fn is None else sleep_fn
+    bind = (bind_ip or "").strip() or None
+    dns = (dns_host or "").strip() or "10.88.0.1"
+
+    def _fwd() -> bool:
+        if forward_fn is not None:
+            return bool(forward_fn())
+        return residual_forward_path_smoke(
+            timeout=float(timeout), bind_ip=bind, if_index=if_index
+        )
+
+    def _dns() -> bool:
+        if dns_fn is not None:
+            return bool(dns_fn())
+        return residual_tunnel_dns_smoke(
+            timeout=float(timeout),
+            bind_ip=bind,
+            if_index=if_index,
+            dns_host=dns,
+        )
+
+    n = max(1, int(attempts))
+    fwd_ok = False
+    dns_ok = False
+    for i in range(n):
+        fwd_ok = _fwd()
+        dns_ok = _dns()
+        ready = residual_post_attach_ready(
+            routes_applied=True,
+            dataplane_running=bool(dataplane_running),
+            keepalive_ok=bool(keepalive_ok),
+            forward_path_ok=fwd_ok,
+            dns_ok=dns_ok,
+        )
+        if ready:
+            return True, fwd_ok, dns_ok
+        if i + 1 < n:
+            sleeper(float(gap_s))
+    return False, fwd_ok, dns_ok
 
 
 def residual_ip_capture_active(result: Optional[WindowsTunnelResult]) -> bool:
@@ -1201,8 +1330,27 @@ def start_full_tunnel(
                 keepalive_ok = False
         # Give dataplane a moment to move first frames before smoke TCP/DNS
         time.sleep(0.35)
-        forward_ok = residual_forward_path_smoke(timeout=3.5)
-        dns_ok = residual_tunnel_dns_smoke(timeout=3.5)
+        dns_host = "10.88.0.1"
+        try:
+            if plan is not None and plan.dns_servers:
+                dns_host = str(plan.dns_servers[0]).strip() or dns_host
+        except Exception:
+            pass
+        bind_ip = ""
+        try:
+            bind_ip = str(getattr(plan, "tunnel_client_ip", "") or "").strip()
+        except Exception:
+            bind_ip = ""
+        _ready, forward_ok, dns_ok = residual_run_post_attach_smokes(
+            bind_ip=bind_ip or None,
+            if_index=if_index,
+            dns_host=dns_host,
+            timeout=2.5,
+            attempts=3,
+            gap_s=0.45,
+            dataplane_running=dataplane_is_live(plane),
+            keepalive_ok=keepalive_ok,
+        )
         if not residual_post_attach_ready(
             routes_applied=True,
             dataplane_running=dataplane_is_live(plane),

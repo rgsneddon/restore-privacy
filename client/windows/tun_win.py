@@ -12,6 +12,7 @@ import sys
 import threading
 from ctypes import wintypes
 from pathlib import Path
+from collections.abc import Callable
 from typing import Optional
 
 from client.dataplane import QueueTun, TunIO
@@ -145,6 +146,12 @@ class WintunTun:
         self._WintunGetReadWaitEvent.argtypes = [HSESSION]
         self._WintunGetReadWaitEvent.restype = wintypes.HANDLE
 
+        self._WintunGetAdapterLUID = None
+        if hasattr(d, "WintunGetAdapterLUID"):
+            self._WintunGetAdapterLUID = d.WintunGetAdapterLUID
+            self._WintunGetAdapterLUID.argtypes = [HADAPTER, ctypes.POINTER(NET_LUID)]
+            self._WintunGetAdapterLUID.restype = None
+
         self._WintunReceivePacket = d.WintunReceivePacket
         self._WintunReceivePacket.argtypes = [HSESSION, ctypes.POINTER(wintypes.DWORD)]
         self._WintunReceivePacket.restype = ctypes.POINTER(ctypes.c_ubyte)
@@ -173,7 +180,20 @@ class WintunTun:
                 raise WintunError(f"missing Wintun export: {attr}")
 
     def interface_index(self) -> Optional[int]:
-        """Windows IF index for route … IF <n> (anti-blackhole full-tunnel)."""
+        """Windows IF index for route … IF <n> (anti-blackhole full-tunnel).
+
+        Prefer Wintun LUID → IF index so dual /1 never binds a leftover Hyper-V
+        or Wi-Fi adapter when PowerShell ``Get-NetAdapter -Name`` is slow/wrong.
+        """
+        try:
+            if self._adapter and self._WintunGetAdapterLUID is not None:
+                luid = NET_LUID()
+                self._WintunGetAdapterLUID(self._adapter, ctypes.byref(luid))
+                idx = if_index_from_luid_value(int(luid.Value))
+                if idx:
+                    return idx
+        except Exception:
+            pass
         return resolve_interface_index(self.name)
 
     def configure_address(self) -> list[str]:
@@ -340,6 +360,53 @@ def create_windows_tun(
         force_queue=force_queue,
         prefer_system_capture=prefer_system_capture,
     )
+
+
+def if_index_from_luid_value(
+    luid_value: int,
+    *,
+    convert: Optional[Callable[[int], Optional[int]]] = None,
+) -> Optional[int]:
+    """Map a NET_LUID integer to an IF index. *convert* is injectable for tests."""
+    try:
+        val = int(luid_value)
+    except (TypeError, ValueError):
+        return None
+    if val <= 0:
+        return None
+    if convert is not None:
+        try:
+            idx = convert(val)
+            n = int(idx) if idx is not None else 0
+            return n if n > 0 else None
+        except Exception:
+            return None
+    return convert_net_luid_to_if_index(val)
+
+
+def convert_net_luid_to_if_index(luid_value: int) -> Optional[int]:
+    """iphlpapi ConvertInterfaceLuidToIndex (Windows)."""
+    if sys.platform != "win32":
+        return None
+    try:
+        val = int(luid_value)
+    except (TypeError, ValueError):
+        return None
+    if val <= 0:
+        return None
+    try:
+        iphlpapi = ctypes.WinDLL("iphlpapi")
+        conv = iphlpapi.ConvertInterfaceLuidToIndex
+        conv.argtypes = [ctypes.POINTER(NET_LUID), ctypes.POINTER(wintypes.DWORD)]
+        conv.restype = wintypes.DWORD
+        luid = NET_LUID(val)
+        idx = wintypes.DWORD(0)
+        status = int(conv(ctypes.byref(luid), ctypes.byref(idx)))
+        if status == 0 and int(idx.value) > 0:
+            return int(idx.value)
+    except Exception:
+        return None
+    return None
 
 
 def resolve_interface_index(name: str) -> Optional[int]:

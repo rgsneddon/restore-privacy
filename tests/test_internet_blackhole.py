@@ -64,6 +64,8 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
         self.assertIn("IF 17", joined)
         self.assertIn("0.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17", joined)
         self.assertIn("128.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17", joined)
+        # Dest-on-link tunnel DNS — never dual /1 next-hop 10.88.0.1
+        self.assertIn("10.88.0.1 mask 255.255.255.255 0.0.0.0 IF 17", joined)
         # /32 address — no fake ARP gateway 10.88.0.1 for dual /1
         self.assertIn("255.255.255.255", joined)
         self.assertNotIn("mask 128.0.0.0 10.88.0.1", joined)
