@@ -123,11 +123,16 @@ class Suite108IosResidualPins(unittest.TestCase):
                 self.assertTrue(members, f"missing {base}")
                 for n in members:
                     self.assertEqual(zf.read(n), product, f"mismatch {n}")
-            # Host + PacketTunnel secrets trees both carry live set
+            # Host + PacketTunnel secrets trees both carry live set.
+            # Host may be bare Runner.app/secrets/ or IPA Payload/Runner.app/secrets/.
             host = {
                 Path(n).name
                 for n in pubs
-                if n.startswith("Runner.app/secrets/")
+                if (
+                    "/Runner.app/secrets/" in f"/{n}"
+                    or n.startswith("Runner.app/secrets/")
+                )
+                and "PacketTunnel.appex" not in n
             }
             ape = {
                 Path(n).name
