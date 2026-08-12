@@ -26,8 +26,9 @@ class TestPackageRagEvaluation(unittest.TestCase):
         cls.mod = _load_audit_mod()
 
     def test_missing_package_is_red(self):
+        # Generic platform without a native-handoff exception stays hard Red.
         out = self.mod.evaluate_package_audit_state(
-            "windows", None, pin="abc"
+            "linux", None, pin="abc", expected_filename="restore-privacy-client-x-linux-x64.tar.gz"
         )
         self.assertEqual(out["state"], "Red")
         why = " ".join(out["reasons"]).lower()
@@ -44,6 +45,81 @@ class TestPackageRagEvaluation(unittest.TestCase):
             f"reason should cite package search paths: {why}",
         )
         self.assertIn("relative_path", why)
+
+    def test_missing_windows_with_native_handoff_is_amber_not_red(self):
+        """Open WINDOWS_HANDOFF_<pin> means PE lag is Amber, not worst-package Red."""
+        ver = self.mod.load_catalog_version()
+        handoff = self.mod.windows_native_handoff_path(ver)
+        if not handoff.is_file():
+            self.skipTest(f"no handoff for monopin {ver}: {handoff}")
+        self.assertTrue(
+            self.mod.windows_native_handoff_pending(ver),
+            f"handoff {handoff} must declare native rebuild obligation",
+        )
+        fname = f"restore-privacy-client-{ver}-windows-x64-setup.exe"
+        # Force local miss + no Helsinki probe so only handoff path applies.
+        with mock.patch.object(self.mod, "probe_helsinki_paid_package", return_value=None):
+            out = self.mod.evaluate_package_audit_state(
+                "windows", None, pin="abc", expected_filename=fname
+            )
+        self.assertEqual(
+            out["state"],
+            "Amber",
+            f"expected Amber for handoff-pending Windows, got {out}",
+        )
+        self.assertTrue(out.get("handoff_pending"))
+        why = " ".join(out["reasons"]).lower()
+        self.assertIn("not staged", why)
+        self.assertIn("handoff", why)
+        self.assertIn("native", why)
+
+    def test_overall_worst_package_amber_not_red_with_handoff_windows(self):
+        """When Windows is handoff-Amber and others Green, overall is Amber not Red."""
+        packages = [
+            {"platform": "windows", "state": "Amber"},
+            {"platform": "android", "state": "Green"},
+            {"platform": "macos", "state": "Green"},
+            {"platform": "ios", "state": "Green"},
+            {"platform": "linux", "state": "Green"},
+        ]
+        order = {"Green": 0, "Amber": 1, "Red": 2}
+        worst = "Green"
+        for p in packages:
+            st = p.get("state") or "Red"
+            if order.get(st, 2) > order.get(worst, 0):
+                worst = st
+        self.assertEqual(worst, "Amber")
+        # Drive real evaluate_catalog_packages with handoff Amber for windows only.
+        ver = self.mod.load_catalog_version()
+        if not self.mod.windows_native_handoff_pending(ver):
+            self.skipTest(f"no handoff pending for {ver}")
+
+        def _fake_eval(platform, path, *, pin, expected_filename=""):
+            if platform == "windows":
+                return {
+                    "platform": "windows",
+                    "label": "Windows",
+                    "filename": expected_filename,
+                    "state": "Amber",
+                    "reasons": ["handoff pending"],
+                    "path": None,
+                    "handoff_pending": True,
+                }
+            return {
+                "platform": platform,
+                "label": platform,
+                "filename": expected_filename,
+                "state": "Green",
+                "reasons": ["fixture green"],
+                "path": f"/tmp/{expected_filename}",
+            }
+
+        with mock.patch.object(
+            self.mod, "evaluate_package_audit_state", side_effect=_fake_eval
+        ):
+            rag = self.mod.evaluate_catalog_packages(ver)
+        self.assertEqual(rag["overall"], "Amber")
+        self.assertNotEqual(rag["overall"], "Red")
 
     def test_catalog_filenames_match_downloads_monopin(self):
         """Package RAG must use same basenames as downloads catalog list."""

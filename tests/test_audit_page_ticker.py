@@ -58,6 +58,20 @@ class TestCurrentAuditRagColour(unittest.TestCase):
         self.assertIsNone(st["colour"])
         self.assertIsNone(st["css"])
 
+    def test_package_rag_takes_precedence_over_overall_ok(self):
+        """Ticker must follow package_rag.overall (not unit-suite overall_ok alone)."""
+        st = current_audit_rag_colour(
+            data={
+                "package_rag": {"overall": "Amber"},
+                "overall_ok": True,  # unit suite can pass while package lag is Amber
+            }
+        )
+        self.assertEqual(st["colour"], "Amber")
+        st_red = current_audit_rag_colour(
+            data={"package_rag": {"overall": "Red"}, "overall_ok": True}
+        )
+        self.assertEqual(st_red["colour"], "Red")
+
 
 class TestAuditPageTickerHtml(unittest.TestCase):
     def test_ticker_has_countdown_and_unique_ids(self):
@@ -96,7 +110,33 @@ class TestAuditPageTickerHtml(unittest.TestCase):
         # Last-run from JSON (not stale markdown)
         self.assertIn('id="audit-page-last-run-time"', html)
         self.assertIn('datetime="2026-07-21T10:00:00Z"', html)
-        self.assertIn("2026-07-21 10:00:00 UTC", html)
+        # Display is Europe/London (BST in summer) or UTC fallback.
+        self.assertTrue(
+            "2026-07-21 10:00:00 UTC" in html or "2026-07-21 11:00:00 BST" in html,
+            html,
+        )
+
+    def test_ticker_amber_when_package_rag_amber(self):
+        last = datetime(2026, 7, 21, 10, 0, 0, tzinfo=timezone.utc)
+        now = last + timedelta(hours=1)
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "security_audit_latest.json"
+            p.write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-07-21T10:00:00Z",
+                        "package_rag": {"overall": "Amber"},
+                        "overall_ok": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            html = render_audit_page_ticker_html(now=now, json_path=p)
+        self.assertIn("The current audit run is", html)
+        self.assertIn(">Amber<", html)
+        self.assertIn("rag-swatch rag-amber", html)
+        self.assertIn('data-rag-colour="amber"', html)
+        self.assertNotIn(">Red<", html)
         # Remaining ~23h of 1-day period (display always includes days)
         self.assertIn("0d 23:00:00", html)
         self.assertIn('data-period-seconds="86400"', html)

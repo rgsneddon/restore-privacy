@@ -124,9 +124,18 @@ def load_security_audit_json_prefer_upstream(
     Residual ``rpt-security-audit`` scp-publishes to Helsinki public-audit after
     each successful write. Status host (Render) must prefer that stamp so
     homepage last-run advances without a laptop git publish.
+
+    When *path* is an **explicit non-default** file (tests / operator fixtures),
+    upstream is **not** consulted — the caller asked for that file's payload.
+    Default / ``None`` path still prefers newer upstream so public last-run
+    tracks the residual timer.
     """
     local_data: dict[str, Any] | None = None
     p = path if path is not None else _DEFAULT_JSON
+    try:
+        p = Path(p)
+    except TypeError:
+        p = _DEFAULT_JSON
     try:
         if p.is_file():
             raw = json.loads(p.read_text(encoding="utf-8"))
@@ -134,6 +143,14 @@ def load_security_audit_json_prefer_upstream(
                 local_data = raw
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         local_data = None
+
+    # Explicit fixture / operator path: never clobber with live Helsinki JSON.
+    try:
+        explicit_non_default = path is not None and p.resolve() != _DEFAULT_JSON.resolve()
+    except OSError:
+        explicit_non_default = path is not None
+    if explicit_non_default:
+        return local_data
 
     up_url = upstream_url if upstream_url is not None else audit_upstream_json_url()
     remote_data: dict[str, Any] | None = None

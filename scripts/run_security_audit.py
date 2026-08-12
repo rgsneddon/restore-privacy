@@ -1221,6 +1221,39 @@ def _windows_multihop_markers(path: Path) -> dict[str, bool]:
     }
 
 
+def windows_native_handoff_path(catalog_version: str | None = None) -> Path:
+    """``client/windows/WINDOWS_HANDOFF_<pin>.md`` for the monopin (if any)."""
+    ver = (catalog_version or load_catalog_version()).strip()
+    return ROOT / "client" / "windows" / f"WINDOWS_HANDOFF_{ver}.md"
+
+
+def windows_native_handoff_pending(catalog_version: str | None = None) -> bool:
+    """True when Windows PE is documented as pending native rebuild for this pin.
+
+    Darwin / status-host audits often run before the Windows machine freezes the
+    monopin PE. A hard Red for that documented lag makes the public AUDIT ticker
+    permanently Red while residual tests and other packages are healthy.
+
+    Product policy: handoff-pending **missing** Windows PE is **Amber** (not
+    seal Green, not worst-package Red). Handoff text must still require native
+    rebuild — this is not a claim that the PE is sealed.
+    """
+    path = windows_native_handoff_path(catalog_version)
+    if not path.is_file():
+        return False
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    low = text.lower()
+    # Require an explicit native-rebuild obligation, not an empty stub file.
+    if "native-rebuild" in low or "native rebuild" in low or "must native-rebuild" in low:
+        return True
+    if "you must native-rebuild" in low:
+        return True
+    return "build_windows_multihop" in low and "windows" in low
+
+
 def evaluate_package_audit_state(
     platform: str,
     path: Path | None,
@@ -1268,18 +1301,41 @@ def evaluate_package_audit_state(
             f"releases/{ver}/, status_page/assets/{ver}/, "
             f"{helsinki_paid_asset_base_url()}/{ver}/"
         )
+        missing_reason = (
+            f"catalog monopin asset not staged "
+            f"(looked for {miss} / relative_path {ver}/{miss} under "
+            f"{roots_txt}; default paid store is Helsinki "
+            f"{helsinki_paid_asset_base_url()}/ — set RPT_ASSET_FETCH_TOKEN "
+            f"to probe, or stage under paid_assets/{ver}/)"
+        )
+        # Documented Windows native handoff: Amber (pending seal), not Red.
+        if platform == "windows" and windows_native_handoff_pending(ver):
+            handoff = windows_native_handoff_path(ver)
+            try:
+                handoff_disp = str(handoff.relative_to(ROOT))
+            except ValueError:
+                handoff_disp = str(handoff)
+            return {
+                "platform": platform,
+                "label": label,
+                "filename": filename or miss,
+                "state": "Amber",
+                "reasons": [
+                    missing_reason,
+                    "Windows PE pending native rebuild on Windows host "
+                    f"(see {handoff_disp}; not seal-claimed — catalog ticker "
+                    "is Amber, not Red, while handoff is open)",
+                ],
+                "path": None,
+                "search_roots": roots,
+                "handoff_pending": True,
+            }
         return {
             "platform": platform,
             "label": label,
             "filename": filename or f"(missing {platform})",
             "state": "Red",
-            "reasons": [
-                f"catalog monopin asset not staged "
-                f"(looked for {miss} / relative_path {ver}/{miss} under "
-                f"{roots_txt}; default paid store is Helsinki "
-                f"{helsinki_paid_asset_base_url()}/ — set RPT_ASSET_FETCH_TOKEN "
-                f"to probe, or stage under paid_assets/{ver}/)"
-            ],
+            "reasons": [missing_reason],
             "path": None,
             "search_roots": roots,
         }
