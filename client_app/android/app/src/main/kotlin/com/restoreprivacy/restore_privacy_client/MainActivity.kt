@@ -190,13 +190,11 @@ class MainActivity : FlutterActivity() {
      * Full process takedown for main-screen Quit — no leftover background window.
      *
      * Order:
-     * 1. Force residual VPN service stop (ACTION_DISCONNECT + stopService) so
-     *    START_STICKY cannot revive the process after kill.
-     * 2. Finish **all** app tasks via [ActivityManager.AppTask.finishAndRemoveTask]
-     *    plus finishAffinity / finishAndRemoveTask on this activity.
-     * 3. **Immediate** killProcess + System.exit + Runtime.halt (no postDelayed —
-     *    deferred kill was unreliable after activity teardown and left a
-     *    disconnected shell in recents).
+     * 1. Force residual VPN stop without FGS restart ([forceStopVpnService]).
+     * 2. Remove **all** app tasks + finishAffinity / finishAndRemoveTask.
+     * 3. **postDelayed** killProcess/System.exit/halt so (1)+(2) can apply —
+     *    immediate kill races AMS task removal (blank/disconnected recents) and
+     *    can fire before DISCONNECT marks START_NOT_STICKY (sticky revival).
      */
     private fun fullProcessExit() {
         forceStopVpnService()
@@ -220,7 +218,14 @@ class MainActivity : FlutterActivity() {
             } catch (_: Exception) {
             }
         }
-        // Immediate hard kill — process must not idle with a leftover task.
+        // Delay kill so DISCONNECT/stopService and AMS task removal can complete.
+        Handler(Looper.getMainLooper()).postDelayed({
+            hardKillProcess()
+        }, FULL_EXIT_KILL_DELAY_MS)
+    }
+
+    /** Last-resort process death after task removal + service stop window. */
+    private fun hardKillProcess() {
         try {
             android.os.Process.killProcess(android.os.Process.myPid())
         } catch (_: Exception) {
@@ -235,10 +240,21 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /** Stop residual VPN so FGS / sticky restart cannot keep a shell alive after Quit. */
+    /**
+     * Stop residual VPN without FGS contract violations or sticky revival.
+     *
+     * 1. Plain [startService] + ACTION_DISCONNECT (never [startForegroundService])
+     *    so onStartCommand sets userStopped, runs stopTunnel, returns START_NOT_STICKY.
+     * 2. [stopService] so the component is unbound even if already stopping.
+     *
+     * DISCONNECT must not use startForegroundService: it never calls startForeground.
+     */
     private fun forceStopVpnService() {
         try {
-            sendDisconnect()
+            val disc = Intent(this, RptVpnService::class.java).apply {
+                action = RptVpnService.ACTION_DISCONNECT
+            }
+            startService(disc)
         } catch (_: Exception) {
         }
         try {
@@ -264,11 +280,10 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         /**
-         * Historical deferred-kill delay (no longer used for kill — teardown is
-         * immediate). Kept so structural tests / docs can cite the constant era;
-         * production kill is synchronous after task removal.
+         * Delay after task/service teardown before killProcess (ms).
+         * Lets ACTION_DISCONNECT set START_NOT_STICKY and AMS drop the task.
          */
-        const val FULL_EXIT_KILL_DELAY_MS: Long = 0L
+        const val FULL_EXIT_KILL_DELAY_MS: Long = 300L
     }
 
     /** True when node public key is available (device Ed25519 is generated on connect). */
@@ -317,22 +332,19 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /** Tell [RptVpnService] to close TUN and stop so traffic reverts to device IP. */
+    /**
+     * Tell [RptVpnService] to close TUN and stop so traffic reverts to device IP.
+     *
+     * Uses plain [startService] only — never [startForegroundService].
+     * ACTION_DISCONNECT does not call startForeground; FGS start would crash or
+     * leave a sticky shell after Quit.
+     */
     private fun sendDisconnect() {
         try {
             val i = Intent(this, RptVpnService::class.java).apply {
                 action = RptVpnService.ACTION_DISCONNECT
             }
-            // Prefer explicit start so ACTION_DISCONNECT is delivered even if already running.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                try {
-                    startForegroundService(i)
-                } catch (_: Exception) {
-                    startService(i)
-                }
-            } else {
-                startService(i)
-            }
+            startService(i)
         } catch (_: Exception) {
             try {
                 stopService(Intent(this, RptVpnService::class.java))

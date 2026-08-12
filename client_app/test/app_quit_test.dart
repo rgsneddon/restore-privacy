@@ -134,21 +134,25 @@ void main() {
   });
 
   group('Android full process exit', () {
-    test('exit planner requires stop service, remove tasks, immediate kill', () {
+    test('exit planner requires stop service, remove tasks, deferred kill', () {
       final steps = androidFullExitSteps();
       expect(steps, contains('await_fullExit_channel'));
       expect(steps, contains('force_stop_vpn_service'));
       expect(steps, contains('remove_all_app_tasks'));
       expect(steps, contains('finishAffinity'));
       expect(steps, contains('finishAndRemoveTask'));
-      expect(steps, contains('immediate_process_kill'));
+      expect(steps, contains('deferred_process_kill'));
       expect(
         steps.indexOf('force_stop_vpn_service'),
         lessThan(steps.indexOf('finishAndRemoveTask')),
       );
       expect(
         steps.indexOf('finishAndRemoveTask'),
-        lessThan(steps.indexOf('immediate_process_kill')),
+        lessThan(steps.indexOf('deferred_process_kill')),
+      );
+      expect(
+        kAndroidFullExitBackupDelay.inMilliseconds,
+        greaterThan(androidFullExitKillDelayMs),
       );
     });
 
@@ -214,7 +218,7 @@ void main() {
       expect(src.contains('Minimize / background does **not** stop'), isTrue);
     });
 
-    test('MainActivity fullExit stops VPN, removes tasks, kills immediately',
+    test('MainActivity fullExit: stop without FGS, remove tasks, deferred kill',
         () {
       final kt = File(
         'android/app/src/main/kotlin/com/restoreprivacy/restore_privacy_client/MainActivity.kt',
@@ -230,18 +234,48 @@ void main() {
       expect(kt.contains('System.exit'), isTrue);
       expect(kt.contains('Runtime.getRuntime().halt'), isTrue);
       expect(kt.contains('stopService'), isTrue);
-      // Must not use postDelayed for kill (that left disconnected shell).
+      expect(kt.contains('FULL_EXIT_KILL_DELAY_MS'), isTrue);
+      // CONNECT may still startForegroundService; DISCONNECT must never do so.
+      expect(
+        kt.contains('ACTION_CONNECT'),
+        isTrue,
+        reason: 'connect path must remain present for FGS baseline',
+      );
+
+      final forceIdx = kt.indexOf('private fun forceStopVpnService');
+      expect(forceIdx, greaterThanOrEqualTo(0));
+      final forceBody =
+          kt.substring(forceIdx, (forceIdx + 900).clamp(0, kt.length));
+      expect(forceBody.contains('ACTION_DISCONNECT'), isTrue);
+      expect(forceBody.contains('startService'), isTrue);
+      expect(forceBody.contains('stopService'), isTrue);
+      expect(
+        forceBody.contains('startForegroundService'),
+        isFalse,
+        reason: 'forceStopVpnService must not start FGS for DISCONNECT',
+      );
+      // stopService after DISCONNECT startService in forceStop
+      expect(
+        forceBody.indexOf('startService'),
+        lessThan(forceBody.indexOf('stopService')),
+      );
+
       final fnIdx = kt.indexOf('private fun fullProcessExit');
       expect(fnIdx, greaterThanOrEqualTo(0));
-      final fnBody = kt.substring(fnIdx, (fnIdx + 1800).clamp(0, kt.length));
+      final fnBody = kt.substring(fnIdx, (fnIdx + 1600).clamp(0, kt.length));
+      // Kill must be postDelayed after finishAndRemoveTask (AMS + DISCONNECT window).
+      expect(fnBody.contains('postDelayed'), isTrue);
       expect(
-        fnBody.contains('postDelayed'),
-        isFalse,
-        reason: 'deferred kill left background window',
+        fnBody.indexOf('finishAndRemoveTask'),
+        lessThan(fnBody.indexOf('postDelayed')),
       );
-      expect(fnBody.indexOf('forceStopVpnService'), lessThan(fnBody.indexOf('killProcess')));
-      expect(fnBody.indexOf('removeAllAppTasks'), lessThan(fnBody.indexOf('killProcess')));
-      // Reply before teardown scheduling
+      expect(
+        fnBody.indexOf('forceStopVpnService'),
+        lessThan(fnBody.indexOf('postDelayed')),
+      );
+      expect(fnBody.contains('FULL_EXIT_KILL_DELAY_MS'), isTrue);
+      expect(fnBody.contains('hardKillProcess'), isTrue);
+
       final fullExitIdx = kt.indexOf('"fullExit"');
       final block = kt.substring(
         fullExitIdx,
@@ -253,6 +287,18 @@ void main() {
         block.indexOf('result.success'),
         lessThan(block.indexOf('fullProcessExit()')),
       );
+
+      final sendIdx = kt.indexOf('private fun sendDisconnect');
+      expect(sendIdx, greaterThanOrEqualTo(0));
+      final sendBody =
+          kt.substring(sendIdx, (sendIdx + 700).clamp(0, kt.length));
+      expect(
+        sendBody.contains('startForegroundService'),
+        isFalse,
+        reason: 'sendDisconnect must use plain startService only',
+      );
+      expect(sendBody.contains('startService'), isTrue);
+      expect(sendBody.contains('ACTION_DISCONNECT'), isTrue);
     });
   });
 }

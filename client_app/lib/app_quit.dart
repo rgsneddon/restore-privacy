@@ -82,12 +82,12 @@ const MethodChannel kAppQuitChannel = MethodChannel('restore_privacy/vpn');
 const String kAndroidFullExitMethod = 'fullExit';
 
 /// Grace before dart:io backup exit if native [kAndroidFullExitMethod] did not
-/// kill the process (channel missing / tests). Native kill is immediate after
-/// task removal — this is only a short fallback, not the primary teardown.
-const Duration kAndroidFullExitBackupDelay = Duration(milliseconds: 250);
+/// kill the process (channel missing / tests). Must exceed native
+/// [androidFullExitKillDelayMs] so AMS task removal + DISCONNECT can finish.
+const Duration kAndroidFullExitBackupDelay = Duration(milliseconds: 500);
 
-/// Native kill is immediate (0). Kept for tests/docs parity with MainActivity.
-const int androidFullExitKillDelayMs = 0;
+/// Mirrors MainActivity.FULL_EXIT_KILL_DELAY_MS (deferred kill after task remove).
+const int androidFullExitKillDelayMs = 300;
 
 /// Fully terminate the host process (not hide-to-tray / minimize).
 ///
@@ -95,9 +95,9 @@ const int androidFullExitKillDelayMs = 0;
 ///
 /// On Android, [SystemNavigator.pop] alone only finishes the activity and can
 /// leave a disconnected shell in the background. We **await** native
-/// [kAndroidFullExitMethod], which force-stops the VPN service, removes all
-/// app tasks, and immediately killProcess/System.exit/halt. A short backup
-/// [exit] runs only if the process somehow still lives.
+/// [kAndroidFullExitMethod], which force-stops the VPN service (no FGS restart),
+/// removes all app tasks, then deferred killProcess after
+/// [androidFullExitKillDelayMs]. A short backup [exit] runs only if still alive.
 ///
 /// Non-Android: SystemNavigator.pop then dart:io exit.
 Future<void> exitAppProcess({
@@ -140,6 +140,6 @@ List<String> androidFullExitSteps() {
     'remove_all_app_tasks',
     'finishAffinity',
     'finishAndRemoveTask',
-    'immediate_process_kill',
+    'deferred_process_kill',
   ];
 }
