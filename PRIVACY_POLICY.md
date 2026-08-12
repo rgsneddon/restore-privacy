@@ -1,8 +1,8 @@
 # Privacy Policy — Restore Privacy
 
 **Last updated:** 3 August 2026  
-**Product:** Restore Privacy **v1.2.1** — a dedicated residual virtual private network and the public shop  
-**Current packages (catalog v1.2.1):** free installers on [restoreprivacy.online](https://restoreprivacy.online/). Residual Connect needs a free device trial or a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **Linux**, **Android**, **macOS**, **iOS**, and **Windows** monopin **1.2.1** packages are fulfilled from the product host. **macOS** is **Developer ID** + notarized when sealed (Team **SFCBP95595**). **iOS** ships as an IPA-compatible Team-signed zip (`Payload/Runner.app` + embedded provisions; rename to `.ipa` for sideload; same Team **SFCBP95595**). Public GitHub Pages ship docs only — not operator admin.
+**Product:** Restore Privacy **v1.2.2** — a dedicated residual virtual private network and the public shop  
+**Current packages (catalog v1.2.2):** free installers on [restoreprivacy.online](https://restoreprivacy.online/). Residual Connect needs a free device trial or a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **Linux**, **Android**, **macOS**, **iOS**, and **Windows** monopin **1.2.2** packages are fulfilled from the product host. **macOS** is **Developer ID** + notarized when sealed (Team **SFCBP95595**). **iOS** ships as an IPA-compatible Team-signed zip (`Payload/Runner.app` + embedded provisions; rename to `.ipa` for sideload; same Team **SFCBP95595**). Public GitHub Pages ship docs only — not operator admin.
 
 ---
 
@@ -66,4 +66,4 @@ You can export local connection logs and stop using residual Connect by not rene
 
 Related: end-user **LICENSE**, product **README**, and the public security **AUDIT**.
 
-This policy describes product behaviour for catalog **v1.2.1**. It is not a substitute for formal legal advice.
+This policy describes product behaviour for catalog **v1.2.2**. It is not a substitute for formal legal advice.

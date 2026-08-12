@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-08-12T06:00:21Z",
+  "generated_at": "2026-08-12T20:13:13Z",
   "node_host": "Germany (DE)",
-  "catalog_version": "1.2.1",
+  "catalog_version": "1.2.2",
   "probe_schedule": [
     {
       "code": "IS",
@@ -119,117 +119,117 @@
     ]
   },
   "package_rag": {
-    "catalog_version": "1.2.1",
+    "catalog_version": "1.2.2",
     "pin": "1b126abfae737c66ce99670b730e123f2831ce5beb2868d7865324f391280bbe",
     "exit_pin": "ea0c7fa338612386cbe666a0ca64a6a69e3471b03db1848e7df4be2ed6823b18",
     "packages": [
       {
         "platform": "windows",
         "label": "Windows",
-        "filename": "restore-privacy-client-1.2.1-windows-x64-setup.exe",
+        "filename": "restore-privacy-client-1.2.2-windows-x64-setup.exe",
         "state": "Amber",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-1.2.1-windows-x64-setup.exe / relative_path 1.2.1/restore-privacy-client-1.2.1-windows-x64-setup.exe under status_page/assets/1.2.1/, releases/1.2.1/, /opt/restore-privacy/paid_assets/1.2.1/, dist/1.2.1/, status_page/assets/, https://135.181.152.10.sslip.io/paid-assets/1.2.1/; default paid store is Helsinki https://135.181.152.10.sslip.io/paid-assets/ \u2014 set RPT_ASSET_FETCH_TOKEN to probe, or stage under paid_assets/1.2.1/)",
-          "Windows PE pending native rebuild on Windows host (see client/windows/WINDOWS_HANDOFF_1.2.1.md; not seal-claimed \u2014 catalog ticker is Amber, not Red, while handoff is open)"
+          "catalog monopin asset not staged (looked for restore-privacy-client-1.2.2-windows-x64-setup.exe / relative_path 1.2.2/restore-privacy-client-1.2.2-windows-x64-setup.exe under status_page/assets/1.2.2/, releases/1.2.2/, /opt/restore-privacy/paid_assets/1.2.2/, dist/1.2.2/, status_page/assets/, https://135.181.152.10.sslip.io/paid-assets/1.2.2/; default paid store is Helsinki https://135.181.152.10.sslip.io/paid-assets/ \u2014 set RPT_ASSET_FETCH_TOKEN to probe, or stage under paid_assets/1.2.2/)",
+          "Windows PE pending native rebuild on Windows host (see client/windows/WINDOWS_HANDOFF_1.2.2.md; not seal-claimed \u2014 catalog ticker is Amber, not Red, while handoff is open)"
         ],
         "path": null,
         "search_roots": [
-          "status_page/assets/1.2.1/",
-          "releases/1.2.1/",
-          "/opt/restore-privacy/paid_assets/1.2.1/",
-          "dist/1.2.1/",
+          "status_page/assets/1.2.2/",
+          "releases/1.2.2/",
+          "/opt/restore-privacy/paid_assets/1.2.2/",
+          "dist/1.2.2/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.2.1/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.2.2/"
         ],
         "handoff_pending": true,
-        "relative_path": "1.2.1/restore-privacy-client-1.2.1-windows-x64-setup.exe"
+        "relative_path": "1.2.2/restore-privacy-client-1.2.2-windows-x64-setup.exe"
       },
       {
         "platform": "android",
         "label": "Android",
-        "filename": "restore-privacy-client-1.2.1-android.apk",
+        "filename": "restore-privacy-client-1.2.2-android.apk",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "Android residual wire (PFS + outer obfs) present",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.1/restore-privacy-client-1.2.1-android.apk",
-        "bytes": 85322794,
-        "relative_path": "1.2.1/restore-privacy-client-1.2.1-android.apk",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.2/restore-privacy-client-1.2.2-android.apk",
+        "bytes": 85322818,
+        "relative_path": "1.2.2/restore-privacy-client-1.2.2-android.apk",
         "search_roots": [
-          "status_page/assets/1.2.1/",
-          "releases/1.2.1/",
-          "/opt/restore-privacy/paid_assets/1.2.1/",
-          "dist/1.2.1/",
+          "status_page/assets/1.2.2/",
+          "releases/1.2.2/",
+          "/opt/restore-privacy/paid_assets/1.2.2/",
+          "dist/1.2.2/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.2.1/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.2.2/"
         ]
       },
       {
         "platform": "macos",
         "label": "macOS",
-        "filename": "restore-privacy-client-1.2.1-macos.zip",
+        "filename": "restore-privacy-client-1.2.2-macos.zip",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.1/restore-privacy-client-1.2.1-macos.zip",
-        "bytes": 27856633,
-        "relative_path": "1.2.1/restore-privacy-client-1.2.1-macos.zip",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.2/restore-privacy-client-1.2.2-macos.zip",
+        "bytes": 27856613,
+        "relative_path": "1.2.2/restore-privacy-client-1.2.2-macos.zip",
         "search_roots": [
-          "status_page/assets/1.2.1/",
-          "releases/1.2.1/",
-          "/opt/restore-privacy/paid_assets/1.2.1/",
-          "dist/1.2.1/",
+          "status_page/assets/1.2.2/",
+          "releases/1.2.2/",
+          "/opt/restore-privacy/paid_assets/1.2.2/",
+          "dist/1.2.2/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.2.1/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.2.2/"
         ]
       },
       {
         "platform": "ios",
         "label": "iOS",
-        "filename": "restore-privacy-client-1.2.1-ios.zip",
+        "filename": "restore-privacy-client-1.2.2-ios.zip",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.1/restore-privacy-client-1.2.1-ios.zip",
-        "bytes": 13246360,
-        "relative_path": "1.2.1/restore-privacy-client-1.2.1-ios.zip",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.2/restore-privacy-client-1.2.2-ios.zip",
+        "bytes": 13246314,
+        "relative_path": "1.2.2/restore-privacy-client-1.2.2-ios.zip",
         "search_roots": [
-          "status_page/assets/1.2.1/",
-          "releases/1.2.1/",
-          "/opt/restore-privacy/paid_assets/1.2.1/",
-          "dist/1.2.1/",
+          "status_page/assets/1.2.2/",
+          "releases/1.2.2/",
+          "/opt/restore-privacy/paid_assets/1.2.2/",
+          "dist/1.2.2/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.2.1/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.2.2/"
         ]
       },
       {
         "platform": "linux",
         "label": "Linux",
-        "filename": "restore-privacy-client-1.2.1-linux-x64.tar.gz",
+        "filename": "restore-privacy-client-1.2.2-linux-x64.tar.gz",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.1/restore-privacy-client-1.2.1-linux-x64.tar.gz",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.2/restore-privacy-client-1.2.2-linux-x64.tar.gz",
         "bytes": 14667758,
-        "relative_path": "1.2.1/restore-privacy-client-1.2.1-linux-x64.tar.gz",
+        "relative_path": "1.2.2/restore-privacy-client-1.2.2-linux-x64.tar.gz",
         "search_roots": [
-          "status_page/assets/1.2.1/",
-          "releases/1.2.1/",
-          "/opt/restore-privacy/paid_assets/1.2.1/",
-          "dist/1.2.1/",
+          "status_page/assets/1.2.2/",
+          "releases/1.2.2/",
+          "/opt/restore-privacy/paid_assets/1.2.2/",
+          "dist/1.2.2/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.2.1/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.2.2/"
         ]
       }
     ],
