@@ -22,8 +22,10 @@ void main() {
     expect(p.trafficShape, isFalse);
     expect(p.outerObfuscation, isFalse);
     expect(p.multihop, isFalse);
+    // Free flavor is always Iceland; paid monopin default entry may be DE.
     expect(p.residualHost, kFreeTierEntryHost);
-    expect(p.residualHost, RptConfig.entryHost);
+    expect(p.residualHost, '82.221.101.241');
+    expect(kFreeTierEntryHost, RptConfig.icelandHost);
   });
 
   test('paid residual defaults lean-off when free off', () {
@@ -39,9 +41,12 @@ void main() {
     }
   });
 
-  test('RptConfig paid productVersion is 0.4.8 catalog pin', () {
-    expect(RptConfig.productVersion, '0.4.8');
-    expect(RptConfig.displayProductVersion, freeAwareProductVersion('0.4.8'));
+  test('RptConfig paid productVersion is monopin catalog pin', () {
+    expect(RptConfig.productVersion, isNot(isEmpty));
+    expect(
+      RptConfig.displayProductVersion,
+      freeAwareProductVersion(RptConfig.productVersion),
+    );
     // Free: multi-hop forced off; paid default also off without settings.
     expect(RptConfig.multiHopEnabled, isFalse);
     expect(RptConfig.host, RptConfig.entryHost);

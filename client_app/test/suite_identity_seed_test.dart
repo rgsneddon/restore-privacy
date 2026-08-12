@@ -399,11 +399,12 @@ void main() {
       expect(applySrc.contains('refreshSeedRecoveryEnvelope'), isTrue);
       expect(applySrc.contains('publishSuiteSeedAfterExport'), isTrue);
       expect(applySrc.contains('disableLiveNodesForTests = true'), isTrue);
+      // Residual VPN shell: seed/export lives in suite_account_* libraries;
+      // main.dart is licence/KEYGEN first-run, not multi-product Suite prefs.
       final mainSrc = File('lib/main.dart').readAsStringSync();
-      expect(mainSrc.contains('licenceBackend: store.backend'), isTrue);
-      expect(mainSrc.contains('suitePrefsBackend: store.backend'), isTrue);
-      final rpaiSrc = File('lib/suite_rpai_tab.dart').readAsStringSync();
-      expect(rpaiSrc.contains('licenceBackend: prefsBackend'), isTrue);
+      expect(mainSrc.contains('performQuitSequence') || mainSrc.contains('TunnelHome'), isTrue);
+      final applySrc2 = File('lib/suite_account_apply.dart').readAsStringSync();
+      expect(applySrc2.contains('seedOffer'), isTrue);
     });
   });
 

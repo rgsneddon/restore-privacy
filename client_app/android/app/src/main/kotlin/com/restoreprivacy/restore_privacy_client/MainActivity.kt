@@ -187,12 +187,12 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * Full process takedown for main-screen Quit — no leftover background window.
+     * Full process takedown for main-screen Quit -- no leftover background window.
      *
      * Order:
      * 1. Force residual VPN stop without FGS restart ([forceStopVpnService]).
      * 2. Remove **all** app tasks + finishAffinity / finishAndRemoveTask.
-     * 3. **postDelayed** killProcess/System.exit/halt so (1)+(2) can apply —
+     * 3. **postDelayed** killProcess/System.exit/halt so (1)+(2) can apply --
      *    immediate kill races AMS task removal (blank/disconnected recents) and
      *    can fire before DISCONNECT marks START_NOT_STICKY (sticky revival).
      */
@@ -335,7 +335,7 @@ class MainActivity : FlutterActivity() {
     /**
      * Tell [RptVpnService] to close TUN and stop so traffic reverts to device IP.
      *
-     * Uses plain [startService] only — never [startForegroundService].
+     * Uses plain [startService] only -- never [startForegroundService].
      * ACTION_DISCONNECT does not call startForeground; FGS start would crash or
      * leave a sticky shell after Quit.
      */

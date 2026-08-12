@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:restore_privacy_client/settings_store.dart';
 import 'package:restore_privacy_client/suite_account.dart';
 import 'package:restore_privacy_client/suite_ned_guide.dart';
@@ -249,6 +250,8 @@ void main() {
     testWidgets('setup yes reuses suite account prompt (singular form)',
         (tester) async {
       await _prepSurface(tester);
+      // Required so SuiteRpaiTab + showSuiteAccountPrompt do not hang on prefs.
+      SharedPreferences.setMockInitialValues({});
       final store = SuiteAccountStore(MemorySettingsBackend());
       await store.markDeferred();
       var applyCalls = 0;
@@ -271,6 +274,10 @@ void main() {
       await tester.pumpAndSettle();
       await _tapKey(tester, 'ned_resume_setup');
       await _tapKey(tester, 'ned_setup_yes');
+      // Async SharedPreferences + modal bottom sheet.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
 
       // Unified prompt — one username/password, not dual panels.
       expect(find.byKey(const Key('suite_account_username')), findsOneWidget);
@@ -286,6 +293,7 @@ void main() {
         'password99',
       );
       await _tapKey(tester, 'suite_account_submit');
+      await tester.pumpAndSettle();
 
       expect(applyCalls, 1);
       expect(await store.isRegistered(), isTrue);

@@ -109,29 +109,20 @@ void main() {
     expect(ledger.isWalletSessionExpired(), isFalse);
   });
 
-  test('suiteNavDestinations keeps Analysis/Voting only when hasAppAccess', () {
+  test('suiteNavDestinations is VPN-only residual shell', () {
     const parts = SuitePartsState(
       walletInstalled: true,
       evolveInstalled: true,
       rpaiInstalled: true,
     );
+    // Dedicated residual client: main bar is VPN only (no multi-product chrome).
     final full = suiteNavDestinations(parts, hasAppAccess: true);
-    expect(full, contains(SuiteNavDest.analysis));
-    expect(full, contains(SuiteNavDest.voting));
-    expect(full, contains(SuiteNavDest.wallet));
-    expect(suiteNavKeepsFamilyAccessIcons(
-      evolveInstalled: true,
-      hasAppAccess: true,
-    ), isTrue);
+    expect(full, equals(const [SuiteNavDest.vpn]));
+    expect(full, isNot(contains(SuiteNavDest.analysis)));
+    expect(full, isNot(contains(SuiteNavDest.wallet)));
 
     final reduced = suiteNavDestinations(parts, hasAppAccess: false);
-    expect(reduced, isNot(contains(SuiteNavDest.analysis)));
-    expect(reduced, isNot(contains(SuiteNavDest.voting)));
-    expect(reduced, contains(SuiteNavDest.wallet));
-    expect(suiteNavKeepsFamilyAccessIcons(
-      evolveInstalled: true,
-      hasAppAccess: false,
-    ), isFalse);
+    expect(reduced, equals(const [SuiteNavDest.vpn]));
   });
 
   test(
@@ -177,9 +168,7 @@ void main() {
         const SuitePartsState(evolveInstalled: true, walletInstalled: true),
         hasAppAccess: family.hasAppAccess,
       );
-      expect(dests, contains(SuiteNavDest.analysis));
-      expect(dests, contains(SuiteNavDest.voting));
-      expect(dests, contains(SuiteNavDest.wallet));
+      expect(dests, equals(const [SuiteNavDest.vpn]));
     },
   );
 
@@ -231,12 +220,11 @@ void main() {
         const SuitePartsState(evolveInstalled: true, walletInstalled: true),
         hasAppAccess: family.hasAppAccess,
       );
-      expect(dests, contains(SuiteNavDest.analysis));
-      expect(dests, contains(SuiteNavDest.voting));
+      expect(dests, equals(const [SuiteNavDest.vpn]));
     },
   );
 
-  test('cold empty store stays without access icons', () async {
+  test('cold empty store stays without multi-product nav', () async {
     evolve_hub.PercLedgerHub.resetForTest();
     final cold = evolve_wallet.PercWalletProvider(
       store: _SharedStoreEvolve(<String, dynamic>{}),
@@ -247,8 +235,8 @@ void main() {
       const SuitePartsState(evolveInstalled: true, walletInstalled: true),
       hasAppAccess: cold.hasAppAccess,
     );
+    expect(dests, equals(const [SuiteNavDest.vpn]));
     expect(dests, isNot(contains(SuiteNavDest.analysis)));
-    expect(dests, isNot(contains(SuiteNavDest.voting)));
-    expect(dests, contains(SuiteNavDest.wallet));
+    expect(dests, isNot(contains(SuiteNavDest.wallet)));
   });
 }

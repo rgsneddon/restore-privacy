@@ -8,7 +8,7 @@ library;
 /// Permanent free-tier pin — never inherit paid 0.x catalog bumps.
 const String kFreeTierVersion = '3.3.3';
 
-/// Iceland product entry (parity with [RptConfig.entryHost]).
+/// Iceland product entry (free flavor only; paid default entry is Germany).
 const String kFreeTierEntryHost = '82.221.101.241';
 const int kFreeTierEntryPort = 44044;
 

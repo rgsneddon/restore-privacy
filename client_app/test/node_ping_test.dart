@@ -20,6 +20,8 @@ void main() {
   });
 
   test('measureSettingsPings includes exit when multihop on', () async {
+    // Product monopin: default entry may equal exit (both DE). Probe must still
+    // return an exit sample when multihop is on; RTTs match when hosts match.
     final r = await measureSettingsPings(
       multihopOn: true,
       probe: (host) async => PingResult(
@@ -30,10 +32,16 @@ void main() {
         method: 'tcp',
       ),
     );
-    expect(r.entry.rttMs, 10.0);
+    expect(r.entry.host, RptConfig.entryHost);
     expect(r.exit, isNotNull);
     expect(r.exit!.host, RptConfig.exitHost);
-    expect(r.exit!.rttMs, 40.0);
+    if (RptConfig.entryHost == RptConfig.exitHost) {
+      expect(r.entry.rttMs, 40.0);
+      expect(r.exit!.rttMs, 40.0);
+    } else {
+      expect(r.entry.rttMs, 10.0);
+      expect(r.exit!.rttMs, 40.0);
+    }
   });
 
   test('PingResult.display formats ok and errors', () {
