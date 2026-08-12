@@ -9,7 +9,7 @@ Buy Me a Coffee is tip/support only.
 
 Current catalog packages: Restore Privacy residual VPN **1.2.0**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
-iOS Team-signed sideload).
+iOS IPA-compatible Team-signed sideload zip — rename to ``.ipa``).
 """
 
 from __future__ import annotations
@@ -307,7 +307,7 @@ RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     ),
     DownloadAsset(
         platform="ios",
-        label="iOS - App package (.zip, Team-signed sideload)",
+        label="iOS - IPA-compatible package (.zip → rename .ipa, Team-signed sideload)",
         filename=IOS_ZIP_FILENAME,
     ),
     DownloadAsset(

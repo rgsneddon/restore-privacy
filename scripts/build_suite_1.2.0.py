@@ -419,77 +419,80 @@ def inject_ios_residual_pubs(runner: Path) -> Path:
 
 
 def codesign_ios_distribution(runner: Path) -> bool:
-    """Best-effort Apple Distribution sign after inject (covers secrets in seal).
+    """Team-sign Runner.app with embedded provisioning (installable sideload).
 
-    Returns True when host ``Runner.app`` codesign succeeds. Missing identity is
-    non-fatal so catalog zip can still ship with residual pubs for sideload.
+    Uses ``ios_sideload_package.prepare_signed_sideload_app``: embeds matching
+    host + PacketTunnel ``embedded.mobileprovision`` profiles then inside-out
+    codesign. **Fail-closed** when operator profiles are missing — never claim
+    Team-signed success without provision (bare signed app cannot install).
+
+    Returns True only when host provision is embedded and codesign succeeds.
     """
-    identity = os.environ.get(
-        "RP_IOS_CODESIGN_IDENTITY",
-        "Apple Distribution: Russell Sneddon (SFCBP95595)",
+    scripts_dir = ROOT / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from ios_sideload_package import (  # type: ignore
+        IosSideloadError,
+        prepare_signed_sideload_app,
     )
+
     try:
-        # Nested frameworks / bundles first (inside-out).
-        fw_dir = runner / "Frameworks"
-        if fw_dir.is_dir():
-            for fw in sorted(fw_dir.glob("*.framework")):
-                subprocess.run(
-                    ["codesign", "--force", "--timestamp", "--sign", identity, str(fw)],
-                    check=False,
-                )
-        for bundle in sorted(runner.rglob("*.bundle")):
-            if bundle.is_dir():
-                subprocess.run(
-                    ["codesign", "--force", "--timestamp", "--sign", identity, str(bundle)],
-                    check=False,
-                )
-        appex = runner / "PlugIns" / "PacketTunnel.appex"
-        if appex.is_dir():
-            ent = CLIENT_APP / "ios" / "PacketTunnel" / "PacketTunnel.entitlements"
-            cmd = ["codesign", "--force", "--timestamp", "--sign", identity]
-            if ent.is_file():
-                cmd.extend(["--entitlements", str(ent)])
-            cmd.append(str(appex))
-            if subprocess.run(cmd, check=False).returncode != 0:
-                subprocess.run(
-                    ["codesign", "--force", "--timestamp", "--sign", identity, str(appex)],
-                    check=False,
-                )
-        r = subprocess.run(
-            ["codesign", "--force", "--timestamp", "--sign", identity, str(runner)],
-            check=False,
+        info = prepare_signed_sideload_app(runner, require_profiles=True)
+    except IosSideloadError as e:
+        print(f"ios sideload codesign refuse (fail-closed): {e}", file=sys.stderr)
+        return False
+    if not info.get("signed"):
+        print(
+            f"ios sideload codesign skipped: {info.get('reason')} (fail-closed)",
+            file=sys.stderr,
         )
-        if r.returncode == 0:
-            print(f"ios Distribution codesign OK identity={identity!r}")
-            return True
-        print(f"ios Distribution codesign failed rc={r.returncode} (zip still has pubs)", file=sys.stderr)
         return False
-    except FileNotFoundError:
-        print("ios codesign tool missing; shipping unsigned zip with residual pubs", file=sys.stderr)
-        return False
+    print(
+        f"ios sideload codesign OK identity={info.get('identity')!r} "
+        f"host_profile={info.get('host_profile_name')!r} "
+        f"tunnel_profile={info.get('tunnel_profile_name')!r}"
+    )
+    return True
 
 
 def package_ios_zip(runner: Path, dest: Path | None = None) -> Path:
-    """Zip Runner.app as catalog ``restore-privacy-client-*-ios.zip``."""
+    """Zip Runner.app as IPA-compatible catalog ``Payload/Runner.app/…`` zip.
+
+    Sideload tools accept rename-to-``.ipa``. Bare top-level ``Runner.app`` zips
+    are rejected by ``require_installable_ios_zip`` after write.
+    """
     dest = dest or (OUT / NAMES["ios"])
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists():
-        dest.unlink()
-    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, _dirs, files in os.walk(runner):
-            for fn in files:
-                fp = Path(root) / fn
-                arc = Path("Runner.app") / fp.relative_to(runner)
-                zf.write(fp, arc.as_posix())
-    print(f"staged {dest.name} flutter ios zip sha256={sha256_file(dest)[:16]}…")
+    scripts_dir = ROOT / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from ios_sideload_package import (  # type: ignore
+        IosSideloadError,
+        package_ios_ipa_zip,
+        require_installable_ios_zip,
+    )
+
+    try:
+        package_ios_ipa_zip(runner, dest)
+        # Require host provision when present on disk (codesign path embedded it).
+        require_prov = (runner / "embedded.mobileprovision").is_file()
+        require_installable_ios_zip(dest, require_provision=require_prov)
+    except IosSideloadError as e:
+        if dest.is_file():
+            dest.unlink(missing_ok=True)
+        raise RuntimeError(f"iOS catalog package refuse: {e}") from e
+    print(
+        f"staged {dest.name} IPA Payload zip sha256={sha256_file(dest)[:16]}… "
+        f"size={dest.stat().st_size}"
+    )
     return dest
 
 
 def build_ios() -> Path | None:
-    """Build iphoneos Runner, inject residual pubs, optional Distribution sign, zip.
+    """Build iphoneos Runner, inject residual pubs, provision+sign, IPA zip.
 
-    Order is fail-closed for residual Connect: inject **must** embed
-    ``node_elgamal.pub`` before the catalog zip is written.
+    Order is fail-closed: inject **must** embed ``node_elgamal.pub``; Team
+    codesign **must** embed host (+appex) ``embedded.mobileprovision``; zip
+    **must** be IPA ``Payload/`` layout. Missing provision is not “success”.
     """
     try:
         _run(
@@ -514,8 +517,24 @@ def build_ios() -> Path | None:
     except (FileNotFoundError, OSError) as e:
         print(f"ios residual inject failed (fail-closed): {e}", file=sys.stderr)
         return None
-    codesign_ios_distribution(runner)
-    return package_ios_zip(runner)
+    if not codesign_ios_distribution(runner):
+        print(
+            "ios catalog refuse: codesign/provision failed (will not ship "
+            "non-installable zip)",
+            file=sys.stderr,
+        )
+        return None
+    if not (runner / "embedded.mobileprovision").is_file():
+        print(
+            "ios catalog refuse: host embedded.mobileprovision missing after sign",
+            file=sys.stderr,
+        )
+        return None
+    try:
+        return package_ios_zip(runner)
+    except RuntimeError as e:
+        print(f"ios package failed (fail-closed): {e}", file=sys.stderr)
+        return None
 
 
 def carry_forward(platform_key: str) -> Path | None:

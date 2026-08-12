@@ -34,7 +34,7 @@ Traffic shaping, outer obfuscation, multi-hop extras, and kill switch are **off 
 | Windows | `restore-privacy-client-1.2.0-windows-x64-setup.exe` (native PE from Windows host) |
 | Android | `restore-privacy-client-1.2.0-android.apk` |
 | macOS | `restore-privacy-client-1.2.0-macos.zip` — Notarized Developer ID + residual Packet Tunnel **host NE** |
-| iOS | `restore-privacy-client-1.2.0-ios.zip` — Apple Distribution **Team-signed** Runner.app (sideload) |
+| iOS | `restore-privacy-client-1.2.0-ios.zip` — IPA `Payload/Runner.app` + embedded provisions (Team-signed sideload; rename to `.ipa`) |
 | Linux | `restore-privacy-client-1.2.0-linux-x64.tar.gz` |
 
 ## Operator build
