@@ -3,11 +3,13 @@
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
+import android.os.PowerManager
 import android.os.ResultReceiver
 import android.system.OsConstants
 import java.io.File
@@ -23,6 +25,12 @@ import kotlin.concurrent.thread
 /**
  * Full-tunnel VPN service for Restore Privacy Tunnel (RPT2).
  * Reports handshake/TUN success or failure via [ResultReceiver] — no silent fail.
+ *
+ * Lock / Doze: while residual is up we hold a partial wake lock so lean KEEPALIVE
+ * UDP still leaves the device under screen-off (node idle prune ~60s). If the
+ * session still dies, TUN is always torn (no blackhole) and re-HELLO is scheduled
+ * whenever the user still wants Connect — not only when Settings
+ * "Auto connect if idle" is on.
  */
 class RptVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
@@ -35,6 +43,8 @@ class RptVpnService : VpnService() {
     /** Bumped to cancel an in-flight reconnect backoff sleep. */
     private val reconnectGeneration = AtomicLong(0)
     private val reconnectAttempts = AtomicLong(0)
+    /** Keeps CPU briefly alive for residual KEEPALIVE under screen lock / Doze. */
+    private var residualWakeLock: PowerManager.WakeLock? = null
     private var lastHost: String = PRODUCT_ENTRY_HOST
     private var lastPort: Int = 44044
     private var lastFullTunnel: Boolean = true
@@ -164,10 +174,63 @@ class RptVpnService : VpnService() {
         StartupPrefs.saveLastConnect(this, host, port, fullTunnel, session, shape, obfs)
     }
 
-    private fun wantsIdleAutoReconnect(): Boolean {
+    /**
+     * User still wants residual Connect (not intentional Disconnect/revoke).
+     * Used for mid-session recovery after lock/liveness loss — independent of
+     * Settings "Auto connect if idle" (that flag only gates cold sticky restart).
+     */
+    private fun wantsDesiredSessionRecovery(): Boolean {
         if (userStopped.get()) return false
-        if (!desiredConnected && !StartupPrefs.isDesiredConnected(this)) return false
+        return desiredConnected || StartupPrefs.isDesiredConnected(this)
+    }
+
+    /**
+     * Cold process / sticky restart without a live session: only re-open residual
+     * when Settings auto-connect-if-idle is on (and still desired).
+     */
+    private fun wantsIdleAutoReconnect(): Boolean {
+        if (!wantsDesiredSessionRecovery()) return false
         return StartupPrefs.autoConnectIfIdleEnabled(this)
+    }
+
+    private fun acquireResidualWakeLock() {
+        try {
+            releaseResidualWakeLock()
+            val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return
+            @Suppress("DEPRECATION")
+            val wl = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "restoreprivacy:rpt_residual_keepalive",
+            )
+            wl.setReferenceCounted(false)
+            // Timeout refresh from KA path; initial acquire covers handshake + first KAs.
+            wl.acquire(10 * 60 * 1000L)
+            residualWakeLock = wl
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun touchResidualWakeLock() {
+        val wl = residualWakeLock ?: return
+        try {
+            if (!wl.isHeld) {
+                wl.acquire(10 * 60 * 1000L)
+            } else {
+                // Refresh timeout window while residual is live (API 21+).
+                wl.acquire(10 * 60 * 1000L)
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun releaseResidualWakeLock() {
+        try {
+            residualWakeLock?.let { wl ->
+                if (wl.isHeld) wl.release()
+            }
+        } catch (_: Exception) {
+        }
+        residualWakeLock = null
     }
 
     private fun extractReceiver(intent: Intent): ResultReceiver? {
@@ -194,7 +257,9 @@ class RptVpnService : VpnService() {
             isSessionActive = false
             activeVpnIp = ""
             activeIpv6Protected = null
-            if (!allowReconnect || !wantsIdleAutoReconnect()) {
+            // Keep desired when recovery is allowed (mid-session desired recovery
+            // or optional idle-auto). Otherwise clear so Disconnect semantics stick.
+            if (!allowReconnect || !wantsDesiredSessionRecovery()) {
                 desiredConnected = false
                 StartupPrefs.setDesiredConnected(this, false)
             }
@@ -223,12 +288,15 @@ class RptVpnService : VpnService() {
     }
 
     /**
-     * After unexpected tunnel death (or failed handshake while still desired),
-     * schedule a gentle backoff re-Connect when Settings auto-connect-if-idle is on.
+     * After unexpected tunnel death (lock/Doze liveness loss, failed handshake
+     * while still desired), schedule a gentle backoff re-HELLO.
+     *
+     * Gated on [wantsDesiredSessionRecovery] — user still wants Connect — not
+     * solely Settings "Auto connect if idle" (that only gates cold sticky restart).
      * Safe to call once from the worker finally block (generation cancels prior timers).
      */
     private fun scheduleIdleReconnect(reason: String) {
-        if (!wantsIdleAutoReconnect()) return
+        if (!wantsDesiredSessionRecovery()) return
         if (running.get()) return
         val attempt = reconnectAttempts.incrementAndGet().toInt()
         val delayMs = reconnectBackoffMs(attempt)
@@ -250,7 +318,7 @@ class RptVpnService : VpnService() {
                 return@thread
             }
             if (gen != reconnectGeneration.get()) return@thread
-            if (userStopped.get() || !wantsIdleAutoReconnect()) return@thread
+            if (userStopped.get() || !wantsDesiredSessionRecovery()) return@thread
             if (running.get() || isSessionActive) return@thread
             reported.set(false)
             val last = StartupPrefs.loadLastConnect(this@RptVpnService, lastHost)
@@ -417,7 +485,7 @@ class RptVpnService : VpnService() {
                         } else {
                             ""
                         }
-                    val canRetry = wantsIdleAutoReconnect()
+                    val canRetry = wantsDesiredSessionRecovery()
                     report(
                         false,
                         "RPT handshake failed: $detail$hint",
@@ -504,7 +572,7 @@ class RptVpnService : VpnService() {
                     } catch (_: Exception) {
                     }
                     tun = null
-                    val canRetry = wantsIdleAutoReconnect()
+                    val canRetry = wantsDesiredSessionRecovery()
                     report(
                         false,
                         "Could not protect UDP to $host:$port after VPN establish " +
@@ -533,6 +601,8 @@ class RptVpnService : VpnService() {
                     residualIpv6 -> ipv6RouteOk
                     else -> false
                 }
+                // Screen lock / Doze: keep residual KEEPALIVE UDP schedulable.
+                acquireResidualWakeLock()
                 startForeground(NOTIFICATION_ID, buildNotification(sessionName, connecting = false))
                 val msg = when {
                     !fullTunnel ->
@@ -628,14 +698,15 @@ class RptVpnService : VpnService() {
                         try {
                             Thread.sleep(intervalMs)
                             if (!running.get()) break
+                            touchResidualWakeLock()
                             val wire = engine.sealAndWrapKeepalive()
                             dataSock.send(DatagramPacket(wire, wire.size))
                             kaFailStreak.set(0)
                         } catch (_: Exception) {
                             // Sustained KA send failure = session liveness lost.
                             // Always tear TUN/routes so traffic is not blackholed into a
-                            // dead residual. Idle-auto only decides re-HELLO after tear
-                            // (worker finally → scheduleIdleReconnect).
+                            // dead residual. Re-HELLO when still desired (worker finally →
+                            // scheduleIdleReconnect) — not only Auto-connect-if-idle.
                             val fails = kaFailStreak.incrementAndGet()
                             if (!running.get()) break
                             if (fails >= KEEPALIVE_FAIL_STREAK_RECONNECT) {
@@ -674,7 +745,7 @@ class RptVpnService : VpnService() {
                 } catch (_: Exception) {
                 }
             } catch (e: Exception) {
-                val canRetry = wantsIdleAutoReconnect()
+                val canRetry = wantsDesiredSessionRecovery()
                 report(
                     false,
                     "VPN tunnel error: ${e.message ?: e.javaClass.simpleName}",
@@ -691,19 +762,21 @@ class RptVpnService : VpnService() {
                 isSessionActive = false
                 activeVpnIp = ""
                 activeIpv6Protected = null
-                // Drop TUN so a later re-establish is clean (idle reconnect or next Connect).
+                // Drop TUN so a later re-establish is clean (session recovery or next Connect).
                 val leftover = tun
                 tun = null
                 try {
                     leftover?.close()
                 } catch (_: Exception) {
                 }
+                releaseResidualWakeLock()
                 when {
                     wasUserStop -> {
                         // stopTunnel already tearing down; do not resurrect.
                     }
-                    wantsIdleAutoReconnect() -> {
-                        // Unexpected drop (or failed connect with still-desired): backoff re-HELLO.
+                    wantsDesiredSessionRecovery() -> {
+                        // Unexpected drop after lock/Doze/liveness loss: tear done above;
+                        // re-HELLO while user still wants Connect (not only idle-auto pref).
                         scheduleIdleReconnect(
                             if (hadLiveSession) "session dropped" else "connect incomplete",
                         )
@@ -768,6 +841,7 @@ class RptVpnService : VpnService() {
         } catch (_: Exception) {
         }
         worker = null
+        releaseResidualWakeLock()
         try {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } catch (_: Exception) {
@@ -920,7 +994,8 @@ class RptVpnService : VpnService() {
         /**
          * Consecutive KEEPALIVE send failures before tearing the TUN (always —
          * clears full-tunnel routes so the device is not blackholed). Re-HELLO
-         * after tear is separate and only runs when Auto-connect-if-idle is on.
+         * after tear runs when the user still wants Connect (desired recovery);
+         * Settings Auto-connect-if-idle only gates cold sticky process restart.
          */
         const val KEEPALIVE_FAIL_STREAK_RECONNECT: Long = 3L
 

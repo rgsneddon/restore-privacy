@@ -1,8 +1,10 @@
 """Structural proof: Android residual idle liveness tear (shipped sources).
 
 Product contract: consecutive KEEPALIVE send failures always close the TUN
-(clear full-tunnel routes) so the device is not blackholed. Auto-connect-if-idle
-(default off) only gates re-HELLO after that clean tear — not the tear itself.
+(clear full-tunnel routes) so the device is not blackholed. After tear, if the
+user still wants Connect (desired), re-HELLO is scheduled with backoff —
+Settings Auto-connect-if-idle (default off) only gates cold sticky restart,
+not mid-session recovery after lock/Doze liveness loss.
 """
 
 from __future__ import annotations
@@ -102,10 +104,10 @@ class TestAndroidIdleBlackholePath(unittest.TestCase):
             self.svc,
         )
         # Within the KA fail branch, running is cleared and PFD closed.
-        ka_idx = self.svc.index("rpt-keepalive")
-        ka_body = self.svc[ka_idx : ka_idx + 1200]
+        ka_idx = self.svc.index('thread(name = "rpt-keepalive"')
+        ka_body = self.svc[ka_idx : ka_idx + 2200]
         fail_idx = ka_body.index("KEEPALIVE_FAIL_STREAK_RECONNECT")
-        tear_window = ka_body[fail_idx : fail_idx + 350]
+        tear_window = ka_body[fail_idx : fail_idx + 550]
         self.assertIn("running.set(false)", tear_window)
         self.assertIn("pfd.close()", tear_window)
         # Idle-auto remains default OFF
@@ -118,19 +120,75 @@ class TestAndroidIdleBlackholePath(unittest.TestCase):
             r"autoConnectIfIdle\s*=\s*false",
         )
 
-    def test_idle_auto_reconnect_is_separate_from_teardown_gate(self) -> None:
-        """Reconnect after tear is still gated on wantsIdleAutoReconnect only."""
+    def test_desired_session_recovery_after_tear_not_only_idle_auto(self) -> None:
+        """Mid-session recovery uses wantsDesiredSessionRecovery (not idle-auto only)."""
+        self.assertIn("fun wantsDesiredSessionRecovery", self.svc)
         self.assertIn("fun scheduleIdleReconnect", self.svc)
         self.assertIn("rpt-idle-reconnect", self.svc)
         self.assertIn("scheduleIdleReconnect(", self.svc)
-        # Worker finally: idle-auto → schedule re-HELLO; else clear desired + stop
-        idx = self.svc.index("wantsIdleAutoReconnect() -> {")
+        # scheduleIdleReconnect must gate on desired recovery, not idle-auto pref alone.
+        sched = self.svc[
+            self.svc.index("private fun scheduleIdleReconnect") : self.svc.index(
+                "private fun scheduleIdleReconnect"
+            )
+            + 900
+        ]
+        self.assertIn("wantsDesiredSessionRecovery()", sched)
+        self.assertNotIn("wantsIdleAutoReconnect()", sched)
+        # Worker finally: still-desired → schedule re-HELLO; else clear desired + stop
+        idx = self.svc.index("wantsDesiredSessionRecovery() -> {")
         window = self.svc[idx : idx + 500]
         self.assertIn("scheduleIdleReconnect", window)
         else_idx = self.svc.index("else -> {", idx)
         else_window = self.svc[else_idx : else_idx + 550]
         self.assertIn("setDesiredConnected", else_window)
         self.assertIn("stopSelf()", else_window)
+
+    def test_disconnect_does_not_schedule_session_recovery(self) -> None:
+        """Intentional Disconnect must not resurrect via desired recovery."""
+        disc = self.svc[
+            self.svc.index("ACTION_DISCONNECT") : self.svc.index("ACTION_DISCONNECT")
+            + 550
+        ]
+        self.assertIn("userStopped.set(true)", disc)
+        self.assertIn("desiredConnected = false", disc)
+        self.assertIn("stopTunnel()", disc)
+        self.assertNotIn("scheduleIdleReconnect", disc)
+
+    def test_residual_wake_lock_for_lock_doze_keepalive(self) -> None:
+        """Partial wake lock keeps lean KEEPALIVE schedulable under screen lock."""
+        self.assertIn("PARTIAL_WAKE_LOCK", self.svc)
+        self.assertIn("acquireResidualWakeLock", self.svc)
+        self.assertIn("touchResidualWakeLock", self.svc)
+        self.assertIn("releaseResidualWakeLock", self.svc)
+        self.assertIn("rpt_residual_keepalive", self.svc)
+        # Acquired when residual session becomes live; released in finally/stopTunnel.
+        live = self.svc.index("isSessionActive = true")
+        live_win = self.svc[live : live + 900]
+        self.assertIn("acquireResidualWakeLock()", live_win)
+        ka = self.svc[
+            self.svc.index('thread(name = "rpt-keepalive"') : self.svc.index(
+                'thread(name = "rpt-keepalive"'
+            )
+            + 900
+        ]
+        self.assertIn("touchResidualWakeLock()", ka)
+        man = (
+            ROOT
+            / "client_app/android/app/src/main/AndroidManifest.xml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("android.permission.WAKE_LOCK", man)
+
+    def test_cold_sticky_restart_still_gated_on_idle_auto(self) -> None:
+        """Process death cold restart still requires Settings auto-connect-if-idle."""
+        # Null-intent / sticky restart path in onStartCommand
+        marker = 'when Settings "Auto connect if idle" is on'
+        self.assertIn(marker, self.svc)
+        else_branch = self.svc[
+            self.svc.index(marker) - 200 : self.svc.index(marker) + 1600
+        ]
+        self.assertIn("autoConnectIfIdleEnabled", else_branch)
+        self.assertIn("startTunnel(last.host", else_branch)
 
     def test_post_establish_protect_still_required(self) -> None:
         """Protect is necessary but not sufficient for idle blackhole after session death."""
