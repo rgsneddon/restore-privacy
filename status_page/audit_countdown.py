@@ -113,6 +113,70 @@ def prefer_newer_generated_at(
     return a if a >= b else b
 
 
+def audit_json_catalog_version(data: dict[str, Any] | None) -> str:
+    """Monopin pin reported by an audit JSON document (top-level or package_rag)."""
+    if not isinstance(data, dict):
+        return ""
+    pr = data.get("package_rag")
+    candidates = (
+        data.get("catalog_version"),
+        pr.get("catalog_version") if isinstance(pr, dict) else None,
+    )
+    for raw in candidates:
+        v = str(raw or "").strip()
+        if v and v.lower() != "unknown":
+            return v
+    return ""
+
+
+def product_monopin_for_audit() -> str | None:
+    """Live product catalog monopin for rejecting stale residual-timer JSON.
+
+    Order: ``RPT_CATALOG_VERSION`` → monorepo ``client/VERSION`` →
+    ``status_page.downloads.RELEASE_VERSION``.
+    """
+    import os
+
+    env_v = os.environ.get("RPT_CATALOG_VERSION", "").strip()
+    if env_v and env_v.lower() != "unknown":
+        return env_v
+    repo = Path(__file__).resolve().parents[1]
+    for rel in ("client/VERSION", "VERSION"):
+        p = repo / rel
+        try:
+            if p.is_file():
+                v = p.read_text(encoding="utf-8").strip().split()[0]
+                if v and v.lower() != "unknown":
+                    return v
+        except OSError:
+            continue
+    try:
+        from downloads import RELEASE_VERSION  # type: ignore
+
+        v = str(RELEASE_VERSION).strip()
+        if v and v.lower() != "unknown":
+            return v
+    except Exception:
+        pass
+    return None
+
+
+def audit_json_matches_product_monopin(
+    data: dict[str, Any] | None,
+    *,
+    monopin: str | None = None,
+) -> bool:
+    """True when JSON catalog pin matches product monopin (or monopin unknown)."""
+    pin = (monopin if monopin is not None else product_monopin_for_audit()) or ""
+    pin = pin.strip()
+    if not pin:
+        return True  # cannot compare — do not discard
+    cat = audit_json_catalog_version(data)
+    if not cat:
+        return False  # refuse unversioned residual inventory for public ticker
+    return cat == pin
+
+
 def load_security_audit_json_prefer_upstream(
     path: Path | None = None,
     *,
@@ -129,6 +193,12 @@ def load_security_audit_json_prefer_upstream(
     upstream is **not** consulted — the caller asked for that file's payload.
     Default / ``None`` path still prefers newer upstream so public last-run
     tracks the residual timer.
+
+    **Monopin guard:** residual JSON whose ``catalog_version`` /
+    ``package_rag.catalog_version`` does **not** match product monopin
+    (``client/VERSION`` / ``RELEASE_VERSION``) is **discarded**. Otherwise a
+    lean residual pin (e.g. 0.3.6 all-Red packages) permanently forces the
+    public AUDIT ticker Red while the live catalog is 1.2.x.
     """
     local_data: dict[str, Any] | None = None
     p = path if path is not None else _DEFAULT_JSON
@@ -152,6 +222,13 @@ def load_security_audit_json_prefer_upstream(
     if explicit_non_default:
         return local_data
 
+    monopin = product_monopin_for_audit()
+    if local_data is not None and not audit_json_matches_product_monopin(
+        local_data, monopin=monopin
+    ):
+        # Keep local only if nothing better; still try monopin-matching upstream.
+        pass
+
     up_url = upstream_url if upstream_url is not None else audit_upstream_json_url()
     remote_data: dict[str, Any] | None = None
     if up_url:
@@ -163,6 +240,21 @@ def load_security_audit_json_prefer_upstream(
                     remote_data = raw
             except (json.JSONDecodeError, TypeError, ValueError):
                 remote_data = None
+
+    # Drop residual inventory for a different catalog pin (false Red).
+    if remote_data is not None and not audit_json_matches_product_monopin(
+        remote_data, monopin=monopin
+    ):
+        remote_data = None
+    if local_data is not None and not audit_json_matches_product_monopin(
+        local_data, monopin=monopin
+    ):
+        # Prefer monopin-matching remote over wrong-pin local.
+        if remote_data is not None:
+            return remote_data
+        # Both wrong or remote absent: still return local (operator visibility)
+        # but public monopin deploys should ship matching static JSON.
+        return local_data
 
     local_at = parse_audit_generated_at(
         str((local_data or {}).get("generated_at") or "")

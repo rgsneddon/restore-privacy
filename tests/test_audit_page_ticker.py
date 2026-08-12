@@ -6,6 +6,7 @@ import json
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -13,10 +14,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "status_page"))
 
 from audit_countdown import (  # noqa: E402
+    audit_json_matches_product_monopin,
     countdown_state,
     current_audit_rag_colour,
     format_countdown,
+    load_security_audit_json_prefer_upstream,
     overlay_audit_generated_in_markdown_html,
+    product_monopin_for_audit,
     remaining_seconds_until,
     render_audit_page_ticker_html,
 )
@@ -71,6 +75,95 @@ class TestCurrentAuditRagColour(unittest.TestCase):
             data={"package_rag": {"overall": "Red"}, "overall_ok": True}
         )
         self.assertEqual(st_red["colour"], "Red")
+
+
+class TestUpstreamMonopinGuard(unittest.TestCase):
+    def test_wrong_catalog_upstream_is_rejected(self):
+        """Residual 0.3.6 all-Red inventory must not win over monopin 1.2.x local."""
+        monopin = product_monopin_for_audit() or "1.2.1"
+        self.assertTrue(monopin)
+        stale = {
+            "generated_at": "2099-01-01T00:00:00Z",  # newer stamp
+            "catalog_version": "0.3.6",
+            "package_rag": {
+                "catalog_version": "0.3.6",
+                "overall": "Red",
+                "packages": [
+                    {"platform": "windows", "state": "Red", "filename": "x-0.3.6.exe"},
+                ],
+            },
+            "overall_ok": True,
+        }
+        fresh = {
+            "generated_at": "2020-01-01T00:00:00Z",  # older stamp
+            "catalog_version": monopin,
+            "package_rag": {
+                "catalog_version": monopin,
+                "overall": "Amber",
+                "packages": [
+                    {"platform": "windows", "state": "Amber"},
+                    {"platform": "android", "state": "Green"},
+                ],
+            },
+            "overall_ok": True,
+        }
+        self.assertFalse(
+            audit_json_matches_product_monopin(stale, monopin=monopin)
+        )
+        self.assertTrue(
+            audit_json_matches_product_monopin(fresh, monopin=monopin)
+        )
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "security_audit_latest.json"
+            p.write_text(json.dumps(fresh), encoding="utf-8")
+            # Simulate Helsinki returning stale 0.3.6 with a newer stamp.
+            import audit_countdown as ac
+
+            with unittest.mock.patch.object(
+                ac, "fetch_url_text", return_value=json.dumps(stale)
+            ):
+                # Default path would prefer upstream if not monopin-gated;
+                # use real prefer with patched default path via explicit call.
+                got = load_security_audit_json_prefer_upstream(
+                    p, upstream_url="https://example.invalid/audit.json"
+                )
+        # Explicit non-default path returns local only (no upstream).
+        self.assertEqual(got.get("catalog_version"), monopin)
+        self.assertEqual((got.get("package_rag") or {}).get("overall"), "Amber")
+
+    def test_default_path_discards_wrong_pin_upstream(self):
+        """Default static path: wrong-pin upstream loses even if newer."""
+        import audit_countdown as ac
+
+        monopin = product_monopin_for_audit() or "1.2.1"
+        stale = {
+            "generated_at": "2099-12-31T23:59:59Z",
+            "catalog_version": "0.3.6",
+            "package_rag": {"catalog_version": "0.3.6", "overall": "Red"},
+        }
+        local = {
+            "generated_at": "2026-01-01T00:00:00Z",
+            "catalog_version": monopin,
+            "package_rag": {"catalog_version": monopin, "overall": "Amber"},
+        }
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "security_audit_latest.json"
+            p.write_text(json.dumps(local), encoding="utf-8")
+            with unittest.mock.patch.object(ac, "_DEFAULT_JSON", p):
+                with unittest.mock.patch.object(
+                    ac, "fetch_url_text", return_value=json.dumps(stale)
+                ):
+                    with unittest.mock.patch.object(
+                        ac, "product_monopin_for_audit", return_value=monopin
+                    ):
+                        got = load_security_audit_json_prefer_upstream(None)
+        self.assertIsNotNone(got)
+        assert got is not None
+        self.assertEqual(got.get("catalog_version"), monopin)
+        self.assertEqual((got.get("package_rag") or {}).get("overall"), "Amber")
+        # Ticker colour follows monopin JSON, not residual 0.3.6 Red.
+        st = current_audit_rag_colour(data=got)
+        self.assertEqual(st["colour"], "Amber")
 
 
 class TestAuditPageTickerHtml(unittest.TestCase):
