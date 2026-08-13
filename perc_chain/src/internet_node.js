@@ -38,6 +38,7 @@ import {
   resolveNetworkSyncBase,
   selectTallerLedger,
 } from './dual_seed_sync.js';
+import { normalizeInternetPathname } from './normalize_internet_path.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -57,6 +58,8 @@ const peers = new Map();
 const ledgers = new Map();
 /** @type {Map<string, string>} wallet address → sessionUsername */
 const addresses = new Map();
+/** @type {Map<string, { envelope: string, meta?: string, updatedAt: number }>} */
+const seedRecoveries = new Map();
 const inboundHints = createInboundHintsStore();
 
 function findRelayEntryByAddress(address) {
@@ -330,6 +333,9 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
+  // Helsinki nginx strips /perc/ before proxy_pass; wallets may also double-prefix.
+  // Canonicalize so /status and /perc/status (and rendezvous) all hit the same handlers.
+  url.pathname = normalizeInternetPathname(url.pathname);
 
   if (req.method === 'GET' && url.pathname === '/api/network') {
     return json(
@@ -565,6 +571,44 @@ const server = http.createServer(async (req, res) => {
       publicAlias: obfuscateUsername(entry.username ?? username ?? ''),
       walletAddress: address ?? null,
       ledger: sanitizeLedgerForPublic(entry.ledger),
+      updatedAt: entry.updatedAt ?? null,
+    });
+  }
+
+  // Suite / wallet seed-phrase recovery envelopes (parity with rendezvous.js).
+  // Missing on internet_node previously → public /perc 404 for new-user recovery.
+  if (req.method === 'PUT' && url.pathname === '/perc/rendezvous/seed-recovery') {
+    const data = await readBody(req);
+    const fingerprint = data.fingerprint?.trim();
+    const envelope = data.envelope?.trim();
+    const meta =
+      typeof data.meta === 'string' && data.meta.trim()
+        ? data.meta.trim()
+        : undefined;
+    if (!fingerprint || !envelope) {
+      return json(res, 400, { error: 'fingerprint and envelope required' });
+    }
+    seedRecoveries.set(fingerprint, {
+      envelope,
+      ...(meta ? { meta } : {}),
+      updatedAt: Date.now(),
+    });
+    return json(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/perc/rendezvous/seed-recovery') {
+    const fingerprint = url.searchParams.get('fingerprint')?.trim();
+    if (!fingerprint) {
+      return json(res, 400, { error: 'fingerprint required' });
+    }
+    const entry = seedRecoveries.get(fingerprint);
+    if (!entry?.envelope) {
+      return json(res, 404, { error: 'seed recovery envelope not found' });
+    }
+    return json(res, 200, {
+      fingerprint,
+      envelope: entry.envelope,
+      ...(entry.meta ? { meta: entry.meta } : {}),
       updatedAt: entry.updatedAt ?? null,
     });
   }

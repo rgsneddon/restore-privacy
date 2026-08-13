@@ -201,13 +201,34 @@ def local_run(port: int = DEFAULT_PORT, timeout_s: float = 25.0) -> dict:
             proc.kill()
 
 
+def _ssh_common_opts() -> list[str]:
+    """Shared OpenSSH flags — IPQoS=none avoids macOS→Hetzner handshake stalls."""
+    return [
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "IPQoS=none",
+        "-o",
+        "ConnectTimeout=45",
+        "-o",
+        "ServerAliveInterval=15",
+    ]
+
+
 def _ssh_base() -> list[str]:
     host = os.environ.get("RPT_SSH_HOST", DEFAULT_HOST)
     user = os.environ.get("RPT_SSH_USER", "root")
     key = os.environ.get("RPT_SSH_KEY", "").strip()
-    cmd = ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new"]
+    cmd = ["ssh", *_ssh_common_opts()]
     if key:
         cmd.extend(["-i", os.path.expanduser(key)])
+    else:
+        # Default Helsinki key used by suite operators on this Mac.
+        default_key = Path.home() / ".ssh" / "id_ed25519_restore_privacy_eu"
+        if default_key.is_file():
+            cmd.extend(["-i", str(default_key)])
     cmd.append(f"{user}@{host}")
     return cmd
 
@@ -216,9 +237,13 @@ def upload_and_install(tarball: Path, install_service: bool) -> None:
     host = os.environ.get("RPT_SSH_HOST", DEFAULT_HOST)
     user = os.environ.get("RPT_SSH_USER", "root")
     key = os.environ.get("RPT_SSH_KEY", "").strip()
-    scp = ["scp", "-o", "BatchMode=yes"]
+    scp = ["scp", *_ssh_common_opts()]
     if key:
         scp.extend(["-i", os.path.expanduser(key)])
+    else:
+        default_key = Path.home() / ".ssh" / "id_ed25519_restore_privacy_eu"
+        if default_key.is_file():
+            scp.extend(["-i", str(default_key)])
     remote_tar = f"/tmp/{tarball.name}"
     scp.extend([str(tarball), f"{user}@{host}:{remote_tar}"])
     print("scp:", " ".join(scp))
