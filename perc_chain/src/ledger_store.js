@@ -11,6 +11,7 @@ import {
   isAnnualBootstrapDue,
 } from './seed_bootstrap.js';
 import { mergeNetworkStateFromPeer } from './merge_network_state.js';
+import { restoreCanonicalSystemAccounts } from './account_privacy.js';
 
 const CHAIN_ID = 'evolve-chronoflux-principia-chain-1';
 
@@ -73,9 +74,15 @@ export class LedgerStore {
       this.genesisRevision = parsed.genesisRevision ?? ledgerGenesisRevision(this.ledger);
       this.lastBootstrapAt = parsed.lastBootstrapAt ?? parsed.savedAt ?? null;
       if (this.ledger) {
+        // Durable files may still hold privacy-aliased treasury/seed keys from
+        // older public exports — restore before any compact/save cycle.
+        restoreCanonicalSystemAccounts(this.ledger);
         const before = JSON.stringify(this.ledger).length;
         this.ledger = compactLedgerForSeed(this.ledger);
         if (JSON.stringify(this.ledger).length < before) {
+          this.save();
+        } else {
+          // Persist rematerialized treasury so seed restarts stay reward-ready.
           this.save();
         }
       }

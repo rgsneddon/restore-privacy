@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   PUBLIC_ALIAS_LENGTH,
   obfuscateUsername,
+  restoreCanonicalSystemAccounts,
   sanitizeLedgerForPublic,
   sanitizePeerForPublic,
   sanitizePublicPayload,
@@ -65,6 +66,128 @@ test('sanitizeLedgerForPublic strips credentials and obfuscates usernames', () =
   assert.equal(sanitized.sessionUsername.length, PUBLIC_ALIAS_LENGTH);
   assert.equal(sanitized.blocks[0].triggerUsername.length, PUBLIC_ALIAS_LENGTH);
   assert.equal(sanitized.blocks[0].transactions[0].fromUsername.length, PUBLIC_ALIAS_LENGTH);
+});
+
+test('restoreCanonicalSystemAccounts undoes aliased evolve_treasury key', () => {
+  const alias = obfuscateUsername('evolve_treasury');
+  assert.ok(alias);
+  assert.notEqual(alias, 'evolve_treasury');
+  const ledger = {
+    accounts: {
+      [alias]: {
+        username: alias,
+        balance: { microUnits: 9_000_000_000_000 },
+        transactions: [],
+      },
+      alice: {
+        username: 'alice',
+        balance: { microUnits: 1 },
+        transactions: [],
+      },
+    },
+    blocks: [
+      {
+        index: 0,
+        transactions: [
+          {
+            kind: 'treasuryEmission',
+            toUsername: alias,
+            amount: { microUnits: 100 },
+          },
+          {
+            kind: 'scenarioReward',
+            fromUsername: alias,
+            toUsername: 'alice',
+            amount: { microUnits: 50 },
+          },
+        ],
+      },
+    ],
+  };
+  restoreCanonicalSystemAccounts(ledger);
+  assert.ok(ledger.accounts.evolve_treasury);
+  assert.equal(ledger.accounts.evolve_treasury.balance.microUnits, 9_000_000_000_000);
+  assert.equal(ledger.accounts[alias], undefined);
+  assert.equal(ledger.blocks[0].transactions[0].toUsername, 'evolve_treasury');
+  assert.equal(ledger.blocks[0].transactions[1].fromUsername, 'evolve_treasury');
+});
+
+test('sanitizeLedgerForPublic keeps treasury and seed under real usernames', () => {
+  const sanitized = sanitizeLedgerForPublic({
+    sessionUsername: 'alice',
+    accounts: {
+      evolve_treasury: {
+        username: 'evolve_treasury',
+        passwordHash: 'secret',
+        salt: 's',
+        balance: { microUnits: 9_000_000_000_000 },
+        transactions: [],
+      },
+      evolve_seed_node: {
+        username: 'evolve_seed_node',
+        balance: { microUnits: 0 },
+        transactions: [],
+      },
+      alice: {
+        username: 'alice',
+        passwordHash: 'h',
+        salt: 's2',
+        balance: { microUnits: 1 },
+        transactions: [
+          {
+            id: 'tx-1',
+            kind: 'scenarioReward',
+            fromUsername: 'evolve_treasury',
+            toUsername: 'alice',
+            amount: { microUnits: 1 },
+          },
+        ],
+      },
+    },
+    blocks: [
+      {
+        index: 0,
+        triggerUsername: 'alice',
+        transactions: [
+          {
+            kind: 'treasuryEmission',
+            toUsername: 'evolve_treasury',
+            amount: { microUnits: 100 },
+          },
+          {
+            kind: 'scenarioReward',
+            fromUsername: 'evolve_treasury',
+            toUsername: 'alice',
+            amount: { microUnits: 50 },
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.ok(sanitized.accounts.evolve_treasury);
+  assert.equal(
+    sanitized.accounts.evolve_treasury.balance.microUnits,
+    9_000_000_000_000,
+  );
+  assert.equal(sanitized.accounts.evolve_treasury.passwordHash, undefined);
+  assert.ok(sanitized.accounts.evolve_seed_node);
+  assert.ok(!sanitized.accounts.alice);
+  // Ordinary users still aliased
+  const aliases = Object.keys(sanitized.accounts).filter(
+    (k) => k !== 'evolve_treasury' && k !== 'evolve_seed_node',
+  );
+  assert.equal(aliases.length, 1);
+  assert.equal(aliases[0].length, PUBLIC_ALIAS_LENGTH);
+  // System usernames preserved in txs so faucet debit keys match.
+  assert.equal(
+    sanitized.blocks[0].transactions[0].toUsername,
+    'evolve_treasury',
+  );
+  assert.equal(
+    sanitized.blocks[0].transactions[1].fromUsername,
+    'evolve_treasury',
+  );
 });
 
 test('sanitizeLedgerForPublic rewrites paused Render peer endpoints', () => {

@@ -31,6 +31,24 @@ const SECRET_FIELD_KEYS = new Set([
   'passwordSwitchCommit',
 ]);
 
+/**
+ * System accounts that must stay under their real usernames in the public
+ * ledger export. Scenario faucet debit/credit needs `evolve_treasury` (not an
+ * obfuscated alias) or cold wallets report treasuryEmpty after seed import.
+ */
+export function systemUsernames() {
+  const treasury = (process.env.PERC_TREASURY_USERNAME ?? 'evolve_treasury').trim();
+  const seed = (process.env.PERC_SEED_USERNAME ?? 'evolve_seed_node').trim();
+  return new Set([treasury, seed].filter(Boolean));
+}
+
+export function isSystemUsername(username) {
+  if (username == null) return false;
+  const raw = String(username).trim();
+  if (!raw) return false;
+  return systemUsernames().has(raw);
+}
+
 export function privacySalt() {
   return (process.env.PERC_PRIVACY_SALT ?? 'evolve-perc-account-privacy-v1').trim();
 }
@@ -59,11 +77,144 @@ function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+/**
+ * Map a known system-account alias (privacy hash) back to its real username.
+ * Durable seed ledgers may already store only obfuscated keys.
+ */
+export function resolveSystemUsername(username) {
+  if (username == null) return null;
+  const text = String(username).trim();
+  if (!text) return null;
+  if (isSystemUsername(text)) return text;
+  for (const canonical of systemUsernames()) {
+    if (obfuscateUsername(canonical) === text) return canonical;
+  }
+  return null;
+}
+
 function aliasUsername(value, aliasFor) {
   if (value == null) return value;
   const text = String(value).trim();
   if (!text) return value;
+  // Keep / restore treasury + seed real names so wallet faucet can debit evolve_treasury.
+  const system = resolveSystemUsername(text);
+  if (system) return system;
   return aliasFor(text) ?? obfuscateUsername(text);
+}
+
+/**
+ * In-place: restore canonical treasury/seed account keys on a ledger that was
+ * previously exported with obfuscated system usernames (or double-aliased).
+ * Also rematerializes treasury from treasuryEmission targets when needed.
+ *
+ * @param {object|null|undefined} ledger
+ * @returns {object|null|undefined}
+ */
+export function restoreCanonicalSystemAccounts(ledger) {
+  if (!ledger || typeof ledger !== 'object') return ledger;
+  const accounts = ledger.accounts;
+  if (!accounts || typeof accounts !== 'object') return ledger;
+
+  const rewriteRefs = (from, to) => {
+    if (ledger.sessionUsername === from) ledger.sessionUsername = to;
+    for (const block of ledger.blocks ?? []) {
+      if (!block || typeof block !== 'object') continue;
+      if (block.triggerUsername === from) block.triggerUsername = to;
+      for (const tx of block.transactions ?? []) {
+        if (!tx || typeof tx !== 'object') continue;
+        for (const key of USERNAME_FIELD_KEYS) {
+          if (tx[key] === from) tx[key] = to;
+        }
+      }
+    }
+    for (const acc of Object.values(accounts)) {
+      if (!acc || typeof acc !== 'object') continue;
+      if (acc.username === from) acc.username = to;
+      for (const tx of acc.transactions ?? []) {
+        if (!tx || typeof tx !== 'object') continue;
+        for (const key of USERNAME_FIELD_KEYS) {
+          if (tx[key] === from) tx[key] = to;
+        }
+      }
+    }
+    if (ledger.networkNodes && typeof ledger.networkNodes === 'object') {
+      if (ledger.networkNodes[from] && !ledger.networkNodes[to]) {
+        const node = ledger.networkNodes[from];
+        delete ledger.networkNodes[from];
+        ledger.networkNodes[to] = {
+          ...node,
+          username: to,
+        };
+      }
+    }
+  };
+
+  for (const canonical of systemUsernames()) {
+    const alias = obfuscateUsername(canonical);
+    if (!alias || alias === canonical) continue;
+    if (accounts[alias] && !accounts[canonical]) {
+      accounts[canonical] = { ...accounts[alias], username: canonical };
+      delete accounts[alias];
+      rewriteRefs(alias, canonical);
+    } else if (accounts[alias] && accounts[canonical]) {
+      // Merge alias into canonical then drop alias.
+      const a = accounts[alias];
+      const c = accounts[canonical];
+      const aBal = Number(a?.balance?.microUnits ?? 0);
+      const cBal = Number(c?.balance?.microUnits ?? 0);
+      if (aBal > 0) {
+        c.balance = { microUnits: cBal + aBal };
+      }
+      delete accounts[alias];
+      rewriteRefs(alias, canonical);
+    }
+  }
+
+  // Emission-based recovery when salt mismatch left treasury only under a foreign alias.
+  const treasury = (process.env.PERC_TREASURY_USERNAME ?? 'evolve_treasury').trim();
+  const treasAcc = accounts[treasury];
+  const treasBal = Number(treasAcc?.balance?.microUnits ?? 0);
+  if (treasBal <= 0) {
+    const emissionTotals = new Map();
+    for (const block of ledger.blocks ?? []) {
+      for (const tx of block.transactions ?? []) {
+        if (!tx || tx.kind !== 'treasuryEmission') continue;
+        const to = String(tx.toUsername ?? '').trim();
+        if (!to || to === treasury) continue;
+        const amt = Number(tx.amount?.microUnits ?? 0);
+        emissionTotals.set(to, (emissionTotals.get(to) ?? 0) + amt);
+      }
+    }
+    if (emissionTotals.size > 0) {
+      let best = null;
+      let bestScore = -1;
+      for (const [name, emitted] of emissionTotals) {
+        const acc = accounts[name];
+        if (!acc) continue;
+        const score = Number(acc.balance?.microUnits ?? 0);
+        // Prefer current balance; use emission total as tie-break.
+        const rank = score * 10 + emitted;
+        if (rank > bestScore) {
+          bestScore = rank;
+          best = name;
+        }
+      }
+      if (best && best !== treasury && accounts[best]) {
+        const acc = accounts[best];
+        if (!accounts[treasury]) {
+          accounts[treasury] = { ...acc, username: treasury };
+        } else {
+          const cBal = Number(accounts[treasury].balance?.microUnits ?? 0);
+          const aBal = Number(acc.balance?.microUnits ?? 0);
+          accounts[treasury].balance = { microUnits: cBal + aBal };
+        }
+        delete accounts[best];
+        rewriteRefs(best, treasury);
+      }
+    }
+  }
+
+  return ledger;
 }
 
 function sanitizeTransactions(txs, aliasFor) {
@@ -83,12 +234,16 @@ function sanitizeTransactions(txs, aliasFor) {
 
 /**
  * Strip credentials and replace usernames with five-character aliases.
+ * System accounts (treasury / seed) stay under their real usernames so scenario
+ * rewards can debit the funded treasury after public ledger import.
  * @param {object|null|undefined} ledger
  */
 export function sanitizeLedgerForPublic(ledger) {
   if (!ledger || typeof ledger !== 'object') return ledger;
 
   const out = cloneValue(ledger);
+  // Undo prior public-only aliasing of system accounts before re-export.
+  restoreCanonicalSystemAccounts(out);
   const aliasFor = (username) => obfuscateUsername(username);
 
   const accounts = out.accounts ?? {};
@@ -125,7 +280,9 @@ export function sanitizeLedgerForPublic(ledger) {
     for (const [key, node] of Object.entries(out.networkNodes)) {
       const alias = aliasUsername(key, aliasFor);
       const clean = node && typeof node === 'object' ? { ...node } : node;
-      if (clean?.username != null) clean.username = aliasUsername(clean.username, aliasFor);
+      if (clean?.username != null) {
+        clean.username = aliasUsername(clean.username, aliasFor);
+      }
       if (clean && typeof clean === 'object' && clean.endpoint != null) {
         const ep = String(clean.endpoint);
         if (/onrender\.com/i.test(ep)) {
