@@ -1,6 +1,6 @@
 # Restore Privacy
 
-**Version v1.2.2** — monorepo for the free residual VPN client and operator tooling.
+**Version v1.2.3** — monorepo for the free residual VPN client and operator tooling.
 
 Public storefront: [restoreprivacy.online](https://restoreprivacy.online).  
 Open Pages export: [rgsneddon.github.io/restore-privacy-suite](https://rgsneddon.github.io/restore-privacy-suite/).
@@ -31,17 +31,17 @@ Traffic shaping, outer obfuscation, multi-hop extras, and kill switch are **off 
 
 | Platform | File |
 |----------|------|
-| Windows | `restore-privacy-client-1.2.2-windows-x64-setup.exe` (native PE from Windows host) |
-| Android | `restore-privacy-client-1.2.2-android.apk` |
-| macOS | `restore-privacy-client-1.2.2-macos.zip` — Notarized Developer ID + residual Packet Tunnel **host NE** |
-| iOS | `restore-privacy-client-1.2.2-ios.zip` — IPA `Payload/Runner.app` + embedded provisions (Team-signed sideload; rename to `.ipa`) |
-| Linux | `restore-privacy-client-1.2.2-linux-x64.tar.gz` |
+| Windows | `restore-privacy-client-1.2.3-windows-x64-setup.exe` (native PE from Windows host) |
+| Android | `restore-privacy-client-1.2.3-android.apk` |
+| macOS | `restore-privacy-client-1.2.3-macos.zip` — Notarized Developer ID + residual Packet Tunnel **host NE** |
+| iOS | `restore-privacy-client-1.2.3-ios.zip` — IPA `Payload/Runner.app` + embedded provisions (Team-signed sideload; rename to `.ipa`) |
+| Linux | `restore-privacy-client-1.2.3-linux-x64.tar.gz` |
 
 ## Operator build
 
-- Pin: `client/VERSION` → `1.2.2`
+- Pin: `client/VERSION` → `1.2.3`
 - Flutter client: `client_app/`
-- Stage script: `scripts/build_suite_1.2.2.py` (this Mac host skips Windows CF)
+- Stage script: `scripts/build_suite_1.2.3.py` (this Mac host skips Windows CF)
 - Full ship skill: type `kyrusfables` / `/kyrusfables`
 - Public static export: `python3 scripts/build_public_pages.py` → `public_site/`
 

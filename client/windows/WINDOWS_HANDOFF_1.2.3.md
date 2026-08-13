@@ -16,8 +16,8 @@ python scripts\breadcrumbs_vault.py check --fetch
 ## Mac agent staging status (1.2.3)
 
 Darwin suite build produces **android / macos / ios / linux** under `releases/1.2.3/`.
-**Windows PE is not sealed on Darwin** — run the freeze below. Do not rename a 1.2.1 EXE as 1.2.3 seal.
-Linux may be **carry-forward** from 1.2.1 (filename re-pin only).
+**Windows PE is not sealed on Darwin** — run the freeze below. Do not rename a 1.2.2 EXE as 1.2.3 seal.
+Linux may be **carry-forward** from 1.2.2 (filename re-pin only).
 
 
 **Target PE basename (exact):**
@@ -63,18 +63,21 @@ Source of truth in tree (after `git pull`):
 
 ---
 
-## Deltas since monopin 1.2.0 (Windows PE must pick up)
+## Deltas since monopin 1.2.2 (Windows PE must pick up)
 
 | Area | Change |
 |------|--------|
 | Catalog pin | `1.2.3` everywhere (`client\VERSION`, setup basename, tray about if it embeds monopin) |
+| macOS free monopin | Connect fail-fast until prepare `readyForConnect` (no startTunnel race during delayed Allow); no VPN profile recreate on ordinary Allow lag |
+| Android lock residual | `wantsDesiredSessionRecovery` + `PARTIAL_WAKE_LOCK` + idle re-HELLO |
+| Windows residual attach | Tunnel-bound DNS + dataplane attach after dual /1 (native PE) |
 | Flutter/Android Quit | Full process exit: plain `startService(DISCONNECT)` (never `startForegroundService`), deferred kill after task remove |
 | iOS catalog | IPA `Payload/Runner.app` + embedded provisions (Mac-side only; Windows PE unaffected) |
 | Residual peers | Unchanged: IS + DE; US retired |
 | Tray string | Still exactly **`Privacy, Restored`** |
 | Kill-switch | Still `KILLSWITCH` confirm on enable |
 
-**You must still native-rebuild the Windows PE for 1.2.3.** Do not rename the 1.2.0 EXE.
+**You must still native-rebuild the Windows PE for 1.2.3.** Do not rename the 1.2.2 EXE.
 
 
 ## 1. Ordered steps — do these in order

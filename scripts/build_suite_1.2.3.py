@@ -45,6 +45,7 @@ NAMES = {
 
 # Prefer newest local pin for carry-forward when native build unavailable
 PRIOR_CANDIDATES = (
+    "1.2.2",
     "1.2.1",
     "1.2.0",
     "1.1.9",

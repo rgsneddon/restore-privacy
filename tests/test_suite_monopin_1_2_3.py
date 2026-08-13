@@ -59,7 +59,6 @@ class TestSuiteMonopin123(unittest.TestCase):
         self.assertIn(
             "restore-privacy-client-1.2.3-windows-x64-setup.exe", text
         )
-        self.assertIn("native-rebuild", text.lower().replace(" ", "-") or "native")
         self.assertTrue(
             "native-rebuild" in text.lower()
             or "native rebuild" in text.lower()
@@ -85,6 +84,22 @@ class TestSuiteMonopin123(unittest.TestCase):
         self.assertIn("wantsDesiredSessionRecovery", svc)
         self.assertIn("PARTIAL_WAKE_LOCK", svc)
         self.assertIn("scheduleIdleReconnect", svc)
+
+    def test_macos_connect_allow_race_fix_in_tree(self) -> None:
+        """1.2.3 product path: no startTunnel race while prepare needs Allow."""
+        vc = (ROOT / "client_app" / "lib" / "vpn_controller.dart").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("macosConnectShouldInvokeStartTunnel", vc)
+        seq = (
+            ROOT / "client_app" / "lib" / "macos_vpn_permission_sequence.dart"
+        ).read_text(encoding="utf-8")
+        self.assertIn("macosConnectShouldInvokeStartTunnel", seq)
+        swift = (
+            ROOT / "client_app" / "macos" / "NativePrep" / "RptVpnChannel.swift"
+        ).read_text(encoding="utf-8")
+        self.assertIn("shouldRecreateVpnProfileAfterStartFailure", swift)
+        self.assertIn("maxAttempts: 100", swift)
 
 
 if __name__ == "__main__":
