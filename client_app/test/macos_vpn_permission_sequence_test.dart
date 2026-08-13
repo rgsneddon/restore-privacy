@@ -73,6 +73,46 @@ void main() {
     );
   });
 
+  test('Connect starts tunnel only when prepare is readyForConnect', () {
+    expect(
+      macosConnectShouldInvokeStartTunnel(
+        MacosVpnAfterPrepareAction.readyForConnect,
+      ),
+      isTrue,
+    );
+    expect(
+      macosConnectShouldInvokeStartTunnel(
+        MacosVpnAfterPrepareAction.openSystemSettingsThenConnect,
+      ),
+      isFalse,
+      reason: 'must not race startTunnel while Allow is still required',
+    );
+    expect(
+      macosConnectShouldInvokeStartTunnel(
+        MacosVpnAfterPrepareAction.hostMissingNetworkExtension,
+      ),
+      isFalse,
+    );
+    expect(
+      macosConnectShouldInvokeStartTunnel(
+        MacosVpnAfterPrepareAction.retryPrepare,
+      ),
+      isFalse,
+    );
+  });
+
+  test('blocked-by-prepare message is honest for Allow path', () {
+    final allow = MacosVpnPrepOutcome(
+      prepared: false,
+      openedSettings: true,
+      action: MacosVpnAfterPrepareAction.openSystemSettingsThenConnect,
+      message: '',
+    );
+    final msg = macosConnectBlockedByPrepareMessage(allow);
+    expect(msg.toLowerCase(), contains('allow'));
+    expect(msg.toLowerCase(), contains('connect'));
+  });
+
   test('native RptVpnChannel prepare gates openSettingsOnDenial', () {
     // Structural: Swift must accept openSettingsOnDenial and default false.
     final src = File('macos/NativePrep/RptVpnChannel.swift').readAsStringSync();

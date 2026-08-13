@@ -210,8 +210,15 @@ class VpnController {
     try {
       // Apple (macOS + iOS): register Packet Tunnel in system VPN prefs before
       // start so the OS can show Allow / install the configuration.
+      // Do **not** race startTunnel while prepare still needs Allow / re-sign —
+      // that steals the delayed Allow dialog and leaves free monopin "no Connect".
       if (applePlatformNeedsVpnPrepare()) {
-        await preparePacketTunnelSequenced();
+        final prep = await preparePacketTunnelSequenced();
+        if (!macosConnectShouldInvokeStartTunnel(prep.action)) {
+          // prepare already set onStatus; re-assert honest blocked copy.
+          onStatus(macosConnectBlockedByPrepareMessage(prep));
+          return false;
+        }
       }
       // Push dual-stack + privacy-scale prefs before native tunnel starts.
       await syncProductSettingsToNative(

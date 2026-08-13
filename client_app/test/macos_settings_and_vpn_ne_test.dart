@@ -261,4 +261,46 @@ void main() {
       expect(prepBody.contains('if !hostHasNe'), isTrue);
     },
   );
+
+  test(
+    'startTunnel: longer Allow poll + recreate only on DR mismatch (not Allow lag)',
+    () {
+      final src =
+          File('macos/NativePrep/RptVpnChannel.swift').readAsStringSync();
+      expect(
+        src.contains('shouldRecreateVpnProfileAfterStartFailure'),
+        isTrue,
+        reason: 'recreate must be gated — unconditional wipe races Allow',
+      );
+      // Poll window for free monopin Allow lag (was 50×0.5s = 25s).
+      expect(src.contains('maxAttempts: 100'), isTrue);
+      final startIdx = src.indexOf('private static func startTunnel');
+      expect(startIdx, greaterThanOrEqualTo(0));
+      final startBody = src.substring(
+        startIdx,
+        src.indexOf(
+          'static func lastDisconnectErrorDescription',
+          startIdx,
+        ),
+      );
+      // Forbidden: recreate on every timeout without DR/signature gate.
+      expect(
+        RegExp(
+          r'if allowProfileRecreate, hostHasNe \{\s*recreateProductVpnProfileAndStart',
+          multiLine: true,
+        ).hasMatch(startBody),
+        isFalse,
+        reason: 'must not recreate VPN profile on ordinary Allow/HELLO timeout',
+      );
+      expect(
+        startBody.contains('shouldRecreateVpnProfileAfterStartFailure(disc)'),
+        isTrue,
+      );
+      // Auto-open Settings only on permission-class (not every PT-not-connected).
+      expect(
+        startBody.contains('let openSettings = isNePermissionFailureDetail'),
+        isTrue,
+      );
+    },
+  );
 }

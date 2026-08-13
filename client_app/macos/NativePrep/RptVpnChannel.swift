@@ -687,17 +687,15 @@ enum RptVpnChannel {
       let hostHasNe = (map["hostHasPacketTunnelEntitlement"] as? Bool)
         ?? hostHasPacketTunnelNetworkExtensionEntitlement()
       // Residual-capable free monopin: tunnel registered but not Connected.
-      // Keep Allow / System Settings path — do NOT rewrite via host-only HELLO
-      // (that swallowed openSettings and piled Team residual tips over a live
-      // entitlement HELLO that already assigned a node IP).
+      // Keep Allow / System Settings sticky control — do NOT rewrite via host-only
+      // HELLO and do **not** force-open Settings again (startTunnel already chose
+      // openSettings only for permission-class; re-opening steals delayed Allow).
       if hostHasNe, isPacketTunnelNotConnectedDetail(detail) {
         var out = map
-        if out["needsVpnSystemSettingsApproval"] == nil {
-          out = annotateNeedsVpnSettings(out, openSettings: true)
-        } else if out["openedVpnSettings"] as? Bool != true {
-          out = annotateNeedsVpnSettings(out, openSettings: true)
-        }
         out["hostHasPacketTunnelEntitlement"] = true
+        if out["needsVpnSystemSettingsApproval"] == nil {
+          out = annotateNeedsVpnSettings(out, openSettings: false)
+        }
         flutterResult(out)
         return
       }
@@ -732,11 +730,15 @@ enum RptVpnChannel {
         )
         return
       }
-      // Other failure — surface tunnel fail with Settings open on residual-capable.
+      // Other failure — residual-capable: sticky Open VPN settings, no auto-open
+      // unless startTunnel already marked permission-class (preserve opened flag).
       if hostHasNe {
         var out = map
         out["hostHasPacketTunnelEntitlement"] = true
-        flutterResult(annotateNeedsVpnSettings(out, openSettings: true))
+        if out["needsVpnSystemSettingsApproval"] == nil {
+          out = annotateNeedsVpnSettings(out, openSettings: false)
+        }
+        flutterResult(out)
         return
       }
       hostSideDiagnostic(
@@ -1228,7 +1230,8 @@ enum RptVpnChannel {
         try session.startTunnel(options: opts)
         // Packet Tunnel handshake + setTunnelNetworkSettings can take several seconds;
         // first run may show the system Allow VPN configuration dialog (OS-owned).
-        pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 50, interval: 0.5) {
+        // Free monopin Allow can lag 30–60s — poll longer than HELLO alone (was 25s).
+        pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 100, interval: 0.5) {
           connected in
           if connected {
             queryProviderSession(manager: manager) { ip, v4, v6 in
@@ -1252,9 +1255,11 @@ enum RptVpnChannel {
           } else {
             let st = manager.connection.status
             let hostHasNe = hostHasPacketTunnelNetworkExtensionEntitlement()
-            // One-shot: remove stale VPN profile (e.g. residual-team DR mismatch)
-            // and recreate free monopin protocol, then startTunnel again.
-            if allowProfileRecreate, hostHasNe {
+            let disc = lastDisconnectErrorDescription(manager.connection)
+            // One-shot recreate only for stale designated-requirement / signing
+            // mismatches (residual-team → monopin). Do **not** recreate on ordinary
+            // Allow lag / HELLO timeout — that deletes the profile the user just Allowed.
+            if allowProfileRecreate, hostHasNe, shouldRecreateVpnProfileAfterStartFailure(disc) {
               recreateProductVpnProfileAndStart(
                 stale: manager,
                 host: host,
@@ -1263,7 +1268,6 @@ enum RptVpnChannel {
               )
               return
             }
-            let disc = lastDisconnectErrorDescription(manager.connection)
             var detail =
               "Packet Tunnel did not become Connected (status \(statusName(st))/\(st.rawValue)). "
               + "Open System Settings → Network → VPN & Filters, enable Restore Privacy, "
@@ -1278,8 +1282,12 @@ enum RptVpnChannel {
               detailMessage: detail
             )
             map["hostHasPacketTunnelEntitlement"] = hostHasNe
-            // Residual-capable free monopin: Allow path, not Team residual re-sign.
-            completion(annotateNeedsVpnSettings(map, openSettings: true))
+            // Residual-capable free monopin: sticky Open VPN settings control, but
+            // only auto-open Settings on permission-class failures — opening Settings
+            // on every HELLO timeout steals focus from a delayed Allow dialog.
+            let openSettings = isNePermissionFailureDetail(disc)
+              || isNePermissionFailureDetail(detail)
+            completion(annotateNeedsVpnSettings(map, openSettings: openSettings))
           }
         }
       } catch {
@@ -1317,6 +1325,20 @@ enum RptVpnChannel {
       return err.localizedDescription
     }
     return nil
+  }
+
+  /// True when startTunnel failure looks like a stale provider designated requirement
+  /// / signing identity (safe to remove + re-register once). Ordinary Allow lag,
+  /// HELLO timeout, and permission denial must **not** recreate the profile.
+  static func shouldRecreateVpnProfileAfterStartFailure(_ detail: String?) -> Bool {
+    guard let d = detail?.lowercased(), !d.isEmpty else { return false }
+    if isNePermissionFailureDetail(d) { return false }
+    return d.contains("code requirement")
+      || d.contains("code failed to satisfy")
+      || d.contains("designated requirement")
+      || d.contains("signature check failed")
+      || d.contains("validation failed")
+      || (d.contains("provider") && d.contains("invalid"))
   }
 
   /// Remove a stale system VPN profile and re-register free monopin protocol once.

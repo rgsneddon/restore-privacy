@@ -136,6 +136,35 @@ bool macosConnectMayOpenSystemSettingsOnPermissionDenial({
 }) =>
     prepareSequenceCompleted;
 
+/// True only when prepare finished successfully and Connect may call startTunnel.
+///
+/// Product bug (1.2.2 free monopin): Connect always raced startTunnel after a
+/// failed prepare (needs Allow / missing host NE). That stole focus from the
+/// delayed Allow dialog and left residual "no Connect" after the user Allowed.
+/// Fail-fast until [MacosVpnAfterPrepareAction.readyForConnect], then the user
+/// presses Connect again after Allow.
+bool macosConnectShouldInvokeStartTunnel(MacosVpnAfterPrepareAction action) =>
+    action == MacosVpnAfterPrepareAction.readyForConnect;
+
+/// Honest status when Connect stops because prepare is not ready for startTunnel.
+String macosConnectBlockedByPrepareMessage(MacosVpnPrepOutcome prep) {
+  final m = prep.message.trim();
+  if (m.isNotEmpty) return m;
+  switch (prep.action) {
+    case MacosVpnAfterPrepareAction.openSystemSettingsThenConnect:
+      return 'Allow Restore Privacy Packet Tunnel in System Settings → Network → '
+          'VPN & Filters (choose Allow if macOS asks), then press Connect again.';
+    case MacosVpnAfterPrepareAction.hostMissingNetworkExtension:
+      return 'This build cannot register residual Packet Tunnel (missing host NE). '
+          'Re-download the free macOS monopin or re-sign with Team residual.';
+    case MacosVpnAfterPrepareAction.retryPrepare:
+      return 'Packet Tunnel is not registered yet. Press Connect again after '
+          'Allowing Restore Privacy if macOS asked.';
+    case MacosVpnAfterPrepareAction.readyForConnect:
+      return 'Restore Privacy Packet Tunnel is ready — press Connect.';
+  }
+}
+
 /// Result of [VpnController.preparePacketTunnelSequenced].
 class MacosVpnPrepOutcome {
   const MacosVpnPrepOutcome({
