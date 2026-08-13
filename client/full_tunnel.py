@@ -167,6 +167,42 @@ def windows_route_commands(
     return cmds
 
 
+def windows_probe_host_route_commands(
+    if_index: int,
+    dests: list[str],
+) -> list[str]:
+    """On-link /32s so attach smokes use Wintun without dual /1 catch-alls.
+
+    Installing dual /1 *before* smokes blackholes the whole PC for the smoke
+    timeout (tens of seconds). Probe dests only (resolver + public check IP).
+    """
+    idx = int(if_index)
+    if idx <= 0:
+        return []
+    cmds: list[str] = []
+    seen: set[str] = set()
+    for raw in dests:
+        ip = str(raw or "").strip()
+        if not ip or ip in seen:
+            continue
+        seen.add(ip)
+        cmds.append(f"route add {ip} mask 255.255.255.255 0.0.0.0 IF {idx} metric 1")
+    return cmds
+
+
+def windows_probe_host_route_delete_commands(dests: list[str]) -> list[str]:
+    """Remove probe /32s (internet stays on the physical default route)."""
+    cmds: list[str] = []
+    seen: set[str] = set()
+    for raw in dests:
+        ip = str(raw or "").strip()
+        if not ip or ip in seen:
+            continue
+        seen.add(ip)
+        cmds.append(f"route delete {ip} mask 255.255.255.255")
+    return cmds
+
+
 def windows_route_delete_commands(
     plan: FullTunnelPlan,
     server_host: str,

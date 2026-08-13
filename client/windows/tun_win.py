@@ -16,7 +16,6 @@ from collections.abc import Callable
 from typing import Optional
 
 from client.dataplane import QueueTun, TunIO
-from client.full_tunnel import default_tunnel_dns_servers
 
 # --- Wintun ctypes API (https://git.zx2c4.com/wintun/about/) ---
 
@@ -108,14 +107,11 @@ class WintunTun:
                 "Run as Administrator and ensure the Wintun driver can load."
             )
         self._adapter = adapter
-
-        session = self._WintunStartSession(adapter, self.RING_CAPACITY)
-        if not session:
-            self._WintunCloseAdapter(adapter)
-            self._adapter = None
-            raise WintunError("WintunStartSession failed")
-        self._session = session
-        self._read_event = self._WintunGetReadWaitEvent(session)
+        # Start the receive ring *after* netsh address/DNS (those cmds bounce
+        # the NIC and would leave a pre-config session deaf — HELLO still
+        # works on the UDP socket, dual /1 then blackholes).
+        self._session = None
+        self._read_event = None
 
     def _bind_api(self) -> None:
         d = self._dll
@@ -179,12 +175,35 @@ class WintunTun:
             if not hasattr(d, attr):
                 raise WintunError(f"missing Wintun export: {attr}")
 
+    def start_session(self) -> None:
+        """Open the Wintun packet ring (call after configure_address)."""
+        if self._closed:
+            raise WintunError("adapter closed")
+        with self._lock:
+            if self._session:
+                try:
+                    self._WintunEndSession(self._session)
+                except Exception:
+                    pass
+                self._session = None
+                self._read_event = None
+            if not self._adapter:
+                raise WintunError("no Wintun adapter")
+            session = self._WintunStartSession(self._adapter, self.RING_CAPACITY)
+            if not session:
+                raise WintunError("WintunStartSession failed after address config")
+            self._session = session
+            self._read_event = self._WintunGetReadWaitEvent(session)
+
     def interface_index(self) -> Optional[int]:
         """Windows IF index for route … IF <n> (anti-blackhole full-tunnel).
 
-        Prefer Wintun LUID → IF index so dual /1 never binds a leftover Hyper-V
-        or Wi-Fi adapter when PowerShell ``Get-NetAdapter -Name`` is slow/wrong.
+        Prefer the adapter **name** (``RPT``) so dual /1 is not applied to a
+        stale LUID. Fall back to Wintun LUID → IF index when name resolve fails.
         """
+        named = resolve_interface_index(self.name)
+        if named:
+            return named
         try:
             if self._adapter and self._WintunGetAdapterLUID is not None:
                 luid = NET_LUID()
@@ -194,7 +213,7 @@ class WintunTun:
                     return idx
         except Exception:
             pass
-        return resolve_interface_index(self.name)
+        return None
 
     def configure_address(self) -> list[str]:
         """Assign IPv4 /32 on Wintun — no fake gateway 10.88.0.1 (cannot ARP).
@@ -202,33 +221,36 @@ class WintunTun:
         Full-tunnel uses IF-bound on-link routes (0.0.0.0 IF <n>), not a next-hop
         that Windows would try to ARP on this virtual NIC.
         """
-        cmds = [
-            f'netsh interface ip set address name="{self.name}" '
-            f"static {self.client_ip} 255.255.255.255",
-            f'netsh interface ip delete dns name="{self.name}" all',
-        ]
-        for i, dns in enumerate(default_tunnel_dns_servers(), start=1):
-            cmds.append(
-                f'netsh interface ip add dns name="{self.name}" addr={dns} index={i}'
-            )
-        cmds.append(
-            f'netsh interface set interface name="{self.name}" admin=ENABLED'
+        required, dns_cmds = wintun_configure_address_commands(
+            self.name, self.client_ip, wintun_attach_dns_servers(unbound_ok=False)
         )
         from client.windows.hidden_subprocess import run_hidden
 
-        for c in cmds:
+        ran: list[str] = []
+        for c in required:
             # netsh is a console app — must use run_hidden or a large blue
             # console flashes on Connect (pythonw has no console to inherit).
-            run_hidden(c, shell=True, text=True, timeout=30)
-        return cmds
+            run_hidden(c, shell=True, text=True, timeout=8)
+            ran.append(c)
+        # DNS add without validate=no contacts 10.88.0.1 before residual is up
+        # and hangs (desktop log: add dns timed out after 8s). Never fail attach.
+        for c in dns_cmds:
+            try:
+                run_hidden(c, shell=True, text=True, timeout=5)
+            except Exception:
+                pass
+            ran.append(c)
+        return ran
 
-    def read_packet(self, max_size: int = 65535) -> Optional[bytes]:
+    def read_packet(self, max_size: int = 65535, wait_ms: int = 20) -> Optional[bytes]:
         if self._closed or not self._session:
             return None
-        # Brief wait on Wintun ring so we do not spin forever with empty receives
+        # wait_ms=0 is a non-blocking ring poll (dataplane burst drain).
         try:
-            if self._read_event:
-                ctypes.windll.kernel32.WaitForSingleObject(self._read_event, 20)
+            if self._read_event and int(wait_ms) > 0:
+                ctypes.windll.kernel32.WaitForSingleObject(
+                    self._read_event, int(wait_ms)
+                )
         except Exception:
             pass
         with self._lock:
@@ -333,8 +355,19 @@ class WindowsTun:
             f"static {self.client_ip} 255.255.255.255",
         ]
 
-    def read_packet(self, max_size: int = 65535) -> Optional[bytes]:
-        return self._impl.read_packet(max_size)
+    def start_io(self) -> None:
+        """Start packet IO after the adapter address is configured."""
+        impl = self._impl
+        start = getattr(impl, "start_session", None)
+        if callable(start):
+            start()
+
+    def read_packet(self, max_size: int = 65535, wait_ms: int = 20) -> Optional[bytes]:
+        impl = self._impl
+        try:
+            return impl.read_packet(max_size, wait_ms=wait_ms)
+        except TypeError:
+            return impl.read_packet(max_size)
 
     def write_packet(self, packet: bytes) -> None:
         self._impl.write_packet(packet)
@@ -360,6 +393,55 @@ def create_windows_tun(
         force_queue=force_queue,
         prefer_system_capture=prefer_system_capture,
     )
+
+
+# Node Unbound (10.88.0.1) has been silent from this Windows client (website
+# log: Connected + no internet with IPv6 blocked). Public resolvers still leave
+# via dual /1. Do not stamp 10.88.0.1 on the IF unless Unbound actually answers.
+WINDOWS_TUNNEL_DNS_PUBLIC: tuple[str, ...] = ("1.1.1.1", "9.9.9.9")
+
+
+def wintun_attach_dns_servers(*, unbound_ok: bool = False) -> list[str]:
+    """Interface DNS for residual Wintun: Unbound only when it has answered."""
+    if unbound_ok:
+        return ["10.88.0.1"]
+    return list(WINDOWS_TUNNEL_DNS_PUBLIC)
+
+
+def wintun_configure_address_commands(
+    name: str,
+    client_ip: str,
+    dns_servers: list[str],
+) -> tuple[list[str], list[str]]:
+    """Required address cmds vs optional DNS cmds (always ``validate=no``)."""
+    required = [
+        f'netsh interface ip set address name="{name}" '
+        f"static {client_ip} 255.255.255.255",
+        f'netsh interface ipv4 set interface name="{name}" '
+        f"metric=1 dadtransmits=0 weakhostsend=enabled weakhostreceive=enabled",
+        f'netsh interface set interface name="{name}" admin=ENABLED',
+    ]
+    dns_cmds = wintun_dns_commands(name, dns_servers)
+    return required, dns_cmds
+
+
+def wintun_dns_commands(name: str, dns_servers: list[str]) -> list[str]:
+    """Interface DNS cmds (always ``validate=no`` — never probe 10.88.0.1)."""
+    dns_cmds: list[str] = []
+    for i, dns in enumerate(dns_servers, start=1):
+        addr = str(dns or "").strip()
+        if not addr:
+            continue
+        if i == 1:
+            dns_cmds.append(
+                f'netsh interface ip set dns name="{name}" static {addr} validate=no'
+            )
+        else:
+            dns_cmds.append(
+                f'netsh interface ip add dns name="{name}" addr={addr} '
+                f"index={i} validate=no"
+            )
+    return dns_cmds
 
 
 def if_index_from_luid_value(

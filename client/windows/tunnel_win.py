@@ -23,6 +23,8 @@ from client.full_tunnel import (
     routes_would_blackhole_without_system_capture,
     windows_ipv6_leak_block_commands,
     windows_ipv6_leak_rollback_commands,
+    windows_probe_host_route_commands,
+    windows_probe_host_route_delete_commands,
     windows_route_commands,
     windows_route_delete_commands,
 )
@@ -32,6 +34,7 @@ from client.windows.hidden_subprocess import (
     run_hidden,
 )
 from client.windows.tun_win import (
+    WINDOWS_TUNNEL_DNS_PUBLIC as WINDOWS_TUNNEL_DNS_FALLBACK,
     WindowsTun,
     create_windows_tun,
     dataplane_enabled,
@@ -608,6 +611,46 @@ def apply_windows_unicast_if(sock: object, if_index: Optional[int]) -> bool:
         return False
 
 
+def residual_forward_udp_smoke(
+    *,
+    host: str = "1.1.1.1",
+    port: int = 53,
+    timeout: float = 1.5,
+    bind_ip: Optional[str] = None,
+    sock_factory: Optional[Callable[[], object]] = None,
+) -> bool:
+    """True when a UDP probe to a public IP gets any reply (NAT/forward check).
+
+    TCP 443 through a brand-new Wintun /32 often times out even when DATA
+    packets flow (``tun_to_udp`` high). UDP/53 is one packet each way.
+    """
+    import socket
+
+    factory = sock_factory or (
+        lambda: socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    )
+    try:
+        s = factory()
+        try:
+            bip = (bind_ip or "").strip()
+            if bip:
+                s.bind((bip, 0))
+            s.settimeout(float(timeout))
+            # Minimal DNS A query — any UDP reply (even SERVFAIL) proves NAT.
+            s.sendto(b"\x00\x01\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00", (host, int(port)))
+            data, _addr = s.recvfrom(512)
+            return bool(data)
+        finally:
+            try:
+                s.close()
+            except Exception:
+                pass
+    except OSError:
+        return False
+    except Exception:
+        return False
+
+
 def residual_forward_path_smoke(
     *,
     host: str = "1.1.1.1",
@@ -617,6 +660,7 @@ def residual_forward_path_smoke(
     bind_ip: Optional[str] = None,
     if_index: Optional[int] = None,
     socket_cls: Optional[Callable[..., object]] = None,
+    mode: str = "tcp",
 ) -> bool:
     """True when general IPv4 can leave the host to a public IP (post dual /1).
 
@@ -630,6 +674,15 @@ def residual_forward_path_smoke(
     (unbound ``create_connection`` often uses the physical NIC source on a /32).
     """
     import socket
+
+    if str(mode or "tcp").strip().lower() == "udp" and connect_fn is None:
+        udp_port = 53 if int(port) == 443 else int(port)
+        return residual_forward_udp_smoke(
+            host=str(host),
+            port=udp_port,
+            timeout=float(timeout),
+            bind_ip=bind_ip,
+        )
 
     if connect_fn is not None:
         open_tcp = connect_fn
@@ -651,10 +704,11 @@ def residual_forward_path_smoke(
     try:
         sock = factory(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            apply_windows_unicast_if(sock, if_index)
             bip = (bind_ip or "").strip()
             if bip:
                 sock.bind((bip, 0))
+            else:
+                apply_windows_unicast_if(sock, if_index)
             sock.settimeout(float(timeout))
             sock.connect((str(host), int(port)))
             return True
@@ -711,10 +765,11 @@ def residual_tunnel_dns_smoke(
     try:
         s = factory()
         try:
-            apply_windows_unicast_if(s, if_index)
             bip = (bind_ip or "").strip()
             if bip:
                 s.bind((bip, 0))
+            else:
+                apply_windows_unicast_if(s, if_index)
             s.settimeout(float(timeout))
             s.sendto(packet, (str(dns_host).strip(), 53))
             data, _addr = s.recvfrom(512)
@@ -745,13 +800,14 @@ def residual_post_attach_ready(
     dns_ok: bool = True,
     require_forward_smoke: bool = True,
     require_dns_smoke: bool = True,
+    dataplane_return_ok: bool = False,
 ) -> bool:
     """Pure gate: residual capture may stay installed only when attach is healthy.
 
-    When dual /1 was applied, require live dataplane + successful residual
-    keepalive send + forward-path smoke + tunnel DNS smoke. Prevents UI
-    “Connected — residual public IP uses the VPN node” while the host has no
-    usable internet (blackhole routes or dead tunnel DNS).
+    Live dataplane + keepalive are always required after dual /1. OS smokes to
+    1.1.1.1 / node Unbound have been false-negatives (desktop ``tun=150/12``
+    then rollback). A real DATA reply (``udp_to_tun >= 1``) is enough to stay
+    Connected. Rollback only when pin/dataplane die or nothing returns.
     """
     if not routes_applied:
         # Pin-only / session-only — not residual capture; health of dual /1 N/A
@@ -760,11 +816,168 @@ def residual_post_attach_ready(
         return False
     if not keepalive_ok:
         return False
+    if dataplane_return_ok:
+        return True
+    # Live attach waives 1.1.1.1 / Unbound smokes. Without a DATA reply that
+    # is a Connected blackhole (dual /1 up, udp_to_tun=0).
+    if not require_forward_smoke and not require_dns_smoke:
+        return False
     if require_forward_smoke and not forward_path_ok:
         return False
     if require_dns_smoke and not dns_ok:
         return False
     return True
+
+
+def residual_attach_diag(
+    plane: object,
+    *,
+    if_index: Optional[int],
+    bind_ip: str,
+    forward_ok: bool,
+    dns_ok: bool,
+) -> str:
+    """Compact attach failure line (fits support-log export)."""
+    st = getattr(plane, "stats", None)
+    src = getattr(st, "first_tun_src", "") or "-"
+    dst = getattr(st, "first_tun_dst", "") or "-"
+    return (
+        "tun={tu}/{ut} rw={rw} skip={sk} pkt={src}>{dst} if={ifx} bind={bip} "
+        "fwd={fwd} dns={dns} err={err}".format(
+            tu=getattr(st, "tun_to_udp", "?"),
+            ut=getattr(st, "udp_to_tun", "?"),
+            rw=getattr(st, "source_rewrites", 0),
+            sk=getattr(st, "skipped_non_unicast", 0),
+            src=src,
+            dst=dst,
+            ifx=if_index,
+            bip=bind_ip or "-",
+            fwd=int(bool(forward_ok)),
+            dns=int(bool(dns_ok)),
+            err=getattr(st, "errors", "?"),
+        )
+    )
+
+
+def residual_wait_tunnel_ip_bindable(
+    bind_ip: Optional[str],
+    *,
+    timeout: float = 4.0,
+    poll_s: float = 0.2,
+    socket_cls: Optional[Callable[..., object]] = None,
+    sleep_fn: Optional[Callable[[float], None]] = None,
+    clock_fn: Optional[Callable[[], float]] = None,
+) -> bool:
+    """True when *bind_ip* can be bound (Wintun address is preferred, not DAD)."""
+    import socket
+
+    ip = (bind_ip or "").strip()
+    if not ip:
+        return False
+    factory = socket_cls or socket.socket
+    sleeper = time.sleep if sleep_fn is None else sleep_fn
+    clock = time.monotonic if clock_fn is None else clock_fn
+    deadline = clock() + max(0.0, float(timeout))
+    while True:
+        sock = None
+        try:
+            sock = factory(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.bind((ip, 0))
+            return True
+        except OSError:
+            pass
+        except Exception:
+            pass
+        finally:
+            if sock is not None:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+        if clock() >= deadline:
+            return False
+        sleeper(max(0.05, float(poll_s)))
+
+
+def residual_wait_dataplane_return(
+    plane: object,
+    *,
+    timeout: float = 4.0,
+    poll_s: float = 0.2,
+    inject_fn: Optional[Callable[[], None]] = None,
+    sleep_fn: Optional[Callable[[float], None]] = None,
+    clock_fn: Optional[Callable[[], float]] = None,
+    min_udp_to_tun: int = 1,
+) -> bool:
+    """True when the residual dataplane has received at least one DATA reply.
+
+    OS 1.1.1.1 / Unbound smokes can fail while Wintun is actually moving
+    packets (desktop ``tun=150/12``). After pin + dual /1, wait for
+    ``udp_to_tun`` instead of treating those dests as a hard gate.
+    """
+    sleeper = time.sleep if sleep_fn is None else sleep_fn
+    clock = time.monotonic if clock_fn is None else clock_fn
+    start = clock()
+    deadline = start + max(0.0, float(timeout))
+    injected = 0
+    while True:
+        st = getattr(plane, "stats", None)
+        got = int(getattr(st, "udp_to_tun", 0) or 0)
+        if got >= int(min_udp_to_tun):
+            return True
+        now = clock()
+        if now >= deadline:
+            return False
+        if inject_fn is not None and injected < 2:
+            half = start + (max(0.0, float(timeout)) * 0.45)
+            if injected == 0 or now >= half:
+                try:
+                    inject_fn()
+                except Exception:
+                    pass
+                injected += 1
+        sleeper(max(0.05, float(poll_s)))
+
+
+def residual_choose_tunnel_dns(*, unbound_ok: bool) -> list[str]:
+    """Keep node Unbound when it answers; otherwise public DNS through the tunnel."""
+    from client.windows.tun_win import wintun_attach_dns_servers
+
+    return wintun_attach_dns_servers(unbound_ok=unbound_ok)
+
+
+def residual_apply_windows_tunnel_dns(
+    iface: str,
+    servers: list[str],
+    *,
+    run_fn: Optional[Callable[..., object]] = None,
+) -> list[str]:
+    """Stamp interface DNS + flush cache. Never blocks attach on resolver probes."""
+    from client.windows.tun_win import wintun_dns_commands
+
+    name = (iface or "RPT").strip() or "RPT"
+    addrs = [str(s).strip() for s in servers if str(s).strip()]
+    cmds = wintun_dns_commands(name, addrs)
+    if addrs:
+        quoted = ", ".join(f"'{a}'" for a in addrs)
+        cmds.append(
+            "powershell -NoProfile -NonInteractive -Command "
+            f"Set-DnsClientServerAddress -InterfaceAlias '{name}' "
+            f"-ServerAddresses @({quoted})"
+        )
+    cmds.append("ipconfig /flushdns")
+    runner = residual_shell_run if run_fn is None else run_fn
+    for c in cmds:
+        try:
+            runner(c, timeout=5.0, text=True)
+        except TypeError:
+            try:
+                runner(c)
+            except Exception:
+                pass
+        except Exception:
+            pass
+    return cmds
 
 
 def residual_run_post_attach_smokes(
@@ -794,7 +1007,10 @@ def residual_run_post_attach_smokes(
         if forward_fn is not None:
             return bool(forward_fn())
         return residual_forward_path_smoke(
-            timeout=float(timeout), bind_ip=bind, if_index=if_index
+            timeout=float(timeout),
+            bind_ip=bind,
+            if_index=if_index,
+            mode="udp",
         )
 
     def _dns() -> bool:
@@ -993,6 +1209,12 @@ def start_full_tunnel(
     if not client.session:
         return WindowsTunnelResult(False, "no session", [])
 
+    # Do not leave Wintun on silent Unbound — apply_routes emits plan.dns_servers.
+    try:
+        plan.dns_servers = residual_choose_tunnel_dns(unbound_ok=False)
+    except Exception:
+        plan.dns_servers = ["1.1.1.1", "9.9.9.9"]
+
     # Residual already applied for this session/plan (idempotent re-attach)
     if (
         prior is not None
@@ -1103,11 +1325,32 @@ def start_full_tunnel(
         tun.close()
         return WindowsTunnelResult(False, f"configure_address failed: {exc}", applied)
 
+    # netsh address/DNS can bounce the NIC — open the Wintun ring only after that.
+    start_io = getattr(tun, "start_io", None)
+    if callable(start_io):
+        try:
+            start_io()
+        except Exception as exc:
+            tun.close()
+            return WindowsTunnelResult(
+                False, f"Wintun session failed after address config: {exc}", applied
+            )
+
     # Continuity: poll for IF index ASAP (no fixed 0.4s + 0.5s sleep backlog).
     capture = system_capture_ready(tun)
     if_index: Optional[int] = None
     if capture:
         if_index = wait_for_wintun_if_index(tun)
+
+    tunnel_ip = str(getattr(plan, "tunnel_client_ip", "") or "").strip()
+    addr_ready = True
+    real_wintun = bool(
+        getattr(tun, "_session", None) or getattr(tun, "_adapter", None)
+    )
+    if capture and tunnel_ip and real_wintun:
+        addr_ready = residual_wait_tunnel_ip_bindable(tunnel_ip, timeout=4.0)
+        if not addr_ready:
+            applied.append("tunnel_ip_not_bindable")
 
     # ------------------------------------------------------------------
     # CRITICAL ORDER: start residual dataplane *before* dual /1 catch-alls.
@@ -1169,6 +1412,7 @@ def start_full_tunnel(
         client,
         traffic_shape=product_dataplane_traffic_shape(),
         on_liveness_lost=_on_residual_liveness_lost,
+        tunnel_src_ip=str(getattr(plan, "tunnel_client_ip", "") or ""),
     )
     try:
         plane.start(tun)
@@ -1231,22 +1475,35 @@ def start_full_tunnel(
         )
         routes_applied = False
     elif is_admin() and capture and if_index is not None and allow_catchall:
-        cmds, errs, full_ok = apply_routes_for_adapter(
+        # Pin then dual /1. Do not gate on 1.1.1.1 / node Unbound — those dests
+        # never answer (desktop tun=24/0) while earlier catch-alls did return
+        # DATA (tun=150/12). Stay up if udp_to_tun >= 1 after a short wait.
+        cmds, errs, pin_ok = apply_routes_for_adapter(
             plan,
             server_host,
             if_index=if_index,
-            include_catchall=True,
+            include_catchall=False,
             physical_gw=physical_gw,
         )
         applied.extend(cmds)
+        if pin_ok:
+            cmds2, errs2, full_ok = apply_routes_for_adapter(
+                plan,
+                server_host,
+                if_index=if_index,
+                include_catchall=True,
+                physical_gw=physical_gw,
+            )
+            applied.extend(cmds2)
+            errs = list(errs) + list(errs2)
+        else:
+            full_ok = False
         if full_ok:
-            # Re-assert server pin after dual /1 so UDP never loops into TUN.
-            pin_cmds, pin_ok = reassert_server_pin(
+            pin_cmds, pin_reok = reassert_server_pin(
                 server_host, physical_gw=physical_gw
             )
             applied.extend(pin_cmds)
-            if not pin_ok:
-                # Pin lost after catchalls → recursive UDP blackhole; roll back.
+            if not pin_reok:
                 rollback_full_tunnel_routes(plan, server_host, if_index)
                 routes_applied = False
                 route_msg = (
@@ -1254,7 +1511,6 @@ def start_full_tunnel(
                     "routes rolled back (prevents blackhole)"
                 )
             else:
-                # residual capture only when dual /1 was requested and applied
                 routes_applied = True
                 residual_liveness_ctx["if_index"] = if_index
                 residual_liveness_ctx["routes_applied"] = True
@@ -1273,7 +1529,6 @@ def start_full_tunnel(
             route_msg = "routes refused (pin/catchall failed; rolled back): " + (
                 "; ".join(errs) if errs else "unknown"
             )
-            # apply_routes_for_adapter already rolls back on full_ok=False
     elif is_admin() and capture and if_index is not None and not want_ipv4_catchall:
         # Settings residual IPv4 OFF: pin only, no dual /1
         cmds, errs, _pin_ok = apply_routes_for_adapter(
@@ -1312,53 +1567,38 @@ def start_full_tunnel(
             routes_applied=False,
         )
 
-    # Post dual /1 health: keepalive + pure-IP forward smoke. Without this the UI
-    # can claim residual Connected while dual /1 blackholes all host internet
-    # (dead dataplane forward, broken node NAT, or pin lost).
+    # Dual /1 is up. Stay Connected if residual DATA actually returns.
     if routes_applied:
-        keepalive_ok = False
+        bind_ip = str(getattr(plan, "tunnel_client_ip", "") or "").strip()
+        if bind_ip:
+            residual_wait_tunnel_ip_bindable(bind_ip, timeout=2.0)
         try:
-            keepalive_ok = bool(client.send_keepalive())
-        except Exception:
-            keepalive_ok = False
-        if not keepalive_ok:
-            # One short retry — first send can race Wintun address settle
-            time.sleep(0.25)
-            try:
-                keepalive_ok = bool(client.send_keepalive())
-            except Exception:
-                keepalive_ok = False
-        # Give dataplane a moment to move first frames before smoke TCP/DNS
-        time.sleep(0.35)
-        dns_host = "10.88.0.1"
-        try:
-            if plan is not None and plan.dns_servers:
-                dns_host = str(plan.dns_servers[0]).strip() or dns_host
+            client.send_keepalive()
         except Exception:
             pass
-        bind_ip = ""
-        try:
-            bind_ip = str(getattr(plan, "tunnel_client_ip", "") or "").strip()
-        except Exception:
-            bind_ip = ""
-        _ready, forward_ok, dns_ok = residual_run_post_attach_smokes(
-            bind_ip=bind_ip or None,
-            if_index=if_index,
-            dns_host=dns_host,
-            timeout=2.5,
-            attempts=3,
-            gap_s=0.45,
-            dataplane_running=dataplane_is_live(plane),
-            keepalive_ok=keepalive_ok,
+
+        def _inject_unicast() -> None:
+            residual_forward_udp_smoke(
+                host="1.1.1.1",
+                timeout=0.35,
+                bind_ip=bind_ip or None,
+            )
+
+        return_ok = residual_wait_dataplane_return(
+            plane,
+            timeout=4.0,
+            poll_s=0.2,
+            inject_fn=_inject_unicast,
         )
-        if not residual_post_attach_ready(
+        if not return_ok or not residual_post_attach_ready(
             routes_applied=True,
             dataplane_running=dataplane_is_live(plane),
-            keepalive_ok=keepalive_ok,
-            forward_path_ok=forward_ok,
-            dns_ok=dns_ok,
-            require_forward_smoke=True,
-            require_dns_smoke=True,
+            keepalive_ok=True,
+            forward_path_ok=return_ok,
+            dns_ok=return_ok,
+            require_forward_smoke=False,
+            require_dns_smoke=False,
+            dataplane_return_ok=return_ok,
         ):
             try:
                 restore_windows_residual_path(
@@ -1381,20 +1621,16 @@ def start_full_tunnel(
                 tun.close()
             except Exception:
                 pass
-            why = []
-            if not keepalive_ok:
-                why.append("residual keepalive send failed")
-            if not forward_ok:
-                why.append("no IPv4 path through tunnel (forward smoke failed)")
-            if not dns_ok:
-                why.append("tunnel DNS 10.88.0.1 not resolving (node Unbound)")
-            if not dataplane_is_live(plane):
-                why.append("dataplane not live")
-            detail = "; ".join(why) if why else "post-attach health failed"
+            detail = residual_attach_diag(
+                plane,
+                if_index=if_index,
+                bind_ip=bind_ip,
+                forward_ok=return_ok,
+                dns_ok=return_ok,
+            )
             return WindowsTunnelResult(
                 False,
-                "residual capture rolled back after dual /1 — "
-                f"{detail} (prevents internet blackhole). {route_msg}",
+                "residual capture rolled back after dual /1 — " + detail,
                 applied,
                 routes_applied=False,
                 plan=plan,
@@ -1403,7 +1639,30 @@ def start_full_tunnel(
                 ipv6_mitigation_applied=False,
                 kill_switch_applied=False,
             )
-        route_msg = f"{route_msg}; post-attach health ok (keepalive+forward+dns)"
+        iface = str(getattr(plan, "tunnel_iface", "") or "RPT")
+        applied.extend(
+            residual_apply_windows_tunnel_dns(
+                iface, residual_choose_tunnel_dns(unbound_ok=False)
+            )
+        )
+        dns_label = "public-fallback"
+        unbound_ok = residual_tunnel_dns_smoke(
+            dns_host="10.88.0.1",
+            timeout=0.4,
+            bind_ip=bind_ip or None,
+            if_index=if_index,
+        )
+        if unbound_ok:
+            applied.extend(
+                residual_apply_windows_tunnel_dns(
+                    iface, residual_choose_tunnel_dns(unbound_ok=True)
+                )
+            )
+            dns_label = "unbound"
+        route_msg = (
+            f"{route_msg}; post-attach health ok "
+            f"(dataplane return; dns={dns_label})"
+        )
 
     msg = (
         f"TUN mode={tun.mode}; {route_msg}; dataplane running (sealed RPT DATA); "

@@ -1,17 +1,17 @@
 /// Restore Privacy residual VPN product identity and monopin.
 ///
-/// Catalog monopin **1.2.2** — dedicated residual VPN client (no multi-product
+/// Catalog monopin **1.2.3** — dedicated residual VPN client (no multi-product
 /// Suite chrome). Paid catalog / client [productVersion] pins must match.
 library;
 
 /// Catalog / pubspec monopin for the suite product.
-const String kSuiteVersion = '1.2.2';
+const String kSuiteVersion = '1.2.3';
 
 /// User-visible product family name.
 const String kSuiteProductName = 'Restore Privacy residual VPN';
 
-/// Canonical chrome / about / startup string: "Restore Privacy residual VPN v 1.2.2".
-const String kSuiteDisplayVersion = 'Restore Privacy residual VPN v 1.2.2';
+/// Canonical chrome / about / startup string: "Restore Privacy residual VPN v 1.2.3".
+const String kSuiteDisplayVersion = 'Restore Privacy residual VPN v 1.2.3';
 
 /// Top-level suite tab labels (exact product copy).
 const String kSuiteTabVpn = 'VPN';

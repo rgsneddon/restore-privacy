@@ -2085,7 +2085,7 @@ class TunnelClientApp:
 
                 def fail_exc() -> None:
                     self._log(f"Could not connect: {err[:160]}")
-                    self._connection_log(KIND_ERROR, f"Connect failed: {err[:160]}")
+                    self._connection_log(KIND_ERROR, f"Connect failed: {err[:280]}")
                     self._set_status("error", detail=err)
                     self._apply_control(connected=False, busy=False)
 
@@ -2113,10 +2113,24 @@ class TunnelClientApp:
                             f"(IF={getattr(tun_res, 'if_index', '?')}; "
                             f"ipv6_protected={v6};{entry_bit})"
                         )
+                        st = getattr(getattr(tun_res, "dataplane", None), "stats", None)
+                        tun_bit = ""
+                        if st is not None:
+                            tun_bit = (
+                                f" tun={getattr(st, 'tun_to_udp', '?')}/"
+                                f"{getattr(st, 'udp_to_tun', '?')}"
+                                f" skip={getattr(st, 'skipped_non_unicast', 0)}"
+                            )
+                        dns_bit = ""
+                        tmsg = str(getattr(tun_res, "message", "") or "")
+                        if "dns=public-fallback" in tmsg:
+                            dns_bit = " dns=public-fallback"
+                        elif "dns=unbound" in tmsg:
+                            dns_bit = " dns=unbound"
                         self._connection_log(
                             KIND_CONNECT,
                             "Connected — residual public IP uses the VPN node "
-                            f"(ipv6_protected={v6};{entry_bit})",
+                            f"(ipv6_protected={v6};{entry_bit}{tun_bit}{dns_bit})",
                         )
                         # Apply control first so _connected is True, then status+tray
                         self._user_requested_disconnect = False
@@ -2183,7 +2197,7 @@ class TunnelClientApp:
                         err = attach_failure_user_message(original_err)
                         self._log(f"Could not connect: {err[:160]}")
                         self._connection_log(
-                            KIND_ERROR, f"Connect failed: {err[:160]}"
+                            KIND_ERROR, f"Connect failed: {err[:280]}"
                         )
                         self._set_status("error", detail=err)
                         self._apply_control(connected=False, busy=False)

@@ -188,5 +188,117 @@ class TestAndroidEngineSource(unittest.TestCase):
         self.assertNotIn("byteArrayOf(0x52, 0x50, 0x54, 0x32)", svc)  # no magic-only probe
 
 
+class TestRewriteIpv4Source(unittest.TestCase):
+    def test_rewrites_lan_source_to_tunnel_ip(self) -> None:
+        from client.dataplane import ipv4_src_dst, rewrite_ipv4_source
+
+        # Minimal IPv4+UDP: src 192.168.1.183 → dst 1.1.1.1
+        ihl = 20
+        pkt = bytearray(ihl + 8)
+        pkt[0] = 0x45
+        pkt[2] = 0
+        pkt[3] = ihl + 8
+        pkt[8] = 64
+        pkt[9] = 17  # UDP
+        pkt[12:16] = bytes([192, 168, 1, 183])
+        pkt[16:20] = bytes([1, 1, 1, 1])
+        info = ipv4_src_dst(bytes(pkt))
+        self.assertEqual(info, ("192.168.1.183", "1.1.1.1"))
+        out, changed = rewrite_ipv4_source(bytes(pkt), "10.88.0.179")
+        self.assertTrue(changed)
+        self.assertEqual(ipv4_src_dst(out), ("10.88.0.179", "1.1.1.1"))
+        same, changed2 = rewrite_ipv4_source(out, "10.88.0.179")
+        self.assertFalse(changed2)
+        self.assertEqual(same, out)
+
+
+class TestDataplaneBurstDrain(unittest.TestCase):
+    def test_drains_many_tun_packets_without_per_packet_sleep(self) -> None:
+        pair = TestDataPlaneRealSealOpen()
+        session, _ = pair._session_pair()
+        client = RptClient.__new__(RptClient)
+        client.session = session
+        client.endpoint = Endpoint("127.0.0.1", 9)
+        client.state = ConnectState.CONNECTED
+        client._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        client._sock.bind(("127.0.0.1", 0))
+        client._sock.setblocking(False)
+
+        plane = RptDataPlane(client)
+        tun = QueueTun()
+        pkt = bytes([0x45]) + bytes(19)
+        for _ in range(16):
+            tun.inbound.put(pkt)
+        plane.start(tun)
+        import time
+
+        deadline = time.monotonic() + 0.25
+        while time.monotonic() < deadline and plane.stats.tun_to_udp < 16:
+            time.sleep(0.01)
+        self.assertGreaterEqual(
+            plane.stats.tun_to_udp,
+            16,
+            "burst drain must seal a queue of TUN packets without 50ms/pkt sleep",
+        )
+        plane.stop()
+        client._sock.close()
+
+    def test_wintun_idle_sleep_only_when_empty(self) -> None:
+        src = (ROOT / "client" / "dataplane.py").read_text(encoding="utf-8")
+        self.assertIn("DATAPLANE_BURST", src)
+        self.assertIn("udp_n == 0 and tun_n == 0 and fd < 0", src)
+        self.assertNotIn(
+            "# Wintun poll-only: honour idle backoff (was capped at 50ms always).",
+            src,
+        )
+
+
+class TestIpv4SkipForward(unittest.TestCase):
+    def test_skips_igmp_multicast_and_broadcast(self) -> None:
+        from client.dataplane import ipv4_skip_forward
+
+        self.assertTrue(ipv4_skip_forward("224.0.0.22"))
+        self.assertTrue(ipv4_skip_forward("255.255.255.255"))
+        self.assertTrue(ipv4_skip_forward("10.88.0.255"))
+        self.assertFalse(ipv4_skip_forward("1.1.1.1"))
+        self.assertFalse(ipv4_skip_forward("10.88.0.1"))
+        self.assertFalse(ipv4_skip_forward("10.88.0.182"))
+
+    def test_dataplane_does_not_seal_igmp(self) -> None:
+        from client.dataplane import ipv4_src_dst
+
+        pair = TestDataPlaneRealSealOpen()
+        session, _ = pair._session_pair()
+        client = RptClient.__new__(RptClient)
+        client.session = session
+        client.endpoint = Endpoint("127.0.0.1", 9)
+        client.state = ConnectState.CONNECTED
+        client._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        client._sock.bind(("127.0.0.1", 0))
+        client._sock.setblocking(False)
+
+        plane = RptDataPlane(client, tunnel_src_ip="10.88.0.182")
+        tun = QueueTun()
+        igmp = bytearray(28)
+        igmp[0] = 0x45
+        igmp[2] = 0
+        igmp[3] = 28
+        igmp[8] = 1
+        igmp[9] = 2  # IGMP
+        igmp[12:16] = bytes([10, 88, 0, 182])
+        igmp[16:20] = bytes([224, 0, 0, 22])
+        self.assertEqual(ipv4_src_dst(bytes(igmp)), ("10.88.0.182", "224.0.0.22"))
+        tun.inbound.put(bytes(igmp))
+        plane.start(tun)
+        import time
+
+        time.sleep(0.2)
+        self.assertEqual(plane.stats.tun_to_udp, 0)
+        self.assertGreaterEqual(plane.stats.skipped_non_unicast, 1)
+        self.assertEqual(plane.stats.first_tun_dst, "")
+        plane.stop()
+        client._sock.close()
+
+
 if __name__ == "__main__":
     unittest.main()

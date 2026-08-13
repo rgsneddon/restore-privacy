@@ -36,6 +36,9 @@ KEEPALIVE_FAIL_THRESHOLD = 3
 # Idle select/sleep backoff caps (seconds) — no busy spin.
 IDLE_SELECT_MIN_S = 0.05
 IDLE_SELECT_MAX_S = 0.40
+# Packets to drain per turn. Wintun has no select() fd — one packet + sleep
+# capped Windows at ~20 pps (desktop: Connected but zip-slow vs same node).
+DATAPLANE_BURST = 32
 
 
 def residual_keepalive_interval_s(
@@ -78,8 +81,12 @@ def residual_keepalive_under_node_idle(
 
 
 class TunIO(Protocol):
-    def read_packet(self, max_size: int = 65535) -> Optional[bytes]:
-        """Return one IP packet or None if none available."""
+    def read_packet(self, max_size: int = 65535, wait_ms: int = 0) -> Optional[bytes]:
+        """Return one IP packet or None if none available.
+
+        *wait_ms* is honoured by Wintun (WaitForSingleObject). Queue/other
+        backends ignore it and return immediately.
+        """
 
     def write_packet(self, packet: bytes) -> None:
         """Write one decrypted IP packet to the TUN."""
@@ -104,6 +111,106 @@ class DataPlaneStats:
     session_liveness_lost: bool = False
     started: bool = False
     stopped: bool = False
+    first_tun_src: str = ""
+    first_tun_dst: str = ""
+    source_rewrites: int = 0
+    skipped_non_unicast: int = 0
+
+
+def ipv4_src_dst(pkt: bytes) -> tuple[str, str] | None:
+    """Return (src, dst) for an IPv4 packet, or None."""
+    if len(pkt) < 20 or (pkt[0] >> 4) != 4:
+        return None
+    src = f"{pkt[12]}.{pkt[13]}.{pkt[14]}.{pkt[15]}"
+    dst = f"{pkt[16]}.{pkt[17]}.{pkt[18]}.{pkt[19]}"
+    return src, dst
+
+
+def ipv4_skip_forward(dst: str) -> bool:
+    """True for multicast/broadcast dests that must not be sealed as residual DATA.
+
+    Windows sends IGMP to 224.0.0.22 on the Wintun IF; that was recorded as
+    first_tun (desktop: ``pkt=10.88.0.182>224.0.0.22``) and never gets a
+    residual reply.
+    """
+    parts = (dst or "").strip().split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        a, _b, _c, d = (int(p) for p in parts)
+    except ValueError:
+        return False
+    if a < 0 or a > 255 or d < 0 or d > 255:
+        return False
+    return a >= 224 or d == 255
+
+
+def _ip_checksum(data: bytes) -> int:
+    if len(data) % 2:
+        data += b"\x00"
+    total = 0
+    for i in range(0, len(data), 2):
+        total += (data[i] << 8) | data[i + 1]
+    while total >> 16:
+        total = (total & 0xFFFF) + (total >> 16)
+    return (~total) & 0xFFFF
+
+
+def _parse_ipv4(ip: str) -> bytes | None:
+    parts = (ip or "").strip().split(".")
+    if len(parts) != 4:
+        return None
+    try:
+        nums = [int(p) for p in parts]
+    except ValueError:
+        return None
+    if any(n < 0 or n > 255 for n in nums):
+        return None
+    return bytes(nums)
+
+
+def rewrite_ipv4_source(pkt: bytes, new_src: str) -> tuple[bytes, bool]:
+    """Force IPv4 source to *new_src* (tunnel client IP) and fix checksums.
+
+    Windows /32 Wintun often emits packets with the physical NIC source while
+    routing them into the TUN. The node maps replies by dest VPN IP, so those
+    packets get no DATA back (desktop log: tun=23/0).
+    """
+    src_b = _parse_ipv4(new_src)
+    if src_b is None or len(pkt) < 20 or (pkt[0] >> 4) != 4:
+        return pkt, False
+    ihl = (pkt[0] & 0x0F) * 4
+    if ihl < 20 or len(pkt) < ihl:
+        return pkt, False
+    if pkt[12:16] == src_b:
+        return pkt, False
+    out = bytearray(pkt)
+    out[12:16] = src_b
+    out[10] = 0
+    out[11] = 0
+    csum = _ip_checksum(bytes(out[:ihl]))
+    out[10] = (csum >> 8) & 0xFF
+    out[11] = csum & 0xFF
+    proto = int(out[9])
+    if proto == 17 and len(out) >= ihl + 8:
+        # IPv4 UDP checksum may be zero
+        out[ihl + 6] = 0
+        out[ihl + 7] = 0
+    elif proto == 6 and len(out) >= ihl + 18:
+        tcp = bytearray(out[ihl:])
+        tcp[16] = 0
+        tcp[17] = 0
+        plen = len(tcp)
+        if plen % 2:
+            body = bytes(tcp) + b"\x00"
+        else:
+            body = bytes(tcp)
+        ph = bytes(out[12:16]) + bytes(out[16:20]) + bytes([0, 6, (plen >> 8) & 0xFF, plen & 0xFF])
+        tc = _ip_checksum(ph + body)
+        tcp[16] = (tc >> 8) & 0xFF
+        tcp[17] = tc & 0xFF
+        out[ihl:] = tcp
+    return bytes(out), True
 
 
 class RptDataPlane:
@@ -116,11 +223,13 @@ class RptDataPlane:
         traffic_shape: TrafficShapePolicy | None = None,
         on_liveness_lost: Optional[Callable[[], None]] = None,
         keepalive_interval_s: float | None = None,
+        tunnel_src_ip: str | None = None,
     ):
         if not client.session or not client._sock:
             raise RuntimeError("RptDataPlane requires connected RptClient with socket")
         self.client = client
         self.sock: socket.socket = client._sock
+        self._tunnel_src_ip = (tunnel_src_ip or "").strip() or None
         self.traffic_shape = traffic_shape or DEFAULT_TRAFFIC_SHAPE
         # Apply policy to session crypto for pad/cover on seal/open
         if client.session:
@@ -178,6 +287,55 @@ class RptDataPlane:
                 pass
             self._tun = None
 
+    def _handle_udp_datagram(self, tun: TunIO, data: bytes, *, outer_on: bool) -> None:
+        try:
+            inner = maybe_unwrap(data, enabled=outer_on)
+        except Exception:  # noqa: BLE001
+            inner = data
+        if peek_type(inner) == MsgType.NODE_STATUS:
+            try:
+                threading.Thread(
+                    target=lambda frame=data: self.client.process_node_status_frame(
+                        frame
+                    ),
+                    name="rpt-wipe-hop-ns",
+                    daemon=True,
+                ).start()
+            except Exception:  # noqa: BLE001
+                self.stats.errors += 1
+            return
+        plain, is_cover = self.client.open_packet_allow_cover(data)
+        if is_cover:
+            self.stats.cover_recv += 1
+        elif plain:
+            tun.write_packet(plain)
+            self.stats.udp_to_tun += 1
+
+    def _handle_tun_packet(self, sock: socket.socket, pkt: bytes) -> bool:
+        """Seal one TUN packet. True when it was real unicast (not skipped)."""
+        info = ipv4_src_dst(pkt)
+        if info and ipv4_skip_forward(info[1]):
+            self.stats.skipped_non_unicast += 1
+            return False
+        if info and not self.stats.first_tun_src:
+            self.stats.first_tun_src, self.stats.first_tun_dst = info
+        if self._tunnel_src_ip:
+            pkt, changed = rewrite_ipv4_source(pkt, self._tunnel_src_ip)
+            if changed:
+                self.stats.source_rewrites += 1
+        if self.traffic_shape.jitter_ms_max > 0:
+            apply_send_jitter(self.traffic_shape.jitter_ms_max)
+        frame = self.client.seal_packet(pkt)
+        sock.sendto(frame, self.client.endpoint.address)
+        self.stats.tun_to_udp += 1
+        return True
+
+    def _read_tun(self, tun: TunIO, wait_ms: int) -> Optional[bytes]:
+        try:
+            return tun.read_packet(wait_ms=wait_ms)
+        except TypeError:
+            return tun.read_packet()
+
     def _loop(self) -> None:
         tun = self._tun
         assert tun is not None
@@ -190,75 +348,59 @@ class RptDataPlane:
         idle_select_s = IDLE_SELECT_MIN_S
         idle_select_max_s = residual_idle_select_max_s()
         liveness_notified = False
+        try:
+            from client.product_policy import product_outer_obfuscation_enabled
+
+            outer_on = bool(product_outer_obfuscation_enabled())
+        except Exception:  # noqa: BLE001
+            outer_on = bool(product_obfuscation_enabled())
+        burst = int(DATAPLANE_BURST)
         while not self._stop.is_set():
             try:
                 rlist = [sock]
                 fd = tun.fileno()
                 if fd >= 0:
                     rlist.append(fd)
-                readable, _, _ = select.select(rlist, [], [], idle_select_s)
+                    wait = idle_select_s
+                else:
+                    # Wintun: do not park here — select cannot see the ring.
+                    wait = 0.0
+                select.select(rlist, [], [], wait)
             except (ValueError, OSError):
-                readable = []
                 fd = -1
 
-            # UDP -> NODE_STATUS control | unwrap+open DATA -> TUN
-            # (nonblocking only — never steal frames via keepalive recv)
-            try:
-                data, _addr = sock.recvfrom(65535)
+            udp_n = 0
+            while udp_n < burst:
+                try:
+                    data, _addr = sock.recvfrom(65535)
+                except BlockingIOError:
+                    break
+                except OSError:
+                    break
+                except Exception:
+                    self.stats.errors += 1
+                    break
+                udp_n += 1
                 last_activity = time.time()
                 idle_select_s = IDLE_SELECT_MIN_S
                 try:
-                    try:
-                        from client.product_policy import (
-                            product_outer_obfuscation_enabled,
-                        )
+                    self._handle_udp_datagram(tun, data, outer_on=outer_on)
+                except Exception:
+                    self.stats.errors += 1
 
-                        outer_on = bool(product_outer_obfuscation_enabled())
-                    except Exception:  # noqa: BLE001
-                        outer_on = bool(product_obfuscation_enabled())
-                    inner = maybe_unwrap(data, enabled=outer_on)
-                except Exception:  # noqa: BLE001
-                    inner = data
-                if peek_type(inner) == MsgType.NODE_STATUS:
-                    # Drain/ready control — do not treat as sealed DATA
-                    try:
-                        threading.Thread(
-                            target=lambda frame=data: self.client.process_node_status_frame(
-                                frame
-                            ),
-                            name="rpt-wipe-hop-ns",
-                            daemon=True,
-                        ).start()
-                    except Exception:  # noqa: BLE001
-                        self.stats.errors += 1
-                else:
-                    # open_packet_allow_cover unwraps outer obfuscation layer
-                    plain, is_cover = self.client.open_packet_allow_cover(data)
-                    if is_cover:
-                        self.stats.cover_recv += 1
-                    elif plain:
-                        tun.write_packet(plain)
-                        self.stats.udp_to_tun += 1
-            except BlockingIOError:
-                pass
-            except OSError:
-                pass
-            except Exception:
-                self.stats.errors += 1
-
-            # TUN -> seal+wrap -> UDP (real seal_packet on shipped client)
-            try:
-                pkt = tun.read_packet()
-                if pkt:
-                    last_activity = time.time()
-                    idle_select_s = IDLE_SELECT_MIN_S
-                    if self.traffic_shape.jitter_ms_max > 0:
-                        apply_send_jitter(self.traffic_shape.jitter_ms_max)
-                    frame = self.client.seal_packet(pkt)
-                    sock.sendto(frame, self.client.endpoint.address)
-                    self.stats.tun_to_udp += 1
-            except Exception:
-                self.stats.errors += 1
+            tun_n = 0
+            while tun_n < burst:
+                try:
+                    pkt = self._read_tun(tun, 0)
+                    if not pkt:
+                        break
+                    tun_n += 1
+                    if self._handle_tun_packet(sock, pkt):
+                        last_activity = time.time()
+                        idle_select_s = IDLE_SELECT_MIN_S
+                except Exception:
+                    self.stats.errors += 1
+                    break
 
             # Optional cover traffic (dummy sealed frames) — not required for liveness
             now = time.time()
@@ -314,9 +456,17 @@ class RptDataPlane:
                     idle_select_max_s,
                     IDLE_SELECT_MIN_S + min(quiet_s, 2.0) * 0.15,
                 )
-            if fd < 0:
-                # Wintun poll-only: honour idle backoff (was capped at 50ms always).
-                time.sleep(idle_select_s)
+            if udp_n == 0 and tun_n == 0 and fd < 0:
+                # Park only when the Wintun ring and UDP socket were empty.
+                # Sleeping every turn (old path) limited Windows to ~20 pkt/s.
+                parked = self._read_tun(tun, max(1, int(idle_select_s * 1000)))
+                if parked:
+                    try:
+                        if self._handle_tun_packet(sock, parked):
+                            last_activity = time.time()
+                            idle_select_s = IDLE_SELECT_MIN_S
+                    except Exception:
+                        self.stats.errors += 1
 
     def _notify_liveness_lost(self) -> None:
         """Best-effort callback when residual session cannot be kept alive."""
@@ -378,7 +528,7 @@ class QueueTun:
         self.inbound: queue.Queue[bytes] = queue.Queue()  # to be "read" from TUN
         self.outbound: queue.Queue[bytes] = queue.Queue()  # written to TUN
 
-    def read_packet(self, max_size: int = 65535) -> Optional[bytes]:
+    def read_packet(self, max_size: int = 65535, wait_ms: int = 0) -> Optional[bytes]:
         try:
             return self.inbound.get_nowait()
         except Exception:

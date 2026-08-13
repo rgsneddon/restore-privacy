@@ -230,6 +230,31 @@ class TestResidualPostAttachHealth(unittest.TestCase):
                 dns_ok=True,
             )
         )
+        self.assertTrue(
+            residual_post_attach_ready(
+                routes_applied=True,
+                dataplane_running=True,
+                keepalive_ok=True,
+                forward_path_ok=False,
+                dns_ok=False,
+                require_forward_smoke=True,
+                require_dns_smoke=True,
+                dataplane_return_ok=True,
+            )
+        )
+        # Exact start_full_tunnel kwargs: smokes waived, no DATA return → rollback.
+        self.assertFalse(
+            residual_post_attach_ready(
+                routes_applied=True,
+                dataplane_running=True,
+                keepalive_ok=True,
+                forward_path_ok=False,
+                dns_ok=False,
+                require_forward_smoke=False,
+                require_dns_smoke=False,
+                dataplane_return_ok=False,
+            )
+        )
 
     def test_forward_path_smoke_uses_connect(self) -> None:
         from client.windows.tunnel_win import residual_forward_path_smoke
@@ -443,6 +468,64 @@ class TestResidualPostAttachHealth(unittest.TestCase):
         self.assertTrue(fo)
         self.assertFalse(do)
 
+    def test_start_full_tunnel_stamps_public_dns_not_unbound_first(self) -> None:
+        src = (
+            Path(__file__).resolve().parents[1]
+            / "client"
+            / "windows"
+            / "tunnel_win.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("residual_choose_tunnel_dns(unbound_ok=False)", src)
+        self.assertIn("residual_apply_windows_tunnel_dns", src)
+        apply_at = src.find("plan.dns_servers = residual_choose_tunnel_dns(unbound_ok=False)")
+        gate_at = src.find("require_forward_smoke=False")
+        self.assertGreater(apply_at, 0)
+        self.assertGreater(gate_at, apply_at)
+
+    def test_start_full_tunnel_starts_io_after_address(self) -> None:
+        src = (
+            Path(__file__).resolve().parents[1]
+            / "client"
+            / "windows"
+            / "tunnel_win.py"
+        ).read_text(encoding="utf-8")
+        cfg = src.find("tun.configure_address")
+        io = src.find("start_io")
+        self.assertGreater(cfg, 0)
+        self.assertGreater(io, cfg)
+
+    def test_wait_tunnel_ip_bindable_retries(self) -> None:
+        from client.windows.tunnel_win import residual_wait_tunnel_ip_bindable
+
+        n = {"binds": 0}
+
+        class Sock:
+            def bind(self, addr):
+                n["binds"] += 1
+                if n["binds"] < 2:
+                    raise OSError("tentative")
+                self.addr = addr
+
+            def close(self):
+                pass
+
+        self.assertTrue(
+            residual_wait_tunnel_ip_bindable(
+                "10.88.0.175",
+                timeout=2.0,
+                poll_s=0.01,
+                socket_cls=lambda *a, **k: Sock(),
+                sleep_fn=lambda s: None,
+            )
+        )
+        self.assertGreaterEqual(n["binds"], 2)
+        self.assertFalse(
+            residual_wait_tunnel_ip_bindable(
+                "",
+                socket_cls=lambda *a, **k: Sock(),
+            )
+        )
+
     def test_luid_if_index_helper(self) -> None:
         from client.windows.tun_win import if_index_from_luid_value
 
@@ -452,6 +535,159 @@ class TestResidualPostAttachHealth(unittest.TestCase):
         self.assertIsNone(
             if_index_from_luid_value(99, convert=lambda v: (_ for _ in ()).throw(OSError()))
         )
+
+    def test_forward_udp_smoke_any_reply(self) -> None:
+        from client.windows.tunnel_win import residual_forward_udp_smoke
+
+        class UdpSock:
+            def bind(self, addr):
+                self.bound = addr
+
+            def settimeout(self, t):
+                pass
+
+            def sendto(self, data, addr):
+                self.sent = addr
+                return len(data)
+
+            def recvfrom(self, n):
+                return b"\x00\x01\x81\x80", ("1.1.1.1", 53)
+
+            def close(self):
+                pass
+
+        sock = UdpSock()
+        self.assertTrue(
+            residual_forward_udp_smoke(
+                sock_factory=lambda: sock, bind_ip="10.88.0.178"
+            )
+        )
+        self.assertEqual(sock.bound, ("10.88.0.178", 0))
+        self.assertEqual(sock.sent, ("1.1.1.1", 53))
+
+    def test_wintun_dns_cmds_use_validate_no(self) -> None:
+        from client.windows.tun_win import (
+            wintun_configure_address_commands,
+            wintun_dns_commands,
+        )
+
+        req, dns = wintun_configure_address_commands(
+            "RPT", "10.88.0.181", ["10.88.0.1"]
+        )
+        self.assertTrue(any("set address" in c for c in req))
+        self.assertEqual(len(dns), 1)
+        self.assertIn("validate=no", dns[0])
+        self.assertNotIn("add dns", dns[0])
+        fb = wintun_dns_commands("RPT", ["1.1.1.1", "9.9.9.9"])
+        self.assertEqual(len(fb), 2)
+        self.assertIn("static 1.1.1.1", fb[0])
+        self.assertIn("validate=no", fb[0])
+        self.assertIn("addr=9.9.9.9", fb[1])
+
+    def test_choose_tunnel_dns_falls_back_when_unbound_silent(self) -> None:
+        from client.windows.tunnel_win import residual_choose_tunnel_dns
+
+        self.assertEqual(residual_choose_tunnel_dns(unbound_ok=True), ["10.88.0.1"])
+        self.assertEqual(
+            residual_choose_tunnel_dns(unbound_ok=False),
+            ["1.1.1.1", "9.9.9.9"],
+        )
+
+    def test_wintun_attach_dns_defaults_public_not_unbound(self) -> None:
+        from client.windows.tun_win import (
+            wintun_attach_dns_servers,
+            wintun_configure_address_commands,
+        )
+
+        self.assertEqual(wintun_attach_dns_servers(unbound_ok=False), ["1.1.1.1", "9.9.9.9"])
+        _req, dns = wintun_configure_address_commands(
+            "RPT", "10.88.0.194", wintun_attach_dns_servers(unbound_ok=False)
+        )
+        joined = "\n".join(dns)
+        self.assertIn("static 1.1.1.1", joined)
+        self.assertIn("validate=no", joined)
+        self.assertNotIn("10.88.0.1", joined)
+
+    def test_apply_windows_tunnel_dns_stamps_public_and_flushes(self) -> None:
+        from client.windows.tunnel_win import residual_apply_windows_tunnel_dns
+
+        ran: list[str] = []
+        cmds = residual_apply_windows_tunnel_dns(
+            "RPT",
+            ["1.1.1.1", "9.9.9.9"],
+            run_fn=lambda c, **k: ran.append(c),
+        )
+        joined = "\n".join(cmds)
+        self.assertIn("static 1.1.1.1", joined)
+        self.assertIn("validate=no", joined)
+        self.assertIn("Set-DnsClientServerAddress", joined)
+        self.assertIn("ipconfig /flushdns", joined)
+        self.assertEqual(cmds, ran)
+        self.assertNotIn("10.88.0.1", joined)
+
+    def test_wait_dataplane_return_sees_reply(self) -> None:
+        from client.windows.tunnel_win import residual_wait_dataplane_return
+
+        class St:
+            udp_to_tun = 0
+
+        class Plane:
+            stats = St()
+
+        clock = {"t": 0.0}
+        injects: list[int] = []
+
+        def sleeper(s: float) -> None:
+            clock["t"] += float(s)
+            if clock["t"] >= 0.4:
+                St.udp_to_tun = 1
+
+        self.assertTrue(
+            residual_wait_dataplane_return(
+                Plane(),
+                timeout=2.0,
+                poll_s=0.2,
+                inject_fn=lambda: injects.append(1),
+                sleep_fn=sleeper,
+                clock_fn=lambda: clock["t"],
+            )
+        )
+        self.assertGreaterEqual(len(injects), 1)
+
+    def test_wait_dataplane_return_times_out(self) -> None:
+        from client.windows.tunnel_win import residual_wait_dataplane_return
+
+        class Plane:
+            stats = type("S", (), {"udp_to_tun": 0})()
+
+        clock = {"t": 0.0}
+
+        def sleeper(s: float) -> None:
+            clock["t"] += float(s)
+
+        self.assertFalse(
+            residual_wait_dataplane_return(
+                Plane(),
+                timeout=0.5,
+                poll_s=0.2,
+                sleep_fn=sleeper,
+                clock_fn=lambda: clock["t"],
+            )
+        )
+
+    def test_probe_host_routes_are_slash32_not_catchall(self) -> None:
+        from client.full_tunnel import (
+            windows_probe_host_route_commands,
+            windows_probe_host_route_delete_commands,
+        )
+
+        cmds = windows_probe_host_route_commands(48, ["10.88.0.1", "1.1.1.1"])
+        joined = "\n".join(cmds)
+        self.assertIn("1.1.1.1 mask 255.255.255.255 0.0.0.0 IF 48", joined)
+        self.assertIn("10.88.0.1 mask 255.255.255.255 0.0.0.0 IF 48", joined)
+        self.assertNotIn("mask 128.0.0.0", joined)
+        deletes = "\n".join(windows_probe_host_route_delete_commands(["1.1.1.1"]))
+        self.assertIn("route delete 1.1.1.1 mask 255.255.255.255", deletes)
 
     def test_windows_route_cmds_dns_dest_not_arp_gateway(self) -> None:
         from client.full_tunnel import (
