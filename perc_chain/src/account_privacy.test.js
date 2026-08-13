@@ -67,6 +67,40 @@ test('sanitizeLedgerForPublic strips credentials and obfuscates usernames', () =
   assert.equal(sanitized.blocks[0].transactions[0].fromUsername.length, PUBLIC_ALIAS_LENGTH);
 });
 
+test('sanitizeLedgerForPublic rewrites paused Render peer endpoints', () => {
+  const prev = process.env.PERC_PUBLIC_ENDPOINT;
+  process.env.PERC_PUBLIC_ENDPOINT = 'https://135.181.152.10.sslip.io/perc';
+  try {
+    const sanitized = sanitizeLedgerForPublic({
+      accounts: {},
+      blocks: [],
+      networkNodes: {
+        evolve_seed_node: {
+          username: 'evolve_seed_node',
+          endpoint: 'https://evolve-perc-internet.onrender.com',
+          blockHeight: 97,
+          online: true,
+        },
+        wallet_a: {
+          username: 'wallet_a',
+          endpoint: 'https://evolve-perc-internet.onrender.com:9477',
+          blockHeight: 10,
+          online: true,
+        },
+      },
+    });
+    const nodes = Object.values(sanitized.networkNodes);
+    assert.equal(nodes.length, 2);
+    for (const n of nodes) {
+      assert.equal(n.endpoint, 'https://135.181.152.10.sslip.io/perc');
+      assert.ok(!/onrender\.com/i.test(n.endpoint));
+    }
+  } finally {
+    if (prev === undefined) delete process.env.PERC_PUBLIC_ENDPOINT;
+    else process.env.PERC_PUBLIC_ENDPOINT = prev;
+  }
+});
+
 test('sanitizePeerForPublic hides sessionUsername and password fields', () => {
   const peer = sanitizePeerForPublic({
     sessionUsername: 'alice',

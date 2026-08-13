@@ -117,11 +117,23 @@ export function sanitizeLedgerForPublic(ledger) {
   }
 
   if (out.networkNodes && typeof out.networkNodes === 'object') {
+    // Helsinki public seed — never advertise paused Render as a live peer endpoint.
+    const publicSeed = (process.env.PERC_PUBLIC_ENDPOINT ?? '')
+      .trim()
+      .replace(/\/$/, '');
     const nodes = {};
     for (const [key, node] of Object.entries(out.networkNodes)) {
       const alias = aliasUsername(key, aliasFor);
       const clean = node && typeof node === 'object' ? { ...node } : node;
       if (clean?.username != null) clean.username = aliasUsername(clean.username, aliasFor);
+      if (clean && typeof clean === 'object' && clean.endpoint != null) {
+        const ep = String(clean.endpoint);
+        if (/onrender\.com/i.test(ep)) {
+          // Rewrite paused Render peer ads so cold wallets do not probe a 503 host.
+          clean.endpoint = publicSeed || '';
+          if (!publicSeed) clean.online = false;
+        }
+      }
       nodes[alias] = clean;
     }
     out.networkNodes = nodes;
