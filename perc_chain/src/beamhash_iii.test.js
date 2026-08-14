@@ -48,6 +48,8 @@ describe('buildJob', () => {
     assert.equal(job.asset, 'PERC');
     assert.equal(job.personal, 'Beam-PoW');
     assert.equal(job.preWork.length, 64);
+    assert.equal(job.input.length, 64);
+    assert.equal(job.input, job.preWork);
     assert.equal(job.height, 12);
     assert.doesNotMatch(JSON.stringify(job), /"BEAM"/);
   });

@@ -1,17 +1,22 @@
 [Unit]
-Description=Perccent PERC pool (BeamHash III) for mineperc.restoreprivacy.online
-After=network.target
+Description=Perccent PERC mine pool (BeamHash III) on :1466
+After=network-online.target rpt-perc-chain.service
+Wants=rpt-perc-chain.service
 
 [Service]
 Type=simple
 WorkingDirectory=/opt/restore-privacy/perc_chain
+Environment=PERC_NODE_URL=http://127.0.0.1:9478
 Environment=MINEPERC_HTTP_PORT=8011
 Environment=MINEPERC_STRATUM_PORTS=1466
+Environment=PERC_MINE_PORTS=1466
 Environment=PERC_MINE_TLS_KEY=/etc/letsencrypt/live/evolve.restoreprivacy.online/privkey.pem
 Environment=PERC_MINE_TLS_CERT=/etc/letsencrypt/live/evolve.restoreprivacy.online/fullchain.pem
-ExecStart=/usr/bin/node src/mineperc_server.js
-Restart=always
-RestartSec=3
+ExecStart=/usr/bin/node src/mine_pool.js
+Restart=on-failure
+RestartSec=5
+Nice=10
+MemoryMax=200M
 
 [Install]
 WantedBy=multi-user.target

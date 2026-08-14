@@ -8,6 +8,10 @@ import {
   isHiddenPeer,
   listBlocks,
 } from './explorer_api.js';
+import { actionChain } from './action_block.js';
+import { confirmBlock } from './block_confirm.js';
+import { buildExplorerDiagrams } from './explorer_diagrams.js';
+import { rpaiNed } from './rpai_ned.js';
 import { LedgerStore, blockHeight, tipHash } from './ledger_store.js';
 import { regenerateTreasuryIfLow } from './treasury_regeneration.js';
 import {
@@ -39,6 +43,7 @@ import {
   selectTallerLedger,
 } from './dual_seed_sync.js';
 import { normalizeInternetPathname } from './normalize_internet_path.js';
+import { mineJob, mineStatus, mineSubmit } from './mine_api.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -365,6 +370,55 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, sanitizeForPublicExplorer(detail));
   }
 
+  const confirmMatch = url.pathname.match(/^\/api\/confirm\/([^/]+)$/);
+  if (req.method === 'GET' && confirmMatch) {
+    const id = decodeURIComponent(confirmMatch[1]);
+    const result = confirmBlock(id, {
+      ledger: store.hasLedger() ? store.ledger : null,
+      actionBlocks: actionChain.blocks,
+    });
+    return json(res, 200, sanitizeForPublicExplorer(result));
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/diagrams') {
+    const epochId = url.searchParams.get('epoch') || 'current';
+    const payload = buildExplorerDiagrams({
+      ledger: store.hasLedger() ? store.ledger : null,
+      actionBlocks: actionChain.blocks,
+      rpaiStats: rpaiNed.stats(),
+      epochId,
+    });
+    return json(res, 200, sanitizeForPublicExplorer(payload));
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/rpai') {
+    return json(res, 200, sanitizeForPublicExplorer({ ned: rpaiNed.stats() }));
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/rpai/learn') {
+    const data = await readBody(req);
+    const result = rpaiNed.learn(data || {});
+    return json(res, 200, result);
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/action-block') {
+    const data = await readBody(req);
+    const kind = String(data?.kind || 'other');
+    const detail = String(data?.detail || '');
+    const block =
+      kind === 'tab_click'
+        ? actionChain.recordTabClick(detail)
+        : kind === 'keystroke'
+          ? actionChain.recordKeystroke(detail)
+          : actionChain.record(kind, detail);
+    rpaiNed.learn({
+      source: data?.source || 'evolve-wallet',
+      kind,
+      payload: detail,
+    });
+    return json(res, 200, { ok: true, block, confirm: actionChain.confirm(block.id) });
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/blocks') {
     if (!store.hasLedger()) {
       return json(res, 200, { total: 0, offset: 0, limit: 50, blocks: [] });
@@ -634,6 +688,27 @@ const server = http.createServer(async (req, res) => {
     indexLedgerAddresses(store.ledger, addresses);
     await registerSeed();
     return json(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/mine/status') {
+    const ledger = store.hasLedger() ? store.ledger : { blocks: [] };
+    return json(res, 200, mineStatus(ledger));
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/mine/job') {
+    const ledger = store.hasLedger() ? store.ledger : { blocks: [] };
+    return json(res, 200, mineJob(ledger));
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/mine/submit') {
+    const data = await readBody(req);
+    const ledger = store.hasLedger() ? store.ledger : { blocks: [] };
+    const result = mineSubmit(ledger, data || {});
+    if (result.accepted && result.credit) {
+      store.revision = (store.revision || 0) + 1;
+      if (typeof store.save === 'function') store.save();
+    }
+    return json(res, result.accepted ? 200 : 400, result);
   }
 
   if (req.method === 'GET' && url.pathname === '/health') {

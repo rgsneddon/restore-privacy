@@ -298,13 +298,16 @@ export function checkShare({ preWork, nonce, solution }) {
  */
 export function buildJob({ preWork, height = 0, jobId = '1', extraNonce = '00000000' } = {}) {
   const pre = asBytes(preWork ?? defaultPreWork(height), PREWORK_LEN);
+  const input = Buffer.from(pre).toString('hex');
   return {
     algorithm: ALGORITHM,
     coin: COIN,
     asset: 'PERC',
     jobId: String(jobId),
+    id: String(jobId),
     height: Number(height) || 0,
-    preWork: Buffer.from(pre).toString('hex'),
+    input,
+    preWork: input,
     extraNonceHint: extraNonce,
     nonceBytes: NONCE_LEN,
     solutionBytes: SOLUTION_LEN,

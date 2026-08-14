@@ -4,11 +4,23 @@
  */
 import http from 'http';
 import net from 'net';
+import tls from 'tls';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { buildJob, checkShare, defaultPreWork } from './beamhash_iii.js';
 import { applyCredit, creditAcceptedShare } from './perc_pool_credit.js';
+import {
+  extractSolution,
+  isLoginMethod,
+  isSolutionMethod,
+  loginIdentity,
+  loginReply,
+  minerJob,
+  minerTlsFlags,
+  nextNoncePrefix,
+  shareAck,
+} from './stratum_protocol.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_HTTP_PORT = 8011;
@@ -33,6 +45,9 @@ export function percStratumPorts(raw = process.env.MINEPERC_STRATUM_PORTS) {
 let jobSeq = 1;
 let credits = {};
 let height = 0;
+let nonceCounter = 1;
+const issuedJobs = new Map();
+let lastJob = null;
 
 export function poolFacing({
   host = DEFAULT_HOST,
@@ -59,28 +74,40 @@ export function poolFacing({
   };
 }
 
-export function nextJob(ledgerHeight) {
-  height = Number(ledgerHeight ?? height) || 0;
-  return buildJob({
-    preWork: defaultPreWork(height),
-    height,
-    jobId: `perc-${height}-${jobSeq++}`,
+export function seedJob(opts = {}) {
+  const job = buildJob({
+    preWork: opts.preWork ?? defaultPreWork(opts.height ?? height),
+    height: opts.height ?? height,
+    jobId: opts.jobId ?? `perc-${opts.height ?? height}-${jobSeq++}`,
   });
+  issuedJobs.set(String(job.jobId), job);
+  lastJob = job;
+  return job;
 }
 
-export function submitShare({ username, nonce, solution, jobId }) {
-  const job = buildJob({ preWork: defaultPreWork(height), height, jobId });
+export function nextJob(ledgerHeight) {
+  height = Number(ledgerHeight ?? height) || 0;
+  return seedJob({ height, preWork: defaultPreWork(height) });
+}
+
+export function submitShare({ username, nonce, solution, output, jobId, preWork, input }) {
+  const job = (jobId && issuedJobs.get(String(jobId))) || lastJob;
+  const work = input || preWork || job?.input || job?.preWork;
+  const sol = output || solution;
   const checked = checkShare({
-    preWork: job.preWork,
+    preWork: work,
     nonce,
-    solution,
+    solution: sol,
   });
   if (!checked.ok) {
     return { accepted: false, reason: checked.reason, asset: 'PERC' };
   }
-  const credit = creditAcceptedShare({ username, jobId: job.jobId });
+  const credit = creditAcceptedShare({
+    username,
+    jobId: job?.jobId || jobId,
+  });
   credits = applyCredit(credits, credit);
-  return { accepted: true, credit, balances: credits };
+  return { accepted: true, credit, balances: credits, asset: 'PERC' };
 }
 
 export function handleApi(url, method, body) {
@@ -117,52 +144,108 @@ function publicDir() {
   return path.join(__dirname, '..', 'mineperc', 'public');
 }
 
-export function createStratumServer({ port = DEFAULT_STRATUM_PORT } = {}) {
-  const server = net.createServer((sock) => {
-    let buf = '';
-    const send = (obj) => sock.write(`${JSON.stringify(obj)}\n`);
-    send({ jsonrpc: '2.0', method: 'job', params: nextJob() });
-    sock.on('data', (chunk) => {
-      buf += chunk.toString('utf8');
-      let idx;
-      while ((idx = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, idx).trim();
-        buf = buf.slice(idx + 1);
-        if (!line) continue;
-        let msg;
-        try {
-          msg = JSON.parse(line);
-        } catch {
-          send({ id: null, error: 'bad_json', coin: 'PERC' });
-          continue;
-        }
-        const method = msg.method || msg.jsonrpc;
-        if (method === 'login' || method === 'mining.subscribe') {
-          const user = msg.params?.login || msg.params?.user || msg.login || 'anon';
-          send({ id: msg.id ?? 1, result: { status: 'ok', coin: 'PERC', algorithm: 'beamhashIII' } });
-          send({ jsonrpc: '2.0', method: 'job', params: nextJob() });
-          void user;
-        } else if (method === 'submit' || method === 'mining.submit') {
-          const p = msg.params || {};
-          const got = submitShare({
-            username: p.login || p.user || 'anon',
-            nonce: p.nonce,
-            solution: p.solution || p.sol,
-            jobId: p.jobId || p.id,
-          });
-          send({ id: msg.id ?? 1, result: got.accepted, error: got.accepted ? null : got.reason, credit: got.credit });
-        } else {
-          send({ id: msg.id ?? null, result: { coin: 'PERC', algorithm: 'BeamHash III' } });
-        }
+export function attachMiner(sock, { jobFactory } = {}) {
+  let buf = '';
+  let username = 'anon';
+  const send = (obj) => sock.write(`${JSON.stringify(obj)}\n`);
+  const issueJob = () => {
+    const built = jobFactory ? jobFactory() : lastJob || nextJob();
+    if (built && !issuedJobs.has(String(built.jobId || built.id))) {
+      issuedJobs.set(String(built.jobId || built.id), built);
+      lastJob = built;
+    }
+    return minerJob(built);
+  };
+  sock.on('data', (chunk) => {
+    buf += chunk.toString('utf8');
+    let idx;
+    while ((idx = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, idx).trim();
+      buf = buf.slice(idx + 1);
+      if (!line) continue;
+      let msg;
+      try {
+        msg = JSON.parse(line);
+      } catch {
+        send({ id: null, error: 'bad_json', coin: 'PERC' });
+        continue;
       }
-    });
+      const method = msg.method;
+      if (isLoginMethod(method)) {
+        username = loginIdentity(msg) || username;
+        send(loginReply(msg, { nonceprefix: nextNoncePrefix(nonceCounter++) }));
+        send(issueJob());
+        continue;
+      }
+      if (isSolutionMethod(method)) {
+        const sol = extractSolution(msg);
+        const got = submitShare({
+          username,
+          nonce: sol.nonce,
+          output: sol.output,
+          solution: sol.output,
+          jobId: sol.jobId,
+        });
+        send({
+          ...shareAck(msg.id ?? sol.jobId, got.accepted, got.reason),
+          credit: got.credit || undefined,
+        });
+        continue;
+      }
+      send({ id: msg.id ?? null, result: { coin: 'PERC', algorithm: 'BeamHash III' } });
+    }
   });
+}
+
+function loadTlsOptions() {
+  const keyPath = process.env.PERC_MINE_TLS_KEY || process.env.MINEPERC_TLS_KEY || '';
+  const certPath = process.env.PERC_MINE_TLS_CERT || process.env.MINEPERC_TLS_CERT || '';
+  if (!keyPath || !certPath || !fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
+    return null;
+  }
+  return {
+    key: fs.readFileSync(keyPath),
+    cert: fs.readFileSync(certPath),
+    ...minerTlsFlags(),
+  };
+}
+
+export function createStratumServer({
+  port = DEFAULT_STRATUM_PORT,
+  tls: tlsOptions,
+  jobFactory,
+} = {}) {
+  const handler = (sock) => attachMiner(sock, { jobFactory });
+  const useTls = tlsOptions === undefined ? loadTlsOptions() : tlsOptions;
+  const server = useTls ? tls.createServer(useTls, handler) : net.createServer(handler);
   return {
     listen: (cb) => server.listen(port, '0.0.0.0', cb),
     close: () => new Promise((resolve) => server.close(resolve)),
     address: () => server.address(),
     server,
+    tls: Boolean(useTls),
   };
+}
+
+export function startPercMinePool({
+  httpPort = Number(process.env.MINEPERC_HTTP_PORT || DEFAULT_HTTP_PORT),
+  stratumPorts,
+} = {}) {
+  const extra = stratumPorts || percStratumPorts();
+  const httpSrv = createServer({ port: httpPort });
+  httpSrv.listen(() => {
+    console.log(`mineperc perc pool http://127.0.0.1:${httpPort}/  coin=PERC algo=BeamHash III`);
+  });
+  const strata = extra.map((sPort) => {
+    const stratum = createStratumServer({ port: sPort });
+    stratum.listen(() => {
+      console.log(
+        `mineperc stratum ${stratum.tls ? 'tls' : 'tcp'} 0.0.0.0:${sPort} BeamHash III PERC`,
+      );
+    });
+    return stratum;
+  });
+  return { http: httpSrv, strata };
 }
 
 export function createServer({ port = DEFAULT_HTTP_PORT } = {}) {
@@ -208,16 +291,5 @@ export function createServer({ port = DEFAULT_HTTP_PORT } = {}) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const port = Number(process.env.MINEPERC_HTTP_PORT || DEFAULT_HTTP_PORT);
-  const extra = percStratumPorts();
-  const srv = createServer({ port });
-  srv.listen(() => {
-    console.log(`mineperc perc pool http://127.0.0.1:${port}/  coin=PERC algo=BeamHash III`);
-  });
-  for (const sPort of extra) {
-    const stratum = createStratumServer({ port: sPort });
-    stratum.listen(() => {
-      console.log(`mineperc stratum 0.0.0.0:${sPort} BeamHash III PERC`);
-    });
-  }
+  startPercMinePool();
 }
