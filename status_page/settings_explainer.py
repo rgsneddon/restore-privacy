@@ -500,7 +500,8 @@ def corporate_clients_css() -> str:
 .corp-meters-heading {
   margin: 0 0 0.45rem; font-size: 0.78rem; font-weight: 800;
   letter-spacing: 0.05em; line-height: 1.35;
-  color: var(--rb-accent-sky, var(--rb-link));
+  color: #39ff14;
+  text-shadow: 0 0 7px rgba(57,255,20,.75);
 }
 .corp-meter-row { margin: 0 0 0.55rem; }
 .corp-meter-lab {

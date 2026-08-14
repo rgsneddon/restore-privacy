@@ -117,6 +117,8 @@ class TestCorporateClientsBoxRender(unittest.TestCase):
         i_row = html.index('class="corp-meter-row"')
         self.assertLess(i_head, i_row)
         self.assertIn('id="corporate-clients-graphs"', html)
+        heading_css = blob[blob.index(".corp-meters-heading") : blob.index(".corp-meter-row")]
+        self.assertIn("#39ff14", heading_css)
         self.assertIn("#39ff14", blob)
         self.assertIn("max-width: 100%", blob)
         self.assertIn(".corp-meter-pct.is-100", blob)
