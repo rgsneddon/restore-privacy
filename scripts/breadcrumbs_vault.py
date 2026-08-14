@@ -240,6 +240,9 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
         "needs_any_apple_work": bool(macos.get("needs_work") or ios.get("needs_work")),
         "handoff_file": handoff_rel if handoff_path.is_file() else None,
         "checklist": [
+            "Singapore residual catalog: ship sg_node_elgamal.pub; menu DE+SG; "
+            "SG dials 5.223.48.8:44044. Rebuild Windows PE on the Windows machine "
+            "after reading WINDOWS_HANDOFF — do not overwrite Helsinki PE from a Mac.",
             f"BUILT (this build monopin {pin}): Windows setup.exe, Linux tar.gz, "
             f"Android APK as restore-privacy-client-{pin}-* (this host). "
             f"Apple packages not sealed here — Mac rebuild/sign required.",
@@ -264,7 +267,8 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
             "full product map: first-run licence (scroll-to-bottom) → KEYGEN or "
             "continue 72h trial (no username/password/seed); residual VPN-only "
             "shell (no Evolve/%/rpAI/Backup chrome); Quit lower-left disconnect-"
-            "then-exit; tray text exactly Privacy, Restored; residual IS+DE; "
+            "then-exit; tray text exactly Privacy, Restored; residual DE+SG "
+            "(Singapore 5.223.48.8, pin sg_node_elgamal.pub; Germany default); "
             "manual free-DL updates only (no UPDATE_PUSH); then native PE seal + "
             f"upload paid_assets/{pin}/",
             "8. Windows machine OBSERVE (macOS 1.2.0 dual-identity parity): after "
