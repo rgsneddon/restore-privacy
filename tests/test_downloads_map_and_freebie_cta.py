@@ -134,7 +134,9 @@ class TestDownloadsMapPage(unittest.TestCase):
         self.assertNotIn("data-map-product=\"Pens\"", page)
         self.assertIn("is-detected", page)  # windows suite link marked
         self.assertIn(map_platform_version("windows"), page)
-        self.assertIn("1.2.5", page)
+        self.assertIn(map_platform_version("linux"), page)
+        self.assertIn(f"Linux - v{map_platform_version('linux')}", page)
+        self.assertEqual(map_platform_version("linux"), "1.2.6")
 
 
 class TestFooterCopyrightAndMapLink(unittest.TestCase):

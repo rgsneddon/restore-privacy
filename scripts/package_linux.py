@@ -61,6 +61,16 @@ def _resolve_package_version() -> tuple[str, bool, Path, str]:
 
 VERSION, FREE_TIER, OUT, NAME = _resolve_package_version()
 
+# Public residual pins shipped in product/ and secrets/ (never *.priv).
+# Singapore is a live 1.2.6 catalog peer — omitting it makes SG HELLO fail closed.
+LINUX_CATALOG_PUBS: tuple[str, ...] = (
+    "node_elgamal.pub",
+    "de_node_elgamal.pub",
+    "sg_node_elgamal.pub",
+    "exit_node_elgamal.pub",
+    "us_node_elgamal.pub",
+)
+
 # manylinux tags + CPython versions: Ubuntu 20.04–24.04 (3.8–3.12) + Arch/CachyOS 3.13
 _PY_VERSIONS = ("38", "39", "310", "311", "312", "313")
 _PLATFORMS = (
@@ -290,7 +300,7 @@ python -c "import cryptography; print('cryptography', cryptography.__version__, 
 # Secrets (entry + exit pubs for multi-hop residual; never private keys)
 SECRETS_DIR="${HOME}/.restore-privacy/secrets"
 mkdir -p "$SECRETS_DIR"
-for pub in node_elgamal.pub exit_node_elgamal.pub us_node_elgamal.pub; do
+for pub in node_elgamal.pub de_node_elgamal.pub sg_node_elgamal.pub exit_node_elgamal.pub us_node_elgamal.pub; do
   if [[ -f "$ROOT/product/$pub" ]]; then
     cp -f "$ROOT/product/$pub" "$SECRETS_DIR/"
     echo "Installed $pub from product/ to $SECRETS_DIR"
@@ -573,37 +583,12 @@ def main() -> int:
 
         sec = stage / "secrets"
         sec.mkdir(exist_ok=True)
-        # Entry + exit ElGamal pubs (public only) for single-hop / multi-hop residual
-        for name, candidates in (
-            (
-                "node_elgamal.pub",
-                (
-                    ROOT / "product" / "node_elgamal.pub",
-                    ROOT / "secrets" / "node_elgamal.pub",
-                ),
-            ),
-            (
-                "exit_node_elgamal.pub",
-                (
-                    ROOT / "product" / "exit_node_elgamal.pub",
-                    ROOT / "secrets" / "exit_node_elgamal.pub",
-                ),
-            ),
-            (
-                "de_node_elgamal.pub",
-                (
-                    ROOT / "product" / "de_node_elgamal.pub",
-                    ROOT / "secrets" / "de_node_elgamal.pub",
-                ),
-            ),
-            (
-                "us_node_elgamal.pub",
-                (
-                    ROOT / "product" / "us_node_elgamal.pub",
-                    ROOT / "secrets" / "us_node_elgamal.pub",
-                ),
-            ),
-        ):
+        # Live catalog ElGamal pubs (public only) — DE default + SG + exit/heal pins
+        for name in LINUX_CATALOG_PUBS:
+            candidates = (
+                ROOT / "product" / name,
+                ROOT / "secrets" / name,
+            )
             for src in candidates:
                 if src.is_file() and src.stat().st_size >= 32:
                     shutil.copy2(src, sec / name)
@@ -611,7 +596,7 @@ def main() -> int:
         # Also ship product/ tree pubs when present (load_node prefers product/)
         prod = stage / "product"
         prod.mkdir(exist_ok=True)
-        for name in ("node_elgamal.pub", "de_node_elgamal.pub", "exit_node_elgamal.pub", "us_node_elgamal.pub"):
+        for name in LINUX_CATALOG_PUBS:
             src = ROOT / "product" / name
             if src.is_file():
                 shutil.copy2(src, prod / name)

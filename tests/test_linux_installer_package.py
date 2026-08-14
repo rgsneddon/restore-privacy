@@ -51,6 +51,17 @@ class TestPackageLinuxHelpers(unittest.TestCase):
             # Must not require apt install of python3-cryptography as primary path
             self.assertNotIn("apt-get install -y python3-cryptography", text)
 
+    def test_linux_catalog_pubs_include_singapore(self) -> None:
+        self.assertIn("sg_node_elgamal.pub", pl.LINUX_CATALOG_PUBS)
+        self.assertIn("de_node_elgamal.pub", pl.LINUX_CATALOG_PUBS)
+        self.assertNotIn("node_elgamal.priv", pl.LINUX_CATALOG_PUBS)
+        with tempfile.TemporaryDirectory() as td:
+            stage = Path(td)
+            pl.write_install_sh(stage)
+            text = (stage / "install.sh").read_text(encoding="utf-8")
+            self.assertIn("sg_node_elgamal.pub", text)
+            self.assertIn("de_node_elgamal.pub", text)
+
     def test_write_launcher_uses_venv(self):
         with tempfile.TemporaryDirectory() as td:
             stage = Path(td)
@@ -92,11 +103,29 @@ class TestStagedOrRecipePackage(unittest.TestCase):
         self.assertGreater(tgz.stat().st_size, 500_000)
         with tarfile.open(tgz, "r:gz") as tf:
             names = tf.getnames()
-        joined = "\n".join(names)
-        self.assertIn("wheels/", joined)
-        self.assertTrue(any("cryptography-" in n and n.endswith(".whl") for n in names))
-        self.assertTrue(any(n.endswith("install.sh") for n in names))
-        self.assertTrue(any("privacy-restored" in n for n in names))
+            joined = "\n".join(names)
+            self.assertIn("wheels/", joined)
+            self.assertTrue(
+                any("cryptography-" in n and n.endswith(".whl") for n in names)
+            )
+            self.assertTrue(any(n.endswith("install.sh") for n in names))
+            self.assertTrue(any("privacy-restored" in n for n in names))
+            ver_members = [
+                n for n in names if n.replace("\\", "/").endswith("client/VERSION")
+            ]
+            self.assertTrue(ver_members, "client/VERSION missing from tarball")
+            extracted = tf.extractfile(tf.getmember(ver_members[0]))
+            assert extracted is not None
+            self.assertEqual(extracted.read().decode("utf-8").strip(), pl.VERSION)
+            sg_members = [
+                n
+                for n in names
+                if n.replace("\\", "/").endswith("product/sg_node_elgamal.pub")
+            ]
+            self.assertTrue(sg_members, "product/sg_node_elgamal.pub missing")
+            sg_f = tf.extractfile(tf.getmember(sg_members[0]))
+            assert sg_f is not None
+            self.assertEqual(len(sg_f.read()), 256)
 
     def test_package_linux_module_exports_helpers(self):
         self.assertTrue(callable(pl.download_linux_wheels))
