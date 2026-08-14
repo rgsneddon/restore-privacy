@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/internet_node.js",
+    "start:mineperc": "node src/mineperc_server.js",
     "start:internet": "node src/internet_node.js",
     "start:rendezvous": "node src/rendezvous.js",
     "start:chain": "node src/server.js",

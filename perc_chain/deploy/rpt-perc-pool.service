@@ -1,0 +1,14 @@
+[Unit]
+Description=Perccent PERC pool (BeamHash III) for mineperc.restoreprivacy.online
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/restore-privacy/perc_chain
+Environment=MINEPERC_HTTP_PORT=8011
+ExecStart=/usr/bin/node src/mineperc_server.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

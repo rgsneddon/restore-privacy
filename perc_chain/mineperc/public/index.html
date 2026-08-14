@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Perccent PERC pool · BeamHash III</title>
+  <style>
+    :root { --bg:#0b0d14; --panel:#141824; --line:#252b3d; --text:#e8ecf4; --muted:#9aa3b8; --neon:#f8ff14; --cyan:#00e5ff; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Segoe UI,system-ui,sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { max-width:1080px; margin:0 auto; padding:28px 18px 64px; }
+    h1 { font-size:1.7rem; margin:0 0 6px; }
+    .sub { color:var(--muted); margin:0 0 22px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:22px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+    .label { color:var(--muted); font-size:.75rem; letter-spacing:.06em; text-transform:uppercase; }
+    .value { font-size:1.2rem; font-weight:700; margin-top:4px; color:var(--neon); text-shadow:0 0 8px rgba(248,255,20,.45); }
+    a { color:var(--cyan); }
+    code, pre { background:#0b1a2c; padding:.15em .4em; border-radius:6px; color:var(--neon); }
+    pre { padding:12px; overflow:auto; white-space:pre-wrap; }
+    .hint { color:var(--muted); font-size:.88rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Perccent PERC pool</h1>
+    <p class="sub">mineperc.restoreprivacy.online · BeamHash III · Perccent users · not a Beam coin pool</p>
+    <div class="grid">
+      <div class="card"><div class="label">Coin</div><div class="value">PERC</div></div>
+      <div class="card"><div class="label">Algorithm</div><div class="value">BeamHash III</div></div>
+      <div class="card"><div class="label">Stratum</div><div class="value" style="font-size:.95rem">mineperc.restoreprivacy.online:3334</div></div>
+      <div class="card"><div class="label">Worker</div><div class="value" style="font-size:.95rem">PERC_USERNAME.WORKER</div></div>
+    </div>
+    <h2>Connect a miner</h2>
+    <p class="hint">Point any BeamHash III miner at this Perccent pool. Username is your Perccent identity (wallet / evolve username). Payouts are PERC. Do not pass <code>--coin BEAM</code>.</p>
+    <pre>lolMiner --algo BEAM-III --pool mineperc.restoreprivacy.online:3334 --user PERC_USERNAME.WORKER
+miniZ --url mineperc.restoreprivacy.online:3334 --user PERC_USERNAME.WORKER --algo beamhashiii
+gminer --algo beamhashIII --server mineperc.restoreprivacy.online:3334 --user PERC_USERNAME.WORKER</pre>
+    <p class="hint">JSON: <a href="/api/connect">/api/connect</a> · health <a href="/health">/health</a> · explorer <a href="https://evolve.restoreprivacy.online/">evolve.restoreprivacy.online</a></p>
+  </div>
+</body>
+</html>
