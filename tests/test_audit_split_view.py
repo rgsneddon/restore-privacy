@@ -31,6 +31,8 @@ from client.audit_split_view import (  # noqa: E402
     pane_may_auto_update,
     render_split_markup,
     show_audit_split_window,
+    AuditSplitSession,
+    load_project_files_snapshot,
 )
 from client.connection_log import format_export, read_events  # noqa: E402
 
@@ -119,7 +121,7 @@ class TestDeviceVisitLog(unittest.TestCase):
         """Imperative: visiting AUDIT in-client leaves a device log row."""
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / ".rpt_support_log.jsonl"
-            state = show_audit_split_window(
+            sess = show_audit_split_window(
                 None,
                 connection_log_path=path,
                 platform="macos",
@@ -129,8 +131,8 @@ class TestDeviceVisitLog(unittest.TestCase):
             events = read_events(path=path)
             self.assertGreaterEqual(len(events), 1)
             self.assertEqual(events[0].kind, KIND_AUDIT_VISIT)
-            self.assertEqual(state.left_sample.get("audit_visit_count"), 1)
-            self.assertTrue(state.left_sample.get("device_only"))
+            self.assertEqual(sess.state.left_sample.get("audit_visit_count"), 1)
+            self.assertTrue(sess.state.left_sample.get("device_only"))
             export = format_export(path=path)
             self.assertIn("AUDIT.md visit", export)
 
@@ -209,7 +211,63 @@ class TestSplitMarkupAndStats(unittest.TestCase):
         self.assertIn("AUDIT.md", html)
         self.assertNotIn("client_ip", html)
 
-    def test_retention_sentence(self) -> None:
+class TestAuditSplitSessionVisiblePanes(unittest.TestCase):
+    def test_left_poll_does_not_change_right_until_manual_refresh(self) -> None:
+        loads: list[str] = []
+
+        def loader() -> dict:
+            loads.append(f"AUDIT BODY {len(loads) + 1}")
+            return build_project_files_snapshot(
+                audit_text=loads[-1],
+                file_names=["AUDIT.md", f"file-{len(loads)}.txt"],
+                catalog_version="1.2.7",
+            )
+
+        pings = iter(
+            (
+                {"ok": True, "rtt_ms": 10, "host": "de"},
+                {"ok": True, "rtt_ms": 99, "host": "de"},
+            )
+        )
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / ".rpt_support_log.jsonl"
+            sess = AuditSplitSession(
+                connection_log_path=path,
+                platform="linux",
+                ping_probe=lambda: next(pings),
+                project_loader=loader,
+            )
+            sess.open_visit()
+            self.assertIn("dedicated ping: 10 ms", sess.visible_left["ping"])
+            self.assertIn("AUDIT BODY 1", sess.visible_right["excerpt"])
+            self.assertIn("file-1.txt", sess.visible_right["files"])
+            self.assertEqual(len(loads), 1)
+            sess.poll_left()
+            self.assertIn("dedicated ping: 99 ms", sess.visible_left["ping"])
+            self.assertIn("AUDIT BODY 1", sess.visible_right["excerpt"])
+            self.assertEqual(len(loads), 1)
+            sess.refresh_right()
+            self.assertEqual(len(loads), 2)
+            self.assertIn("AUDIT BODY 2", sess.visible_right["excerpt"])
+            self.assertIn("file-2.txt", sess.visible_right["files"])
+            self.assertIn("dedicated ping: 99 ms", sess.visible_left["ping"])
+
+    def test_load_project_files_reads_audit_md(self) -> None:
+        snap = load_project_files_snapshot(repo_root=ROOT, platform="macos")
+        self.assertIn("AUDIT.md", snap["files"])
+        self.assertIn("Restore Privacy", snap["audit_excerpt"])
+
+
+class TestLinuxInterceptsAuditUrl(unittest.TestCase):
+    def test_linux_documents_opens_in_client_split(self) -> None:
+        src = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("is_audit_url", src)
+        self.assertIn("show_audit_split_window", src)
+        self.assertIn('platform="linux"', src)
+        idx = src.index("for link in LEGAL_DOC_LINKS")
+        block = src[idx : idx + 900]
+        self.assertIn("_open_legal_doc", block)
+        self.assertNotIn("webbrowser.open(u)", block)
         self.assertIn("own device", DEVICE_ONLY_RETENTION_SENTENCE)
         self.assertTrue(
             DEVICE_ONLY_RETENTION_SENTENCE.endswith(

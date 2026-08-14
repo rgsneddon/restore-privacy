@@ -16,6 +16,7 @@ never uploads log content.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 from urllib.parse import urlparse
 
@@ -418,6 +419,162 @@ def render_split_markup(state: AuditSplitState) -> str:
 """
 
 
+def paint_left_visible(sample: Mapping[str, Any] | None) -> dict[str, str]:
+    """Strings the left pane actually shows (Tk labels / Flutter text)."""
+    left = dict(sample or {})
+    ping = left.get("ping_ms")
+    ping_txt = f"{ping} ms" if ping is not None else "n/a"
+    return {
+        "label": LEFT_PANE_LABEL,
+        "ping": f"dedicated ping: {ping_txt}",
+        "visits": f"visits on this device: {left.get('audit_visit_count') or 0}",
+        "retention": DEVICE_ONLY_RETENTION_SENTENCE,
+    }
+
+
+def paint_right_visible(snapshot: Mapping[str, Any] | None) -> dict[str, str]:
+    """Strings the right pane actually shows after open / manual refresh."""
+    right = dict(snapshot or {})
+    files = right.get("files") or []
+    excerpt = str(right.get("audit_excerpt") or "")
+    return {
+        "label": RIGHT_PANE_LABEL,
+        "catalog": (
+            f"catalog {right.get('catalog_version') or ''} "
+            f"overall {right.get('catalog_overall') or ''}"
+        ).strip(),
+        "files": "\n".join(str(n) for n in files),
+        "excerpt": excerpt,
+    }
+
+
+def load_project_files_snapshot(
+    *,
+    repo_root: Any = None,
+    catalog_version: str = "",
+    platform: str = "",
+    audit_text: str | None = None,
+) -> dict[str, Any]:
+    """Load the **project** AUDIT.md + file names (no user browsing stats).
+
+    Re-read on every call so an explicit right-pane refresh can change.
+    """
+    root = Path(repo_root) if repo_root is not None else Path(__file__).resolve().parents[1]
+    ver = str(catalog_version or "").strip()
+    if not ver:
+        try:
+            ver = (root / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        except OSError:
+            ver = ""
+    text = audit_text
+    if text is None:
+        text = ""
+        audit_path = root / "AUDIT.md"
+        try:
+            if audit_path.is_file():
+                text = audit_path.read_text(encoding="utf-8")
+        except OSError:
+            text = ""
+    names: list[str] = []
+    for rel in default_project_file_names():
+        p = root / rel
+        if p.is_file() or rel == "AUDIT.md":
+            names.append(rel)
+    rel_dir = root / "releases" / ver if ver else None
+    if rel_dir is not None and rel_dir.is_dir():
+        for p in sorted(rel_dir.iterdir()):
+            if p.is_file() and p.name.startswith("restore-privacy-client-"):
+                names.append(f"releases/{ver}/{p.name}")
+    return build_project_files_snapshot(
+        audit_text=str(text or ""),
+        file_names=names,
+        catalog_overall=catalog_overall_for_installed(
+            [{"platform": platform, "state": "Green"}],
+            [platform] if platform else [],
+        ),
+        catalog_version=ver,
+    )
+
+
+class AuditSplitSession:
+    """Shipped in-client controller: left polls; right reloads only on explicit refresh.
+
+    Windows and Linux Tk windows paint ``visible_left`` / ``visible_right``.
+    Tests drive this class — not a reimplemented policy.
+    """
+
+    LEFT_POLL_MS = 8000
+
+    def __init__(
+        self,
+        *,
+        connection_log_path: Any = None,
+        platform: str = "",
+        ping_probe: Any = None,
+        project_loader: Any = None,
+        events_reader: Any = None,
+    ) -> None:
+        self.connection_log_path = connection_log_path
+        self.platform = str(platform or "")
+        self._ping_probe = ping_probe
+        self._project_loader = project_loader or (
+            lambda: load_project_files_snapshot(platform=self.platform)
+        )
+        self._events_reader = events_reader
+        self.state = AuditSplitState()
+        self.visible_left: dict[str, str] = paint_left_visible({})
+        self.visible_right: dict[str, str] = paint_right_visible({})
+
+    def _read_events(self) -> list[Any]:
+        if self._events_reader is not None:
+            return list(self._events_reader() or [])
+        from client.connection_log import read_events
+
+        return list(read_events(path=self.connection_log_path))
+
+    def _probe_ping(self) -> dict[str, Any]:
+        if self._ping_probe is None:
+            return {}
+        out = self._ping_probe()
+        return dict(out or {}) if isinstance(out, Mapping) else {}
+
+    def open_visit(self) -> AuditSplitState:
+        """Record the device visit, seed both panes (right via project loader)."""
+        ping = self._probe_ping()
+        append_audit_visit_to_device_log(
+            path=self.connection_log_path,
+            platform=self.platform,
+            ping_ms=ping.get("rtt_ms"),
+        )
+        self.poll_left(ping=ping)
+        self.refresh_right()
+        return self.state
+
+    def poll_left(self, ping: Mapping[str, Any] | None = None) -> dict[str, str]:
+        """Dynamic left update — does not reload the right snapshot."""
+        sample = build_user_browsing_stats(
+            self._read_events(),
+            ping if ping is not None else self._probe_ping(),
+            platform=self.platform,
+        )
+        self.state = apply_pane_refresh(
+            self.state, LEFT_PANE_ID, sample, explicit=False
+        )
+        self.visible_left = paint_left_visible(self.state.left_sample)
+        return self.visible_left
+
+    def refresh_right(self) -> dict[str, str]:
+        """Manual right refresh — re-invokes the project loader."""
+        snap = self._project_loader()
+        if not isinstance(snap, Mapping):
+            snap = {}
+        self.state = apply_pane_refresh(
+            self.state, RIGHT_PANE_ID, dict(snap), explicit=True
+        )
+        self.visible_right = paint_right_visible(self.state.right_snapshot)
+        return self.visible_right
+
+
 def show_audit_split_window(
     parent: Any,
     *,
@@ -425,41 +582,38 @@ def show_audit_split_window(
     platform: str = "",
     audit_text: str = "",
     ping: Mapping[str, Any] | None = None,
-) -> AuditSplitState:
+    project_loader: Any = None,
+    ping_probe: Any = None,
+    session: AuditSplitSession | None = None,
+) -> AuditSplitSession:
     """Open the in-client two-pane AUDIT view and **append the visit to device log**.
 
-    Tk window when *parent* is a Tk widget; otherwise still appends the visit
-    and returns the seeded pane state (headless / tests).
+    Tk window when *parent* is a Tk widget: left pane is re-polled; the right
+    pane widgets are rebuilt on **Refresh project files**. Headless (parent is
+    None) still runs :class:`AuditSplitSession` so tests drive the same path.
     """
-    ev = append_audit_visit_to_device_log(
-        path=connection_log_path,
+    probe = ping_probe
+    if probe is None and ping is not None:
+        probe = lambda p=dict(ping): p  # noqa: E731
+    loader = project_loader
+    if loader is None and audit_text:
+        loader = lambda t=audit_text, plat=platform: load_project_files_snapshot(
+            platform=plat, audit_text=t
+        )
+    sess = session or AuditSplitSession(
+        connection_log_path=connection_log_path,
         platform=platform,
-        ping_ms=(ping or {}).get("rtt_ms"),
+        ping_probe=probe,
+        project_loader=loader,
     )
-    try:
-        from client.connection_log import read_events
-
-        events = read_events(path=connection_log_path)
-    except Exception:
-        events = [ev]
-    left = build_user_browsing_stats(events, ping, platform=platform)
-    right = build_project_files_snapshot(
-        audit_text=audit_text,
-        file_names=default_project_file_names(),
-        catalog_overall=catalog_overall_for_installed(
-            [{"platform": platform, "state": "Green"}],
-            [platform] if platform else [],
-        ),
-    )
-    state = apply_pane_refresh(None, LEFT_PANE_ID, left, explicit=True)
-    state = apply_pane_refresh(state, RIGHT_PANE_ID, right, explicit=True)
+    sess.open_visit()
+    if parent is None:
+        return sess
     try:
         import tkinter as tk
         from tkinter import ttk
     except Exception:
-        return state
-    if parent is None:
-        return state
+        return sess
     try:
         win = tk.Toplevel(parent)
         win.title("Most recent audit")
@@ -470,17 +624,14 @@ def show_audit_split_window(
         right_fr = ttk.Frame(pane, padding=12)
         pane.add(left_fr, weight=1)
         pane.add(right_fr, weight=1)
+
         ttk.Label(left_fr, text=LEFT_PANE_LABEL, font=("Segoe UI", 12, "bold")).pack(
             anchor="w"
         )
-        ttk.Label(
-            left_fr,
-            text=f"dedicated ping: {left.get('ping_ms') if left.get('ping_ms') is not None else 'n/a'}",
-        ).pack(anchor="w", pady=(8, 0))
-        ttk.Label(
-            left_fr,
-            text=f"visits on this device: {left.get('audit_visit_count') or 0}",
-        ).pack(anchor="w")
+        left_ping = tk.StringVar(master=win, value=sess.visible_left.get("ping", ""))
+        left_visits = tk.StringVar(master=win, value=sess.visible_left.get("visits", ""))
+        ttk.Label(left_fr, textvariable=left_ping).pack(anchor="w", pady=(8, 0))
+        ttk.Label(left_fr, textvariable=left_visits).pack(anchor="w")
         ttk.Label(
             left_fr,
             text=DEVICE_ONLY_RETENTION_PREFIX,
@@ -492,26 +643,44 @@ def show_audit_split_window(
             text=DEVICE_ONLY_RETENTION_TYPEWRITER,
             font=("Segoe UI", 11, "bold"),
         ).pack(anchor="w")
+
         ttk.Label(right_fr, text=RIGHT_PANE_LABEL, font=("Segoe UI", 12, "bold")).pack(
             anchor="w"
         )
-        for name in default_project_file_names():
-            ttk.Label(right_fr, text=name).pack(anchor="w")
+        right_catalog = tk.StringVar(
+            master=win, value=sess.visible_right.get("catalog", "")
+        )
+        ttk.Label(right_fr, textvariable=right_catalog).pack(anchor="w", pady=(4, 0))
+        right_body = tk.Text(right_fr, height=22, wrap=tk.WORD)
+        right_body.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+
+        def _paint_right() -> None:
+            right_catalog.set(sess.visible_right.get("catalog", ""))
+            right_body.delete("1.0", tk.END)
+            files = sess.visible_right.get("files") or ""
+            excerpt = sess.visible_right.get("excerpt") or ""
+            right_body.insert(tk.END, files + ("\n\n" if files else "") + excerpt)
+
+        def _tick_left() -> None:
+            if not win.winfo_exists():
+                return
+            sess.poll_left()
+            left_ping.set(sess.visible_left.get("ping", ""))
+            left_visits.set(sess.visible_left.get("visits", ""))
+            win.after(AuditSplitSession.LEFT_POLL_MS, _tick_left)
 
         def _manual_right() -> None:
-            nonlocal state
-            nxt = build_project_files_snapshot(
-                audit_text=audit_text,
-                file_names=default_project_file_names(),
-            )
-            state = apply_pane_refresh(state, RIGHT_PANE_ID, nxt, explicit=True)
+            sess.refresh_right()
+            _paint_right()
 
         ttk.Button(
             right_fr, text="Refresh project files", command=_manual_right
         ).pack(anchor="w", pady=(12, 0))
+        _paint_right()
+        win.after(AuditSplitSession.LEFT_POLL_MS, _tick_left)
     except Exception:
-        return state
-    return state
+        return sess
+    return sess
 
 
 def _esc(text: str) -> str:

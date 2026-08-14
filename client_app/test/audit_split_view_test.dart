@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/audit_split_view.dart';
@@ -82,8 +84,8 @@ void main() {
         home: AuditSplitView(
           connectionLog: log,
           platformLabel: 'macos',
-          auditText: '# Restore Privacy — Code & Policy Audit\n',
           leftPoll: const Stream<void>.empty(),
+          fetchAuditText: () async => '# Restore Privacy — Code & Policy Audit\n',
           pingProbe: (host) async => PingResult(
             host: host,
             port: kStatusTcpPort,
@@ -101,5 +103,74 @@ void main() {
     expect(find.text(kLeftPaneLabel), findsOneWidget);
     expect(find.text(kRightPaneLabel), findsOneWidget);
     expect(find.textContaining('own device'), findsOneWidget);
+    expect(find.textContaining('Code & Policy Audit'), findsOneWidget);
+  });
+
+  testWidgets('right pane reloads project snapshot only on explicit refresh',
+      (tester) async {
+    final log = ConnectionLog(MemoryConnectionLogBackend());
+    var loads = 0;
+    final leftTick = StreamController<void>.broadcast();
+    addTearDown(leftTick.close);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuditSplitView(
+          connectionLog: log,
+          platformLabel: 'macos',
+          leftPoll: leftTick.stream,
+          pingProbe: (host) async => PingResult(
+            host: host,
+            port: kStatusTcpPort,
+            ok: true,
+            rttMs: 15.0 + loads,
+          ),
+          projectSnapshotLoader: () async {
+            loads += 1;
+            return buildProjectFilesSnapshot(
+              auditText: 'PROJECT SNAPSHOT $loads',
+              fileNames: ['AUDIT.md', 'snap-$loads.md'],
+              catalogVersion: '1.2.7',
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(loads, 1);
+    expect(find.textContaining('PROJECT SNAPSHOT 1'), findsOneWidget);
+    expect(find.textContaining('snap-1.md'), findsOneWidget);
+    leftTick.add(null);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(loads, 1);
+    expect(find.textContaining('PROJECT SNAPSHOT 1'), findsOneWidget);
+    await tester.tap(find.byKey(kAuditRightRefreshKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(loads, 2);
+    expect(find.textContaining('PROJECT SNAPSHOT 2'), findsOneWidget);
+    expect(find.textContaining('snap-2.md'), findsOneWidget);
+  });
+
+  test('loadProjectAuditSnapshot uses fetchAuditText on each call', () async {
+    var n = 0;
+    final first = await loadProjectAuditSnapshot(
+      platform: 'ios',
+      fetchAuditText: () async {
+        n += 1;
+        return 'PUBLIC AUDIT $n';
+      },
+    );
+    final second = await loadProjectAuditSnapshot(
+      platform: 'ios',
+      fetchAuditText: () async {
+        n += 1;
+        return 'PUBLIC AUDIT $n';
+      },
+    );
+    expect(first['audit_excerpt'], 'PUBLIC AUDIT 1');
+    expect(second['audit_excerpt'], 'PUBLIC AUDIT 2');
+    expect(first['files'], contains('AUDIT.md'));
   });
 }

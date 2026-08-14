@@ -5,10 +5,13 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import 'connection_log.dart';
+import 'legal_links.dart';
 import 'node_ping.dart';
 import 'rpt_config.dart';
 import 'suite_version.dart';
@@ -27,6 +30,15 @@ const String kDeviceOnlyRetentionSentence =
 
 const String kAuditVisitKind = 'audit_visit';
 const String kAuditVisitMessage = 'AUDIT.md visit (device-only log)';
+
+const List<String> kDefaultProjectFileNames = [
+  'AUDIT.md',
+  'README.md',
+  'PRIVACY_POLICY.md',
+  'LICENSE',
+  'CREDITS.md',
+  'client/VERSION',
+];
 
 const Key kAuditSplitViewKey = Key('audit_split_view');
 const Key kAuditLeftPaneKey = Key('audit_left_pane');
@@ -130,6 +142,55 @@ Map<String, dynamic> buildProjectFilesSnapshot({
   };
 }
 
+/// Fetch the public project AUDIT.md (no user stats). Used on first open and
+/// every explicit right-pane refresh so the project half can change.
+Future<String> fetchPublicAuditMarkdown({
+  Uri? uri,
+  Future<String> Function(Uri url)? getText,
+}) async {
+  final target = uri ?? Uri.parse('${LegalDocLink.statusOrigin}/AUDIT.md');
+  if (getText != null) {
+    return getText(target);
+  }
+  final client = HttpClient();
+  try {
+    final req = await client.getUrl(target);
+    req.headers.set(HttpHeaders.userAgentHeader, 'rpt-client-audit-split/1');
+    final resp = await req.close();
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      return '';
+    }
+    return await resp.transform(utf8.decoder).join();
+  } catch (_) {
+    return '';
+  } finally {
+    client.close(force: true);
+  }
+}
+
+/// Load the right-pane project snapshot (AUDIT.md + file names).
+Future<Map<String, dynamic>> loadProjectAuditSnapshot({
+  String platform = '',
+  String catalogVersion = kSuiteVersion,
+  Future<String> Function()? fetchAuditText,
+  List<String>? fileNames,
+}) async {
+  final text = fetchAuditText != null
+      ? await fetchAuditText()
+      : await fetchPublicAuditMarkdown();
+  return buildProjectFilesSnapshot(
+    auditText: text,
+    fileNames: fileNames ?? kDefaultProjectFileNames,
+    catalogVersion: catalogVersion,
+    catalogOverall: catalogOverallForInstalled(
+      [
+        {'platform': platform, 'state': 'Green'},
+      ],
+      platform.isEmpty ? const <String>[] : [platform],
+    ),
+  );
+}
+
 /// Imperative: record this AUDIT visit on the **device** connection log.
 Future<ConnectionLogEvent> appendAuditVisitToDeviceLog(
   ConnectionLog log, {
@@ -154,16 +215,11 @@ class AuditSplitView extends StatefulWidget {
     this.platformLabel = 'flutter',
     this.multihopOn = false,
     this.auditText = '',
-    this.fileNames = const [
-      'AUDIT.md',
-      'README.md',
-      'PRIVACY_POLICY.md',
-      'LICENSE',
-      'CREDITS.md',
-      'client/VERSION',
-    ],
+    this.fileNames = kDefaultProjectFileNames,
     this.leftPoll,
     this.pingProbe,
+    this.projectSnapshotLoader,
+    this.fetchAuditText,
   });
 
   final ConnectionLog connectionLog;
@@ -175,6 +231,10 @@ class AuditSplitView extends StatefulWidget {
   /// Injected ticker for tests (left-pane dynamic refresh).
   final Stream<void>? leftPoll;
   final Future<PingResult> Function(String host)? pingProbe;
+
+  /// Right pane: called on first open and every explicit refresh.
+  final Future<Map<String, dynamic>> Function()? projectSnapshotLoader;
+  final Future<String> Function()? fetchAuditText;
 
   @override
   State<AuditSplitView> createState() => _AuditSplitViewState();
@@ -221,7 +281,7 @@ class _AuditSplitViewState extends State<AuditSplitView> {
       pingMs: ping.rttMs,
     );
     await _refreshLeft(ping: ping);
-    _refreshRight();
+    await _refreshRight();
   }
 
   Future<PingResult> _probe() async {
@@ -252,19 +312,21 @@ class _AuditSplitViewState extends State<AuditSplitView> {
     });
   }
 
-  void _refreshRight() {
-    final overall = catalogOverallForInstalled(
-      [
-        {'platform': widget.platformLabel, 'state': 'Green'},
-      ],
-      [widget.platformLabel],
-    );
-    final snap = buildProjectFilesSnapshot(
-      auditText: widget.auditText,
-      fileNames: widget.fileNames,
-      catalogOverall: overall,
-      catalogVersion: kSuiteVersion,
-    );
+  Future<void> _refreshRight() async {
+    final loader = widget.projectSnapshotLoader;
+    final Map<String, dynamic> snap;
+    if (loader != null) {
+      snap = await loader();
+    } else {
+      snap = await loadProjectAuditSnapshot(
+        platform: widget.platformLabel,
+        catalogVersion: kSuiteVersion,
+        fetchAuditText: widget.fetchAuditText ??
+            (widget.auditText.isEmpty ? null : () async => widget.auditText),
+        fileNames: widget.fileNames,
+      );
+    }
+    if (!mounted) return;
     setState(() {
       _state = applyPaneRefresh(_state, kRightPaneId, snap, explicit: true);
     });

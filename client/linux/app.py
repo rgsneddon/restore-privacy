@@ -1144,14 +1144,32 @@ class TunnelClientApp:
             fg=PRIMARY_DARK,
             font=("DejaVu Sans", 10, "bold"),
         ).pack(anchor="w", pady=(6, 2))
+        def _open_legal_doc(url: str, title: str) -> None:
+            try:
+                from client.audit_split_view import (
+                    is_audit_url,
+                    show_audit_split_window,
+                )
+                from client.connection_log import default_log_path
+
+                if is_audit_url(url):
+                    show_audit_split_window(
+                        self.root,
+                        connection_log_path=default_log_path(),
+                        platform="linux",
+                    )
+                    self._log("AUDIT visit recorded on this device (not uploaded).")
+                    return
+            except Exception as exc:
+                self._log(f"In-client audit view unavailable ({exc}); opening in browser.")
+            webbrowser.open(url)
+            self._log(f"Opened {title}")
+
         for link in LEGAL_DOC_LINKS:
             tk.Button(
                 frm,
                 text=link.label,
-                command=lambda u=link.url, t=link.label: (
-                    webbrowser.open(u),
-                    self._log(f"Opened {t}"),
-                ),
+                command=lambda u=link.url, t=link.label: _open_legal_doc(u, t),
                 bg=CHROME_BG,
                 fg=PRIMARY_DARK,
                 relief=tk.FLAT,
