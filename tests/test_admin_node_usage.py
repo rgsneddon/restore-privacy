@@ -420,6 +420,7 @@ class TestInstallScriptDefaults(unittest.TestCase):
         self.assertIn("unlimited-class", text)
         self.assertIn("200000000", text)
         self.assertIn("178.105.187.178) PEER_CODE=DE", text)
+        self.assertIn("5.223.48.8) PEER_CODE=SG", text)
         # IS is not pinned to flat 100 Mbps default
         self.assertNotIn("IS|RO)\n    DEFAULT_MAX=256\n    DEFAULT_BW=100000000", text)
 

@@ -53,7 +53,8 @@ fi
 #   DE: unlimited-class bandwidth (30 TB class), session soft max 1024
 #       (dedicated 8 vCPU / 32 GB residual host)
 #   US: 200 Mbps fixed budget, session soft max 512
-# Override with RPT_NODE_PEER_CODE=IS|DE|US|RO, RPT_NODE_MAX_SESSIONS, RPT_NODE_BANDWIDTH_CAP_BPS.
+#   SG: unlimited-class bandwidth, session soft max 256
+# Override with RPT_NODE_PEER_CODE=IS|DE|US|RO|SG, RPT_NODE_MAX_SESSIONS, RPT_NODE_BANDWIDTH_CAP_BPS.
 PEER_CODE="${RPT_NODE_PEER_CODE:-${RPT_PEER_CODE:-}}"
 if [[ -z "$PEER_CODE" ]]; then
   # Best-effort: match primary IPv4 to catalog residual hosts
@@ -63,6 +64,7 @@ if [[ -z "$PEER_CODE" ]]; then
     178.105.187.178) PEER_CODE=DE ;;
     185.146.232.107) PEER_CODE=RO ;;
     5.161.242.85) PEER_CODE=US ;;
+    5.223.48.8) PEER_CODE=SG ;;
   esac
 fi
 PEER_CODE="$(echo "${PEER_CODE}" | tr '[:lower:]' '[:upper:]')"
@@ -80,6 +82,10 @@ case "${PEER_CODE}" in
     DEFAULT_BW=""  # unlimited-class (30 TB entitlement; extendable at cost)
     ;;
   RO)
+    DEFAULT_MAX=256
+    DEFAULT_BW=""  # unlimited-class (extendable at cost)
+    ;;
+  SG)
     DEFAULT_MAX=256
     DEFAULT_BW=""  # unlimited-class (extendable at cost)
     ;;
