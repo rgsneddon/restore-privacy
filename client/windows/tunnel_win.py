@@ -78,6 +78,20 @@ def is_admin() -> bool:
 LEGACY_ADAPTER_SETTLE_TOTAL_SEC = 0.9  # historical fixed 0.4s + 0.5s
 DEFAULT_ADAPTER_SETTLE_MAX_SEC = LEGACY_ADAPTER_SETTLE_TOTAL_SEC
 DEFAULT_ADAPTER_SETTLE_POLL_SEC = 0.05
+# Connect was 30–40s after HELLO because every netsh/route/PS used 30–45s
+# timeouts and ran twice. Fail-fast; commands that work return in <2s.
+RESIDUAL_ROUTE_CMD_TIMEOUT_S = 8.0
+RESIDUAL_IPV6_CMD_TIMEOUT_S = 8.0
+
+
+def residual_route_cmd_timeout_s() -> float:
+    """Bounded timeout for route add / pin / catch-all shell commands."""
+    return float(RESIDUAL_ROUTE_CMD_TIMEOUT_S)
+
+
+def residual_ipv6_cmd_timeout_s() -> float:
+    """Bounded timeout for IPv6 leak-mitigation shell commands."""
+    return float(RESIDUAL_IPV6_CMD_TIMEOUT_S)
 
 
 def adapter_settle_budget(
@@ -215,7 +229,7 @@ def _run_cmds(cmds: list[str]) -> tuple[list[str], list[str]]:
         if "PHYSICAL_GW" in cmd:
             errors.append("physical gateway not substituted")
             continue
-        r = residual_shell_run(cmd, timeout=30.0, text=True)
+        r = residual_shell_run(cmd, timeout=residual_route_cmd_timeout_s(), text=True)
         applied.append(cmd)
         if not _route_cmd_succeeded(
             r.returncode, r.stderr or "", r.stdout or ""
@@ -289,7 +303,7 @@ def apply_routes_for_adapter(
             # Do not run this or further catch-alls
             continue
 
-        r = residual_shell_run(cmd, timeout=30.0, text=True)
+        r = residual_shell_run(cmd, timeout=residual_route_cmd_timeout_s(), text=True)
         applied.append(cmd)
         ok = _route_cmd_succeeded(r.returncode, r.stderr or "", r.stdout or "")
         if not ok:
@@ -1104,7 +1118,7 @@ def reassert_server_pin(
     if not gw or not (server_host or "").strip():
         return [], False
     cmd = reassert_server_pin_command(server_host, gw)
-    r = residual_shell_run(cmd, timeout=30.0, text=True)
+    r = residual_shell_run(cmd, timeout=residual_route_cmd_timeout_s(), text=True)
     ok = _route_cmd_succeeded(r.returncode, r.stderr or "", r.stdout or "")
     return [cmd], bool(ok)
 
@@ -1148,11 +1162,19 @@ def apply_ipv6_leak_mitigation(plan: FullTunnelPlan) -> tuple[list[str], bool]:
     )
     successful: list[str] = []
     critical_ok = False
-    for cmd in cmds:
-        r = residual_shell_run(cmd, timeout=45.0, text=True)
-        is_critical = cmd.strip() == critical_ps.strip() or (
+    crit = critical_ps.strip()
+    # Critical Disable-NetAdapterBinding first (quality). Teredo/6to4/isatap
+    # are best-effort and must not add 30s+ after HELLO.
+    ordered = [c for c in cmds if c.strip() == crit or (
+        "Disable-NetAdapterBinding" in c and "RPT_IPV6_DISABLED" in c
+    )]
+    ordered.extend(c for c in cmds if c not in ordered)
+    for cmd in ordered:
+        is_critical = cmd.strip() == crit or (
             "Disable-NetAdapterBinding" in cmd and "RPT_IPV6_DISABLED" in cmd
         )
+        budget = residual_ipv6_cmd_timeout_s() if is_critical else 2.0
+        r = residual_shell_run(cmd, timeout=budget, text=True)
         if is_critical:
             ok, _count = parse_windows_ipv6_disable_result(
                 r.returncode, r.stdout or "", r.stderr or ""
@@ -1174,7 +1196,7 @@ def rollback_ipv6_leak_mitigation(plan: Optional[FullTunnelPlan] = None) -> list
     cmds = windows_ipv6_leak_rollback_commands(tunnel_iface=iface)
     successful: list[str] = []
     for cmd in cmds:
-        r = residual_shell_run(cmd, timeout=45.0, text=True)
+        r = residual_shell_run(cmd, timeout=residual_ipv6_cmd_timeout_s(), text=True)
         if _cmd_exit_ok(r.returncode, r.stderr or "", r.stdout or ""):
             successful.append(cmd)
     return successful
@@ -1270,13 +1292,20 @@ def start_full_tunnel(
             server_host=server_host,
         )
 
-    # Best-effort: scoped Defender Firewall allows for residual UDP + product exe
-    # (does not enable kill-switch; safe Allow rules only).
+    # Best-effort Defender allows. HELLO already proved residual UDP; do not
+    # block Connected on Get-NetFirewallRule (often 10–30s). Run off-thread.
     if is_admin():
         try:
+            import threading
+
             from client.windows.firewall_allow import apply_windows_fw_allows
 
-            apply_windows_fw_allows(server_host=server_host)
+            threading.Thread(
+                target=apply_windows_fw_allows,
+                kwargs={"server_host": server_host, "timeout": 8.0},
+                name="rpt-fw-allow",
+                daemon=True,
+            ).start()
         except Exception:
             pass
 
@@ -1348,7 +1377,7 @@ def start_full_tunnel(
         getattr(tun, "_session", None) or getattr(tun, "_adapter", None)
     )
     if capture and tunnel_ip and real_wintun:
-        addr_ready = residual_wait_tunnel_ip_bindable(tunnel_ip, timeout=4.0)
+        addr_ready = residual_wait_tunnel_ip_bindable(tunnel_ip, timeout=2.0)
         if not addr_ready:
             applied.append("tunnel_ip_not_bindable")
 
@@ -1475,29 +1504,17 @@ def start_full_tunnel(
         )
         routes_applied = False
     elif is_admin() and capture and if_index is not None and allow_catchall:
-        # Pin then dual /1. Do not gate on 1.1.1.1 / node Unbound — those dests
-        # never answer (desktop tun=24/0) while earlier catch-alls did return
-        # DATA (tun=150/12). Stay up if udp_to_tun >= 1 after a short wait.
-        cmds, errs, pin_ok = apply_routes_for_adapter(
+        # One pass: pin then dual /1 inside apply_routes_for_adapter.
+        # A second pin-only pass re-ran netsh address/DNS and padded Connect.
+        # Stay up if udp_to_tun >= 1 after a short wait — not 1.1.1.1/Unbound OS smokes.
+        cmds, errs, full_ok = apply_routes_for_adapter(
             plan,
             server_host,
             if_index=if_index,
-            include_catchall=False,
+            include_catchall=True,
             physical_gw=physical_gw,
         )
         applied.extend(cmds)
-        if pin_ok:
-            cmds2, errs2, full_ok = apply_routes_for_adapter(
-                plan,
-                server_host,
-                if_index=if_index,
-                include_catchall=True,
-                physical_gw=physical_gw,
-            )
-            applied.extend(cmds2)
-            errs = list(errs) + list(errs2)
-        else:
-            full_ok = False
         if full_ok:
             pin_cmds, pin_reok = reassert_server_pin(
                 server_host, physical_gw=physical_gw
@@ -1570,7 +1587,7 @@ def start_full_tunnel(
     # Dual /1 is up. Stay Connected if residual DATA actually returns.
     if routes_applied:
         bind_ip = str(getattr(plan, "tunnel_client_ip", "") or "").strip()
-        if bind_ip:
+        if bind_ip and not addr_ready:
             residual_wait_tunnel_ip_bindable(bind_ip, timeout=2.0)
         try:
             client.send_keepalive()
@@ -1586,8 +1603,8 @@ def start_full_tunnel(
 
         return_ok = residual_wait_dataplane_return(
             plane,
-            timeout=4.0,
-            poll_s=0.2,
+            timeout=2.5,
+            poll_s=0.15,
             inject_fn=_inject_unicast,
         )
         if not return_ok or not residual_post_attach_ready(
@@ -1640,25 +1657,20 @@ def start_full_tunnel(
                 kill_switch_applied=False,
             )
         iface = str(getattr(plan, "tunnel_iface", "") or "RPT")
-        applied.extend(
-            residual_apply_windows_tunnel_dns(
-                iface, residual_choose_tunnel_dns(unbound_ok=False)
-            )
-        )
-        dns_label = "public-fallback"
+        # Public DNS is already on the IF (configure_address + apply_routes).
+        # Probe Unbound briefly; stamp once with the winner — not public then Unbound.
         unbound_ok = residual_tunnel_dns_smoke(
             dns_host="10.88.0.1",
             timeout=0.4,
             bind_ip=bind_ip or None,
             if_index=if_index,
         )
-        if unbound_ok:
-            applied.extend(
-                residual_apply_windows_tunnel_dns(
-                    iface, residual_choose_tunnel_dns(unbound_ok=True)
-                )
+        applied.extend(
+            residual_apply_windows_tunnel_dns(
+                iface, residual_choose_tunnel_dns(unbound_ok=unbound_ok)
             )
-            dns_label = "unbound"
+        )
+        dns_label = "unbound" if unbound_ok else "public-fallback"
         route_msg = (
             f"{route_msg}; post-attach health ok "
             f"(dataplane return; dns={dns_label})"

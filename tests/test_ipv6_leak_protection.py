@@ -151,7 +151,7 @@ class TestWindowsResultIpv6Flag(unittest.TestCase):
 
         plan = FullTunnelPlan(tunnel_iface="RPT", tunnel_client_ip="10.88.0.2")
 
-        def fake_run(cmd, shell=True, capture_output=True, text=True):
+        def fake_run(cmd, timeout=8.0, text=True):
             r = mock.Mock()
             if "Disable-NetAdapterBinding" in str(cmd):
                 r.returncode = 1
@@ -163,7 +163,7 @@ class TestWindowsResultIpv6Flag(unittest.TestCase):
                 r.stdout = ""
             return r
 
-        with mock.patch("client.windows.tunnel_win.subprocess.run", side_effect=fake_run):
+        with mock.patch("client.windows.tunnel_win.residual_shell_run", side_effect=fake_run):
             applied, ok = tw.apply_ipv6_leak_mitigation(plan)
         self.assertFalse(ok)
         self.assertFalse(any("Disable-NetAdapterBinding" in c for c in applied))
@@ -177,7 +177,7 @@ class TestWindowsResultIpv6Flag(unittest.TestCase):
 
         plan = FullTunnelPlan(tunnel_iface="RPT", tunnel_client_ip="10.88.0.2")
 
-        def fake_run(cmd, shell=True, capture_output=True, text=True):
+        def fake_run(cmd, timeout=8.0, text=True):
             r = mock.Mock()
             r.returncode = 0
             r.stderr = ""
@@ -188,7 +188,7 @@ class TestWindowsResultIpv6Flag(unittest.TestCase):
                 r.stdout = ""
             return r
 
-        with mock.patch("client.windows.tunnel_win.subprocess.run", side_effect=fake_run):
+        with mock.patch("client.windows.tunnel_win.residual_shell_run", side_effect=fake_run):
             applied, ok = tw.apply_ipv6_leak_mitigation(plan)
         self.assertFalse(ok, "zero-effect must not set mitigation_ok")
         self.assertFalse(any("Disable-NetAdapterBinding" in c for c in applied))
@@ -201,7 +201,7 @@ class TestWindowsResultIpv6Flag(unittest.TestCase):
 
         plan = FullTunnelPlan(tunnel_iface="RPT", tunnel_client_ip="10.88.0.2")
 
-        def fake_run(cmd, shell=True, capture_output=True, text=True):
+        def fake_run(cmd, timeout=8.0, text=True):
             r = mock.Mock()
             r.returncode = 0
             r.stderr = ""
@@ -211,7 +211,7 @@ class TestWindowsResultIpv6Flag(unittest.TestCase):
                 r.stdout = ""
             return r
 
-        with mock.patch("client.windows.tunnel_win.subprocess.run", side_effect=fake_run):
+        with mock.patch("client.windows.tunnel_win.residual_shell_run", side_effect=fake_run):
             applied, ok = tw.apply_ipv6_leak_mitigation(plan)
         self.assertTrue(ok)
         self.assertTrue(any("Disable-NetAdapterBinding" in c for c in applied))

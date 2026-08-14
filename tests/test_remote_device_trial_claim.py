@@ -482,6 +482,44 @@ class TestResidualPostAttachHealth(unittest.TestCase):
         self.assertGreater(apply_at, 0)
         self.assertGreater(gate_at, apply_at)
 
+    def test_attach_shell_timeouts_fail_fast(self) -> None:
+        from client.windows.tunnel_win import (
+            residual_ipv6_cmd_timeout_s,
+            residual_route_cmd_timeout_s,
+        )
+
+        self.assertLessEqual(residual_route_cmd_timeout_s(), 8.0)
+        self.assertLessEqual(residual_ipv6_cmd_timeout_s(), 8.0)
+
+    def test_start_full_tunnel_single_catchall_pass(self) -> None:
+        src = (
+            Path(__file__).resolve().parents[1]
+            / "client"
+            / "windows"
+            / "tunnel_win.py"
+        ).read_text(encoding="utf-8")
+        body = src[src.find("def start_full_tunnel") :]
+        # Dual /1 success path is one apply_routes pass (pin+catchall inside).
+        self.assertIn("include_catchall=True", body)
+        self.assertNotIn(
+            "if pin_ok:\n            cmds2, errs2, full_ok = apply_routes_for_adapter",
+            body,
+        )
+
+    def test_start_full_tunnel_stamps_dns_once_after_unbound_probe(self) -> None:
+        src = (
+            Path(__file__).resolve().parents[1]
+            / "client"
+            / "windows"
+            / "tunnel_win.py"
+        ).read_text(encoding="utf-8")
+        body = src[src.find("def start_full_tunnel") :]
+        probe = body.find('residual_tunnel_dns_smoke(')
+        stamp = body.find("residual_apply_windows_tunnel_dns(")
+        self.assertGreater(probe, 0)
+        self.assertGreater(stamp, probe)
+        self.assertEqual(body.count("residual_apply_windows_tunnel_dns("), 1)
+
     def test_start_full_tunnel_starts_io_after_address(self) -> None:
         src = (
             Path(__file__).resolve().parents[1]
