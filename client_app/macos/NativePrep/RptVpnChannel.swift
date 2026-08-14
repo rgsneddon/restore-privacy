@@ -1330,6 +1330,10 @@ enum RptVpnChannel {
   /// True when startTunnel failure looks like a stale provider designated requirement
   /// / signing identity (safe to remove + re-register once). Ordinary Allow lag,
   /// HELLO timeout, and permission denial must **not** recreate the profile.
+  ///
+  /// After a monopin upgrade (same bundle id, new DevID seal) Apple often wraps
+  /// the DR mismatch as NEVPNConnectionErrorDomain “internal error” with no
+  /// “code requirement” text — still a one-shot recreate candidate.
   static func shouldRecreateVpnProfileAfterStartFailure(_ detail: String?) -> Bool {
     guard let d = detail?.lowercased(), !d.isEmpty else { return false }
     if isNePermissionFailureDetail(d) { return false }
@@ -1339,6 +1343,8 @@ enum RptVpnChannel {
       || d.contains("signature check failed")
       || d.contains("validation failed")
       || (d.contains("provider") && d.contains("invalid"))
+      || d.contains("internal error")
+      || d.contains("nevpnconnectionerrordomain")
   }
 
   /// Remove a stale system VPN profile and re-register free monopin protocol once.

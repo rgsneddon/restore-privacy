@@ -296,6 +296,22 @@ void main() {
         startBody.contains('shouldRecreateVpnProfileAfterStartFailure(disc)'),
         isTrue,
       );
+      // Upgrade 1.2.0→1.2.3 wrapped DR mismatch as generic internal error.
+      final recreateFn = src.indexOf(
+        'static func shouldRecreateVpnProfileAfterStartFailure',
+      );
+      expect(recreateFn, greaterThanOrEqualTo(0));
+      final recreateBody = src.substring(
+        recreateFn,
+        src.indexOf('private static func recreateProductVpnProfileAndStart', recreateFn),
+      );
+      expect(recreateBody.contains('internal error'), isTrue);
+      expect(recreateBody.contains('nevpnconnectionerrordomain'), isTrue);
+      expect(
+        recreateBody.contains('isNePermissionFailureDetail(d)'),
+        isTrue,
+        reason: 'permission denial must still refuse recreate',
+      );
       // Auto-open Settings only on permission-class (not every PT-not-connected).
       expect(
         startBody.contains('let openSettings = isNePermissionFailureDetail'),
