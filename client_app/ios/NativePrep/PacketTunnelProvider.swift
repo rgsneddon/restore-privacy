@@ -50,7 +50,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         let engine = try RptClientEngine(clientPrivRaw: material.clientPriv, nodeElgamalPubRaw: material.nodePub)
 
         // 2. RPT2 handshake on a long-lived connected UDP socket (kept open for DATA/KEEPALIVE)
-        let session = try engine.handshake(host: self.endpointHost, port: self.endpointPort, timeout: 20)
+        let session = try engine.handshake(host: self.endpointHost, port: self.endpointPort, timeout: 3)
         guard engine.transport?.isConnected == true else {
           completionHandler(Self.error("UDP transport not ready after HELLO", code: 12))
           return
@@ -80,6 +80,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         settings.dnsSettings = NEDNSSettings(servers: ["10.88.0.1"])
         settings.mtu = 1280
 
+        DispatchQueue.main.async {
         self.setTunnelNetworkSettings(settings) { err in
           if let err {
             engine.closeTransport()
@@ -98,6 +99,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
           self.startKeepalive()
           self.startCoverTraffic()
           completionHandler(nil)
+        }
         }
       } catch {
         completionHandler(Self.error(error.localizedDescription, code: 11))

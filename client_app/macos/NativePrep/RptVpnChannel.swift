@@ -1186,7 +1186,7 @@ enum RptVpnChannel {
         // Connecting already — wait for connected instead of double-start.
         if manager.connection.status == .connecting
           || manager.connection.status == .reasserting {
-          pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 40, interval: 0.5) {
+          pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 24, interval: 0.25) {
             connected in
             if connected {
               queryProviderSession(manager: manager) { ip, v4, v6 in
@@ -1230,8 +1230,8 @@ enum RptVpnChannel {
         try session.startTunnel(options: opts)
         // Packet Tunnel handshake + setTunnelNetworkSettings can take several seconds;
         // first run may show the system Allow VPN configuration dialog (OS-owned).
-        // Free monopin Allow can lag 30–60s — poll longer than HELLO alone (was 25s).
-        pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 100, interval: 0.5) {
+        // Product Connect budget is 6s (HELLO 3s + NE settings). Poll 24×0.25s.
+        pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 24, interval: 0.25) {
           connected in
           if connected {
             queryProviderSession(manager: manager) { ip, v4, v6 in
@@ -1312,19 +1312,27 @@ enum RptVpnChannel {
   /// Best-effort extension failure text after startTunnel leaves status disconnected.
   static func lastDisconnectErrorDescription(_ connection: NEVPNConnection) -> String? {
     // Prefer modern API when linked; fall back to KVC for broader macOS SDKs.
+    var base: String?
     let mirror = Mirror(reflecting: connection)
     for child in mirror.children {
       if child.label == "lastDisconnectError", let err = child.value as? Error {
-        return err.localizedDescription
+        base = err.localizedDescription
+        break
       }
     }
-    if let err = connection.value(forKey: "lastDisconnectError") as? Error {
-      return err.localizedDescription
+    if base == nil, let err = connection.value(forKey: "lastDisconnectError") as? Error {
+      base = err.localizedDescription
     }
-    if let err = connection.value(forKey: "error") as? Error {
-      return err.localizedDescription
+    if base == nil, let err = connection.value(forKey: "error") as? Error {
+      base = err.localizedDescription
     }
-    return nil
+    if let trace = RptSecrets.packetTunnelStartTraceTail() {
+      if let base, !base.isEmpty {
+        return base + " Trace: " + trace
+      }
+      return trace
+    }
+    return base
   }
 
   /// True when startTunnel failure looks like a stale provider designated requirement

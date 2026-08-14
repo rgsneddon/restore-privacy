@@ -333,8 +333,8 @@ class VpnController {
 
   /// Poll native session until full tunnel is up or give up (Android in-progress).
   Future<bool> _waitForFullTunnel({
-    Duration maxWait = const Duration(seconds: 75),
-    Duration pollEvery = const Duration(seconds: 2),
+    Duration maxWait = const Duration(seconds: 6),
+    Duration pollEvery = const Duration(milliseconds: 250),
   }) async {
     final deadline = DateTime.now().add(maxWait);
     while (DateTime.now().isBefore(deadline)) {

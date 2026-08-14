@@ -42,7 +42,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
       endpointHost,
       endpointPort
     )
+    RptSecrets.writePacketTunnelStartTrace("startTunnel host=\(endpointHost) port=\(endpointPort)")
 
+    // HELLO/UDP on pathQueue; NE setTunnelNetworkSettings + startTunnel
+    // completionHandler must hop to main — calling them off-thread is a
+    // documented NEVPNConnectionErrorDomain Plugin "internal error".
     pathQueue.async { [weak self] in
       guard let self else { return }
       do {
@@ -89,7 +93,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
               clientPrivRaw: material.clientPriv,
               nodeElgamalPubRaw: material.nodePub
             )
-            let sess = try eng.handshake(host: host, port: self.endpointPort, timeout: 20)
+            let sess = try eng.handshake(host: host, port: self.endpointPort, timeout: 3)
             guard eng.transport?.isConnected == true else {
               eng.closeTransport()
               lastError = Self.error("UDP transport not ready after HELLO", code: 12)
@@ -119,10 +123,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             lastError?.localizedDescription
             ?? "Connect failed: preferred residual and catalog alternates unreachable"
           os_log("startTunnel abort: %{public}@", log: Self.log, type: .error, msg)
-          completionHandler(
-            lastError
-              ?? Self.error(msg, code: 11)
-          )
+          RptSecrets.writePacketTunnelStartTrace("abort \(msg)")
+          Self.completeStartOnMain(completionHandler, lastError ?? Self.error(msg, code: 11))
           return
         }
         self.engine = engine
@@ -155,23 +157,28 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         settings.dnsSettings = NEDNSSettings(servers: ["10.88.0.1"])
         settings.mtu = 1280
 
-        self.setTunnelNetworkSettings(settings) { err in
-          if let err {
-            engine.closeTransport()
-            completionHandler(err)
-            return
+        RptSecrets.writePacketTunnelStartTrace("hello_ok vpnIp=\(session.vpnIp) applying settings on main")
+        DispatchQueue.main.async {
+          self.setTunnelNetworkSettings(settings) { err in
+            if let err {
+              RptSecrets.writePacketTunnelStartTrace("setTunnelNetworkSettings \(err.localizedDescription)")
+              engine.closeTransport()
+              completionHandler(err)
+              return
+            }
+            self.setTunnelNetworkSettingsDone(
+              vpnIp: session.vpnIp,
+              ipv6Protected: stack.ipv6,
+              ipv4Residual: stack.ipv4
+            )
+            self.running = true
+            // Transport already connected + ready (BSD connect completed before HELLO reply)
+            self.startPacketLoops()
+            self.startKeepalive()
+            self.startCoverTraffic()
+            RptSecrets.writePacketTunnelStartTrace("connected vpnIp=\(session.vpnIp)")
+            completionHandler(nil)
           }
-          self.setTunnelNetworkSettingsDone(
-            vpnIp: session.vpnIp,
-            ipv6Protected: stack.ipv6,
-            ipv4Residual: stack.ipv4
-          )
-          self.running = true
-          // Transport already connected + ready (BSD connect completed before HELLO reply)
-          self.startPacketLoops()
-          self.startKeepalive()
-          self.startCoverTraffic()
-          completionHandler(nil)
         }
       } catch {
         os_log(
@@ -180,8 +187,23 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
           type: .error,
           error.localizedDescription
         )
-        completionHandler(Self.error(error.localizedDescription, code: 11))
+        RptSecrets.writePacketTunnelStartTrace("error \(error.localizedDescription)")
+        Self.completeStartOnMain(
+          completionHandler,
+          Self.error(error.localizedDescription, code: 11)
+        )
       }
+    }
+  }
+
+  static func completeStartOnMain(
+    _ completionHandler: @escaping (Error?) -> Void,
+    _ error: Error?
+  ) {
+    if Thread.isMainThread {
+      completionHandler(error)
+    } else {
+      DispatchQueue.main.async { completionHandler(error) }
     }
   }
 

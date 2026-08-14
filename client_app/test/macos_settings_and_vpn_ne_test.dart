@@ -263,7 +263,7 @@ void main() {
   );
 
   test(
-    'startTunnel: longer Allow poll + recreate only on DR mismatch (not Allow lag)',
+    'startTunnel: 6s Connect poll + recreate only on DR mismatch (not Allow lag)',
     () {
       final src =
           File('macos/NativePrep/RptVpnChannel.swift').readAsStringSync();
@@ -272,8 +272,10 @@ void main() {
         isTrue,
         reason: 'recreate must be gated — unconditional wipe races Allow',
       );
-      // Poll window for free monopin Allow lag (was 50×0.5s = 25s).
-      expect(src.contains('maxAttempts: 100'), isTrue);
+      // Product Connect budget: 24×0.25s = 6s.
+      expect(src.contains('maxAttempts: 24'), isTrue);
+      expect(src.contains('interval: 0.25'), isTrue);
+      expect(src.contains('maxAttempts: 100'), isFalse);
       final startIdx = src.indexOf('private static func startTunnel');
       expect(startIdx, greaterThanOrEqualTo(0));
       final startBody = src.substring(
@@ -306,6 +308,8 @@ void main() {
         src.indexOf('private static func recreateProductVpnProfileAndStart', recreateFn),
       );
       expect(recreateBody.contains('internal error'), isTrue);
+      expect(src.contains('packetTunnelStartTraceTail'), isTrue);
+      expect(src.contains('RptSecrets.packetTunnelStartTraceTail'), isTrue);
       expect(recreateBody.contains('nevpnconnectionerrordomain'), isTrue);
       expect(
         recreateBody.contains('isNePermissionFailureDetail(d)'),
@@ -319,4 +323,22 @@ void main() {
       );
     },
   );
+
+  test('PacketTunnel startTunnel applies settings on main after 3s HELLO', () {
+    final src =
+        File('macos/NativePrep/PacketTunnelProvider.swift').readAsStringSync();
+    expect(src.contains('timeout: 3'), isTrue);
+    expect(src.contains('DispatchQueue.main.async'), isTrue);
+    expect(src.contains('setTunnelNetworkSettings(settings)'), isTrue);
+    expect(src.contains('writePacketTunnelStartTrace'), isTrue);
+    // Off-thread setTunnelNetworkSettings is the Plugin internal-error path.
+    final settingsIdx = src.indexOf('self.setTunnelNetworkSettings(settings)');
+    expect(settingsIdx, greaterThanOrEqualTo(0));
+    final before = src.substring(0, settingsIdx);
+    expect(
+      before.contains('DispatchQueue.main.async'),
+      isTrue,
+      reason: 'setTunnelNetworkSettings must hop to main',
+    );
+  });
 }

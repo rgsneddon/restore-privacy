@@ -250,6 +250,40 @@ public enum RptSecrets {
 
     public static var appGroupId: String { "group.com.restoreprivacy.shared" }
 
+    /// Packet Tunnel start trace (host reads this after NEVPN internal error).
+    public static let packetTunnelStartTraceName = "pt_start_trace.txt"
+
+    public static func packetTunnelStartTraceURL(
+        fileManager: FileManager = .default
+    ) -> URL? {
+        fileManager
+            .containerURL(forSecurityApplicationGroupIdentifier: appGroupId)?
+            .appendingPathComponent(packetTunnelStartTraceName)
+    }
+
+    public static func writePacketTunnelStartTrace(_ message: String) {
+        guard let url = packetTunnelStartTraceURL() else { return }
+        let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        if FileManager.default.fileExists(atPath: url.path),
+           let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(data)
+            try? handle.close()
+        } else {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+
+    public static func packetTunnelStartTraceTail(maxChars: Int = 400) -> String? {
+        guard let url = packetTunnelStartTraceURL() else { return nil }
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.count <= maxChars { return trimmed }
+        return String(trimmed.suffix(maxChars))
+    }
+
     /// Product-relative secrets folder name under Application Support / bundle.
     public static let appSupportFolderName = "Restore Privacy"
 
