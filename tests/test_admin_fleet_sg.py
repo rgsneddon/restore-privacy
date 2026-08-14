@@ -30,6 +30,24 @@ class TestAdminFleetSgCatalogAndProbe(TestCase):
         sg = next(p for p in peers if p["code"] == "SG")
         self.assertEqual(sg["host"], "5.223.48.8")
         self.assertEqual(sg["name"], "Singapore")
+        self.assertNotIn("IS", {p["code"] for p in peers})
+        self.assertNotIn("82.221.101.241", {p["host"] for p in peers})
+
+        from status_page.admin_node_usage import (
+            fleet_probe_note_html,
+            status_host_fallback_peers,
+        )
+
+        fb = status_host_fallback_peers()
+        self.assertEqual({p["code"] for p in fb}, {"DE", "SG"})
+        self.assertNotIn("IS", {p["code"] for p in fb})
+        note = fleet_probe_note_html(5000, peers=peers)
+        self.assertIn("SG", note)
+        self.assertIn("Singapore", note)
+        self.assertIn("DE", note)
+        self.assertIn("Germany", note)
+        self.assertNotIn("Iceland", note)
+        self.assertNotRegex(note, r"\bIS\b")
 
     def test_fleet_probe_url_and_401_marks_sg_error(self) -> None:
         from status_page.admin_node_usage import (

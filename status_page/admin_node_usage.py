@@ -1,14 +1,14 @@
 """Admin fleet node usage: bandwidth used vs capability (authenticated only).
 
-Public status stays title-only. This module builds operator rows for **IS/DE**
+Public status stays title-only. This module builds operator rows for **DE/SG**
 (live residual catalog only) from the product country catalog and optional
-private capacity probes. United States (US) and Romania (RO) are **retired**
-and must not appear as live fleet peers.
+private capacity probes. Iceland (IS), United States (US) and Romania (RO)
+are **retired** and must not appear as live fleet peers.
 
 Limits are **per-peer** (from ``node.private_capacity``):
-  - **Bandwidth** — IS/DE product **unlimited-class** (extendable at cost; DE has
+  - **Bandwidth** — DE/SG product **unlimited-class** (extendable at cost; DE has
     30 TB class entitlement). Not auto-detected NIC line-rate.
-  - **Session soft max** — utilization / residual routing hint (IS **512**;
+  - **Session soft max** — utilization / residual routing hint (SG **256**;
     DE dedicated 8 vCPU / 32 GB → **1024**). Not a hard public admission lock.
 """
 
@@ -176,6 +176,14 @@ class NodeUsageRow:
         }
 
 
+def status_host_fallback_peers() -> list[dict[str, Any]]:
+    """Catalog used when ``client.multihop`` cannot import (status-only tree)."""
+    return [
+        {"code": "DE", "name": "Germany", "host": "178.105.187.178", "port": 44044},
+        {"code": "SG", "name": "Singapore", "host": "5.223.48.8", "port": 44044},
+    ]
+
+
 def product_catalog_peers() -> list[dict[str, Any]]:
     """Residual catalog peers (code, name, host, port) in product order."""
     try:
@@ -183,11 +191,7 @@ def product_catalog_peers() -> list[dict[str, Any]]:
 
         cat = product_country_catalog()
     except Exception:  # noqa: BLE001
-        # Minimal fallback if client tree unavailable on status host
-        return [
-            {"code": "IS", "name": "Iceland", "host": "82.221.101.241", "port": 44044},
-            {"code": "DE", "name": "Germany", "host": "178.105.187.178", "port": 44044},
-        ]
+        return status_host_fallback_peers()
     out: list[dict[str, Any]] = []
     for n in cat:
         out.append(
@@ -199,6 +203,39 @@ def product_catalog_peers() -> list[dict[str, Any]]:
             }
         )
     return [p for p in out if p["code"] and p["host"]]
+
+
+def fleet_probe_note_html(
+    refresh_ms: int,
+    peers: Sequence[Mapping[str, Any]] | None = None,
+) -> str:
+    """Probe-note HTML from the same peer list as the fleet table (no IS)."""
+    catalog = list(peers) if peers is not None else product_catalog_peers()
+    labels: list[str] = []
+    sess_bits: list[str] = []
+    for p in catalog:
+        code = str(p.get("code") or "").strip().upper()
+        name = str(p.get("name") or code).strip()
+        host = str(p.get("host") or "").strip()
+        if not code:
+            continue
+        labels.append(f"<strong>{_escape(code)}</strong> ({_escape(name)})")
+        mx = resolve_session_soft_max(code=code, host=host)
+        if mx:
+            sess_bits.append(f"{_escape(code)}&nbsp;{int(mx)}")
+    if len(labels) == 2:
+        label_s = f"{labels[0]} and {labels[1]}"
+    else:
+        label_s = ", ".join(labels) or "none"
+    sess_s = " / ".join(sess_bits) if sess_bits else "—"
+    secs = max(1, int(refresh_ms) // 1000)
+    return (
+        f"Live residual peers {label_s}. "
+        "Bandwidth capability is product <strong>unlimited-class</strong> "
+        f"for both (extendable at cost); session soft max {sess_s}. "
+        f"Avg used rate from private probes; table refreshes about every {secs}s "
+        '(<span id="admin-node-usage-refreshed">—</span>). Not on the public shop.'
+    )
 
 
 def parse_int_map(raw: str | None) -> dict[str, int]:
@@ -1210,12 +1247,7 @@ def render_admin_node_usage_section_html(
          data-fleet-usage-api="{FLEET_USAGE_API_PATH}">
   <h2 id="admin-node-usage-heading">Fleet node usage (bandwidth)</h2>
   <p class="muted" id="admin-node-usage-probe-note">
-  Live residual peers <strong>IS</strong> (Iceland) and <strong>DE</strong> (Germany) only —
-  US and RO are retired. Bandwidth capability is product
-  <strong>unlimited-class</strong> for both (extendable at cost); session soft max
-  IS&nbsp;512 / DE&nbsp;1024. Avg used rate from private probes; table refreshes
-  about every {refresh_ms // 1000}s
-  (<span id="admin-node-usage-refreshed">—</span>). Not on the public shop.
+  {fleet_probe_note_html(refresh_ms, peers=product_catalog_peers())}
   </p>
   <table id="admin-node-usage-table">
     <thead><tr>
