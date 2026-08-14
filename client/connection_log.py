@@ -32,6 +32,7 @@ KIND_ERROR = "error"
 KIND_INFO = "info"
 KIND_LEAK_TEST = "leak_test"
 KIND_SETTINGS = "settings"
+KIND_AUDIT_VISIT = "audit_visit"
 
 # Keys commonly useful for support (safe, no secrets).
 _DIAG_PREFERRED_KEYS = (

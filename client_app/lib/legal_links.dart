@@ -30,3 +30,15 @@ const List<LegalDocLink> kLegalDocLinks = [
   // On-disk spelling is LICENSE; UI label uses “licence”.
   LegalDocLink(label: kEndUserLicenceLabel, statusPath: '/LICENSE'),
 ];
+
+/// True when Settings must open the in-client AUDIT split view (not a browser).
+bool isAuditDoc(LegalDocLink link) {
+  final path = link.statusPath.toLowerCase();
+  return path.endsWith('/audit.md') || path == 'audit.md' || path.endsWith('audit.md');
+}
+
+bool isAuditUrl(String url) {
+  final low = url.trim().toLowerCase();
+  if (low.isEmpty) return false;
+  return low.contains('/audit.md') || low.endsWith('audit.md');
+}

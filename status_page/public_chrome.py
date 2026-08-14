@@ -1421,6 +1421,9 @@ SUITE_HOME_INTRO_ID = "suite-home-intro"
 # Neon typewriter lines (one-shot keystroke animation on page load)
 SUITE_HOME_WELCOME_TYPE = ".:WELCOME, ANON:."
 SUITE_HOME_CLOSING_TYPE = "YOUR PRIVACY, RESTORED"
+# Device-only retention line (prefix static; "privacy, restored." types like welcome).
+SUITE_HOME_RETENTION_PREFIX = "your data is only retained by your own device. "
+SUITE_HOME_RETENTION_TYPE = "privacy, restored."
 # Normal CSS heading (not neon typewriter)
 SUITE_HOME_INTRO_HEADING = "...privacy you can actually use..."
 # Legacy alias for callers/tests that still import the short human title idea
@@ -1461,6 +1464,8 @@ def render_suite_home_intro_html() -> str:
     closing = _esc(SUITE_HOME_CLOSING_TYPE)
     heading = _esc(SUITE_HOME_INTRO_HEADING)
     body = _esc(SUITE_HOME_INTRO_BODY)
+    retention_prefix = _esc(SUITE_HOME_RETENTION_PREFIX)
+    retention_type = _esc(SUITE_HOME_RETENTION_TYPE)
     return f"""  <section class="panel-card suite-home-intro" id="{SUITE_HOME_INTRO_ID}"
            aria-labelledby="suite-home-intro-title" data-product="suite"
            data-suite-version="{PUBLIC_BRAND_VERSION}" data-suite-intro="1">
@@ -1481,6 +1486,15 @@ def render_suite_home_intro_html() -> str:
        data-typewriter-once="1"
        data-typewriter-after="suite-welcome-type"
        aria-label="{closing}"></p>
+    <p class="suite-home-retention" id="suite-home-retention">{retention_prefix}<span
+       class="suite-typewriter suite-typewriter-welcome neon-type"
+       id="suite-retention-type"
+       data-typewriter="1"
+       data-typewriter-role="welcome"
+       data-typewriter-text="{retention_type}"
+       data-typewriter-once="1"
+       data-typewriter-after="suite-closing-type"
+       aria-label="{retention_type}"></span></p>
     <p class="suite-home-version" id="suite-home-version">{PUBLIC_BRAND_DISPLAY}</p>
   </section>
 """

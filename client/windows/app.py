@@ -112,6 +112,7 @@ from client.transparency_copy import (
     DPI_MITIGATION_DISCLAIMER,
     DPI_MITIGATION_TITLE,
     EXPORT_LOG_BUTTON,
+    SUPPORT_LOG_FIND_HINT,
     LEAK_TEST_BUTTON,
     LEAK_TEST_DISCLAIMER,
     LEAK_TEST_TITLE,
@@ -4033,6 +4034,16 @@ class TunnelClientApp:
 
         btn_row = tk.Frame(log_card, bg=PANEL_BG)
         btn_row.pack(fill=tk.X, pady=(8, 0))
+        tk.Label(
+            log_card,
+            text=SUPPORT_LOG_FIND_HINT,
+            bg=PANEL_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(4, 0))
         tk.Button(
             btn_row,
             text=EXPORT_LOG_BUTTON,
@@ -4171,6 +4182,23 @@ class TunnelClientApp:
 
         def _open_legal(url: str, label: str) -> None:
             self._log(f"Opening {label}...")
+            try:
+                from client.audit_split_view import (
+                    is_audit_url,
+                    show_audit_split_window,
+                )
+                from client.connection_log import default_log_path
+
+                if is_audit_url(url):
+                    show_audit_split_window(
+                        self.root,
+                        connection_log_path=default_log_path(),
+                        platform="windows",
+                    )
+                    self._log("AUDIT visit recorded on this device (not uploaded).")
+                    return
+            except Exception as exc:
+                self._log(f"In-client audit view unavailable ({exc}); opening in browser.")
             try:
                 webbrowser.open(url)
             except Exception as exc:

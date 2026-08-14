@@ -96,6 +96,7 @@ class TestComputeOverallOkFalseRed(unittest.TestCase):
             "section_b": {"ok": True},
             "multihop_structure": {"ok": True},
             "package_rag": {"overall": "Green"},
+            "weekly_wipe": {"ok": True, "reason": "weekly residual leak wipe current"},
         }
         base.update(over)
         return base
@@ -121,6 +122,14 @@ class TestComputeOverallOkFalseRed(unittest.TestCase):
     def test_tcp_fail_is_not_ok(self) -> None:
         r = self._healthy_base(tcp_status={"ok": False})
         self.assertFalse(self.mod.compute_overall_ok(r))
+
+    def test_weekly_wipe_absent_fails_overall(self) -> None:
+        """Prerequisite: residual leak wipe missing → audit does not pass."""
+        r = self._healthy_base(weekly_wipe={"ok": False, "reason": "no weekly residual leak wipe recorded"})
+        self.assertFalse(self.mod.compute_overall_ok(r))
+        missing = self._healthy_base()
+        missing.pop("weekly_wipe", None)
+        self.assertFalse(self.mod.compute_overall_ok(missing))
 
     def test_suite_fail_and_red_rag_with_probe_fail_is_not_ok(self) -> None:
         r = self._healthy_base(

@@ -2,7 +2,7 @@
 
 **Last updated:** 14 August 2026  
 **Product:** Restore Privacy — a dedicated residual virtual private network and the public shop  
-**Current packages:** free installers on [restoreprivacy.online](https://restoreprivacy.online/). The public **Downloads Map** (`/downloads-map` and `/downloads-map.json`) is the source of truth for which installer version each platform gets. Residual Connect needs a free device trial or a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **macOS** is **Developer ID** + notarized when sealed (Team **SFCBP95595**). **iOS** ships as an IPA-compatible Team-signed zip (`Payload/Runner.app` + embedded provisions; rename to `.ipa` for sideload; same Team **SFCBP95595**). Public GitHub Pages ship docs only — not operator admin.
+**Current packages (catalog v1.2.7):** free installers on [restoreprivacy.online](https://restoreprivacy.online/). The public **Downloads Map** (`/downloads-map` and `/downloads-map.json`) is the source of truth for which installer version each platform gets. Residual Connect needs a free device trial or a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **macOS** is **Developer ID** + notarized when sealed (Team **SFCBP95595**). **iOS** ships as an IPA-compatible Team-signed zip (`Payload/Runner.app` + embedded provisions; rename to `.ipa` for sideload; same Team **SFCBP95595**). Public GitHub Pages ship docs only — not operator admin.
 
 ---
 
@@ -31,12 +31,12 @@ Before residual Connect, you **accept the end-user licence** on this device (loc
 
 - Cryptographic HELLO/session material between your client and residual nodes.
 - Payment entitlement checks (session id + device public key bind) so Connect can confirm an **active** KEYGEN on this device.
-- **No user-info connection logs** are uploaded by the client. Export of a local connection log is **user-initiated** only (save/clipboard/email by you).
+- **No user-info connection logs** are uploaded by the client. Export of a local connection log is **user-initiated** only (save/clipboard/email by you). In-client visits to `/AUDIT.md` append a visit row to the same **on-device** file only: Windows `%LOCALAPPDATA%\RestorePrivacy\.rpt_support_log.jsonl`; Linux/macOS `~/.local/share/restore-privacy/.rpt_support_log.jsonl`.
 
 ### Downloads Map and device platform
 
 - The homepage **FREE DOWNLOAD** button and `/downloads-map` read your browser **User-Agent** only to guess OS (Windows, macOS, iOS, Android, Linux). That string is used for the current request so we can highlight and start the matching installer. We do not store User-Agent as an account profile.
-- You get the **latest installer for that OS that is listed on the Downloads Map** (fulfilled from the Helsinki package store). Platforms can be on different versions (for example Windows 1.2.7 while Android is still 1.2.6) until that platform is rebuilt and the map is updated.
+- You get the **latest installer for that OS that is listed on the Downloads Map** (fulfilled from the Helsinki package store). The current map lists Windows, Android, macOS, iOS, and Linux on **1.2.7**. Platforms can sit on different versions until that platform is rebuilt and the map is updated.
 - **Platform requirements we check against:** Windows 10 or later, 64-bit (x64) for the `.exe` installer; Android 8+ for the APK; macOS 12+ x86_64/arm64 for the notarized zip; iOS 15+ for the Team-signed sideload zip (rename to `.ipa`); Linux x86_64 for the `.tar.gz`. We do not collect hardware inventories. If your device does not match, the installer may refuse to run — we do not silently give you another OS package.
 - The same map is published at `/downloads-map.json` (version + filename per platform, no personal data).
 

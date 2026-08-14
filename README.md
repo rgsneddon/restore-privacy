@@ -1,6 +1,6 @@
 # Restore Privacy
 
-**Version v1.2.6** — monorepo for the free residual VPN client and operator tooling.
+**Version v1.2.7** — monorepo for the free residual VPN client and operator tooling.
 
 Public storefront: [restoreprivacy.online](https://restoreprivacy.online).  
 Open Pages export: [rgsneddon.github.io/restore-privacy-suite](https://rgsneddon.github.io/restore-privacy-suite/).
@@ -24,26 +24,30 @@ Traffic shaping, outer obfuscation, multi-hop extras, and kill switch are **off 
 | Residual IPv6 | On | Optional ISP IPv6 leak posture while residual is up |
 | Traffic shaping / outer obfs / multi-hop | Off | Privacy-scale extras |
 | Kill switch | Off | Opt-in fail-closed UI with explicit confirm |
-| Leak test / local log | On demand | Device-local honesty diagnostics |
+| Leak test / local log | On demand | Device-local honesty diagnostics. AUDIT.md visits append to the **on-device** support log only (never uploaded): Windows `%LOCALAPPDATA%\RestorePrivacy\.rpt_support_log.jsonl`; Linux/macOS `~/.local/share/restore-privacy/.rpt_support_log.jsonl`. Email that file to support yourself if needed. |
 | Updates | Manual | Free re-download when a newer monopin is published |
 
 ## Catalog packages
 
 | Platform | File |
 |----------|------|
-| Windows | `restore-privacy-client-1.2.5-windows-x64-setup.exe` (Helsinki 1.2.5 stays; this Mac does not rebuild or overwrite it — Windows machine ships 1.2.6) |
-| Android | `restore-privacy-client-1.2.6-android.apk` |
-| macOS | `restore-privacy-client-1.2.6-macos.zip` — Notarized Developer ID + residual Packet Tunnel **systemextension** host NE |
-| iOS | `restore-privacy-client-1.2.6-ios.zip` — IPA `Payload/Runner.app` + embedded provisions (Team-signed sideload; rename to `.ipa`) |
-| Linux | `restore-privacy-client-1.2.5-linux-x64.tar.gz` (Helsinki 1.2.5 stays until a Linux agent rebuilds 1.2.6) |
+| Windows | `restore-privacy-client-1.2.7-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-1.2.7-android.apk` |
+| macOS | `restore-privacy-client-1.2.7-macos.zip` — Notarized Developer ID + residual Packet Tunnel **systemextension** host NE |
+| iOS | `restore-privacy-client-1.2.7-ios.zip` — IPA `Payload/Runner.app` + embedded provisions (Team-signed sideload; rename to `.ipa`) |
+| Linux | `restore-privacy-client-1.2.7-linux-x64.tar.gz` |
 
 ## Operator build
 
-- Pin: `client/VERSION` → `1.2.6`
+- Pin: `client/VERSION` → `1.2.7`
 - Flutter client: `client_app/`
-- Stage script: `scripts/build_suite_1.2.6.py` (this Mac host skips Windows PE and does not restamp Linux)
+- Stage script: `scripts/build_suite_1.2.7.py` (this Mac host skips Windows PE and does not restamp Linux)
 - Full ship skill: type `kyrusfables` / `/kyrusfables`
 - Public static export: `python3 scripts/build_public_pages.py` → `public_site/`
+
+## Support logs
+
+Connection and in-client AUDIT visits stay on **your device** (`.rpt_support_log.jsonl` under `%LOCALAPPDATA%\RestorePrivacy` on Windows or `~/.local/share/restore-privacy` on Linux/macOS). The client never uploads them. Export from Settings and email the file if you want help.
 
 ## Licence & support
 

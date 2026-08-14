@@ -411,10 +411,12 @@ def load_fleet_wipe_state(
     completed_n = [str(c).strip().upper() for c in completed if c]
     prog = data.get("in_progress")
     prog_n = str(prog).strip().upper() if prog else None
+    last = data.get("last_wipe_at")
     return {
         "completed": completed_n,
         "in_progress": prog_n,
         "cycle_id": str(data.get("cycle_id") or ""),
+        "last_wipe_at": last,
     }
 
 
@@ -429,10 +431,13 @@ def save_fleet_wipe_state(
     import json
     from pathlib import Path
 
+    import time
+
     payload = {
         "completed": [str(c).strip().upper() for c in completed if c],
         "in_progress": (in_progress or "").strip().upper() or None,
         "cycle_id": cycle_id or "",
+        "last_wipe_at": time.time(),
     }
     path = Path(fleet_state_path(install_root))
     path.parent.mkdir(parents=True, exist_ok=True)

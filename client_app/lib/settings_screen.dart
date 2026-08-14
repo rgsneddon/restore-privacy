@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'audit_split_view.dart';
 import 'connection_log.dart';
 import 'easter_egg_server.dart';
 import 'free_tier.dart';
@@ -670,6 +671,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _openLegalDoc(LegalDocLink link) async {
+    if (isAuditDoc(link)) {
+      final log = _log;
+      if (log != null && mounted) {
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => AuditSplitView(
+              connectionLog: log,
+              platformLabel: connectionLogPlatformLabel(),
+              multihopOn: _settings.privacyMultihop,
+            ),
+          ),
+        );
+        return;
+      }
+    }
     final uri = Uri.parse(link.url);
     try {
       final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);

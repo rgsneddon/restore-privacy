@@ -516,6 +516,9 @@ def compute_overall_ok(results: dict[str, Any] | None) -> bool:
     priv = r.get("no_priv") if isinstance(r.get("no_priv"), dict) else {}
     sb = r.get("section_b") if isinstance(r.get("section_b"), dict) else {}
     mh = r.get("multihop_structure") if isinstance(r.get("multihop_structure"), dict) else {}
+    ww = r.get("weekly_wipe") if isinstance(r.get("weekly_wipe"), dict) else {}
+    # Weekly residual leak wipe is a hard prerequisite (wipe-absent fails).
+    wipe_ok = bool(ww.get("ok"))
     return bool(
         suite_ok
         and tcp.get("ok")
@@ -523,7 +526,36 @@ def compute_overall_ok(results: dict[str, Any] | None) -> bool:
         and priv.get("ok")
         and sb.get("ok", True)
         and mh.get("ok", True)
+        and wipe_ok
     )
+
+
+def evaluate_weekly_wipe_for_audit(
+    *,
+    install_root: str | None = None,
+    now: float | None = None,
+) -> dict:
+    """Weekly residual leak wipe prerequisite for ``compute_overall_ok``."""
+    sys.path.insert(0, str(ROOT))
+    from client.audit_split_view import (
+        evaluate_weekly_wipe_prerequisite,
+        last_wipe_at_from_state,
+    )
+
+    state: dict = {}
+    try:
+        from node.fleet_wipe import load_fleet_wipe_state
+
+        state = load_fleet_wipe_state(install_root)
+    except Exception:
+        state = {}
+    # Optional env override for operator/laptop evidence (unix timestamp).
+    env_raw = os.environ.get("RPT_LAST_WEEKLY_WIPE_AT", "").strip()
+    if env_raw:
+        state = dict(state)
+        state["last_wipe_at"] = env_raw
+    last = last_wipe_at_from_state(state)
+    return evaluate_weekly_wipe_prerequisite(last_wipe_at=last, now=now)
 
 
 def run_unit_suite() -> dict:
@@ -1558,6 +1590,16 @@ def evaluate_catalog_packages(catalog_version: str | None = None) -> dict:
             worst = st
     staged = sum(1 for p in packages if p.get("path"))
     remote_n = sum(1 for p in packages if p.get("remote_store") == "helsinki")
+    installed_raw = os.environ.get("RPT_AUDIT_INSTALLED_PLATFORMS", "").strip()
+    installed = [x.strip() for x in installed_raw.split(",") if x.strip()]
+    if installed:
+        try:
+            sys.path.insert(0, str(ROOT))
+            from client.audit_split_view import catalog_overall_for_installed
+
+            worst = catalog_overall_for_installed(packages, installed)
+        except Exception:
+            pass
     return {
         "catalog_version": ver,
         "pin": pin,
@@ -1566,6 +1608,7 @@ def evaluate_catalog_packages(catalog_version: str | None = None) -> dict:
         "staged_count": staged,
         "helsinki_remote_count": remote_n,
         "helsinki_paid_asset_base": helsinki_paid_asset_base_url(),
+        "installed_platforms": installed,
         "overall": worst,
         "legend": {
             "Green": (
@@ -2072,6 +2115,7 @@ def collect(node_only: bool = False) -> dict:
         "package_rag": evaluate_catalog_packages(catalog),
         "section_b": section_b,
         "multihop_structure": multihop_structure,
+        "weekly_wipe": evaluate_weekly_wipe_for_audit(),
         "audit_privacy": {
             "localhost_required": localhost_probe_required(),
             "outbound_allowed": audit_outbound_allowed(),

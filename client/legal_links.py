@@ -90,6 +90,25 @@ def legal_doc_urls() -> dict[str, str]:
     return {link.label: link.url for link in LEGAL_DOC_LINKS}
 
 
+def is_audit_doc(link: LegalDocLink | str) -> bool:
+    """True when Settings should open the in-client AUDIT split view."""
+    if isinstance(link, LegalDocLink):
+        path = link.status_path
+        url = link.url
+    else:
+        path = str(link)
+        url = str(link)
+    low = (path or "").lower()
+    if low.endswith("/audit.md") or low == "audit.md" or low.endswith("audit.md"):
+        return True
+    try:
+        from client.audit_split_view import is_audit_url
+
+        return is_audit_url(url)
+    except Exception:
+        return "audit.md" in (url or "").lower()
+
+
 def audit_url() -> str:
     return LEGAL_DOC_LINKS[0].url
 
