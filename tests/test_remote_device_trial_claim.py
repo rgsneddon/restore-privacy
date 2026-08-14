@@ -484,12 +484,119 @@ class TestResidualPostAttachHealth(unittest.TestCase):
 
     def test_attach_shell_timeouts_fail_fast(self) -> None:
         from client.windows.tunnel_win import (
+            residual_attach_budget_s,
+            residual_bindable_wait_s,
+            residual_dataplane_wait_s,
+            residual_dns_cmd_timeout_s,
             residual_ipv6_cmd_timeout_s,
             residual_route_cmd_timeout_s,
+            residual_unbound_probe_s,
         )
 
-        self.assertLessEqual(residual_route_cmd_timeout_s(), 8.0)
-        self.assertLessEqual(residual_ipv6_cmd_timeout_s(), 8.0)
+        self.assertLessEqual(residual_attach_budget_s(), 6.0)
+        self.assertLessEqual(residual_route_cmd_timeout_s(), 3.0)
+        self.assertLessEqual(residual_ipv6_cmd_timeout_s(), 3.0)
+        self.assertLessEqual(residual_dns_cmd_timeout_s(), 3.0)
+        from client.windows.tun_win import RESIDUAL_IF_RESOLVE_TIMEOUT_S
+
+        self.assertLessEqual(float(RESIDUAL_IF_RESOLVE_TIMEOUT_S), 2.0)
+        gating = (
+            residual_bindable_wait_s()
+            + residual_dataplane_wait_s()
+            + residual_unbound_probe_s()
+        )
+        self.assertLessEqual(gating, residual_attach_budget_s())
+        self.assertGreaterEqual(residual_dataplane_wait_s(), 3.0)
+
+    def test_apply_routes_skips_netsh_address_and_dns(self) -> None:
+        from unittest.mock import patch
+
+        from client.full_tunnel import build_full_tunnel_plan
+        from client.windows import tunnel_win as tw
+
+        ran: list[str] = []
+
+        class _R:
+            returncode = 0
+            stderr = ""
+            stdout = ""
+
+        def fake_run(cmd, **_kw):
+            ran.append(cmd)
+            return _R()
+
+        plan = build_full_tunnel_plan("10.88.0.203", tunnel_iface="RPT")
+        with patch.object(tw, "residual_shell_run", fake_run), patch.object(
+            tw, "physical_if_index_for_nexthop", return_value=18
+        ):
+            applied, errs, ok = tw.apply_routes_for_adapter(
+                plan,
+                "178.105.187.178",
+                if_index=42,
+                include_catchall=True,
+                physical_gw="192.168.1.1",
+            )
+        self.assertTrue(ok, errs)
+        self.assertTrue(ran)
+        self.assertFalse(
+            any(
+                "set address" in c or "set dns" in c or "add dns" in c for c in ran
+            )
+        )
+        self.assertTrue(any("178.105.187.178" in c and "route add" in c for c in ran))
+        self.assertTrue(any("178.105.187.178" in c and " IF 18" in c for c in ran))
+        self.assertGreaterEqual(sum(1 for c in ran if "mask 128.0.0.0" in c), 2)
+        self.assertFalse(
+            any("set address" in c or "set dns" in c or "add dns" in c for c in applied)
+        )
+
+    def test_wintun_interface_index_prefers_luid(self) -> None:
+        src = (
+            Path(__file__).resolve().parents[1]
+            / "client"
+            / "windows"
+            / "tun_win.py"
+        ).read_text(encoding="utf-8")
+        body = src[src.find("def interface_index") : src.find("def configure_address")]
+        luid_at = body.find("if_index_from_luid_value")
+        name_at = body.find("resolve_interface_index")
+        self.assertGreater(luid_at, 0)
+        self.assertGreater(name_at, luid_at)
+
+    def test_start_full_tunnel_ipv6_is_off_connected_path(self) -> None:
+        src = (
+            Path(__file__).resolve().parents[1]
+            / "client"
+            / "windows"
+            / "tunnel_win.py"
+        ).read_text(encoding="utf-8")
+        body = src[src.find("def start_full_tunnel") :]
+        self.assertIn('name="rpt-ipv6"', body)
+        self.assertIn("apply_ipv6_leak_mitigation", body)
+        self.assertIn("apply_ipv6_fast_isp_block", body)
+        self.assertIn("ipv6_thread.join(0.05)", body)
+
+    def test_apply_ipv6_fast_isp_block_treats_missing_route_as_ok(self) -> None:
+        from unittest.mock import patch
+
+        from client.full_tunnel import build_full_tunnel_plan
+        from client.windows import tunnel_win as tw
+
+        class _R:
+            returncode = 1
+            stderr = "The route deletion failed: Element not found."
+            stdout = ""
+
+        plan = build_full_tunnel_plan("10.88.0.208", tunnel_iface="RPT", ipv6_enabled=True)
+        with patch.object(tw, "residual_shell_run", return_value=_R()):
+            cmds, ok = tw.apply_ipv6_fast_isp_block(plan)
+        self.assertTrue(any("delete ::/0" in c for c in cmds))
+        self.assertTrue(ok)
+
+        off = build_full_tunnel_plan("10.88.0.208", tunnel_iface="RPT", ipv6_enabled=False)
+        cmds_off, ok_off = tw.apply_ipv6_fast_isp_block(off)
+        self.assertFalse(ok_off)
+        self.assertEqual(cmds_off, [])
 
     def test_start_full_tunnel_single_catchall_pass(self) -> None:
         src = (
@@ -514,11 +621,35 @@ class TestResidualPostAttachHealth(unittest.TestCase):
             / "tunnel_win.py"
         ).read_text(encoding="utf-8")
         body = src[src.find("def start_full_tunnel") :]
-        probe = body.find('residual_tunnel_dns_smoke(')
-        stamp = body.find("residual_apply_windows_tunnel_dns(")
+        probe = body.find("residual_tunnel_dns_smoke(")
+        stamp = body.find("residual_stamp_tunnel_dns_async(")
         self.assertGreater(probe, 0)
         self.assertGreater(stamp, probe)
-        self.assertEqual(body.count("residual_apply_windows_tunnel_dns("), 1)
+        self.assertEqual(body.count("residual_stamp_tunnel_dns_async("), 1)
+        # Serial netsh/PS stamp must not sit on Connected.
+        self.assertNotIn("residual_apply_windows_tunnel_dns(", body)
+        self.assertNotIn("rpt-dns", body[stamp : stamp + 80])
+        join_win = body[stamp : stamp + 220]
+        self.assertNotIn(".join(", join_win)
+
+    def test_start_full_tunnel_injects_dataplane_unicast_probe(self) -> None:
+        src = (
+            Path(__file__).resolve().parents[1]
+            / "client"
+            / "windows"
+            / "tunnel_win.py"
+        ).read_text(encoding="utf-8")
+        body = src[src.find("def start_full_tunnel") :]
+        inj = body.find("def _inject_unicast")
+        wait = body.find("residual_wait_dataplane_return(")
+        self.assertGreater(inj, 0)
+        self.assertGreater(wait, inj)
+        chunk = body[inj:wait]
+        self.assertIn("seal_unicast_probe", chunk)
+        self.assertIn("10.88.0.1", chunk)
+        self.assertNotIn("residual_forward_udp_smoke", chunk)
+        self.assertIn("run_ipv6_rollback=False", body)
+        self.assertIn('name="rpt-ipv6-rollback"', body)
 
     def test_start_full_tunnel_starts_io_after_address(self) -> None:
         src = (
@@ -561,6 +692,19 @@ class TestResidualPostAttachHealth(unittest.TestCase):
             residual_wait_tunnel_ip_bindable(
                 "",
                 socket_cls=lambda *a, **k: Sock(),
+            )
+        )
+
+    def test_physical_if_index_for_nexthop_helper(self) -> None:
+        from client.windows.tunnel_win import physical_if_index_for_nexthop
+
+        self.assertEqual(physical_if_index_for_nexthop("192.168.1.1", convert=lambda _g: 18), 18)
+        self.assertIsNone(physical_if_index_for_nexthop("", convert=lambda _g: 18))
+        self.assertIsNone(physical_if_index_for_nexthop("192.168.1.1", convert=lambda _g: 0))
+        self.assertIsNone(
+            physical_if_index_for_nexthop(
+                "192.168.1.1",
+                convert=lambda _g: (_ for _ in ()).throw(OSError()),
             )
         )
 
@@ -647,13 +791,23 @@ class TestResidualPostAttachHealth(unittest.TestCase):
         self.assertNotIn("10.88.0.1", joined)
 
     def test_apply_windows_tunnel_dns_stamps_public_and_flushes(self) -> None:
-        from client.windows.tunnel_win import residual_apply_windows_tunnel_dns
+        from client.windows.tunnel_win import (
+            residual_apply_windows_tunnel_dns,
+            residual_dns_cmd_timeout_s,
+        )
 
         ran: list[str] = []
+        timeouts: list[float] = []
+
+        def run_fn(c, **k):
+            ran.append(c)
+            if "timeout" in k:
+                timeouts.append(float(k["timeout"]))
+
         cmds = residual_apply_windows_tunnel_dns(
             "RPT",
             ["1.1.1.1", "9.9.9.9"],
-            run_fn=lambda c, **k: ran.append(c),
+            run_fn=run_fn,
         )
         joined = "\n".join(cmds)
         self.assertIn("static 1.1.1.1", joined)
@@ -662,6 +816,52 @@ class TestResidualPostAttachHealth(unittest.TestCase):
         self.assertIn("ipconfig /flushdns", joined)
         self.assertEqual(cmds, ran)
         self.assertNotIn("10.88.0.1", joined)
+        self.assertTrue(timeouts)
+        self.assertTrue(all(t == residual_dns_cmd_timeout_s() for t in timeouts))
+        self.assertLessEqual(residual_dns_cmd_timeout_s(), 3.0)
+
+    def test_stamp_tunnel_dns_async_public_when_unbound_silent(self) -> None:
+        from client.windows.tunnel_win import residual_stamp_tunnel_dns_async
+
+        applied: list[tuple[str, list[str]]] = []
+        started: list[str] = []
+
+        class FakeThread:
+            def __init__(self, target=None, name="", daemon=False):
+                self.target = target
+                self.name = name
+                self.daemon = daemon
+
+            def start(self):
+                started.append(self.name)
+                if self.target:
+                    self.target()
+
+        def apply_fn(iface, servers):
+            applied.append((iface, list(servers)))
+            return list(servers)
+
+        public = residual_stamp_tunnel_dns_async(
+            "RPT",
+            unbound_ok=False,
+            apply_fn=apply_fn,
+            thread_cls=FakeThread,
+        )
+        self.assertEqual(public, ["1.1.1.1", "9.9.9.9"])
+        self.assertEqual(applied, [("RPT", ["1.1.1.1", "9.9.9.9"])])
+        self.assertEqual(started, ["rpt-dns"])
+
+        applied.clear()
+        started.clear()
+        unbound = residual_stamp_tunnel_dns_async(
+            "RPT",
+            unbound_ok=True,
+            apply_fn=apply_fn,
+            thread_cls=FakeThread,
+        )
+        self.assertEqual(unbound, ["10.88.0.1"])
+        self.assertEqual(applied, [("RPT", ["10.88.0.1"])])
+        self.assertEqual(started, ["rpt-dns"])
 
     def test_wait_dataplane_return_sees_reply(self) -> None:
         from client.windows.tunnel_win import residual_wait_dataplane_return

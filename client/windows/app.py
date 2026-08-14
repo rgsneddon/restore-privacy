@@ -367,9 +367,12 @@ class TunnelClientApp:
         # Defer tray until after main chrome exists — avoids racing Win32
         # RegisterClass/CreateWindow with Tk widget construction (seen as AV).
         try:
-            self.root.after_idle(self._start_system_tray)
+            # Delay tray until Tk has finished mapping (avoids open AV).
+            # Elevate handoff: wait until Connect chrome is up before tray HWND.
+            tray_delay = 2500 if "--rpt-auto-connect" in sys.argv else 800
+            self.root.after(tray_delay, self._start_system_tray)
         except Exception:
-            self._start_system_tray()
+            pass
 
         # Evolve hairline accent along the top of the window
         self.accent_bar = tk.Frame(
@@ -795,21 +798,7 @@ class TunnelClientApp:
             if status.get("iconphoto") or status.get("iconbitmap"):
                 self._icon_photo = getattr(self.root, "_rpt_icon_photo", None)
 
-            def _reapply_brand_icon() -> None:
-                try:
-                    if not self.root.winfo_exists():
-                        return
-                except Exception:
-                    return
-                try:
-                    apply_brand_window_icon(self.root)
-                except Exception:
-                    pass
-
-            try:
-                self._icon_reapply_after_id = self.root.after(200, _reapply_brand_icon)
-            except Exception:
-                self._icon_reapply_after_id = None
+            # No after(200) reapply — update_idletasks + SetClassLong AVs on open.
         except Exception:
             self._icon_status = {"error": True}
 
@@ -2032,6 +2021,29 @@ class TunnelClientApp:
 
             prior = self._tunnel
             residual_ready = residual_ip_capture_active(prior)
+            ipv6_prefetch: dict = {"ok": False, "cmds": []}
+
+            def _ipv6_prefetch() -> None:
+                try:
+                    from client.full_tunnel import build_full_tunnel_plan
+                    from client.windows.settings_store import load_settings
+                    from client.windows.tunnel_win import apply_ipv6_leak_mitigation
+
+                    st = load_settings()
+                    if not bool(getattr(st, "residual_ipv6", True)):
+                        return
+                    plan0 = build_full_tunnel_plan(
+                        "10.88.0.0", tunnel_iface="RPT", ipv6_enabled=True
+                    )
+                    cmds, ok = apply_ipv6_leak_mitigation(plan0)
+                    ipv6_prefetch["cmds"] = cmds
+                    ipv6_prefetch["ok"] = bool(ok)
+                except Exception:
+                    ipv6_prefetch["ok"] = False
+
+            threading.Thread(
+                target=_ipv6_prefetch, name="rpt-ipv6", daemon=True
+            ).start()
             with ThreadPoolExecutor(max_workers=1) as pool:
                 gw_fut = pool.submit(physical_default_gateway)
                 # Idle auto-reconnect passes force_reconnect so a stale
@@ -2105,6 +2117,7 @@ class TunnelClientApp:
                     require_system_capture=True,
                     prior=prior if residual_ready else None,
                     physical_gw=phys_gw,
+                    ipv6_prefetch=ipv6_prefetch,
                     on_idle_session_drop=lambda: self.root.after(
                         0, self._on_idle_session_drop
                     ),

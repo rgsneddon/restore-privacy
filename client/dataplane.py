@@ -127,22 +127,34 @@ def ipv4_src_dst(pkt: bytes) -> tuple[str, str] | None:
 
 
 def ipv4_skip_forward(dst: str) -> bool:
-    """True for multicast/broadcast dests that must not be sealed as residual DATA.
+    """True for dests that must not be sealed as residual DATA.
 
-    Windows sends IGMP to 224.0.0.22 on the Wintun IF; that was recorded as
-    first_tun (desktop: ``pkt=10.88.0.182>224.0.0.22``) and never gets a
-    residual reply.
+    Windows dual /1 also captures LAN/IGMP (desktop: ``pkt=10.88.0.206>192.168.1.1``
+    then ``tun=0/0``). Those never get a residual reply. Keep 10.88.0.0/16
+    (node Unbound) and public unicast.
     """
     parts = (dst or "").strip().split(".")
     if len(parts) != 4:
         return False
     try:
-        a, _b, _c, d = (int(p) for p in parts)
+        a, b, _c, d = (int(p) for p in parts)
     except ValueError:
         return False
-    if a < 0 or a > 255 or d < 0 or d > 255:
+    if a < 0 or a > 255 or b < 0 or b > 255 or d < 0 or d > 255:
         return False
-    return a >= 224 or d == 255
+    if a >= 224 or d == 255:
+        return True
+    if a == 10:
+        return b != 88
+    if a == 192 and b == 168:
+        return True
+    if a == 172 and 16 <= b <= 31:
+        return True
+    if a == 169 and b == 254:
+        return True
+    if a == 127:
+        return True
+    return False
 
 
 def _ip_checksum(data: bytes) -> int:
@@ -167,6 +179,55 @@ def _parse_ipv4(ip: str) -> bytes | None:
     if any(n < 0 or n > 255 for n in nums):
         return None
     return bytes(nums)
+
+
+def _dns_a_query(name: str = "example.com") -> bytes:
+    """RFC 1035 A-IN query. Empty/invalid DNS is ignored by 1.1.1.1 and Unbound."""
+    import struct
+
+    header = struct.pack("!HHHHHH", 0x1234, 0x0100, 1, 0, 0, 0)
+    q = b""
+    for label in (name or "example.com").split("."):
+        part = label.encode("ascii", "ignore")[:63]
+        if not part:
+            continue
+        q += bytes([len(part)]) + part
+    q += b"\x00" + struct.pack("!HH", 1, 1)
+    return header + q
+
+
+def build_ipv4_udp_probe(src: str, dst: str, *, dport: int = 53) -> bytes | None:
+    """IPv4/UDP DNS A query for residual DATA inject (no OS routing)."""
+    src_b = _parse_ipv4(src)
+    dst_b = _parse_ipv4(dst)
+    if src_b is None or dst_b is None:
+        return None
+    payload = _dns_a_query("example.com")
+    udp_len = 8 + len(payload)
+    udp = bytearray(udp_len)
+    udp[0:2] = (53053).to_bytes(2, "big")
+    udp[2:4] = int(dport).to_bytes(2, "big")
+    udp[4:6] = int(udp_len).to_bytes(2, "big")
+    udp[8:] = payload
+    # IPv4 UDP checksum 0 is dropped by some resolvers/nodes (desktop tun=2/0).
+    ph = src_b + dst_b + bytes([0, 17, (udp_len >> 8) & 0xFF, udp_len & 0xFF])
+    uc = _ip_checksum(ph + bytes(udp))
+    if uc == 0:
+        uc = 0xFFFF
+    udp[6] = (uc >> 8) & 0xFF
+    udp[7] = uc & 0xFF
+    total = 20 + udp_len
+    ip = bytearray(20)
+    ip[0] = 0x45
+    ip[2:4] = int(total).to_bytes(2, "big")
+    ip[8] = 64
+    ip[9] = 17
+    ip[12:16] = src_b
+    ip[16:20] = dst_b
+    csum = _ip_checksum(bytes(ip))
+    ip[10] = (csum >> 8) & 0xFF
+    ip[11] = csum & 0xFF
+    return bytes(ip) + bytes(udp)
 
 
 def rewrite_ipv4_source(pkt: bytes, new_src: str) -> tuple[bytes, bool]:
@@ -311,13 +372,31 @@ class RptDataPlane:
             tun.write_packet(plain)
             self.stats.udp_to_tun += 1
 
+    def seal_unicast_probe(self, dst: str = "1.1.1.1") -> bool:
+        """Seal one public IPv4 UDP probe via the live residual session.
+
+        OS bind+sendto often never appears on Wintun (desktop ``tun=0/0``).
+        This injects on the dataplane path so ``udp_to_tun`` can prove return.
+        """
+        src = self._tunnel_src_ip or ""
+        pkt = build_ipv4_udp_probe(src, dst)
+        if not pkt:
+            return False
+        try:
+            return bool(self._handle_tun_packet(self.sock, pkt))
+        except Exception:
+            self.stats.errors += 1
+            return False
+
     def _handle_tun_packet(self, sock: socket.socket, pkt: bytes) -> bool:
         """Seal one TUN packet. True when it was real unicast (not skipped)."""
         info = ipv4_src_dst(pkt)
-        if info and ipv4_skip_forward(info[1]):
+        # IPv6 / non-IPv4 must not be sealed as residual DATA (desktop
+        # ``pkt=->- tun=156/0`` while IPv6 leak-mitigation was still applying).
+        if info is None or ipv4_skip_forward(info[1]):
             self.stats.skipped_non_unicast += 1
             return False
-        if info and not self.stats.first_tun_src:
+        if not self.stats.first_tun_src:
             self.stats.first_tun_src, self.stats.first_tun_dst = info
         if self._tunnel_src_ip:
             pkt, changed = rewrite_ipv4_source(pkt, self._tunnel_src_ip)

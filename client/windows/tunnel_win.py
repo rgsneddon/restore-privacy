@@ -78,10 +78,22 @@ def is_admin() -> bool:
 LEGACY_ADAPTER_SETTLE_TOTAL_SEC = 0.9  # historical fixed 0.4s + 0.5s
 DEFAULT_ADAPTER_SETTLE_MAX_SEC = LEGACY_ADAPTER_SETTLE_TOTAL_SEC
 DEFAULT_ADAPTER_SETTLE_POLL_SEC = 0.05
-# Connect was 30–40s after HELLO because every netsh/route/PS used 30–45s
-# timeouts and ran twice. Fail-fast; commands that work return in <2s.
-RESIDUAL_ROUTE_CMD_TIMEOUT_S = 8.0
-RESIDUAL_IPV6_CMD_TIMEOUT_S = 8.0
+# Connect target: session-ready → Connected ≤6s. A hung netsh must not sit 8–45s.
+RESIDUAL_ATTACH_BUDGET_S = 6.0
+RESIDUAL_ROUTE_CMD_TIMEOUT_S = 3.0
+RESIDUAL_IPV6_CMD_TIMEOUT_S = 3.0
+RESIDUAL_BINDABLE_WAIT_S = 1.0
+# Desktop 1.2.4: 1.5s was too short after dual /1 (tun=156/0 then rollback ~27s).
+RESIDUAL_DATAPLANE_WAIT_S = 3.0
+RESIDUAL_UNBOUND_PROBE_S = 0.35
+# Disable-NetAdapterBinding needs >3s; keep it off Connected. Fast ::/0 delete is 2s.
+RESIDUAL_IPV6_PS_TIMEOUT_S = 12.0
+RESIDUAL_IPV6_FAST_TIMEOUT_S = 2.0
+
+
+def residual_attach_budget_s() -> float:
+    """Wall-clock target for residual attach after HELLO / session ready."""
+    return float(RESIDUAL_ATTACH_BUDGET_S)
 
 
 def residual_route_cmd_timeout_s() -> float:
@@ -92,6 +104,36 @@ def residual_route_cmd_timeout_s() -> float:
 def residual_ipv6_cmd_timeout_s() -> float:
     """Bounded timeout for IPv6 leak-mitigation shell commands."""
     return float(RESIDUAL_IPV6_CMD_TIMEOUT_S)
+
+
+def residual_ipv6_ps_timeout_s() -> float:
+    """Off-thread Disable-NetAdapterBinding budget (must actually finish)."""
+    return float(RESIDUAL_IPV6_PS_TIMEOUT_S)
+
+
+def residual_ipv6_fast_timeout_s() -> float:
+    """Timeout for teredo / ``route -6 delete ::/0`` on the Connected path."""
+    return float(RESIDUAL_IPV6_FAST_TIMEOUT_S)
+
+
+def residual_bindable_wait_s() -> float:
+    """Max wait for the Wintun tunnel IP to become bindable."""
+    return float(RESIDUAL_BINDABLE_WAIT_S)
+
+
+def residual_dataplane_wait_s() -> float:
+    """Max wait for residual DATA return after dual /1."""
+    return float(RESIDUAL_DATAPLANE_WAIT_S)
+
+
+def residual_unbound_probe_s() -> float:
+    """Brief Unbound probe after DATA return (does not restamp public DNS)."""
+    return float(RESIDUAL_UNBOUND_PROBE_S)
+
+
+def residual_dns_cmd_timeout_s() -> float:
+    """Bounded timeout for IF DNS netsh/PowerShell (never 5–8s on Connected)."""
+    return float(RESIDUAL_ROUTE_CMD_TIMEOUT_S)
 
 
 def adapter_settle_budget(
@@ -158,6 +200,42 @@ def wait_for_wintun_if_index(
     return _try()
 
 
+def physical_if_index_for_nexthop(
+    nexthop: str,
+    *,
+    convert: Optional[Callable[[str], Optional[int]]] = None,
+) -> Optional[int]:
+    """IF index used to reach *nexthop* (physical LAN). Instant — no netsh."""
+    gw = (nexthop or "").strip()
+    if not gw or gw.count(".") != 3:
+        return None
+    if convert is not None:
+        try:
+            idx = convert(gw)
+            n = int(idx) if idx is not None else 0
+            return n if n > 0 else None
+        except Exception:
+            return None
+    if sys.platform != "win32":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        ws2 = ctypes.windll.ws2_32
+        iph = ctypes.windll.iphlpapi
+        addr = ws2.inet_addr(gw.encode("ascii"))
+        if addr == 0xFFFFFFFF:
+            return None
+        idx = wintypes.DWORD(0)
+        status = int(iph.GetBestInterface(addr, ctypes.byref(idx)))
+        if status == 0 and int(idx.value) > 0:
+            return int(idx.value)
+    except Exception:
+        return None
+    return None
+
+
 def physical_default_gateway() -> Optional[str]:
     """Return the physical LAN default gateway (not the RPT tunnel GW)."""
     try:
@@ -207,6 +285,22 @@ def _is_server_pin_cmd(cmd: str, server_host: str) -> bool:
 
 def _is_catchall_cmd(cmd: str) -> bool:
     return "route add" in cmd and "mask 128.0.0.0" in cmd
+
+
+def _is_netsh_address_or_dns_cmd(cmd: str) -> bool:
+    """Address/DNS netsh already ran in configure_address / after DATA.
+
+    Re-running ``set address`` after WintunStartSession bounces the NIC.
+    ``set dns`` / ``add dns`` have hung 8s+ on this Windows host (desktop log).
+    """
+    low = (cmd or "").lower()
+    if "netsh interface ip set address" in low:
+        return True
+    if "netsh interface ip set dns" in low:
+        return True
+    if "netsh interface ip add dns" in low:
+        return True
+    return False
 
 
 def _is_tunnel_dns_dest_cmd(cmd: str, server_host: str) -> bool:
@@ -290,9 +384,19 @@ def apply_routes_for_adapter(
             )
             return applied, errors, False
 
+        # Address + IF DNS are not on the Connected-critical path.
+        if _is_netsh_address_or_dns_cmd(cmd):
+            continue
+
         is_pin = _is_server_pin_cmd(cmd, server_host)
         is_catch = _is_catchall_cmd(cmd)
         is_dns_dest = _is_tunnel_dns_dest_cmd(cmd, server_host)
+
+        # Bind the node pin to the physical IF so dual /1 cannot steal UDP.
+        if is_pin and " IF " not in cmd:
+            phys_if = physical_if_index_for_nexthop(gw)
+            if phys_if:
+                cmd = f"{cmd} IF {int(phys_if)}"
 
         # Never install dual /1 / tunnel-DNS dest unless server pin already succeeded
         if (is_catch or is_dns_dest) and not pin_ok:
@@ -981,9 +1085,10 @@ def residual_apply_windows_tunnel_dns(
         )
     cmds.append("ipconfig /flushdns")
     runner = residual_shell_run if run_fn is None else run_fn
+    budget = residual_dns_cmd_timeout_s()
     for c in cmds:
         try:
-            runner(c, timeout=5.0, text=True)
+            runner(c, timeout=budget, text=True)
         except TypeError:
             try:
                 runner(c)
@@ -992,6 +1097,40 @@ def residual_apply_windows_tunnel_dns(
         except Exception:
             pass
     return cmds
+
+
+def residual_stamp_tunnel_dns_async(
+    iface: str,
+    *,
+    unbound_ok: bool,
+    apply_fn: Optional[Callable[..., list[str]]] = None,
+    thread_cls: Optional[type] = None,
+) -> list[str]:
+    """Stamp Unbound or public IF DNS off-thread. Connected does not join.
+
+    Public ``1.1.1.1`` / ``9.9.9.9`` must still be stamped when Unbound is
+    silent — apply_routes no longer runs netsh DNS.
+    """
+    servers = residual_choose_tunnel_dns(unbound_ok=unbound_ok)
+    applier = apply_fn if apply_fn is not None else residual_apply_windows_tunnel_dns
+    name = (iface or "RPT").strip() or "RPT"
+
+    def _work() -> None:
+        try:
+            applier(name, servers)
+        except Exception:
+            pass
+
+    cls = thread_cls
+    if cls is None:
+        import threading
+
+        cls = threading.Thread
+    t = cls(target=_work, name="rpt-dns", daemon=True)
+    start = getattr(t, "start", None)
+    if callable(start):
+        start()
+    return list(servers)
 
 
 def residual_run_post_attach_smokes(
@@ -1102,11 +1241,18 @@ def session_ok_without_residual_capture(
     )
 
 
-def reassert_server_pin_command(server_host: str, physical_gw: str) -> str:
+def reassert_server_pin_command(
+    server_host: str,
+    physical_gw: str,
+    physical_if: Optional[int] = None,
+) -> str:
     """route add for server pin (re-assert after dual /1 so UDP never loops into TUN)."""
     host = (server_host or "").strip()
     gw = (physical_gw or "").strip()
-    return f"route add {host} mask 255.255.255.255 {gw} metric 1"
+    cmd = f"route add {host} mask 255.255.255.255 {gw} metric 1"
+    if physical_if is not None and int(physical_if) > 0:
+        cmd = f"{cmd} IF {int(physical_if)}"
+    return cmd
 
 
 def reassert_server_pin(
@@ -1117,7 +1263,8 @@ def reassert_server_pin(
     gw = (physical_gw or physical_default_gateway() or "").strip()
     if not gw or not (server_host or "").strip():
         return [], False
-    cmd = reassert_server_pin_command(server_host, gw)
+    phys_if = physical_if_index_for_nexthop(gw)
+    cmd = reassert_server_pin_command(server_host, gw, phys_if)
     r = residual_shell_run(cmd, timeout=residual_route_cmd_timeout_s(), text=True)
     ok = _route_cmd_succeeded(r.returncode, r.stderr or "", r.stdout or "")
     return [cmd], bool(ok)
@@ -1133,6 +1280,53 @@ def ipv6_residual_protected(result: Optional[WindowsTunnelResult]) -> bool:
 def _cmd_exit_ok(returncode: int, stderr: str, stdout: str) -> bool:
     """True only when the process succeeded (or route 'already exists' benign)."""
     return _route_cmd_succeeded(returncode, stderr, stdout)
+
+
+def _ipv6_route_delete_ok(returncode: int, stderr: str, stdout: str) -> bool:
+    """True when ::/0 was deleted or was already absent (IPv6 has no ISP default)."""
+    if _cmd_exit_ok(returncode, stderr, stdout):
+        return True
+    text = f"{stderr or ''}{stdout or ''}".lower()
+    return (
+        "not found" in text
+        or "element not found" in text
+        or "cannot find" in text
+        or "the route deletion failed" in text
+    )
+
+
+def apply_ipv6_fast_isp_block(plan: FullTunnelPlan) -> tuple[list[str], bool]:
+    """Cut ISP IPv6 now (Happy Eyeballs hang) without waiting on Disable-NetAdapterBinding.
+
+    Deletes ``::/0`` and disables transition tunnels. Durable adapter unbind
+    still runs off-thread via ``apply_ipv6_leak_mitigation``.
+    """
+    from client.full_tunnel import IPV6_LEAK_POLICY_BLOCK_ISP
+
+    if str(getattr(plan, "ipv6_leak_policy", "")) != IPV6_LEAK_POLICY_BLOCK_ISP:
+        return [], False
+    cmds = [
+        "netsh interface teredo set state disabled",
+        "netsh interface 6to4 set state state=disabled",
+        "netsh interface isatap set state disabled",
+        "route -6 delete ::/0",
+    ]
+    applied: list[str] = []
+    route_ok = False
+    budget = residual_ipv6_fast_timeout_s()
+    for cmd in cmds:
+        try:
+            r = residual_shell_run(cmd, timeout=budget, text=True)
+        except Exception:
+            continue
+        applied.append(cmd)
+        if "delete ::/0" in cmd and _ipv6_route_delete_ok(
+            r.returncode, r.stderr or "", r.stdout or ""
+        ):
+            route_ok = True
+        elif _cmd_exit_ok(r.returncode, r.stderr or "", r.stdout or ""):
+            pass
+    return applied, route_ok
 
 
 def apply_ipv6_leak_mitigation(plan: FullTunnelPlan) -> tuple[list[str], bool]:
@@ -1173,7 +1367,7 @@ def apply_ipv6_leak_mitigation(plan: FullTunnelPlan) -> tuple[list[str], bool]:
         is_critical = cmd.strip() == crit or (
             "Disable-NetAdapterBinding" in cmd and "RPT_IPV6_DISABLED" in cmd
         )
-        budget = residual_ipv6_cmd_timeout_s() if is_critical else 2.0
+        budget = residual_ipv6_ps_timeout_s() if is_critical else residual_ipv6_fast_timeout_s()
         r = residual_shell_run(cmd, timeout=budget, text=True)
         if is_critical:
             ok, _count = parse_windows_ipv6_disable_result(
@@ -1214,6 +1408,7 @@ def start_full_tunnel(
     prior: Optional[WindowsTunnelResult] = None,
     physical_gw: Optional[str] = None,
     on_idle_session_drop: Optional[Callable[[], None]] = None,
+    ipv6_prefetch: Optional[dict] = None,
 ) -> WindowsTunnelResult:
     """Create OS TUN (Wintun), install safe full-tunnel routes, start DATA plane.
 
@@ -1231,7 +1426,7 @@ def start_full_tunnel(
     if not client.session:
         return WindowsTunnelResult(False, "no session", [])
 
-    # Do not leave Wintun on silent Unbound — apply_routes emits plan.dns_servers.
+    # Public DNS on the plan for the post-DATA stamp; apply_routes skips netsh DNS.
     try:
         plan.dns_servers = residual_choose_tunnel_dns(unbound_ok=False)
     except Exception:
@@ -1347,12 +1542,47 @@ def start_full_tunnel(
 
     plan.tunnel_iface = tun.name
     applied: list[str] = []
+    ipv6_holder: dict = {"ok": False, "cmds": []}
+    ipv6_thread = None
 
     try:
         applied.extend(tun.configure_address())
     except Exception as exc:
         tun.close()
         return WindowsTunnelResult(False, f"configure_address failed: {exc}", applied)
+
+    # Fast ::/0 delete stops IPv6 Happy Eyeballs / ISP leak now. Durable
+    # Disable-NetAdapterBinding stays off-thread (8–15s).
+    try:
+        from client.residual_stack import plan_wants_ipv6_isp_block
+
+        if plan_wants_ipv6_isp_block(plan):
+            import threading
+
+            fast_cmds, fast_ok = apply_ipv6_fast_isp_block(plan)
+            ipv6_holder["cmds"] = list(fast_cmds)
+            ipv6_holder["ok"] = bool(fast_ok)
+            if ipv6_prefetch and ipv6_prefetch.get("ok"):
+                ipv6_holder["ok"] = True
+                ipv6_holder["cmds"].extend(list(ipv6_prefetch.get("cmds") or []))
+
+            def _ipv6_work() -> None:
+                try:
+                    cmds, ok = apply_ipv6_leak_mitigation(plan)
+                    ipv6_holder["cmds"] = list(ipv6_holder.get("cmds") or []) + list(
+                        cmds or []
+                    )
+                    if ok:
+                        ipv6_holder["ok"] = True
+                except Exception:
+                    pass
+
+            ipv6_thread = threading.Thread(
+                target=_ipv6_work, name="rpt-ipv6", daemon=True
+            )
+            ipv6_thread.start()
+    except Exception:
+        ipv6_thread = None
 
     # netsh address/DNS can bounce the NIC — open the Wintun ring only after that.
     start_io = getattr(tun, "start_io", None)
@@ -1377,7 +1607,9 @@ def start_full_tunnel(
         getattr(tun, "_session", None) or getattr(tun, "_adapter", None)
     )
     if capture and tunnel_ip and real_wintun:
-        addr_ready = residual_wait_tunnel_ip_bindable(tunnel_ip, timeout=2.0)
+        addr_ready = residual_wait_tunnel_ip_bindable(
+            tunnel_ip, timeout=residual_bindable_wait_s()
+        )
         if not addr_ready:
             applied.append("tunnel_ip_not_bindable")
 
@@ -1588,23 +1820,26 @@ def start_full_tunnel(
     if routes_applied:
         bind_ip = str(getattr(plan, "tunnel_client_ip", "") or "").strip()
         if bind_ip and not addr_ready:
-            residual_wait_tunnel_ip_bindable(bind_ip, timeout=2.0)
+            residual_wait_tunnel_ip_bindable(
+                bind_ip, timeout=residual_bindable_wait_s()
+            )
         try:
             client.send_keepalive()
         except Exception:
             pass
 
         def _inject_unicast() -> None:
-            residual_forward_udp_smoke(
-                host="1.1.1.1",
-                timeout=0.35,
-                bind_ip=bind_ip or None,
-            )
+            # Valid DNS A (not an empty query — desktop tun=2/0 to 1.1.1.1).
+            for dest in ("1.1.1.1", "10.88.0.1"):
+                try:
+                    plane.seal_unicast_probe(dest)
+                except Exception:
+                    pass
 
         return_ok = residual_wait_dataplane_return(
             plane,
-            timeout=2.5,
-            poll_s=0.15,
+            timeout=residual_dataplane_wait_s(),
+            poll_s=0.1,
             inject_fn=_inject_unicast,
         )
         if not return_ok or not residual_post_attach_ready(
@@ -1623,13 +1858,24 @@ def start_full_tunnel(
                     plan=plan,
                     if_index=if_index,
                     run_kill_switch_rollback=True,
-                    run_ipv6_rollback=True,
+                    run_ipv6_rollback=False,
                 )
             except Exception:
                 try:
                     rollback_full_tunnel_routes(plan, server_host, if_index)
                 except Exception:
                     pass
+            try:
+                import threading
+
+                threading.Thread(
+                    target=rollback_ipv6_leak_mitigation,
+                    args=(plan,),
+                    name="rpt-ipv6-rollback",
+                    daemon=True,
+                ).start()
+            except Exception:
+                pass
             try:
                 plane.stop()
             except Exception:
@@ -1657,19 +1903,16 @@ def start_full_tunnel(
                 kill_switch_applied=False,
             )
         iface = str(getattr(plan, "tunnel_iface", "") or "RPT")
-        # Public DNS is already on the IF (configure_address + apply_routes).
-        # Probe Unbound briefly; stamp once with the winner — not public then Unbound.
+        # Probe Unbound for the honesty label only (0.35s). Stamp IF DNS
+        # off-thread (rpt-dns) — netsh/PS must not sit on Connected.
+        # Always stamp: Unbound when it answers, else public 1.1.1.1/9.9.9.9.
         unbound_ok = residual_tunnel_dns_smoke(
             dns_host="10.88.0.1",
-            timeout=0.4,
+            timeout=residual_unbound_probe_s(),
             bind_ip=bind_ip or None,
             if_index=if_index,
         )
-        applied.extend(
-            residual_apply_windows_tunnel_dns(
-                iface, residual_choose_tunnel_dns(unbound_ok=unbound_ok)
-            )
-        )
+        residual_stamp_tunnel_dns_async(iface, unbound_ok=unbound_ok)
         dns_label = "unbound" if unbound_ok else "public-fallback"
         route_msg = (
             f"{route_msg}; post-attach health ok "
@@ -1701,19 +1944,20 @@ def start_full_tunnel(
     ipv6_ok = False
     from client.residual_stack import plan_wants_ipv6_isp_block
 
-    # IPv6 residual is independent of IPv4 dual /1; apply when Settings IPv6 ON
-    # and system TUN is up. Intentional IPv6 OFF → no "incomplete" wording.
-    if capture and plan_wants_ipv6_isp_block(plan):
+    # IPv6 ran off-thread (rpt-ipv6). Do not wait — Connected is IPv4 DATA.
+    if ipv6_thread is not None:
         try:
-            v6_cmds, ipv6_ok = apply_ipv6_leak_mitigation(plan)
-            applied.extend(v6_cmds)
-            if ipv6_ok:
-                msg += "; IPv6 ISP path blocked"
-            else:
-                msg += "; IPv6 leak mitigation incomplete"
-        except Exception as exc:
-            msg += f"; IPv6 mitigation error: {exc}"
-            ipv6_ok = False
+            ipv6_thread.join(0.05)
+        except Exception:
+            pass
+        ipv6_ok = bool(ipv6_holder.get("ok"))
+        applied.extend(list(ipv6_holder.get("cmds") or []))
+        if ipv6_ok:
+            msg += "; IPv6 ISP path blocked"
+        elif ipv6_thread.is_alive():
+            msg += "; IPv6 leak mitigation still applying"
+        else:
+            msg += "; IPv6 leak mitigation incomplete"
     elif capture and not plan_wants_ipv6_isp_block(plan):
         msg += "; IPv6 residual off (Settings)"
 

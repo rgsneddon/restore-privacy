@@ -38,6 +38,26 @@ NOTIFYICON_VERSION_4 = 4
 _WM_RPT_TRAY_STATUS = 0x0400 + 99  # WM_USER + 99
 
 
+def tray_window_class_name(pid: int | None = None) -> str:
+    """Per-process tray HWND class — never share ``RptPrivacyRestoredTray``.
+
+    Elevate-handoff overlaps two processes. UnregisterClassW on a shared name
+    AVs the other process's tray thread (desktop Connect crash).
+    """
+    import os
+
+    p = int(os.getpid() if pid is None else pid)
+    return f"RptPrivacyRestoredTray_{p}"
+
+
+def should_create_tray_hwnd(atom: int, last_error: int) -> bool:
+    """True only when RegisterClassW succeeded or the class already exists."""
+    if int(atom or 0) != 0:
+        return True
+    # ERROR_CLASS_ALREADY_EXISTS
+    return int(last_error) == 1410
+
+
 def product_tray_guid_bytes() -> bytes:
     """16-byte Windows GUID for the product tray icon (little-endian)."""
     return PRODUCT_TRAY_ICON_GUID.bytes_le
@@ -626,33 +646,51 @@ class WindowsSystemTray:
 
         self._wndproc = WNDPROC(wnd_proc)  # keep ref alive
         hinst = kernel32.GetModuleHandleW(None)
-        class_name = "RptPrivacyRestoredTray"
+        class_name = tray_window_class_name()
         wc = WNDCLASSW()
         wc.lpfnWndProc = ctypes.cast(self._wndproc, ctypes.c_void_p)
         wc.hInstance = hinst
         wc.lpszClassName = class_name
+        # Do not UnregisterClassW — a shared/stale unregister AVs the handoff peer.
+        # Skip RegisterClassW when this PID's class already exists (handoff AV).
+        wc_query = WNDCLASSW()
+        user32.GetClassInfoW.restype = wintypes.BOOL
+        already = False
         try:
-            user32.UnregisterClassW(class_name, hinst)
+            already = bool(user32.GetClassInfoW(hinst, class_name, ctypes.byref(wc_query)))
         except Exception:
-            pass
-        atom = user32.RegisterClassW(ctypes.byref(wc))
-        if not atom and ctypes.get_last_error() not in (0, 1410):
-            pass
+            already = False
+        if already:
+            atom = 1
+            last_err = 1410
+        else:
+            ctypes.set_last_error(0)
+            try:
+                atom = user32.RegisterClassW(ctypes.byref(wc))
+            except Exception:
+                atom = 0
+            last_err = int(ctypes.get_last_error() or 0)
+        if not should_create_tray_hwnd(int(atom or 0), last_err):
+            self._running = False
+            return
 
-        hwnd = user32.CreateWindowExW(
-            0,
-            class_name,
-            TRAY_DISPLAY_NAME,
-            0,
-            0,
-            0,
-            0,
-            0,
-            None,
-            None,
-            hinst,
-            None,
-        )
+        try:
+            hwnd = user32.CreateWindowExW(
+                0,
+                class_name,
+                TRAY_DISPLAY_NAME,
+                0,
+                0,
+                0,
+                0,
+                0,
+                None,
+                None,
+                hinst,
+                None,
+            )
+        except Exception:
+            hwnd = 0
         if not hwnd:
             self._running = False
             return

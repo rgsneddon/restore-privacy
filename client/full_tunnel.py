@@ -409,6 +409,7 @@ def windows_ipv6_leak_block_commands(*, tunnel_iface: str = "RPT") -> list[str]:
         "netsh interface teredo set state disabled",
         "netsh interface 6to4 set state state=disabled",
         "netsh interface isatap set state disabled",
+        "route -6 delete ::/0",
         windows_ipv6_disable_powershell(tunnel_iface=tunnel_iface),
     ]
 

@@ -260,6 +260,8 @@ class TestIpv4SkipForward(unittest.TestCase):
         self.assertTrue(ipv4_skip_forward("224.0.0.22"))
         self.assertTrue(ipv4_skip_forward("255.255.255.255"))
         self.assertTrue(ipv4_skip_forward("10.88.0.255"))
+        self.assertTrue(ipv4_skip_forward("192.168.1.1"))
+        self.assertTrue(ipv4_skip_forward("10.0.0.1"))
         self.assertFalse(ipv4_skip_forward("1.1.1.1"))
         self.assertFalse(ipv4_skip_forward("10.88.0.1"))
         self.assertFalse(ipv4_skip_forward("10.88.0.182"))
@@ -297,6 +299,94 @@ class TestIpv4SkipForward(unittest.TestCase):
         self.assertGreaterEqual(plane.stats.skipped_non_unicast, 1)
         self.assertEqual(plane.stats.first_tun_dst, "")
         plane.stop()
+        client._sock.close()
+
+    def test_dataplane_does_not_seal_ipv6(self) -> None:
+        pair = TestDataPlaneRealSealOpen()
+        session, _ = pair._session_pair()
+        client = RptClient.__new__(RptClient)
+        client.session = session
+        client.endpoint = Endpoint("127.0.0.1", 9)
+        client.state = ConnectState.CONNECTED
+        client._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        client._sock.bind(("127.0.0.1", 0))
+        client._sock.setblocking(False)
+
+        plane = RptDataPlane(client, tunnel_src_ip="10.88.0.203")
+        tun = QueueTun()
+        v6 = bytes([0x60]) + b"\x00" * 39
+        tun.inbound.put(v6)
+        plane.start(tun)
+        import time
+
+        time.sleep(0.2)
+        self.assertEqual(plane.stats.tun_to_udp, 0)
+        self.assertGreaterEqual(plane.stats.skipped_non_unicast, 1)
+        self.assertEqual(plane.stats.first_tun_src, "")
+        plane.stop()
+        client._sock.close()
+
+    def test_dataplane_does_not_seal_lan_gateway(self) -> None:
+        from client.dataplane import ipv4_src_dst
+
+        pair = TestDataPlaneRealSealOpen()
+        session, _ = pair._session_pair()
+        client = RptClient.__new__(RptClient)
+        client.session = session
+        client.endpoint = Endpoint("127.0.0.1", 9)
+        client.state = ConnectState.CONNECTED
+        client._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        client._sock.bind(("127.0.0.1", 0))
+        client._sock.setblocking(False)
+
+        plane = RptDataPlane(client, tunnel_src_ip="10.88.0.206")
+        tun = QueueTun()
+        lan = bytearray(28)
+        lan[0] = 0x45
+        lan[2] = 0
+        lan[3] = 28
+        lan[8] = 64
+        lan[9] = 17
+        lan[12:16] = bytes([10, 88, 0, 206])
+        lan[16:20] = bytes([192, 168, 1, 1])
+        self.assertEqual(ipv4_src_dst(bytes(lan)), ("10.88.0.206", "192.168.1.1"))
+        tun.inbound.put(bytes(lan))
+        plane.start(tun)
+        import time
+
+        time.sleep(0.2)
+        self.assertEqual(plane.stats.tun_to_udp, 0)
+        self.assertGreaterEqual(plane.stats.skipped_non_unicast, 1)
+        self.assertEqual(plane.stats.first_tun_dst, "")
+        plane.stop()
+        client._sock.close()
+
+    def test_seal_unicast_probe_increments_tun_to_udp(self) -> None:
+        from client.dataplane import build_ipv4_udp_probe, ipv4_src_dst
+
+        pkt = build_ipv4_udp_probe("10.88.0.206", "1.1.1.1")
+        self.assertIsNotNone(pkt)
+        self.assertEqual(ipv4_src_dst(pkt or b""), ("10.88.0.206", "1.1.1.1"))
+        self.assertIn(b"\x07example\x03com\x00", pkt or b"")
+        # UDP checksum must be non-zero (IPv4 UDP 0 is "no checksum").
+        self.assertGreater(len(pkt or b""), 27)
+        self.assertTrue((pkt or b"")[26] != 0 or (pkt or b"")[27] != 0)
+
+        pair = TestDataPlaneRealSealOpen()
+        session, _ = pair._session_pair()
+        client = RptClient.__new__(RptClient)
+        client.session = session
+        client.endpoint = Endpoint("127.0.0.1", 9)
+        client.state = ConnectState.CONNECTED
+        client._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        client._sock.bind(("127.0.0.1", 0))
+        client._sock.setblocking(False)
+
+        plane = RptDataPlane(client, tunnel_src_ip="10.88.0.206")
+        plane.stats.started = True
+        self.assertTrue(plane.seal_unicast_probe("1.1.1.1"))
+        self.assertEqual(plane.stats.tun_to_udp, 1)
+        self.assertEqual(plane.stats.first_tun_dst, "1.1.1.1")
         client._sock.close()
 
 

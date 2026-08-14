@@ -25,8 +25,10 @@ from client.windows.tray_win import (  # noqa: E402
     product_tray_guid_bytes,
     purge_product_tray_icon,
     resolve_tray_icon_path,
+    should_create_tray_hwnd,
     tray_icon_state_key,
     tray_tooltip_for_state,
+    tray_window_class_name,
 )
 from client.windows.installer import (  # noqa: E402
     SHORTCUT_DISPLAY_NAME,
@@ -73,6 +75,27 @@ class TestTrayBranding(unittest.TestCase):
         assert p is not None
         self.assertTrue(p.is_file())
         self.assertTrue(p.suffix.lower() in (".ico", ".png"))
+
+    def test_tray_class_name_is_per_pid(self):
+        a = tray_window_class_name(111)
+        b = tray_window_class_name(222)
+        self.assertEqual(a, "RptPrivacyRestoredTray_111")
+        self.assertEqual(b, "RptPrivacyRestoredTray_222")
+        self.assertNotEqual(a, b)
+        src = (ROOT / "client" / "windows" / "tray_win.py").read_text(encoding="utf-8")
+        self.assertIn("tray_window_class_name()", src)
+        self.assertNotIn(
+            'class_name = "RptPrivacyRestoredTray"',
+            src,
+        )
+        self.assertNotIn("UnregisterClassW(", src)
+        self.assertIn("GetClassInfoW", src)
+
+    def test_should_create_tray_hwnd(self):
+        self.assertTrue(should_create_tray_hwnd(1, 0))
+        self.assertTrue(should_create_tray_hwnd(0, 1410))
+        self.assertFalse(should_create_tray_hwnd(0, 5))
+        self.assertFalse(should_create_tray_hwnd(0, 0))
 
     def test_app_wires_tray(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
@@ -304,5 +327,35 @@ class TestBrandAssetsPresent(unittest.TestCase):
         )
 
 
+class TestSingleInstanceDecision(unittest.TestCase):
+    def test_handoff_always_continues(self):
+        from client.windows.single_instance import single_instance_decision
+
+        cont, reason = single_instance_decision(
+            mutex_owned=True, allow_handoff=True
+        )
+        self.assertTrue(cont)
+        self.assertEqual(reason, "handoff")
+
+    def test_second_launch_without_handoff_stops(self):
+        from client.windows.single_instance import single_instance_decision
+
+        cont, reason = single_instance_decision(
+            mutex_owned=True, allow_handoff=False
+        )
+        self.assertFalse(cont)
+        self.assertEqual(reason, "already_running")
+
+    def test_primary_continues(self):
+        from client.windows.single_instance import single_instance_decision
+
+        cont, reason = single_instance_decision(
+            mutex_owned=False, allow_handoff=False
+        )
+        self.assertTrue(cont)
+        self.assertEqual(reason, "primary")
+
+
 if __name__ == "__main__":
     unittest.main()
+

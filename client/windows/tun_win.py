@@ -198,12 +198,9 @@ class WintunTun:
     def interface_index(self) -> Optional[int]:
         """Windows IF index for route … IF <n> (anti-blackhole full-tunnel).
 
-        Prefer the adapter **name** (``RPT``) so dual /1 is not applied to a
-        stale LUID. Fall back to Wintun LUID → IF index when name resolve fails.
+        Prefer the live Wintun LUID (this process just created the adapter).
+        Name resolve via Get-NetAdapter used to sit 15s and blew attach.
         """
-        named = resolve_interface_index(self.name)
-        if named:
-            return named
         try:
             if self._adapter and self._WintunGetAdapterLUID is not None:
                 luid = NET_LUID()
@@ -213,7 +210,7 @@ class WintunTun:
                     return idx
         except Exception:
             pass
-        return None
+        return resolve_interface_index(self.name)
 
     def configure_address(self) -> list[str]:
         """Assign IPv4 /32 on Wintun — no fake gateway 10.88.0.1 (cannot ARP).
@@ -227,19 +224,15 @@ class WintunTun:
         from client.windows.hidden_subprocess import run_hidden
 
         ran: list[str] = []
+        # 3s: a hung netsh must not eat the 6s session-ready → Connected budget.
         for c in required:
             # netsh is a console app — must use run_hidden or a large blue
             # console flashes on Connect (pythonw has no console to inherit).
-            run_hidden(c, shell=True, text=True, timeout=8)
+            run_hidden(c, shell=True, text=True, timeout=3)
             ran.append(c)
-        # DNS add without validate=no contacts 10.88.0.1 before residual is up
-        # and hangs (desktop log: add dns timed out after 8s). Never fail attach.
-        for c in dns_cmds:
-            try:
-                run_hidden(c, shell=True, text=True, timeout=5)
-            except Exception:
-                pass
-            ran.append(c)
+        # DNS is stamped later (apply_routes / Unbound probe). Running it here
+        # doubled netsh and padded Connect by several seconds.
+        _ = dns_cmds
         return ran
 
     def read_packet(self, max_size: int = 65535, wait_ms: int = 20) -> Optional[bytes]:
@@ -399,6 +392,8 @@ def create_windows_tun(
 # log: Connected + no internet with IPv6 blocked). Public resolvers still leave
 # via dual /1. Do not stamp 10.88.0.1 on the IF unless Unbound actually answers.
 WINDOWS_TUNNEL_DNS_PUBLIC: tuple[str, ...] = ("1.1.1.1", "9.9.9.9")
+# Get-NetAdapter / netsh show interfaces must not sit 15s on attach.
+RESIDUAL_IF_RESOLVE_TIMEOUT_S = 1.5
 
 
 def wintun_attach_dns_servers(*, unbound_ok: bool = False) -> list[str]:
@@ -513,7 +508,7 @@ def resolve_interface_index(name: str) -> Optional[int]:
             ],
             shell=False,
             text=True,
-            timeout=15,
+            timeout=RESIDUAL_IF_RESOLVE_TIMEOUT_S,
         )
         out = (r.stdout or "").strip()
         if out.isdigit():
@@ -526,7 +521,7 @@ def resolve_interface_index(name: str) -> Optional[int]:
             ["netsh", "interface", "ipv4", "show", "interfaces"],
             shell=False,
             text=True,
-            timeout=15,
+            timeout=RESIDUAL_IF_RESOLVE_TIMEOUT_S,
         )
         out = r.stdout or ""
         for line in out.splitlines():

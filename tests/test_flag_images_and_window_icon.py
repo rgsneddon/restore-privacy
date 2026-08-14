@@ -79,6 +79,18 @@ class TestWindowIconBrand(unittest.TestCase):
         # Menubutton image compound for flags (not OptionMenu-only)
         self.assertIn("compound=tk.LEFT", app_src)
 
+    def test_win32_icon_helper_does_not_reenter_tk_or_set_class_long(self):
+        src = (ROOT / "client" / "windows" / "window_icon.py").read_text(
+            encoding="utf-8"
+        )
+        fn = src[src.find("def _win32_set_icons_from_ico") :]
+        self.assertNotIn("root.update_idletasks", fn)
+        self.assertNotIn("SetClassLongPtrW(", fn)
+        self.assertNotIn("SetClassLongW(", fn)
+        self.assertIn("SendMessageW", src)
+        app_src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
+        self.assertNotIn("_reapply_brand_icon", app_src)
+
     def test_apply_brand_window_icon_on_real_tk(self):
         import tkinter as tk
 

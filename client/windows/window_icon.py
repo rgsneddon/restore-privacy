@@ -113,10 +113,8 @@ def _win32_set_icons_from_ico(root: Any, ico: Path) -> bool:
     import ctypes
     from ctypes import wintypes
 
-    try:
-        root.update_idletasks()
-    except Exception:
-        pass
+    # Do not call update_idletasks here — re-entering Tk from after(200)
+    # while the tray thread starts AVs the process on open (fault.log).
     try:
         # Tk frame hwnd; parent is often the real toplevel for taskbar
         hwnd = int(root.winfo_id())
@@ -166,17 +164,8 @@ def _win32_set_icons_from_ico(root: Any, ico: Path) -> bool:
     if h_big.value:
         user32.SendMessageW(hwnd_w, WM_SETICON, ICON_BIG, h_big)
         ok = True
-    # Class icons — this is what replaces the Python/Tk feather on the taskbar
-    try:
-        set_cls = getattr(user32, "SetClassLongPtrW", None) or user32.SetClassLongW
-        if h_big.value:
-            set_cls(hwnd_w, GCL_HICON, h_big)
-            ok = True
-        if h_small.value:
-            set_cls(hwnd_w, GCL_HICONSM, h_small)
-            ok = True
-    except Exception:
-        pass
+    # Do not SetClassLongPtrW/GCL_HICON — that AVs on this host during
+    # open (tray + icon reapply). WM_SETICON is enough for the taskbar.
     # Stash handles so they are not destroyed mid-session
     try:
         root._rpt_hicon_small = h_small  # type: ignore[attr-defined]

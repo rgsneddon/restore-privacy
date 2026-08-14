@@ -41,6 +41,7 @@ class TestIpv6LeakCommandBuilders(unittest.TestCase):
         self.assertIn("Disable-NetAdapterBinding", joined_b)
         self.assertIn("Enable-NetAdapterBinding", joined_r)
         self.assertIn("teredo", joined_b.lower())
+        self.assertIn("route -6 delete ::/0", joined_b)
         # Tunnel name excluded from disable
         self.assertIn("RPT", joined_b)
         # Critical PS must not swallow disable failures
