@@ -9,7 +9,7 @@ hop list still names entry → exit for path honesty.
 the user's **selected entry** when healthy; automatically residual-fails over to
 the **other catalog peer** when preferred entry is draining/down; re-prefers
 entry when healthy again. Fail closed if neither path is usable. Live catalog
-peers are **Iceland (IS)** and **Germany (DE)** only.
+peer is **Germany (DE)** only (Iceland is not offered until sales).
 
 Node-only zram + LUKS2 applies on multi-hop hosts; clients never run LUKS/zram.
 
@@ -645,10 +645,10 @@ def alternate_peer_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
     for n in PRODUCT_COUNTRY_CATALOG:
         if (n.host or "").strip() != entry_host:
             return n.as_endpoint()
-    # Single-node catalog edge: cannot invent a peer
-    if entry_host == PRODUCT_EXIT_HOST:
-        return Endpoint(host=PRODUCT_NODE_HOST, port=PRODUCT_NODE_PORT)
-    return Endpoint(host=PRODUCT_EXIT_HOST, port=PRODUCT_EXIT_PORT)
+    raise ResidualUnavailable(
+        "fail closed: no alternate catalog peer — do not invent Iceland or "
+        "any host outside the offered residual list"
+    )
 
 
 def exit_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
@@ -744,10 +744,17 @@ def select_residual_endpoint(
     entry_ok = bool(entry_healthy) and not bool(entry_draining)
     exit_ok = bool(exit_healthy)
     entry_ep = entry_endpoint(cfg)
-    exit_ep = exit_endpoint(cfg)
+    try:
+        exit_ep = exit_endpoint(cfg)
+    except ResidualUnavailable:
+        exit_ep = entry_ep
+        exit_ok = False
     # Never treat same-host as a real failover peer
     if (exit_ep.host or "").strip() == (entry_ep.host or "").strip():
-        exit_ep = alternate_peer_endpoint(cfg)
+        try:
+            exit_ep = alternate_peer_endpoint(cfg)
+        except ResidualUnavailable:
+            exit_ok = False
         if (exit_ep.host or "").strip() == (entry_ep.host or "").strip():
             exit_ok = False
 
@@ -885,10 +892,16 @@ def residual_try_order(
 
     order: list[Endpoint] = [primary]
     entry_ep = entry_endpoint(cfg)
-    exit_ep = exit_endpoint(cfg)
+    try:
+        exit_ep = exit_endpoint(cfg)
+    except ResidualUnavailable:
+        exit_ep = None
     # Always allow try of the other hop when it is believed healthy
-    for alt, ok in ((exit_ep, exit_healthy), (entry_ep, entry_healthy and not entry_draining)):
-        if not ok:
+    for alt, ok in (
+        (exit_ep, exit_healthy),
+        (entry_ep, entry_healthy and not entry_draining),
+    ):
+        if alt is None or not ok:
             continue
         if any(a.host == alt.host and a.port == alt.port for a in order):
             continue

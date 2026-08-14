@@ -124,7 +124,8 @@ class TestWindowsFwWiring(unittest.TestCase):
         text = bat.read_text(encoding="utf-8", errors="replace")
         self.assertIn("RPT-FW", text)
         self.assertIn("allow-node-udp", text)
-        self.assertIn(PRODUCT_NODE_HOST, text)
+        self.assertNotIn(PRODUCT_NODE_HOST, text)
+        self.assertIn(PRODUCT_DE_HOST, text)
         self.assertIn("44044", text)
         inst = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
         self.assertIn("AllowFirewall.bat", inst)
@@ -166,22 +167,21 @@ class TestWindowsFwWiring(unittest.TestCase):
         self.assertNotIn("Set-NetFirewallProfile", body)
 
     def test_catalog_peers_is_and_de_both_allowed(self):
-        """DE residual must not be blocked when installer historically only allowed IS."""
+        """Firewall allows follow offered catalog (DE); Iceland is not a live peer."""
         hosts = residual_firewall_hosts()
-        self.assertIn(PRODUCT_NODE_HOST, hosts)
         self.assertIn(PRODUCT_DE_HOST, hosts)
+        self.assertNotIn(PRODUCT_NODE_HOST, hosts)
         body = windows_fw_allow_script()
-        self.assertIn(PRODUCT_NODE_HOST, body)
         self.assertIn(PRODUCT_DE_HOST, body)
+        self.assertNotIn(PRODUCT_NODE_HOST, body)
         self.assertEqual(assert_windows_fw_allow_script_safe(body), [])
-        # Explicit DE dial still keeps IS (failover) in the allow set
         body_de = windows_fw_allow_script(server_host=PRODUCT_DE_HOST)
         self.assertIn(PRODUCT_DE_HOST, body_de)
-        self.assertIn(PRODUCT_NODE_HOST, body_de)
+        self.assertNotIn(PRODUCT_NODE_HOST, body_de)
         bat = ROOT / "client" / "windows" / "AllowFirewall.bat"
         bat_text = bat.read_text(encoding="utf-8", errors="replace")
-        self.assertIn(PRODUCT_NODE_HOST, bat_text)
         self.assertIn(PRODUCT_DE_HOST, bat_text)
+        self.assertNotIn(PRODUCT_NODE_HOST, bat_text)
 
 
 class TestNoInternetBlackholeOnFailedResidual(unittest.TestCase):

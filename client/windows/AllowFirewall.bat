@@ -14,8 +14,7 @@ if errorlevel 1 (
   exit /b %ERRORLEVEL%
 )
 
-REM Live residual catalog peers (IS + DE) — must match client.multihop PRODUCT_COUNTRY_CATALOG
-set "NODE_IS=82.221.101.241"
+REM Live residual catalog peers (DE only until sales)
 set "NODE_DE=178.105.187.178"
 set "PORT=44044"
 set "EXE="
@@ -27,7 +26,7 @@ if not defined EXE (
 echo Adding scoped Windows Defender Firewall allows for Restore Privacy...
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ErrorActionPreference='Stop'; $pfx='RPT-FW'; $nodes=@('%NODE_IS%','%NODE_DE%'); $port=%PORT%; $exe='%EXE%';" ^
+  "$ErrorActionPreference='Stop'; $pfx='RPT-FW'; $nodes=@('%NODE_DE%'); $port=%PORT%; $exe='%EXE%';" ^
   "Get-NetFirewallRule -EA SilentlyContinue | Where-Object { $_.DisplayName -like ($pfx+'-*') } | Remove-NetFirewallRule -EA SilentlyContinue;" ^
   "New-NetFirewallRule -DisplayName ($pfx+'-allow-node-udp') -Direction Outbound -Action Allow -Protocol UDP -RemoteAddress $nodes -RemotePort $port -Enabled True -Profile Any | Out-Null;" ^
   "New-NetFirewallRule -DisplayName ($pfx+'-allow-node-any') -Direction Outbound -Action Allow -RemoteAddress $nodes -Enabled True -Profile Any -EA SilentlyContinue | Out-Null;" ^

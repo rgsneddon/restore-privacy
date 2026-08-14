@@ -42,12 +42,13 @@ from client.windows.settings_store import (  # noqa: E402
 class TestResolveEntryExit(unittest.TestCase):
     def test_single_hop_iceland(self):
         entry, exit_n = resolve_entry_exit(COUNTRY_IS, multihop_enabled=False)
-        self.assertEqual(entry.code, COUNTRY_IS)
-        self.assertEqual(entry.host, PRODUCT_NODE_HOST)
+        self.assertEqual(entry.code, COUNTRY_DE)
+        self.assertEqual(entry.host, PRODUCT_DE_HOST)
         self.assertIsNone(exit_n)
         cfg = multihop_config_for_entry_country(COUNTRY_IS, multihop_enabled=False)
         self.assertFalse(is_multihop_active(cfg))
-        self.assertEqual(residual_endpoint(cfg).host, PRODUCT_NODE_HOST)
+        self.assertEqual(residual_endpoint(cfg).host, PRODUCT_DE_HOST)
+        self.assertNotEqual(residual_endpoint(cfg).host, PRODUCT_NODE_HOST)
 
     def test_stale_romania_normalizes_to_de(self):
         entry, exit_n = resolve_entry_exit(COUNTRY_RO, multihop_enabled=False)
@@ -62,22 +63,22 @@ class TestResolveEntryExit(unittest.TestCase):
         )
 
     def test_multihop_iceland_entry_de_exit(self):
-        # Two-peer catalog: only non-entry exit is DE
+        # Iceland is not offered: stale IS heals to DE; no second catalog peer.
         entry, exit_n = resolve_entry_exit(
             COUNTRY_IS, multihop_enabled=True, rng=random.Random(0)
         )
-        self.assertEqual(entry.code, COUNTRY_IS)
-        self.assertIsNotNone(exit_n)
-        assert exit_n is not None
-        self.assertEqual(exit_n.code, COUNTRY_DE)
-        self.assertNotEqual(entry.host, exit_n.host)
+        self.assertEqual(entry.code, COUNTRY_DE)
+        self.assertIsNone(exit_n)
         cfg = multihop_config_for_entry_country(
             COUNTRY_IS, multihop_enabled=True, rng=random.Random(0)
         )
-        self.assertTrue(is_multihop_active(cfg))
-        self.assertEqual(entry_endpoint(cfg).host, PRODUCT_NODE_HOST)
-        self.assertEqual(exit_endpoint(cfg).host, PRODUCT_DE_HOST)
-        self.assertEqual(residual_endpoint(cfg).host, exit_endpoint(cfg).host)
+        self.assertFalse(is_multihop_active(cfg))
+        self.assertEqual(entry_endpoint(cfg).host, PRODUCT_DE_HOST)
+        self.assertEqual(residual_endpoint(cfg).host, PRODUCT_DE_HOST)
+        from client.multihop import ResidualUnavailable, exit_endpoint
+
+        with self.assertRaises(ResidualUnavailable):
+            exit_endpoint(cfg)
 
     def test_single_hop_germany(self):
         entry, exit_n = resolve_entry_exit(COUNTRY_DE, multihop_enabled=False)
@@ -116,17 +117,14 @@ class TestResolveEntryExit(unittest.TestCase):
                     self.assertNotEqual(e.host, x.host)
 
     def test_single_hop_de_drain_failovers_to_iceland(self):
-        from client.multihop import select_residual_endpoint
+        from client.multihop import ResidualUnavailable, select_residual_endpoint
 
         cfg = multihop_config_for_entry_country(COUNTRY_DE, multihop_enabled=False)
         self.assertEqual(entry_endpoint(cfg).host, PRODUCT_DE_HOST)
-        sel = select_residual_endpoint(
-            cfg, entry_healthy=True, exit_healthy=True, entry_draining=True
-        )
-        # Prefer alternate catalog peer when preferred draining
-        self.assertIn(sel.endpoint.host, {PRODUCT_NODE_HOST, PRODUCT_DE_HOST})
-        if sel.failover_active:
-            self.assertEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
+        with self.assertRaises(ResidualUnavailable):
+            select_residual_endpoint(
+                cfg, entry_healthy=True, exit_healthy=True, entry_draining=True
+            )
 
     def test_random_among_non_entry_when_catalog_expanded(self):
         extra = CountryNode(
@@ -141,16 +139,15 @@ class TestResolveEntryExit(unittest.TestCase):
         picks = set()
         for _ in range(40):
             _e, x = resolve_entry_exit(
-                COUNTRY_IS, multihop_enabled=True, catalog=cat, rng=rng
+                COUNTRY_DE, multihop_enabled=True, catalog=cat, rng=rng
             )
             assert x is not None
             picks.add(x.code)
-        self.assertIn(COUNTRY_DE, picks)
         self.assertIn("XX", picks)
         self.assertNotIn(COUNTRY_IS, picks)
 
     def test_normalize_aliases(self):
-        self.assertEqual(normalize_entry_country("iceland"), COUNTRY_IS)
+        self.assertEqual(normalize_entry_country("iceland"), COUNTRY_DE)
         self.assertEqual(normalize_entry_country("Romania"), COUNTRY_DE)
         self.assertEqual(normalize_entry_country("USA"), COUNTRY_DE)
         self.assertEqual(normalize_entry_country("US"), COUNTRY_DE)
@@ -172,7 +169,7 @@ class TestSettingsEntryCountryPersist(unittest.TestCase):
             s = ProductSettings(entry_country=COUNTRY_IS, privacy_multihop=True)
             save_settings(s, path=path)
             loaded = load_settings(path=path)
-            self.assertEqual(loaded.entry_country, COUNTRY_IS)
+            self.assertEqual(loaded.entry_country, COUNTRY_DE)
             self.assertTrue(loaded.privacy_multihop)
             # Stale RO on disk normalizes to DE on load
             s2 = ProductSettings(entry_country=COUNTRY_RO)
@@ -186,8 +183,8 @@ class TestSettingsEntryCountryPersist(unittest.TestCase):
         self.assertIn("OptionMenu", src)
         self.assertIn("entry_country=", src)
         self.assertIn("catalog_country_options", src)
-        self.assertIn("Iceland", src)
         self.assertIn("Germany", src)
+        self.assertNotIn("Iceland or Germany", src)
         self.assertNotIn("United States", src)
         self.assertNotIn("Romania", src)
 
@@ -205,7 +202,8 @@ class TestConnectWiring(unittest.TestCase):
 
     def test_catalog_live_codes_only(self):
         codes = {n.code for n in PRODUCT_COUNTRY_CATALOG}
-        self.assertEqual(codes, {COUNTRY_IS, COUNTRY_DE})
+        self.assertEqual(codes, {COUNTRY_DE})
+        self.assertNotIn(COUNTRY_IS, codes)
         self.assertNotIn(COUNTRY_US, codes)
         self.assertNotIn(COUNTRY_RO, codes)
 

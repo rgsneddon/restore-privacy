@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT))
 from client.connect import RptClient  # noqa: E402
 from client.endpoint import Endpoint  # noqa: E402
 from client.multihop import (  # noqa: E402
+    PRODUCT_DE_HOST,
     PRODUCT_EXIT_HOST,
     PRODUCT_NODE_HOST,
     PRODUCT_US_HOST,
@@ -51,7 +52,9 @@ class TestPrimaryResidualTryOrder(unittest.TestCase):
             exit_healthy=True,
             entry_draining=False,
         )
-        self.assertEqual(sel.endpoint.host, PRODUCT_US_HOST)
+        # Stale US heals to DE; DE-only catalog has no Iceland failover.
+        self.assertEqual(sel.endpoint.host, PRODUCT_DE_HOST)
+        self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
         self.assertEqual(sel.reason, "entry_primary")
         self.assertFalse(sel.failover_active)
 
@@ -61,11 +64,8 @@ class TestPrimaryResidualTryOrder(unittest.TestCase):
             exit_healthy=True,
             entry_draining=False,
         )
-        self.assertGreaterEqual(len(order), 2)
-        self.assertEqual(order[0].host, PRODUCT_US_HOST)
-        # Alternate catalog peer for genuine HELLO failover (IS or RO)
-        alt_hosts = {e.host for e in order[1:]}
-        self.assertTrue(alt_hosts & {PRODUCT_NODE_HOST, PRODUCT_EXIT_HOST})
+        self.assertEqual([e.host for e in order], [PRODUCT_DE_HOST])
+        self.assertNotIn(PRODUCT_NODE_HOST, [e.host for e in order])
 
     def test_forced_primary_fail_try_order_failover_to_alternate(self) -> None:
         cfg = multihop_config_for_entry_country("US", multihop_enabled=False)
@@ -75,8 +75,8 @@ class TestPrimaryResidualTryOrder(unittest.TestCase):
             exit_healthy=True,
             entry_draining=False,
         )
-        self.assertEqual(order[0].host, PRODUCT_US_HOST)
-        self.assertNotEqual(order[1].host, PRODUCT_US_HOST)
+        self.assertEqual(order[0].host, PRODUCT_DE_HOST)
+        self.assertNotIn(PRODUCT_NODE_HOST, [e.host for e in order])
 
     def test_both_unhealthy_fail_closed(self) -> None:
         cfg = multihop_config_for_entry_country("US", multihop_enabled=False)
@@ -132,14 +132,8 @@ class TestPrimaryResidualTryOrder(unittest.TestCase):
         calls: list[str] = []
 
         def _fake_hello(ep, **_kw):
-            from client.connect import ConnectResult, ConnectState
-
             calls.append(ep.host)
-            if ep.host == PRODUCT_US_HOST:
-                raise TimeoutError("simulated primary HELLO timeout")
-            client.endpoint = ep
-            client.state = ConnectState.CONNECTED
-            return ConnectResult(ok=True, state=ConnectState.CONNECTED, message="ok")
+            raise TimeoutError("simulated primary HELLO timeout")
 
         with mock.patch.object(client, "_hello_to_endpoint", side_effect=_fake_hello):
             with mock.patch(
@@ -152,14 +146,11 @@ class TestPrimaryResidualTryOrder(unittest.TestCase):
                 ):
                     result = client.connect(timeout=2.0)
 
-        self.assertTrue(result.ok)
-        self.assertEqual(calls[0], PRODUCT_US_HOST)
-        self.assertNotEqual(calls[1], PRODUCT_US_HOST)
-        self.assertEqual(client.last_selection_reason, "hello_failover")
-        self.assertTrue(
-            any("Primary residual failed" in s for s in statuses),
-            statuses,
-        )
+        # DE-only: one HELLO target; no Iceland failover after primary fail.
+        self.assertFalse(result.ok)
+        self.assertEqual(calls, [PRODUCT_DE_HOST])
+        self.assertNotIn(PRODUCT_NODE_HOST, calls)
+        self.assertNotEqual(client.last_selection_reason, "hello_failover")
 
 
 class TestUsPubCatalogHeal(unittest.TestCase):

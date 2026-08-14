@@ -55,20 +55,17 @@ except Exception:  # noqa: BLE001
 
 class TestWipeHopSelection(unittest.TestCase):
     def test_drain_hops_to_non_preferred(self):
-        sel = select_wipe_aware_residual(
-            MultiHopConfig(),
-            preferred_draining=True,
-            preferred_healthy=True,
-            peer_health={
-                PRODUCT_NODE_HOST: True,
-                PRODUCT_EXIT_HOST: True,
-            },
-            rng=random.Random(0),
-        )
-        self.assertEqual(sel.reason, REASON_WIPE_DRAIN_FAILOVER)
-        self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
-        self.assertTrue(sel.failover_active)
-        self.assertEqual(sel.preferred_host, PRODUCT_NODE_HOST)
+        with self.assertRaises(ResidualUnavailable):
+            select_wipe_aware_residual(
+                MultiHopConfig(),
+                preferred_draining=True,
+                preferred_healthy=True,
+                peer_health={
+                    PRODUCT_DE_HOST: True,
+                    PRODUCT_NODE_HOST: True,
+                },
+                rng=random.Random(0),
+            )
 
     def test_ready_rejoins_preferred(self):
         sel = select_wipe_aware_residual(
@@ -77,26 +74,27 @@ class TestWipeHopSelection(unittest.TestCase):
             preferred_healthy=True,
         )
         self.assertEqual(sel.reason, REASON_WIPE_REJOIN)
-        self.assertEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
+        self.assertEqual(sel.endpoint.host, PRODUCT_DE_HOST)
+        self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
         self.assertFalse(sel.failover_active)
 
     def test_alternate_never_same_host(self):
         pref = MultiHopConfig()
         for seed in range(20):
-            sel = select_wipe_aware_residual(
-                pref,
-                preferred_draining=True,
-                peer_health={
-                    PRODUCT_NODE_HOST: False,
-                    PRODUCT_EXIT_HOST: True,
-                },
-                rng=random.Random(seed),
-            )
-            self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
+            with self.assertRaises(ResidualUnavailable):
+                select_wipe_aware_residual(
+                    pref,
+                    preferred_draining=True,
+                    peer_health={
+                        PRODUCT_DE_HOST: True,
+                        PRODUCT_NODE_HOST: True,
+                    },
+                    rng=random.Random(seed),
+                )
 
     def test_catalog_alternates_include_de_and_us(self):
-        """Three-peer catalog: DE and US eligible when preferred is IS."""
-        preferred = Endpoint(host=PRODUCT_NODE_HOST, port=44044)
+        """Offered catalog is DE-only: no IS/US alternate from shipped catalog."""
+        preferred = Endpoint(host=PRODUCT_DE_HOST, port=44044)
         alts = eligible_wipe_alternates(
             preferred,
             peer_health={
@@ -107,43 +105,34 @@ class TestWipeHopSelection(unittest.TestCase):
             catalog=PRODUCT_COUNTRY_CATALOG,
         )
         hosts = {a.host for a in alts}
-        self.assertEqual(hosts, {PRODUCT_DE_HOST, PRODUCT_US_HOST})
+        self.assertEqual(hosts, set())
         self.assertNotIn(PRODUCT_NODE_HOST, hosts)
-        seen: set[str] = set()
-        for seed in range(40):
-            ep = pick_random_alternate(
-                preferred,
+        ep = pick_random_alternate(
+            preferred,
+            peer_health={
+                PRODUCT_DE_HOST: True,
+                PRODUCT_NODE_HOST: True,
+            },
+            catalog=PRODUCT_COUNTRY_CATALOG,
+            rng=random.Random(0),
+        )
+        self.assertIsNone(ep)
+
+    def test_de_preferred_drain_hops_to_is_or_us(self):
+        """DE-only catalog: drain has no alternate — fail closed, never Iceland."""
+        cfg = multihop_config_for_entry_country("DE", multihop_enabled=False)
+        with self.assertRaises(ResidualUnavailable):
+            select_wipe_aware_residual(
+                cfg,
+                preferred_draining=True,
+                preferred_healthy=True,
                 peer_health={
+                    PRODUCT_NODE_HOST: True,
                     PRODUCT_DE_HOST: True,
                     PRODUCT_US_HOST: True,
                 },
-                catalog=PRODUCT_COUNTRY_CATALOG,
-                rng=random.Random(seed),
+                rng=random.Random(1),
             )
-            assert ep is not None
-            seen.add(ep.host)
-        self.assertGreaterEqual(len(seen), 2)
-        self.assertIn(PRODUCT_DE_HOST, seen)
-        self.assertIn(PRODUCT_US_HOST, seen)
-
-    def test_de_preferred_drain_hops_to_is_or_us(self):
-        """Monopin DE preferred draining → alternate is IS or US (not DE)."""
-        cfg = multihop_config_for_entry_country("DE", multihop_enabled=False)
-        sel = select_wipe_aware_residual(
-            cfg,
-            preferred_draining=True,
-            preferred_healthy=True,
-            peer_health={
-                PRODUCT_NODE_HOST: True,
-                PRODUCT_DE_HOST: True,
-                PRODUCT_US_HOST: True,
-            },
-            rng=random.Random(1),
-        )
-        self.assertEqual(sel.reason, REASON_WIPE_DRAIN_FAILOVER)
-        self.assertIn(sel.endpoint.host, {PRODUCT_NODE_HOST, PRODUCT_US_HOST})
-        self.assertNotEqual(sel.endpoint.host, PRODUCT_DE_HOST)
-        # rejoin preferred DE when ready
         sel2 = select_wipe_aware_residual(
             cfg,
             preferred_draining=False,
@@ -158,22 +147,15 @@ class TestWipeHopSelection(unittest.TestCase):
         self.assertEqual(sel2.endpoint.host, PRODUCT_DE_HOST)
 
     def test_select_residual_endpoint_drain_multi_peer(self):
-        seen: set[str] = set()
-        for seed in range(30):
-            sel = select_residual_endpoint(
-                MultiHopConfig(),
-                entry_healthy=True,
-                exit_healthy=True,
-                entry_draining=True,
-                rng=random.Random(seed),
-            )
-            self.assertIn(
-                sel.reason,
-                (REASON_WIPE_DRAIN_FAILOVER, "exit_failover"),
-            )
-            self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
-            seen.add(sel.endpoint.host)
-        self.assertGreaterEqual(len(seen), 1)
+        for seed in range(10):
+            with self.assertRaises(ResidualUnavailable):
+                select_residual_endpoint(
+                    MultiHopConfig(),
+                    entry_healthy=True,
+                    exit_healthy=True,
+                    entry_draining=True,
+                    rng=random.Random(seed),
+                )
 
     def test_no_alternate_fail_closed(self):
         with self.assertRaises(ResidualUnavailable):

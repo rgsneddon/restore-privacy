@@ -61,3 +61,47 @@ class TestIcelandNotWipeTarget(unittest.TestCase):
         self.assertNotIn("IS", [n.code for n in product_country_catalog()])
         self.assertNotEqual(next_wipe_target(completed=[], in_progress=None), "IS")
         self.assertEqual(next_wipe_target(completed=[], in_progress=None), "DE")
+
+
+class TestNoIcelandFailoverOrFirewall(unittest.TestCase):
+    def test_try_order_and_drain_never_dial_iceland(self) -> None:
+        from client.endpoint import PRODUCT_NODE_HOST
+        from client.multihop import (
+            PRODUCT_DE_HOST,
+            ResidualUnavailable,
+            default_single_hop,
+            residual_try_order,
+            select_residual_endpoint,
+        )
+
+        cfg = default_single_hop()
+        order = residual_try_order(cfg)
+        hosts = [e.host for e in order]
+        self.assertEqual(hosts, [PRODUCT_DE_HOST])
+        self.assertNotIn(PRODUCT_NODE_HOST, hosts)
+        sel = select_residual_endpoint(
+            cfg, entry_healthy=True, exit_healthy=True, entry_draining=False
+        )
+        self.assertEqual(sel.endpoint.host, PRODUCT_DE_HOST)
+        self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
+        self.assertEqual(sel.reason, "entry_primary")
+        with self.assertRaises(ResidualUnavailable):
+            select_residual_endpoint(
+                cfg, entry_healthy=True, exit_healthy=True, entry_draining=True
+            )
+        with self.assertRaises(ResidualUnavailable):
+            select_residual_endpoint(
+                cfg, entry_healthy=False, exit_healthy=True, entry_draining=False
+            )
+
+    def test_firewall_hosts_follow_offered_catalog(self) -> None:
+        from client.endpoint import PRODUCT_NODE_HOST
+        from client.multihop import PRODUCT_DE_HOST, offered_catalog_hosts
+        from client.windows.firewall_allow import residual_firewall_hosts
+
+        hosts = residual_firewall_hosts()
+        self.assertEqual(set(hosts), set(offered_catalog_hosts()))
+        self.assertIn(PRODUCT_DE_HOST, hosts)
+        self.assertNotIn(PRODUCT_NODE_HOST, hosts)
+        de_only = residual_firewall_hosts(server_host=PRODUCT_DE_HOST)
+        self.assertNotIn(PRODUCT_NODE_HOST, de_only)

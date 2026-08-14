@@ -41,27 +41,33 @@ def _ps_escape_single(s: str) -> str:
 def residual_firewall_hosts(server_host: str | None = None) -> list[str]:
     """Hosts that must be allowed for residual HELLO (catalog peers + dial target).
 
-    Product catalog is Iceland + Germany. AllowFirewall / Connect path must cover
-    **every** live residual peer so DE entry (and IS failover) is not blocked when
-    the installer only baked the historical Iceland monopin address.
+    Offered residual catalog only (Germany today). Do not append Iceland
+    ``PRODUCT_NODE_HOST`` when it is not a live connection option.
     """
     hosts: list[str] = []
     primary = (server_host or "").strip()
     if primary:
         hosts.append(primary)
     try:
-        from client.multihop import product_country_catalog
+        from client.multihop import offered_catalog_hosts, product_country_catalog
 
         for n in product_country_catalog():
             h = (getattr(n, "host", None) or "").strip()
             if h and h not in hosts:
                 hosts.append(h)
+        for h in offered_catalog_hosts():
+            hh = (h or "").strip()
+            if hh and hh not in hosts:
+                hosts.append(hh)
     except Exception:  # noqa: BLE001
         pass
-    if PRODUCT_NODE_HOST.strip() and PRODUCT_NODE_HOST.strip() not in hosts:
-        hosts.append(PRODUCT_NODE_HOST.strip())
     if not hosts:
-        hosts = [PRODUCT_NODE_HOST.strip() or "82.221.101.241"]
+        try:
+            from client.multihop import PRODUCT_DE_HOST
+
+            hosts = [str(PRODUCT_DE_HOST).strip()]
+        except Exception:  # noqa: BLE001
+            hosts = ["178.105.187.178"]
     return hosts
 
 

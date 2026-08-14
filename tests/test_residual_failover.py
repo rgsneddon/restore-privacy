@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 from client.endpoint import PRODUCT_NODE_HOST  # noqa: E402
 from client.multihop import (  # noqa: E402
     PRODUCT_COUNTRY_CATALOG,
+    PRODUCT_DE_HOST,
     PRODUCT_EXIT_HOST,
     MultiHopConfig,
     ResidualUnavailable,
@@ -39,53 +40,48 @@ class TestResidualFailoverSelection(unittest.TestCase):
             exit_healthy=True,
             entry_draining=False,
         )
-        self.assertEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
+        self.assertEqual(sel.endpoint.host, PRODUCT_DE_HOST)
+        self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
         self.assertEqual(sel.reason, "entry_primary")
         self.assertFalse(sel.failover_active)
 
     def test_wipe_drain_hops_to_random_non_preferred(self):
-        """Preferred draining → wipe_drain_failover to any healthy non-preferred peer."""
-        sel = select_residual_endpoint(
-            MultiHopConfig(),
-            entry_healthy=True,
-            exit_healthy=True,
-            entry_draining=True,
-        )
-        self.assertIn(sel.endpoint.host, _catalog_hosts_except(PRODUCT_NODE_HOST))
-        self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
-        self.assertEqual(sel.reason, REASON_WIPE_DRAIN_FAILOVER)
-        self.assertTrue(sel.failover_active)
+        """Sole offered peer: drain must fail closed — do not invent Iceland."""
+        with self.assertRaises(ResidualUnavailable):
+            select_residual_endpoint(
+                MultiHopConfig(),
+                entry_healthy=True,
+                exit_healthy=True,
+                entry_draining=True,
+            )
+        self.assertEqual(_catalog_hosts_except(PRODUCT_DE_HOST), set())
 
     def test_exit_failover_when_entry_unhealthy(self):
-        """Entry down (not draining) → exit_failover to a healthy alternate peer."""
-        sel = select_residual_endpoint(
-            MultiHopConfig(),
-            entry_healthy=False,
-            exit_healthy=True,
-            entry_draining=False,
-        )
-        self.assertIn(sel.endpoint.host, _catalog_hosts_except(PRODUCT_NODE_HOST))
-        self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
-        self.assertEqual(sel.reason, "exit_failover")
-        self.assertTrue(sel.failover_active)
+        """Sole offered peer: entry down must fail closed — do not dial Iceland."""
+        with self.assertRaises(ResidualUnavailable):
+            select_residual_endpoint(
+                MultiHopConfig(),
+                entry_healthy=False,
+                exit_healthy=True,
+                entry_draining=False,
+            )
 
     def test_reentry_when_entry_healthy_again(self):
-        # During wipe: drain hop-off; after rebuild: prefer entry again
-        down = select_residual_endpoint(
-            MultiHopConfig(),
-            entry_healthy=False,
-            exit_healthy=True,
-            entry_draining=True,
-        )
-        self.assertEqual(down.reason, REASON_WIPE_DRAIN_FAILOVER)
-        self.assertNotEqual(down.endpoint.host, PRODUCT_NODE_HOST)
+        with self.assertRaises(ResidualUnavailable):
+            select_residual_endpoint(
+                MultiHopConfig(),
+                entry_healthy=False,
+                exit_healthy=True,
+                entry_draining=True,
+            )
         up = select_residual_endpoint(
             MultiHopConfig(),
             entry_healthy=True,
             exit_healthy=True,
             entry_draining=False,
         )
-        self.assertEqual(up.endpoint.host, PRODUCT_NODE_HOST)
+        self.assertEqual(up.endpoint.host, PRODUCT_DE_HOST)
+        self.assertNotEqual(up.endpoint.host, PRODUCT_NODE_HOST)
         self.assertEqual(up.reason, "entry_primary")
         self.assertFalse(up.failover_active)
 
@@ -100,7 +96,12 @@ class TestResidualFailoverSelection(unittest.TestCase):
         self.assertIn("fail closed", str(cm.exception).lower())
 
     def test_multihop_active_residual_via_exit_when_entry_up(self):
-        path = build_entry_exit_path(PRODUCT_EXIT_HOST)
+        from client.multihop import Hop
+
+        path = [
+            Hop(PRODUCT_DE_HOST, 44044, role="entry"),
+            Hop("198.51.100.9", 44044, role="exit"),
+        ]
         cfg = MultiHopConfig(hops=path, enabled=True)
         sel = select_residual_endpoint(
             cfg,
@@ -108,22 +109,22 @@ class TestResidualFailoverSelection(unittest.TestCase):
             exit_healthy=True,
             entry_draining=False,
         )
-        self.assertEqual(sel.endpoint.host, PRODUCT_EXIT_HOST)
+        self.assertEqual(sel.endpoint.host, "198.51.100.9")
         self.assertEqual(sel.reason, "multihop_residual_via_exit")
         self.assertFalse(sel.failover_active)
+        self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
 
     def test_multihop_entry_drain_wipe_hop(self):
         path = build_entry_exit_path(PRODUCT_EXIT_HOST)
         cfg = MultiHopConfig(hops=path, enabled=True)
-        sel = select_residual_endpoint(
-            cfg,
-            entry_healthy=True,
-            exit_healthy=True,
-            entry_draining=True,
-        )
-        self.assertIn(sel.endpoint.host, _catalog_hosts_except(PRODUCT_NODE_HOST))
-        self.assertEqual(sel.reason, REASON_WIPE_DRAIN_FAILOVER)
-        self.assertTrue(sel.failover_active)
+        # Default entry is DE; exit is also DE — no other catalog peer.
+        with self.assertRaises(ResidualUnavailable):
+            select_residual_endpoint(
+                cfg,
+                entry_healthy=True,
+                exit_healthy=True,
+                entry_draining=True,
+            )
 
     def test_try_order_failover_includes_alternate(self):
         order = residual_try_order(
@@ -132,11 +133,8 @@ class TestResidualFailoverSelection(unittest.TestCase):
             exit_healthy=True,
             entry_draining=False,
         )
-        self.assertGreaterEqual(len(order), 1)
-        self.assertEqual(order[0].host, PRODUCT_NODE_HOST)
-        # Healthy exit is alternate for HELLO failover
-        hosts = [e.host for e in order]
-        self.assertIn(PRODUCT_EXIT_HOST, hosts)
+        self.assertEqual([e.host for e in order], [PRODUCT_DE_HOST])
+        self.assertNotIn(PRODUCT_NODE_HOST, [e.host for e in order])
 
         drained = residual_try_order(
             MultiHopConfig(),
@@ -144,17 +142,15 @@ class TestResidualFailoverSelection(unittest.TestCase):
             exit_healthy=True,
             entry_draining=True,
         )
-        self.assertGreaterEqual(len(drained), 1)
-        self.assertIn(drained[0].host, _catalog_hosts_except(PRODUCT_NODE_HOST))
-        self.assertNotEqual(drained[0].host, PRODUCT_NODE_HOST)
+        self.assertEqual(drained, [])
+        self.assertNotIn(PRODUCT_NODE_HOST, [e.host for e in drained])
 
     def test_selection_to_dict(self):
-        d = select_residual_endpoint(
-            MultiHopConfig(), entry_draining=True
-        ).to_dict()
-        self.assertIn(d["host"], _catalog_hosts_except(PRODUCT_NODE_HOST))
-        self.assertEqual(d["reason"], REASON_WIPE_DRAIN_FAILOVER)
-        self.assertTrue(d["failover_active"])
+        d = select_residual_endpoint(MultiHopConfig()).to_dict()
+        self.assertEqual(d["host"], PRODUCT_DE_HOST)
+        self.assertNotEqual(d["host"], PRODUCT_NODE_HOST)
+        self.assertEqual(d["reason"], "entry_primary")
+        self.assertFalse(d["failover_active"])
 
 
 if __name__ == "__main__":
