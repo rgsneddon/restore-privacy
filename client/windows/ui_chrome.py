@@ -1,9 +1,8 @@
-"""Windows product UI chrome: center placement, size floors, neon boxes, switches.
+"""Windows product UI chrome: center placement, size floors, Evolve cards, switches.
 
-Aligns the desktop shell with restoreprivacy.online **panel-card** language:
-rounded card padding, neon/teal accent borders, and switch-style toggles for
-Settings booleans. Classic Tk cannot do CSS ``border-radius``; multi-frame
-rings approximate neon rounded boxes.
+Aligns the desktop shell with Evolve dark chrome (indigo ring, teal secondary)
+and restoreprivacy.online panel-card language. Classic Tk cannot do CSS
+``border-radius``; multi-frame rings approximate rounded boxes.
 """
 
 from __future__ import annotations
@@ -11,23 +10,24 @@ from __future__ import annotations
 import tkinter as tk
 from typing import Any, Callable, Optional
 
-# --- Site-aligned neon / box tokens (restoreprivacy.online panel-card feel) ---
-NEON_BORDER = "#2EE6D6"  # neon teal edge
-NEON_BORDER_DIM = "#1B767E"  # product STATUS_OK teal
-NEON_GLOW_SOFT = "#0D3D42"  # outer glow ring (dark)
-CARD_BG = "#FFFFFF"
-CHROME_DARKISH = "#0B1218"  # deep chrome behind cards (site dark stack)
-SWITCH_TRACK_OFF = "#CBD5E1"
-SWITCH_TRACK_ON = "#1B767E"
+# --- Evolve-inspired neon / box tokens (indigo ring, teal secondary) ---
+NEON_BORDER = "#6C63FF"  # Evolve accent
+NEON_BORDER_DIM = "#00D9C0"  # Evolve secondary / connected
+NEON_GLOW_SOFT = "#1A1F2B"  # Evolve fill
+CARD_BG = "#151922"  # Evolve card
+CHROME_DARKISH = "#0D0F14"  # Evolve canvas
+SWITCH_TRACK_OFF = "#2A3142"
+SWITCH_TRACK_ON = "#6C63FF"
 SWITCH_KNOB = "#FFFFFF"
 SWITCH_WIDTH = 52
 SWITCH_HEIGHT = 28
 SWITCH_PAD = 3
+HERO_ORB_SIZE = 88
 
-# Default / minimum geometries (width, height) — large enough for primary content
+# Default / minimum geometries (width, height) — room for hero orb
 SURFACE_SIZES: dict[str, tuple[tuple[int, int], tuple[int, int]]] = {
     # surface: (default_wh, min_wh)
-    "main": ((600, 680), (560, 600)),
+    "main": ((640, 760), (580, 640)),
     "licence": ((560, 540), (520, 480)),
     "keygen": ((560, 480), (520, 420)),
     "renew": ((560, 420), (520, 380)),
@@ -140,17 +140,19 @@ def make_neon_card(
     padx: int = 14,
     pady: int = 12,
     bg: str = CARD_BG,
+    ring: str = NEON_BORDER,
+    glow: str = NEON_GLOW_SOFT,
 ) -> tuple[Any, Any]:
-    """Build a site-like neon-bordered card; return ``(inner_content, outer_frame)``.
+    """Build an Evolve-like indigo-ringed card; return ``(inner_content, outer_frame)``.
 
-    Outer neon ring + soft glow ring + white/panel body (rounded language via
+    Outer accent ring + soft fill glow + panel body (rounded language via
     padding and multi-layer frames — classic Tk has no true border-radius).
     """
-    outer = tk.Frame(parent, bg=NEON_BORDER, bd=0, highlightthickness=0)
-    glow = tk.Frame(outer, bg=NEON_BORDER_DIM, bd=0, highlightthickness=0)
-    glow.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+    outer = tk.Frame(parent, bg=ring, bd=0, highlightthickness=0)
+    glow_fr = tk.Frame(outer, bg=glow, bd=0, highlightthickness=0)
+    glow_fr.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
     body = tk.Frame(
-        glow,
+        glow_fr,
         bg=bg,
         bd=0,
         highlightthickness=0,
@@ -159,6 +161,79 @@ def make_neon_card(
     )
     body.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
     return body, outer
+
+
+class HeroStatusOrb(tk.Frame):
+    """Circular residual-status orb (disconnected / connecting / connected / error)."""
+
+    def __init__(
+        self,
+        master: Any,
+        *,
+        size: int = HERO_ORB_SIZE,
+        bg: str = CARD_BG,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(master, bg=bg, **kwargs)
+        self._size = max(48, int(size))
+        self._state = "disconnected"
+        self.canvas = tk.Canvas(
+            self,
+            width=self._size,
+            height=self._size,
+            bg=bg,
+            highlightthickness=0,
+            bd=0,
+        )
+        self.canvas.pack()
+        self.set_state("disconnected")
+
+    def set_state(
+        self,
+        state: str,
+        *,
+        tokens: dict[str, str] | None = None,
+    ) -> None:
+        """Redraw the orb for *state* using shipped :func:`hero_orb_palette`."""
+        from client.ui_theme import hero_orb_palette
+
+        self._state = (state or "disconnected").strip().lower() or "disconnected"
+        pal = hero_orb_palette(self._state, tokens)
+        self._draw(pal)
+
+    def _draw(self, pal: dict[str, str]) -> None:
+        c = self.canvas
+        n = self._size
+        c.delete("all")
+        try:
+            c.configure(bg=self["bg"])
+        except Exception:
+            pass
+        # Soft outer glow
+        c.create_oval(2, 2, n - 2, n - 2, fill=pal["glow"], outline="")
+        # Ring
+        inset = 8
+        c.create_oval(
+            inset,
+            inset,
+            n - inset,
+            n - inset,
+            fill=pal["core"],
+            outline=pal["ring"],
+            width=4,
+        )
+        # Inner core dot
+        d = n // 5
+        mid = n // 2
+        c.create_oval(
+            mid - d,
+            mid - d,
+            mid + d,
+            mid + d,
+            fill=pal["dot"],
+            outline=pal["ring"],
+            width=1,
+        )
 
 
 class SwitchToggle(tk.Frame):

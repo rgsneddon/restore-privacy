@@ -30,7 +30,7 @@ KEY_RESIDUAL_IPV6 = "residual_ipv6"
 KEY_ENTRY_COUNTRY = "entry_country"
 # Set only when user OK's first-run settings after keygen unlock (not a bypass).
 KEY_FIRST_RUN_SETTINGS_COMPLETED = "first_run_settings_completed"
-# Chrome appearance: "light" (default) or "dark"
+# Chrome appearance: "dark" (1.2.4 Evolve default) or "light"
 KEY_UI_MODE = "ui_mode"
 # Opt-in: CHECK BREADCRUMBS self-update path (Helsinki vault). Default off.
 KEY_CHECK_BREADCRUMBS = "check_breadcrumbs"
@@ -57,7 +57,7 @@ def normalize_entry_country(code: str | None) -> str:
 
 
 def normalize_ui_mode(mode: str | None) -> str:
-    """Product local preference: ``light`` or ``dark`` (default light)."""
+    """Product local preference: ``light`` or ``dark`` (default dark)."""
     from client.ui_theme import normalize_ui_mode as _norm
 
     return _norm(mode)
@@ -81,8 +81,8 @@ class ProductSettings:
     entry_country: str = "DE"
     # False until user binds first-run Settings with OK (post-keygen onboarding).
     first_run_settings_completed: bool = False
-    # Main-window chrome: light (default) or dark
-    ui_mode: str = "light"
+    # Main-window chrome: dark (1.2.4 Evolve default) or light
+    ui_mode: str = "dark"
     # Opt-in Helsinki breadcrumbs → monopin self-update (Settings CHECK BREADCRUMBS).
     check_breadcrumbs: bool = False
     # Kill-switch fail-closed firewall while residual connected (default OFF).
@@ -114,7 +114,7 @@ def default_settings() -> ProductSettings:
         residual_ipv6=True,
         entry_country=DEFAULT_ENTRY_COUNTRY,
         first_run_settings_completed=False,
-        ui_mode="light",
+        ui_mode="dark",
         check_breadcrumbs=False,
         kill_switch_opt_in=False,
         auto_connect_if_idle=False,
@@ -153,7 +153,7 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
             first_run_settings_completed=bool(
                 data.get(KEY_FIRST_RUN_SETTINGS_COMPLETED, False)
             ),
-            ui_mode=normalize_ui_mode(data.get(KEY_UI_MODE, "light")),
+            ui_mode=normalize_ui_mode(data.get(KEY_UI_MODE, "dark")),
             check_breadcrumbs=bool(data.get(KEY_CHECK_BREADCRUMBS, False)),
             # Missing key → OFF (product default; never inherit accidental true).
             kill_switch_opt_in=bool(data.get(KEY_KILL_SWITCH_OPT_IN, False)),
@@ -184,7 +184,7 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
         KEY_FIRST_RUN_SETTINGS_COMPLETED: bool(
             settings.first_run_settings_completed
         ),
-        KEY_UI_MODE: normalize_ui_mode(getattr(settings, "ui_mode", "light")),
+        KEY_UI_MODE: normalize_ui_mode(getattr(settings, "ui_mode", "dark")),
         KEY_CHECK_BREADCRUMBS: bool(
             getattr(settings, "check_breadcrumbs", False)
         ),

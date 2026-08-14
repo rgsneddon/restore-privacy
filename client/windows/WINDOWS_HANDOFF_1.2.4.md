@@ -17,7 +17,7 @@ python scripts\breadcrumbs_vault.py check --fetch
 
 Darwin suite build produces **android / macos / ios / linux** under `releases/1.2.4/`.
 **Windows PE is not sealed on Darwin** — run the freeze below. Do not rename a 1.2.3 EXE as 1.2.4 seal.
-Linux may be **carry-forward** from 1.2.2 (filename re-pin only).
+Linux may be **carry-forward** from 1.2.3 (filename re-pin only).
 
 
 **Target PE basename (exact):**
@@ -76,6 +76,7 @@ Source of truth in tree (after `git pull`):
 | Residual peers | Unchanged: IS + DE; US retired |
 | Tray string | Still exactly **`Privacy, Restored`** |
 | Kill-switch | Still `KILLSWITCH` confirm on enable |
+| Windows chrome | Evolve-inspired dark canvas (`#0D0F14` / `#151922` / indigo `#6C63FF` / teal `#00D9C0`); hero status orb; no Evolve/Perccent product tabs |
 
 **You must still native-rebuild the Windows PE for 1.2.4.** Do not rename the 1.2.3 EXE.
 

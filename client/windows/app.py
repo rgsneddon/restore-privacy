@@ -139,6 +139,7 @@ from client.windows.ui_chrome import (
     apply_centered_window,
     bind_scrollable_canvas,
     make_neon_card,
+    HeroStatusOrb,
     style_primary_button,
     surface_default_size,
     surface_geometry_string,
@@ -338,7 +339,7 @@ class TunnelClientApp:
     def __init__(self) -> None:
         self.root = tk.Tk()
         self._settings = load_settings()
-        self._ui_mode = normalize_ui_mode(getattr(self._settings, "ui_mode", "light"))
+        self._ui_mode = normalize_ui_mode(getattr(self._settings, "ui_mode", "dark"))
         self._t = theme_tokens(self._ui_mode)
         self.root.title(APP_TITLE)
         self.root.configure(bg=self._t["chrome_bg"])
@@ -370,9 +371,14 @@ class TunnelClientApp:
         except Exception:
             self._start_system_tray()
 
+        # Evolve hairline accent along the top of the window
+        self.accent_bar = tk.Frame(
+            self.root, bg=self._t["primary"], height=3, bd=0, highlightthickness=0
+        )
+        self.accent_bar.pack(side=tk.TOP, fill=tk.X)
         # Outer chrome with padding (rounded language via spacing)
         self.chrome = tk.Frame(
-            self.root, bg=self._t["chrome_bg"], padx=PANEL_PAD + 4, pady=PANEL_PAD + 4
+            self.root, bg=self._t["chrome_bg"], padx=PANEL_PAD + 6, pady=PANEL_PAD + 4
         )
         self.chrome.pack(fill=tk.BOTH, expand=True)
 
@@ -427,10 +433,12 @@ class TunnelClientApp:
             highlightbackground=self._t["border"] if "border" in self._t else BORDER,
             font=("Segoe UI", 10),
             anchor="w",
-            relief=tk.RAISED,
-            bd=1,
+            relief=tk.FLAT,
+            bd=0,
             direction="below",
             indicatoron=True,
+            padx=10,
+            pady=6,
         )
         _cmenu = tk.Menu(
             self.country_menu,
@@ -534,7 +542,7 @@ class TunnelClientApp:
             text=APP_TITLE,
             bg=self._t["chrome_bg"],
             fg=self._t["primary_dark"],
-            font=("Segoe UI", 18, "bold"),
+            font=("Segoe UI", 20, "bold"),
             anchor="w",
         )
         self.title_label.pack(fill=tk.X)
@@ -633,10 +641,21 @@ class TunnelClientApp:
             padx=PANEL_PAD + 4,
             pady=PANEL_PAD + 4,
             bg=self._t["panel_bg"],
+            ring=self._t["neon_border"],
+            glow=self._t["light_accent"],
         )
         self.status_card_outer.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
 
-        self.hero_top = tk.Frame(self.status_card, bg=self._t["panel_bg"])
+        self.hero_row = tk.Frame(self.status_card, bg=self._t["panel_bg"])
+        self.hero_row.pack(fill=tk.X)
+        self.hero_orb = HeroStatusOrb(
+            self.hero_row, size=88, bg=self._t["panel_bg"]
+        )
+        self.hero_orb.pack(side=tk.LEFT, padx=(0, 14), pady=(2, 2))
+        self.hero_copy = tk.Frame(self.hero_row, bg=self._t["panel_bg"])
+        self.hero_copy.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.hero_top = tk.Frame(self.hero_copy, bg=self._t["panel_bg"])
         self.hero_top.pack(fill=tk.X)
         self.vpn_status_caption = tk.Label(
             self.hero_top,
@@ -663,13 +682,13 @@ class TunnelClientApp:
 
         self.status_var = tk.StringVar(value=plain_tunnel_status("disconnected"))
         self.status_label = tk.Label(
-            self.status_card,
+            self.hero_copy,
             textvariable=self.status_var,
             bg=self._t["panel_bg"],
             fg=self._t["text"],
             font=("Segoe UI", 16, "bold"),
             anchor="w",
-            wraplength=460,
+            wraplength=400,
             justify=tk.LEFT,
         )
         self.status_label.pack(fill=tk.X, pady=(8, 0))
@@ -682,13 +701,13 @@ class TunnelClientApp:
             )
         )
         self.detail_label = tk.Label(
-            self.status_card,
+            self.hero_copy,
             textvariable=self.detail_var,
             bg=self._t["panel_bg"],
             fg=self._t["text_muted"],
             font=("Segoe UI", 9),
             anchor="w",
-            wraplength=460,
+            wraplength=400,
             justify=tk.LEFT,
         )
         self.detail_label.pack(fill=tk.X, pady=(6, 0))
@@ -718,24 +737,28 @@ class TunnelClientApp:
             self._licence_cta.pack(fill=tk.X)
 
         # --- Concise activity log (secondary) ---
-        tk.Label(
+        self.activity_caption = tk.Label(
             self.chrome,
             text="Activity",
-            bg=CHROME_BG,
-            fg=TEXT_MUTED,
+            bg=self._t["chrome_bg"],
+            fg=self._t["text_muted"],
             font=("Segoe UI", 8),
             anchor="w",
-        ).pack(side=tk.TOP, fill=tk.X)
+        )
+        self.activity_caption.pack(side=tk.TOP, fill=tk.X)
 
         self.log_shell = tk.Frame(
-            self.chrome, bg=PANEL_BG, highlightbackground=BORDER, highlightthickness=1
+            self.chrome,
+            bg=self._t["panel_bg"],
+            highlightbackground=self._t["border"],
+            highlightthickness=1,
         )
         self.log_shell.pack(side=tk.TOP, fill=tk.BOTH, expand=True, pady=(4, 0))
         self.output = tk.Text(
             self.log_shell,
-            bg=PANEL_BG,
-            fg=TEXT_MUTED,
-            insertbackground=TEXT,
+            bg=self._t["light_accent"],
+            fg=self._t["text_muted"],
+            insertbackground=self._t["text"],
             font=("Segoe UI", 9),
             wrap=tk.WORD,
             state=tk.DISABLED,
@@ -967,6 +990,12 @@ class TunnelClientApp:
                 ipv6_protected=ipv6_protected,
             )
         )
+        try:
+            orb = getattr(self, "hero_orb", None)
+            if orb is not None:
+                orb.set_state(s, tokens=self._t)
+        except Exception:
+            pass
         # Headline colour: residual Connect success is always product teal
         # (STATUS_OK). Never paint Connected residual in error-red — that read as
         # "broken" even when residual public IP was on the VPN. IPv6 honesty stays
@@ -2481,12 +2510,20 @@ class TunnelClientApp:
             self.root.configure(bg=chrome)
         except Exception:
             pass
+        try:
+            bar = getattr(self, "accent_bar", None)
+            if bar is not None:
+                bar.configure(bg=t["primary"])
+        except Exception:
+            pass
         for w in (
             getattr(self, "chrome", None),
             getattr(self, "bottom", None),
             getattr(self, "header", None),
             getattr(self, "hint_row", None),
             getattr(self, "title_col", None),
+            getattr(self, "country_frame", None),
+            getattr(self, "_country_row", None),
         ):
             if w is not None:
                 try:
@@ -2556,6 +2593,8 @@ class TunnelClientApp:
         for w in (
             getattr(self, "status_card", None),
             getattr(self, "hero_top", None),
+            getattr(self, "hero_row", None),
+            getattr(self, "hero_copy", None),
             getattr(self, "_licence_cta", None),
         ):
             if w is not None:
@@ -2563,6 +2602,35 @@ class TunnelClientApp:
                     w.configure(bg=panel)
                 except Exception:
                     pass
+        try:
+            orb = getattr(self, "hero_orb", None)
+            if orb is not None:
+                orb.configure(bg=panel)
+                orb.set_state(getattr(orb, "_state", "disconnected"), tokens=t)
+        except Exception:
+            pass
+        try:
+            cap = getattr(self, "activity_caption", None)
+            if cap is not None:
+                cap.configure(bg=chrome, fg=muted)
+        except Exception:
+            pass
+        try:
+            shell = getattr(self, "log_shell", None)
+            if shell is not None:
+                shell.configure(bg=panel, highlightbackground=t["border"])
+        except Exception:
+            pass
+        try:
+            out = getattr(self, "output", None)
+            if out is not None:
+                out.configure(
+                    bg=t["light_accent"],
+                    fg=muted,
+                    insertbackground=text,
+                )
+        except Exception:
+            pass
         status_fg = getattr(self, "_status_headline_fg", None) or text
         for w, kw in (
             (getattr(self, "vpn_status_caption", None), {"bg": panel, "fg": muted}),

@@ -1,9 +1,9 @@
-"""UI theme: restorebritain.org.uk contact palette, plain-language status, labels.
+"""UI theme: Evolve-inspired residual VPN chrome + plain-language status.
 
-Palette extracted from https://www.restorebritain.org.uk/contact page stack
-(jQuery UI Cupertino theme CSS loaded by that page) plus light chrome for a
-sleek product shell. Rounded-edge language is expressed via CORNER_RADIUS and
-padding (Tk has limited native rounded widgets).
+Dark tokens match Evolve desktop (``evolve/lib/theme/app_theme.dart``):
+``#0D0F14`` canvas, ``#151922`` cards, indigo ``#6C63FF``, teal ``#00D9C0``.
+Light mode keeps the same accents on a professional paper stack.
+Rounded-edge language is padding + rings (classic Tk has no CSS radius).
 """
 
 from __future__ import annotations
@@ -18,78 +18,129 @@ PRIVACY_MESSAGE_TEXT = (
     "lightweight vpn to restore your privacy - no user data is retained - your privacy is restored"
 )
 
-# --- Palette (restorebritain.org.uk/contact -> Cupertino theme CSS) ---
-# Source: ajax.googleapis.com/.../themes/cupertino/jquery-ui.css as loaded by the contact page
-PALETTE_SOURCE_URL = "https://www.restorebritain.org.uk/contact"
+# Evolve desktop chrome (evolve/lib/theme/app_theme.dart) — residual VPN mimic
+PALETTE_SOURCE_URL = "evolve/lib/theme/app_theme.dart"
+EVOLVE_BG = "#0D0F14"
+EVOLVE_CARD = "#151922"
+EVOLVE_ACCENT = "#6C63FF"
+EVOLVE_SECONDARY = "#00D9C0"
+EVOLVE_FILL = "#1A1F2B"
+EVOLVE_TEXT = "#E8EAED"
+EVOLVE_HAIRLINE = "#2A3142"
 
 # UI mode preference (product settings ``ui_mode``)
 UI_MODE_LIGHT = "light"
 UI_MODE_DARK = "dark"
 UI_MODES = (UI_MODE_LIGHT, UI_MODE_DARK)
+# 1.2.4 product default: Evolve dark canvas
+DEFAULT_UI_MODE = UI_MODE_DARK
 
-# Light (default product chrome)
+# Light — same indigo/teal accents on a professional paper stack
 _LIGHT_TOKENS: dict[str, str] = {
-    "chrome_bg": "#F2F5F7",  # cupertino soft page background
-    "panel_bg": "#FFFFFF",  # white cards / status panel
-    "primary": "#2779AA",
-    "primary_active": "#2694E8",
-    "primary_dark": "#0070A3",
-    "light_accent": "#DEEDF7",
-    "text": "#222222",
-    "text_muted": "#363636",
+    "chrome_bg": "#F4F5F8",
+    "panel_bg": "#FFFFFF",
+    "primary": EVOLVE_ACCENT,
+    "primary_active": "#8B85FF",
+    "primary_dark": "#4A44C4",
+    "light_accent": "#EEEDFF",
+    "text": "#1A1C23",
+    "text_muted": "#5C6470",
     "white": "#FFFFFF",
-    "status_ok": "#1B767E",
-    "status_error": "#CD0A0A",
+    "status_ok": "#0B9B8A",
+    "status_error": "#C62828",
     "status_warn": "#A67C00",
-    "border": "#AED0EA",
-    "neon_border": "#2EE6D6",
-    "neon_teal": "#1B767E",
-    "button_connect_bg": "#2779AA",
-    "button_disconnect_bg": "#1B767E",
+    "border": "#D5D8E0",
+    "neon_border": EVOLVE_ACCENT,
+    "neon_teal": EVOLVE_SECONDARY,
+    "button_connect_bg": EVOLVE_ACCENT,
+    "button_disconnect_bg": "#0B9B8A",
     "button_fg": "#FFFFFF",
     "disabled_fg": "#AAAAAA",
 }
 
-# Dark mode — keep Connected/error readable; neon accents stay high-contrast
+# Dark — Evolve canvas / card / indigo / teal
 _DARK_TOKENS: dict[str, str] = {
-    "chrome_bg": "#0B1218",
-    "panel_bg": "#152028",
-    "primary": "#4BA3D9",
-    "primary_active": "#6BB8E8",
-    "primary_dark": "#8EC8EA",
-    "light_accent": "#1A2A38",
-    "text": "#E8EEF2",
-    "text_muted": "#A8B4BE",
+    "chrome_bg": EVOLVE_BG,
+    "panel_bg": EVOLVE_CARD,
+    "primary": EVOLVE_ACCENT,
+    "primary_active": "#8B85FF",
+    "primary_dark": "#A8A3FF",
+    "light_accent": EVOLVE_FILL,
+    "text": EVOLVE_TEXT,
+    "text_muted": "#9AA3B2",
     "white": "#FFFFFF",
-    "status_ok": "#2EE6D6",
+    "status_ok": EVOLVE_SECONDARY,
     "status_error": "#FF6B6B",
     "status_warn": "#E0B84A",
-    "border": "#2A4A5C",
-    "neon_border": "#2EE6D6",
-    "neon_teal": "#1B767E",
-    "button_connect_bg": "#2779AA",
-    "button_disconnect_bg": "#1B767E",
-    "button_fg": "#FFFFFF",
-    "disabled_fg": "#6A7680",
+    "border": EVOLVE_HAIRLINE,
+    "neon_border": EVOLVE_ACCENT,
+    "neon_teal": EVOLVE_SECONDARY,
+    "button_connect_bg": EVOLVE_ACCENT,
+    "button_disconnect_bg": EVOLVE_SECONDARY,
+    "button_fg": "#0D0F14",
+    "disabled_fg": "#5A6270",
 }
 
 
 def normalize_ui_mode(mode: str | None) -> str:
-    """Return ``light`` or ``dark``; unknown / empty → light (product default)."""
+    """Return ``light`` or ``dark``; unknown / empty → dark (1.2.4 default)."""
     m = (mode or "").strip().lower()
+    if m in ("light", "day", "white"):
+        return UI_MODE_LIGHT
     if m in ("dark", "night", "black"):
         return UI_MODE_DARK
-    return UI_MODE_LIGHT
+    return DEFAULT_UI_MODE
 
 
 def theme_tokens(mode: str | None = None) -> dict[str, str]:
     """Shipped chrome/panel/text tokens for *mode* (light or dark).
 
     Pure map — no Tk. Status OK/error stay distinct in both modes.
+    Dark map is the Evolve desktop palette (canvas / card / indigo / teal).
     """
     if normalize_ui_mode(mode) == UI_MODE_DARK:
         return dict(_DARK_TOKENS)
     return dict(_LIGHT_TOKENS)
+
+
+def hero_orb_palette(
+    state: str,
+    tokens: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Ring / core / glow / dot colors for the main-window status orb.
+
+    Pure helper (no Tk). *state* is disconnected | connecting | connected |
+    disconnecting | error. Unknown → disconnected.
+    """
+    t = dict(tokens) if tokens else theme_tokens(DEFAULT_UI_MODE)
+    s = (state or "").strip().lower()
+    if s == "connected":
+        return {
+            "ring": t["status_ok"],
+            "core": t["panel_bg"],
+            "glow": t["status_ok"],
+            "dot": t["status_ok"],
+        }
+    if s in ("connecting", "disconnecting"):
+        return {
+            "ring": t["primary"],
+            "core": t["light_accent"],
+            "glow": t["primary"],
+            "dot": t["primary_active"],
+        }
+    if s in ("error", "failed"):
+        return {
+            "ring": t["status_error"],
+            "core": t["panel_bg"],
+            "glow": t["status_error"],
+            "dot": t["status_error"],
+        }
+    return {
+        "ring": t["border"],
+        "core": t["light_accent"],
+        "glow": t["chrome_bg"],
+        "dot": t["text_muted"],
+    }
 
 
 def theme_mode_label(mode: str | None) -> str:
@@ -109,27 +160,27 @@ def theme_toggle_button_text(mode: str | None) -> str:
     return "☾ Dark"
 
 
-# Module-level constants = light defaults (import compatibility / legacy tests)
-CHROME_BG = _LIGHT_TOKENS["chrome_bg"]
-PANEL_BG = _LIGHT_TOKENS["panel_bg"]
-PRIMARY = _LIGHT_TOKENS["primary"]
-PRIMARY_ACTIVE = _LIGHT_TOKENS["primary_active"]
-PRIMARY_DARK = _LIGHT_TOKENS["primary_dark"]
-LIGHT_ACCENT = _LIGHT_TOKENS["light_accent"]
-TEXT = _LIGHT_TOKENS["text"]
-TEXT_MUTED = _LIGHT_TOKENS["text_muted"]
-WHITE = _LIGHT_TOKENS["white"]
-STATUS_OK = _LIGHT_TOKENS["status_ok"]
-STATUS_ERROR = _LIGHT_TOKENS["status_error"]
+# Module-level constants = 1.2.4 dark (Evolve) defaults
+CHROME_BG = _DARK_TOKENS["chrome_bg"]
+PANEL_BG = _DARK_TOKENS["panel_bg"]
+PRIMARY = _DARK_TOKENS["primary"]
+PRIMARY_ACTIVE = _DARK_TOKENS["primary_active"]
+PRIMARY_DARK = _DARK_TOKENS["primary_dark"]
+LIGHT_ACCENT = _DARK_TOKENS["light_accent"]
+TEXT = _DARK_TOKENS["text"]
+TEXT_MUTED = _DARK_TOKENS["text_muted"]
+WHITE = _DARK_TOKENS["white"]
+STATUS_OK = _DARK_TOKENS["status_ok"]
+STATUS_ERROR = _DARK_TOKENS["status_error"]
 STATUS_ERROR_FG = STATUS_ERROR  # alias for fg= usage
-STATUS_WARN = _LIGHT_TOKENS["status_warn"]
-BORDER = _LIGHT_TOKENS["border"]
-NEON_BORDER = _LIGHT_TOKENS["neon_border"]
-NEON_TEAL = _LIGHT_TOKENS["neon_teal"]
-BUTTON_CONNECT_BG = _LIGHT_TOKENS["button_connect_bg"]
-BUTTON_DISCONNECT_BG = _LIGHT_TOKENS["button_disconnect_bg"]
-BUTTON_FG = _LIGHT_TOKENS["button_fg"]
-DISABLED_FG = _LIGHT_TOKENS["disabled_fg"]
+STATUS_WARN = _DARK_TOKENS["status_warn"]
+BORDER = _DARK_TOKENS["border"]
+NEON_BORDER = _DARK_TOKENS["neon_border"]
+NEON_TEAL = _DARK_TOKENS["neon_teal"]
+BUTTON_CONNECT_BG = _DARK_TOKENS["button_connect_bg"]
+BUTTON_DISCONNECT_BG = _DARK_TOKENS["button_disconnect_bg"]
+BUTTON_FG = _DARK_TOKENS["button_fg"]
+DISABLED_FG = _DARK_TOKENS["disabled_fg"]
 # Legacy aliases (tests / older imports)
 BANNER_BG = PRIMARY_DARK
 BANNER_FG = WHITE
@@ -141,12 +192,12 @@ BUTTON_BG = BUTTON_CONNECT_BG
 BUTTON_BG_ACTIVE = BUTTON_DISCONNECT_BG
 
 # Flutter / ARGB
-BANNER_BG_ARGB = 0xFF0070A3
-CHROME_BG_ARGB = 0xFFF2F5F7
-WINDOW_BG_ARGB = 0xFFFFFFFF
-WINDOW_FG_ARGB = 0xFF222222
-BUTTON_BG_ARGB = 0xFF2779AA
-BUTTON_ACTIVE_ARGB = 0xFF1B767E
+BANNER_BG_ARGB = 0xFF6C63FF
+CHROME_BG_ARGB = 0xFF0D0F14
+WINDOW_BG_ARGB = 0xFF151922
+WINDOW_FG_ARGB = 0xFFE8EAED
+BUTTON_BG_ARGB = 0xFF6C63FF
+BUTTON_ACTIVE_ARGB = 0xFF00D9C0
 
 APP_TITLE = "Restore Privacy"
 BANNER_TITLE = "Restore Privacy - Virtual Private Network"

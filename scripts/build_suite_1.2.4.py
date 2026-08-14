@@ -6,7 +6,7 @@ Suite is free to download; Connect still requires a KEYGEN (£3/month licence).
 On Darwin this builds **android**, **macos**, and **ios** from ``client_app``
 (residual VPN client shell). **Windows** and **linux** are staged from the newest local
 prior catalog pin when a native rebuild is unavailable on this host — filenames
-are re-pinned to 1.2.4 (carry-forward prior 1.2.2) for store layout; operators should replace with native
+are re-pinned to 1.2.4 (carry-forward prior 1.2.3) for store layout; operators should replace with native
 rebuilds when a Windows/Linux build agent is available.
 
 Usage::

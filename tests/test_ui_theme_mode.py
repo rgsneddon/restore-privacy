@@ -28,11 +28,15 @@ from client.windows.settings_store import (  # noqa: E402
 
 
 class TestThemeTokens(unittest.TestCase):
-    def test_normalize_default_light(self):
-        self.assertEqual(normalize_ui_mode(None), UI_MODE_LIGHT)
-        self.assertEqual(normalize_ui_mode(""), UI_MODE_LIGHT)
-        self.assertEqual(normalize_ui_mode("weird"), UI_MODE_LIGHT)
+    def test_normalize_default_dark(self):
+        from client.ui_theme import DEFAULT_UI_MODE
+
+        self.assertEqual(DEFAULT_UI_MODE, UI_MODE_DARK)
+        self.assertEqual(normalize_ui_mode(None), UI_MODE_DARK)
+        self.assertEqual(normalize_ui_mode(""), UI_MODE_DARK)
+        self.assertEqual(normalize_ui_mode("weird"), UI_MODE_DARK)
         self.assertEqual(normalize_ui_mode("DARK"), UI_MODE_DARK)
+        self.assertEqual(normalize_ui_mode("light"), UI_MODE_LIGHT)
 
     def test_light_and_dark_maps_differ(self):
         light = theme_tokens(UI_MODE_LIGHT)
@@ -52,9 +56,9 @@ class TestThemeTokens(unittest.TestCase):
 
 
 class TestUiModePersistence(unittest.TestCase):
-    def test_default_ui_mode_light(self):
+    def test_default_ui_mode_dark(self):
         d = default_settings()
-        self.assertEqual(normalize_ui_mode(d.ui_mode), UI_MODE_LIGHT)
+        self.assertEqual(normalize_ui_mode(d.ui_mode), UI_MODE_DARK)
 
     def test_save_load_ui_mode_roundtrip(self):
         with tempfile.TemporaryDirectory() as td:
@@ -71,7 +75,7 @@ class TestUiModePersistence(unittest.TestCase):
             save_settings(s2, path=path)
             self.assertEqual(load_settings(path=path).ui_mode, UI_MODE_LIGHT)
 
-    def test_missing_ui_mode_key_defaults_light(self):
+    def test_missing_ui_mode_key_defaults_dark(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "settings.json"
             path.write_text(
@@ -79,7 +83,7 @@ class TestUiModePersistence(unittest.TestCase):
                 encoding="utf-8",
             )
             loaded = load_settings(path=path)
-            self.assertEqual(loaded.ui_mode, UI_MODE_LIGHT)
+            self.assertEqual(loaded.ui_mode, UI_MODE_DARK)
 
 
 class TestMainWindowThemeStructure(unittest.TestCase):

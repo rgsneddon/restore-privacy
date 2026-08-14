@@ -1,4 +1,4 @@
-"""Catalog monopin 1.2.3 Android package naming (shipped suite build path)."""
+"""Catalog monopin 1.2.4 Android package naming (shipped suite build path)."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 class TestSuiteAndroid123StageName(unittest.TestCase):
     def test_version_pin_and_android_filename(self) -> None:
         pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(pin, "1.2.3")
-        suite = (ROOT / "scripts" / "build_suite_1.2.3.py").read_text(encoding="utf-8")
+        self.assertEqual(pin, "1.2.4")
+        suite = (ROOT / "scripts" / "build_suite_1.2.4.py").read_text(encoding="utf-8")
         m = re.search(r'^VERSION = "([^"]+)"', suite, re.M)
         self.assertIsNotNone(m)
         self.assertEqual(m.group(1), pin)
