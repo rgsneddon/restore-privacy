@@ -17,7 +17,7 @@ test('longest-string helper grows min-width with the longest sample', () => {
   const longer = [...short, 'mineperc.restoreprivacy.online:1466'];
   const longest = [
     ...longer,
-    'lolMiner --algo BEAM-III --pool mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER',
+    'perc-mine --pool mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER',
   ];
   assert.equal(longestPartLength(short), 4);
   const wShort = minWidthChFromParts(short, 1);
@@ -29,7 +29,7 @@ test('longest-string helper grows min-width with the longest sample', () => {
 });
 
 test('copy helper returns that part only', () => {
-  const cmd = 'gminer --algo beamhashIII --server mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER';
+  const cmd = 'perc-mine --pool mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER';
   assert.equal(copyPayloadForPart(cmd), cmd);
   assert.equal(copyPayloadForPart('PERC_USERNAME.WORKER'), 'PERC_USERNAME.WORKER');
   assert.notEqual(copyPayloadForPart('1466'), cmd);
@@ -39,19 +39,14 @@ test('shipped page has facts, no clip, copy controls per part', () => {
   const html = readFileSync(PAGE, 'utf8');
   assert.match(html, /mineperc\.restoreprivacy\.online/);
   assert.match(html, /1466/);
-  assert.match(html, /BeamHash III/);
   assert.match(html, /PERC_USERNAME\.WORKER/);
-  assert.match(html, /lolMiner --algo BEAM-III --pool mineperc\.restoreprivacy\.online:1466/);
-  assert.match(html, /miniZ --url mineperc\.restoreprivacy\.online:1466/);
-  assert.match(html, /gminer --algo beamhashIII --server mineperc\.restoreprivacy\.online:1466/);
+  assert.match(html, /perc-mine --pool mineperc\.restoreprivacy\.online:1466/);
+  assert.doesNotMatch(html, /beam/i);
   assert.match(html, /data-copy-part="stratum"/);
   assert.match(html, /data-copy-part="worker"/);
-  assert.match(html, /data-copy-part="lolminer"/);
-  assert.match(html, /data-copy-part="miniz"/);
-  assert.match(html, /data-copy-part="gminer"/);
   assert.match(html, /data-copy-part="high"/);
   assert.match(html, /data-copy-part="perc-mine"/);
-  assert.equal((html.match(/class="copy-icon"/g) || []).length, 7);
+  assert.equal((html.match(/class="copy-icon"/g) || []).length, 4);
   const valueCss = html.slice(html.indexOf('.info-value'), html.indexOf('.copy-icon'));
   assert.doesNotMatch(valueCss, /text-overflow:\s*ellipsis/);
   assert.doesNotMatch(valueCss, /overflow:\s*hidden/);

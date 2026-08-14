@@ -14,21 +14,16 @@ class TestMinepercPage(unittest.TestCase):
         html = PAGE.read_text(encoding="utf-8")
         self.assertIn("mineperc.restoreprivacy.online", html)
         self.assertIn("1466", html)
-        self.assertIn("BeamHash III", html)
         self.assertIn("PERC_USERNAME.WORKER", html)
         self.assertIn(
-            "lolMiner --algo BEAM-III --pool mineperc.restoreprivacy.online:1466",
+            "perc-mine --pool mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER",
             html,
         )
-        self.assertIn("miniZ --url mineperc.restoreprivacy.online:1466", html)
-        self.assertIn(
-            "gminer --algo beamhashIII --server mineperc.restoreprivacy.online:1466",
-            html,
-        )
-        for part in ("stratum", "high", "worker", "perc-mine", "lolminer", "miniz", "gminer"):
+        self.assertNotRegex(html, r"(?i)beam")
+        for part in ("stratum", "high", "worker", "perc-mine"):
             self.assertIn(f'data-copy-part="{part}"', html)
             self.assertIn(f'data-copy-target="{part}"', html)
-        self.assertEqual(html.count('class="copy-icon"'), 7)
+        self.assertEqual(html.count('class="copy-icon"'), 4)
         self.assertIn("minWidthChFromParts", html)
         self.assertIn("copyPayloadForPart", html)
         css = html[html.index(".info-value") : html.index(".copy-icon")]

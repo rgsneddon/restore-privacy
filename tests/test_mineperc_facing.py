@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGE = ROOT / "perc_chain" / "mineperc" / "public" / "index.html"
+MIRROR = ROOT / "perc_chain" / "public" / "mineperc.html"
 SERVER = ROOT / "perc_chain" / "src" / "mineperc_server.js"
 
 
@@ -18,6 +19,10 @@ class TestMinepercFacing(unittest.TestCase):
         self.assertIn("PERC_USERNAME.WORKER", html)
         self.assertIn("payouts in PERC", html)
         self.assertNotRegex(html, r"(?i)beam")
+        mirror = MIRROR.read_text(encoding="utf-8")
+        self.assertNotRegex(mirror, r"(?i)beam")
+        self.assertIn("Perccent PERC pool", mirror)
+        self.assertIn("perc-mine --pool mineperc.restoreprivacy.online:1466", mirror)
 
     def test_server_publishes_perc_stratum(self) -> None:
         src = SERVER.read_text(encoding="utf-8")
