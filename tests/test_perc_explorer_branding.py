@@ -27,6 +27,11 @@ class TestPercExplorerBranding(unittest.TestCase):
         self.assertIn("rpt-logo", html)
         # Title names Suite product
         self.assertIn("Restore Privacy", html.split("<title>")[1].split("</title>")[0])
+        self.assertIn("page-top-links", html)
+        self.assertIn("justify-content: space-between", html)
+        self.assertIn('href="#nodes"', html)
+        self.assertIn('href="#explorer"', html)
+        self.assertIn("FCG white paper", html)
 
 
 if __name__ == "__main__":

@@ -27,14 +27,42 @@
       min-height: 100vh;
       line-height: 1.5;
     }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 20px 64px; }
     .page-top {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 10px;
-      flex-wrap: wrap;
+      gap: 16px 24px;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 20px;
+      margin: 0;
+      border-bottom: 1px solid var(--border);
+      background: #0d1018;
+      flex-wrap: nowrap;
+    }
+    .page-top-links {
+      display: flex;
+      flex: 1 1 auto;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+    .page-top-links a {
+      flex: 1 1 0;
+      text-align: center;
+      white-space: nowrap;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-decoration: none;
+      color: var(--muted);
+      padding: 8px 4px;
+    }
+    .page-top-links a:hover,
+    .page-top-links a:focus-visible {
+      color: var(--rb-cyan);
     }
     .brand-lockup {
       display: flex;
@@ -69,14 +97,7 @@
       letter-spacing: 0.04em;
       color: var(--rb-cyan);
     }
-    .fcg-link {
-      font-size: 0.78rem;
-      color: var(--muted);
-      text-decoration: none;
-      letter-spacing: 0.02em;
-      opacity: 0.82;
-    }
-    .fcg-link:hover { color: var(--accent); opacity: 1; }
+    .fcg-link { opacity: 1; }
     header { margin-bottom: 28px; }
     header.explorer-header {
       display: flex;
@@ -146,6 +167,18 @@
     }
     @media (max-width: 760px) {
       .chart-layout { grid-template-columns: 1fr; }
+      .page-top {
+        flex-wrap: wrap;
+        padding: 10px 12px;
+      }
+      .page-top-links {
+        flex: 1 1 100%;
+        justify-content: space-between;
+      }
+      .page-top-links a {
+        font-size: 0.68rem;
+        padding: 6px 2px;
+      }
     }
     #wallet-pentagon-chart {
       width: 100%;
@@ -188,22 +221,29 @@
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="page-top">
-      <a class="brand-lockup" id="rpt-brand-lockup" href="https://restoreprivacy.online/"
-         data-rpt-brand="1" aria-label="Restore Privacy Suite">
-        <img class="rpt-logo" id="rpt-logo"
-             src="public/restore-privacy-logo.png"
-             width="52" height="52"
-             alt="Restore Privacy logo"
-             data-rpt-logo="1"/>
-        <span class="brand-text">
-          <span class="brand-name">Restore Privacy Suite</span>
-          <span class="brand-tag">Perc · Evolve Chronoflux</span>
-        </span>
-      </a>
+  <nav class="page-top" aria-label="Explorer">
+    <a class="brand-lockup" id="rpt-brand-lockup" href="https://restoreprivacy.online/"
+       data-rpt-brand="1" aria-label="Restore Privacy Suite">
+      <img class="rpt-logo" id="rpt-logo"
+           src="public/restore-privacy-logo.png"
+           width="52" height="52"
+           alt="Restore Privacy logo"
+           data-rpt-logo="1"/>
+      <span class="brand-text">
+        <span class="brand-name">Restore Privacy Suite</span>
+        <span class="brand-tag">Perc · Evolve Chronoflux</span>
+      </span>
+    </a>
+    <div class="page-top-links">
+      <a href="#nodes">Nodes</a>
+      <a href="#confirm">Confirm</a>
+      <a href="#diagrams">Diagrams</a>
+      <a href="#rpai">rpAI</a>
+      <a href="#explorer">Explorer</a>
       <a class="fcg-link" href="https://rgsneddon.github.io/evolve/fcg_white_paper.html" target="_blank" rel="noopener noreferrer">FCG white paper</a>
     </div>
+  </nav>
+  <div class="wrap">
     <header class="explorer-header" data-rpt-branded-header="1">
       <div class="header-copy">
         <h1>Perccent Network Explorer</h1>
@@ -219,10 +259,10 @@
     <section id="treasury-emission-public" style="display:none">
       <h2>Treasury emission</h2>
       <div class="grid" id="treasury-emission-stats"></div>
-      <p class="hint">Treasury emission is dynamic — it scales with average block time and wallet load on a faucet-aligned baseline (up to 1 PERC per 7-minute window at 1.0×). Manual sends from evolve_treasury are disabled after launch; emission, regeneration, and faucet payouts continue.</p>
+      <p class="hint">Treasury emission is dynamic — it scales with average block time and wallet load on a faucet-aligned baseline (up to 1/3 PERC per 7-minute window at 1.0× after the action-as-block mint cut). Manual sends from evolve_treasury are disabled after launch; emission, regeneration, and faucet payouts continue.</p>
     </section>
 
-    <section>
+    <section id="nodes">
       <h2>Network nodes</h2>
       <p class="hint" style="margin-bottom:12px" id="network-nodes-hint">
         Chronoflux five-point pentagon — every registered wallet by current block height
@@ -235,7 +275,38 @@
       </div>
     </section>
 
-    <section>
+    <section id="confirm">
+      <h2>Confirm a block</h2>
+      <div class="card">
+        <div class="toolbar">
+          <input id="confirm-id" class="mono" placeholder="block id or index" style="flex:1;min-width:160px;padding:8px;background:#0b0d14;color:#e8ecf4;border:1px solid var(--border);border-radius:8px"/>
+          <button class="btn" id="confirm-btn">Confirm</button>
+        </div>
+        <pre class="mono" id="confirm-result" style="white-space:pre-wrap;margin-top:8px">Every lookup returns confirmed, not_found, or rejected.</pre>
+      </div>
+    </section>
+
+    <section id="diagrams">
+      <h2>Chain diagrams</h2>
+      <p class="hint" style="margin-bottom:12px">Blocks, wards, mint (1/3 prior), and NED rpAI — each piece as a graph.</p>
+      <div class="grid">
+        <div class="card"><div class="label">Blocks</div><svg id="graph-blocks" viewBox="0 0 240 80" width="100%" height="80"></svg></div>
+        <div class="card"><div class="label">Wards</div><svg id="graph-wards" viewBox="0 0 240 80" width="100%" height="80"></svg></div>
+        <div class="card"><div class="label">Mint</div><svg id="graph-mint" viewBox="0 0 240 80" width="100%" height="80"></svg></div>
+        <div class="card"><div class="label">rpAI</div><svg id="graph-rpai" viewBox="0 0 240 80" width="100%" height="80"></svg></div>
+      </div>
+    </section>
+
+    <section id="rpai">
+      <h2>NED · rpAI</h2>
+      <div class="grid" id="ned-stats"></div>
+      <div class="card" style="margin-top:12px">
+        <div class="label">Capability matrix + recent</div>
+        <pre class="mono" id="ned-detail" style="white-space:pre-wrap;margin-top:8px"></pre>
+      </div>
+    </section>
+
+    <section id="explorer">
       <div class="toolbar">
         <h2 style="margin:0">Block explorer</h2>
         <button class="btn secondary" id="refresh-btn">Refresh</button>
@@ -267,6 +338,9 @@
     <footer>
       API: <a id="link-api-network" href="api/network">api/network</a> &middot;
       <a id="link-api-blocks" href="api/blocks">api/blocks</a> &middot;
+      <a id="link-api-confirm" href="api/confirm/0">api/confirm</a> &middot;
+      <a id="link-api-diagrams" href="api/diagrams">api/diagrams</a> &middot;
+      <a id="link-api-rpai" href="api/rpai">api/rpai</a> &middot;
       <a id="link-health" href="health">health</a> &middot;
       Auto-refresh in <span id="refresh-countdown-footer">30</span>s
     </footer>
@@ -324,6 +398,87 @@
       if (health) {
         health.href = explorerApiUrl('health');
         health.textContent = explorerApiUrl('health');
+      }
+      const confirm = $('link-api-confirm');
+      if (confirm) {
+        confirm.href = explorerApiUrl('api/confirm/0');
+        confirm.textContent = explorerApiUrl('api/confirm/:id');
+      }
+      const diagrams = $('link-api-diagrams');
+      if (diagrams) {
+        diagrams.href = explorerApiUrl('api/diagrams');
+        diagrams.textContent = explorerApiUrl('api/diagrams');
+      }
+      const rpai = $('link-api-rpai');
+      if (rpai) {
+        rpai.href = explorerApiUrl('api/rpai');
+        rpai.textContent = explorerApiUrl('api/rpai');
+      }
+    }
+
+    function sparkline(svgId, series) {
+      const el = $(svgId);
+      if (!el) return;
+      const vals = (series || []).map((n) => Number(n) || 0);
+      if (!vals.length) vals.push(0);
+      const w = 240, h = 80, pad = 6;
+      const max = Math.max(1, ...vals);
+      const step = vals.length > 1 ? (w - pad * 2) / (vals.length - 1) : 0;
+      const pts = vals.map((v, i) => {
+        const x = pad + i * step;
+        const y = h - pad - ((v / max) * (h - pad * 2));
+        return `${x},${y}`;
+      }).join(' ');
+      el.innerHTML = `<polyline fill="none" stroke="#6c63ff" stroke-width="2" points="${pts}"/>`;
+    }
+
+    function renderDiagrams(data) {
+      const g = (data && data.graphs) || {};
+      sparkline('graph-blocks', g.blocks || [0]);
+      sparkline('graph-wards', g.wards || [0]);
+      sparkline('graph-mint', g.mint || [0]);
+      sparkline('graph-rpai', g.rpai || [0]);
+    }
+
+    function renderNed(ned) {
+      const host = $('ned-stats');
+      const detail = $('ned-detail');
+      if (!ned) return;
+      if (host) {
+        const cards = [
+          ['Identity', ned.identity || 'NED'],
+          ['Learned', String(ned.learned ?? 0)],
+          ['Wallet events', String(ned.walletEvents ?? 0)],
+          ['VPN events', String(ned.vpnEvents ?? 0)],
+          ['Accuracy', String(ned.accuracy ?? 0)],
+          ['Coverage', String(ned.coverage ?? 0)],
+          ['Calibration', String(ned.calibration ?? 0)],
+          ['Latency ms', String(ned.latencyMs ?? '—')],
+        ];
+        host.innerHTML = cards.map(([k, v]) =>
+          `<div class="card"><div class="label">${k}</div><div class="value">${v}</div></div>`
+        ).join('');
+      }
+      if (detail) {
+        detail.textContent = JSON.stringify({
+          sota: ned.sota,
+          capabilityMatrix: ned.capabilityMatrix,
+          recent: ned.recent,
+          byKind: ned.byKind,
+          bySource: ned.bySource,
+        }, null, 2);
+      }
+    }
+
+    async function confirmLookedUp() {
+      const id = ($('confirm-id') && $('confirm-id').value.trim()) || '0';
+      const out = $('confirm-result');
+      try {
+        const res = await fetch(explorerApiUrl(`api/confirm/${encodeURIComponent(id)}`));
+        const body = await res.json();
+        if (out) out.textContent = JSON.stringify(body, null, 2);
+      } catch (e) {
+        if (out) out.textContent = JSON.stringify({ status: 'rejected', reason: String(e) }, null, 2);
       }
     }
 
@@ -619,9 +774,11 @@
       updateCountdownDisplay();
       showError('');
       try {
-        const [netRes, blocksRes] = await Promise.all([
+        const [netRes, blocksRes, diagRes, rpaiRes] = await Promise.all([
           fetch(explorerApiUrl('api/network')),
           fetch(explorerApiUrl('api/blocks?limit=40')),
+          fetch(explorerApiUrl('api/diagrams')),
+          fetch(explorerApiUrl('api/rpai')),
         ]);
         if (!netRes.ok) throw new Error('Network API unavailable');
         renderStats(await netRes.json());
@@ -629,6 +786,11 @@
           renderBlocks(await blocksRes.json());
         } else {
           renderBlocks({ total: 0, blocks: [] });
+        }
+        if (diagRes.ok) renderDiagrams(await diagRes.json());
+        if (rpaiRes.ok) {
+          const rp = await rpaiRes.json();
+          renderNed(rp.ned || rp);
         }
       } catch (e) {
         showError(e.message || 'Failed to load explorer data');
@@ -639,6 +801,7 @@
     }
 
     wireFooterApiLinks();
+    if ($('confirm-btn')) $('confirm-btn').addEventListener('click', confirmLookedUp);
     $('refresh-btn').addEventListener('click', refresh);
     resetCountdown();
     refresh();
