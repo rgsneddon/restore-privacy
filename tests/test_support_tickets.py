@@ -385,6 +385,9 @@ class TestSupportTicketPure(unittest.TestCase):
         page = render_support_page_html()
         self.assertIn('action="/support"', page)
         self.assertIn('id="support-form"', page)
+        self.assertIn('id="god-support-box"', page)
+        self.assertIn("Ask GOD", page)
+        self.assertIn("/support/god-ask", page)
         self.assertIn("support-email", page)
         self.assertIn(SUPPORT_PATH, page)
         # Keygen field removed from public form

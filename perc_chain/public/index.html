@@ -317,7 +317,27 @@
 
     <div id="error" class="error" style="display:none"></div>
 
-    <div class="grid" id="stats"></div>
+    <div class="grid" id="stats">
+      <div class="card"><div class="label">Node</div><div class="value" id="stat-node">—</div></div>
+      <div class="card"><div class="label">Seed height</div><div class="value" id="stat-seed-height">—</div></div>
+      <div class="card"><div class="label">Network height</div><div class="value" id="stat-network-height">—</div></div>
+      <div class="card"><div class="label">Peers online</div><div class="value" id="stat-peers">—</div></div>
+      <div class="card"><div class="label">Ledger</div><div class="value" id="stat-ledger">—</div></div>
+      <div class="card"><div class="label">Chain</div><div class="value mono" style="font-size:0.75rem" id="stat-chain">—</div></div>
+    </div>
+
+    <section id="network-calculations">
+      <h2>Network calculations</h2>
+      <div class="grid" id="network-calculation-stats">
+        <div class="card"><div class="label">Emission rate</div><div class="value" id="calc-emission-rate">—</div></div>
+        <div class="card"><div class="label">Load factor</div><div class="value" id="calc-load-factor">—</div></div>
+        <div class="card"><div class="label">Block-time factor</div><div class="value" id="calc-block-time">—</div></div>
+        <div class="card"><div class="label">Combined factor</div><div class="value" id="calc-combined-factor">—</div></div>
+        <div class="card"><div class="label">Wallet load</div><div class="value" id="calc-wallet-load">—</div></div>
+        <div class="card"><div class="label">Average block seconds</div><div class="value" id="calc-avg-block-seconds">—</div></div>
+      </div>
+      <p class="hint">Computed from the perc_chain ledger tip — the same height mineperc jobs, wallets, and this explorer share.</p>
+    </section>
 
     <section id="treasury-emission-public" style="display:none">
       <h2>Treasury emission</h2>
@@ -362,7 +382,25 @@
 
     <section id="rpai">
       <h2>GOD · rpAI</h2>
+      <p class="hint" style="margin-bottom:12px">Current helper is GOD. NED and FRED are iterations under GOD, with their own learned stats.</p>
       <div class="grid" id="ned-stats"></div>
+      <div class="card" style="margin-top:12px;overflow:auto">
+        <div class="label">Iterations under GOD</div>
+        <table id="god-iterations-table">
+          <thead>
+            <tr>
+              <th>Iteration</th>
+              <th>Role</th>
+              <th>Learned</th>
+              <th>Height</th>
+              <th>Interval</th>
+              <th>Status</th>
+              <th>Last</th>
+            </tr>
+          </thead>
+          <tbody id="god-iterations"></tbody>
+        </table>
+      </div>
       <div class="card" style="margin-top:12px">
         <div class="label">Capability matrix + recent</div>
         <pre class="mono" id="ned-detail" style="white-space:pre-wrap;margin-top:8px"></pre>
@@ -506,21 +544,42 @@
     function renderNed(ned) {
       const host = $('ned-stats');
       const detail = $('ned-detail');
+      const body = $('god-iterations');
       if (!ned) return;
+      const identity = String(ned.identity || 'GOD · rpAI').replace(/^NED\b/i, 'GOD');
       if (host) {
         const cards = [
-          ['Identity', ned.identity || 'GOD'],
+          ['Identity', identity],
           ['Learned', String(ned.learned ?? 0)],
-          ['Wallet events', String(ned.walletEvents ?? 0)],
-          ['VPN events', String(ned.vpnEvents ?? 0)],
-          ['Accuracy', String(ned.accuracy ?? 0)],
-          ['Coverage', String(ned.coverage ?? 0)],
-          ['Calibration', String(ned.calibration ?? 0)],
-          ['Latency ms', String(ned.latencyMs ?? '—')],
+          ['Height', String(ned.height ?? ned.walletEvents ?? 0)],
+          ['Surfaces', String((ned.surfaces || []).length || ned.vpnEvents || 0)],
         ];
         host.innerHTML = cards.map(([k, v]) =>
           `<div class="card"><div class="label">${k}</div><div class="value">${v}</div></div>`
         ).join('');
+      }
+      if (body) {
+        const rows = Array.isArray(ned.iterations) && ned.iterations.length
+          ? ned.iterations
+          : [
+              { id: 'GOD', name: 'GOD', role: 'current helper', learned: ned.learned ?? 0, height: ned.height ?? 0, intervalSec: 7200, status: 'live' },
+              { id: 'NED', name: 'NED', role: 'prior iteration', learned: ned.learned ?? 0, height: ned.height ?? 0, intervalSec: null, status: 'absorbed', lastLine: '' },
+              { id: 'FRED', name: 'FRED', role: 'Helsinki scenario bot', learned: 0, height: 0, intervalSec: 7200, status: 'running', lastQuestion: '' },
+              { id: 'PED', name: 'PED', role: 'X.com / Grok observer · @rgsneddon wallet', learned: 0, height: 0, intervalSec: 3600, status: 'running', lastQuestion: '' },
+            ];
+        body.innerHTML = rows.map((row) => {
+          const interval = row.intervalSec ? `${Math.round(Number(row.intervalSec) / 3600)}h` : '—';
+          const last = row.lastQuestion || row.lastLine || row.lastSource || '—';
+          return `<tr data-iteration="${String(row.id || '')}">
+            <td>${String(row.name || row.id || '')}</td>
+            <td>${String(row.role || '')}</td>
+            <td>${String(row.learned ?? 0)}</td>
+            <td>${String(row.height ?? 0)}</td>
+            <td>${interval}</td>
+            <td>${String(row.status || '')}</td>
+            <td>${String(last)}</td>
+          </tr>`;
+        }).join('');
       }
       if (detail) {
         detail.textContent = JSON.stringify({
@@ -617,9 +676,24 @@
       return `${rate} ${unit}`;
     }
 
+    function paintNetworkCalculations(net) {
+      const calc = net.networkCalculations || net.treasuryEmission || {};
+      const set = (id, text) => {
+        const el = $(id);
+        if (el) el.textContent = text;
+      };
+      set('calc-emission-rate', emissionRateLabel(calc));
+      set('calc-load-factor', calc.loadFactorPercent != null ? `${calc.loadFactorPercent}%` : '—');
+      set('calc-block-time', calc.blockTimeFactorPercent != null ? `${calc.blockTimeFactorPercent}%` : '—');
+      set('calc-combined-factor', calc.combinedFactorPercent != null ? `${calc.combinedFactorPercent}%` : '—');
+      set('calc-wallet-load', calc.walletLoadCount != null ? String(calc.walletLoadCount) : '—');
+      set('calc-avg-block-seconds', calc.averageBlockSeconds != null ? String(calc.averageBlockSeconds) : '—');
+    }
+
     function renderTreasuryEmissionPublic(net) {
       const section = $('treasury-emission-public');
       const emission = net.treasuryEmission;
+      paintNetworkCalculations(net);
       if (!net.blockchainLaunched || !emission) {
         section.style.display = 'none';
         return;
@@ -627,6 +701,10 @@
       section.style.display = 'block';
       $('treasury-emission-stats').innerHTML = `
         <div class="card"><div class="label">Emission rate</div><div class="value">${emissionRateLabel(emission)}</div></div>
+        <div class="card"><div class="label">Load factor</div><div class="value">${emission.loadFactorPercent != null ? emission.loadFactorPercent + '%' : '—'}</div></div>
+        <div class="card"><div class="label">Block-time factor</div><div class="value">${emission.blockTimeFactorPercent != null ? emission.blockTimeFactorPercent + '%' : '—'}</div></div>
+        <div class="card"><div class="label">Wallet load</div><div class="value">${emission.walletLoadCount ?? '—'}</div></div>
+        <div class="card"><div class="label">Average block seconds</div><div class="value">${emission.averageBlockSeconds ?? '—'}</div></div>
         <div class="card"><div class="label">Treasury balance</div><div class="value">${emission.balance} PERC</div></div>
         <div class="card"><div class="label">Cumulative minted</div><div class="value">${emission.cumulativeMinted} PERC</div></div>
         <div class="card"><div class="label">Treasury cycle</div><div class="value">${emission.treasuryCycle}</div></div>
@@ -758,14 +836,18 @@
           `Chronoflux five-point pentagon — wallets by current block height (scenario, chain, or relay). ` +
           `Five rings mark 0%–100% of network max. Wallets show for ${timeoutMin} minutes after last heartbeat, then drop off.`;
       }
-      $('stats').innerHTML = `
-        <div class="card"><div class="label">Node</div><div class="value">${pill(net.nodeStatus === 'online')}</div></div>
-        <div class="card"><div class="label">Seed height</div><div class="value">${net.blockHeight}</div></div>
-        <div class="card"><div class="label">Network height</div><div class="value">${net.networkHeight}</div></div>
-        <div class="card"><div class="label">Peers online</div><div class="value">${net.peers.online} / ${net.peers.total}</div></div>
-        <div class="card"><div class="label">Ledger</div><div class="value">${net.ledgerReady ? 'Synced' : 'Pending'}</div></div>
-        <div class="card"><div class="label">Chain</div><div class="value mono" style="font-size:0.75rem">${net.chainId}</div></div>
-      `;
+      const set = (id, htmlOrText, asHtml = false) => {
+        const el = $(id);
+        if (!el) return;
+        if (asHtml) el.innerHTML = htmlOrText;
+        else el.textContent = htmlOrText;
+      };
+      set('stat-node', pill(net.nodeStatus === 'online'), true);
+      set('stat-seed-height', String(net.blockHeight ?? ''));
+      set('stat-network-height', String(net.networkHeight ?? ''));
+      set('stat-peers', `${net.peers.online} / ${net.peers.total}`);
+      set('stat-ledger', net.ledgerReady ? 'Synced' : 'Pending');
+      set('stat-chain', net.chainId || '—');
     }
 
     function renderBlocks(data) {

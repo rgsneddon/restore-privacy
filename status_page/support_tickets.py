@@ -1045,18 +1045,27 @@ def render_support_page_html(
         "platform": html.escape(pre.get("platform") or ""),
         "app_version": html.escape(pre.get("app_version") or ""),
     }
+    try:
+        from god_support import god_support_css, render_god_support_box_html
+    except ImportError:  # pragma: no cover
+        from status_page.god_support import (  # type: ignore
+            god_support_css,
+            render_god_support_box_html,
+        )
     # Support form chrome lives in public_site_css (theme-aware inputs / CTAs).
     head = public_head_open(
         title=f"Support — {PUBLIC_BRAND_TITLE}",
-        extra_css="",
+        extra_css=god_support_css(),
     )
     header = public_brand_header_html(active="support")
     close = public_page_close()
+    god_box = render_god_support_box_html()
     return f"""{head}
   <div class="page-shell" id="support-page-shell" data-page="support">
 {header}
 <main class="support-wrap panel-card" id="support-main" data-chrome="pro">
   <h2>Customer support</h2>
+  {god_box}
   <p class="support-lead" id="support-lead">
     Tell us what went wrong. We will open a ticket and notify
     <strong>{html.escape(SUPPORT_INBOX)}</strong> of your issue. Please allow

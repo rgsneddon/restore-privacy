@@ -177,6 +177,7 @@ STATIC_ROUTES: dict[str, str] = {
     "/static/admin_fleet_usage.js": "admin_fleet_usage.js",
     "/static/admin_link_generation.js": "admin_link_generation.js",
     "/static/admin_support_tickets.js": "admin_support_tickets.js",
+    "/static/god_support.js": "god_support.js",
     "/static/admin_suite_push.js": "admin_suite_push.js",
     "/static/tester_page_gate.js": "tester_page_gate.js",
     # Public redesign: logo-aligned circuit / data-path motif
@@ -2714,6 +2715,29 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         path, _query = _parse_query(self.path)
         body = self._read_body()
+
+        if path in ("/support/god-ask", "/support/god-ask/"):
+            try:
+                from god_support import answer_god_question
+            except ImportError:  # pragma: no cover
+                from status_page.god_support import answer_god_question  # type: ignore
+            question = ""
+            try:
+                payload = json.loads(body.decode("utf-8", errors="replace") or "{}")
+                if isinstance(payload, dict):
+                    question = str(payload.get("question") or "")
+            except json.JSONDecodeError:
+                form = urllib.parse.parse_qs(body.decode("utf-8", errors="replace"))
+                vals = form.get("question") or form.get("god_question") or []
+                question = str(vals[0] if vals else "")
+            result = answer_god_question(question)
+            code = 200 if result.get("ok") else 400
+            self._send(
+                code,
+                "application/json; charset=utf-8",
+                json.dumps(result).encode("utf-8"),
+            )
+            return
 
         # Public customer support form → ticket + email to rus@
         if path in ("/support", "/support/"):

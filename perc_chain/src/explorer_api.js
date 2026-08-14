@@ -3,6 +3,7 @@ import { genericBlockLabel } from './block_display_label.js';
 import { resolveRelayBlockView } from './transfer_relay_view.js';
 import { buildDynamicEmissionStats } from './dynamic_emission.js';
 import { blockHeight, tipHash } from './ledger_store.js';
+import { percChainTipHeight } from './chain_tip.js';
 import {
   chainBlockHeightFromLedger,
   treasuryEmissionMilestoneFromLedger,
@@ -57,10 +58,14 @@ export function formatPercAmount(amount) {
   return frac ? `${whole}.${frac}` : String(whole);
 }
 
+export function networkCalculationsFromLedger(ledger) {
+  return buildDynamicEmissionStats(ledger);
+}
+
 export function buildPublicTreasuryEmission(ledger, treasuryUsername = 'evolve_treasury') {
   if (!ledger?.blockchainLaunched) return null;
   const treasury = ledger.accounts?.[treasuryUsername];
-  const dynamic = buildDynamicEmissionStats(ledger);
+  const dynamic = networkCalculationsFromLedger(ledger);
   return {
     ...dynamic,
     balance: formatPercAmount(treasury?.balance),
@@ -70,6 +75,30 @@ export function buildPublicTreasuryEmission(ledger, treasuryUsername = 'evolve_t
     disclaimer:
       'Manual sends from evolve_treasury are disabled; dynamic emission, regeneration, and faucet payouts continue.',
   };
+}
+
+/** Fill shipped explorer HTML with tip height + ledger-derived calculations. */
+export function hydrateExplorerIndex(html, snapshot) {
+  const calc = snapshot?.networkCalculations || snapshot?.treasuryEmission || {};
+  const height = snapshot?.blockHeight ?? '';
+  const netH = snapshot?.networkHeight ?? height;
+  const emissionLabel =
+    calc.emissionPerMinute != null ? `${calc.emissionPerMinute} PERC/min` : '—';
+  const pairs = [
+    ['stat-seed-height', height],
+    ['stat-network-height', netH],
+    ['calc-emission-rate', emissionLabel],
+    ['calc-load-factor', calc.loadFactorPercent != null ? `${calc.loadFactorPercent}%` : '—'],
+    ['calc-block-time', calc.blockTimeFactorPercent != null ? `${calc.blockTimeFactorPercent}%` : '—'],
+    ['calc-combined-factor', calc.combinedFactorPercent != null ? `${calc.combinedFactorPercent}%` : '—'],
+    ['calc-wallet-load', calc.walletLoadCount ?? '—'],
+    ['calc-avg-block-seconds', calc.averageBlockSeconds ?? '—'],
+  ];
+  let out = String(html || '');
+  for (const [id, value] of pairs) {
+    out = out.replace(new RegExp(`(id="${id}">)[^<]*`), `$1${value}`);
+  }
+  return out;
 }
 
 export function summarizeBlock(block, ledger) {
@@ -287,7 +316,7 @@ export function buildNetworkSnapshot({
 }) {
   const now = Date.now();
   const ledger = store.ledger;
-  const height = blockHeight(ledger);
+  const height = percChainTipHeight(ledger);
   const peerRows = [...peers.values()]
     .filter((p) => (p.evolutionaryChainId ?? chainId) === chainId)
     .filter((p) => !isHiddenPeer(p.sessionUsername))
@@ -319,7 +348,7 @@ export function buildNetworkSnapshot({
     chainId,
     seedUsername,
     endpoint: maskEndpoint(endpoint),
-    blockHeight: blockHeight(ledger),
+    blockHeight: percChainTipHeight(ledger),
     tipHash: tipHash(ledger),
     revision: store.revision,
     networkGenesisRevision: store.getGenesisRevision(),
@@ -334,6 +363,7 @@ export function buildNetworkSnapshot({
     peerList: peerRows,
     blockchainLaunched: ledger?.blockchainLaunched ?? false,
     treasuryEmission: buildPublicTreasuryEmission(ledger),
+    networkCalculations: networkCalculationsFromLedger(ledger),
     walletBlockChart: buildWalletBlockChart({
       peers,
       ledgers,

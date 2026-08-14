@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import {
   buildNetworkSnapshot,
   getBlockDetail,
+  hydrateExplorerIndex,
   isHiddenPeer,
   listBlocks,
 } from './explorer_api.js';
@@ -12,6 +13,11 @@ import { actionChain } from './action_block.js';
 import { confirmBlock } from './block_confirm.js';
 import { buildExplorerDiagrams } from './explorer_diagrams.js';
 import { rpaiNed } from './rpai_ned.js';
+import {
+  explorerNedPayload,
+  getSharedNedState,
+} from './ned_learn.js';
+import { startRpaiHourlySeals } from './rpai_ped.js';
 import { LedgerStore, blockHeight, tipHash } from './ledger_store.js';
 import { regenerateTreasuryIfLow } from './treasury_regeneration.js';
 import {
@@ -180,11 +186,23 @@ function servePublic(relPath, res) {
     '.png': 'image/png',
     '.ico': 'image/x-icon',
   };
+  let body = fs.readFileSync(filePath);
+  if (ext === '.html' && (safe === 'index.html' || safe.endsWith(`${path.sep}index.html`))) {
+    const snapshot = buildNetworkSnapshot({
+      peers,
+      ledgers,
+      store,
+      seedUsername: SEED_USERNAME,
+      endpoint: publicEndpoint(),
+      chainId: CHAIN_ID,
+    });
+    body = hydrateExplorerIndex(body.toString('utf8'), snapshot);
+  }
   res.writeHead(200, {
     'Content-Type': types[ext] ?? 'application/octet-stream',
     'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600',
   });
-  res.end(fs.readFileSync(filePath));
+  res.end(body);
   return true;
 }
 
@@ -392,7 +410,15 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/rpai') {
-    return json(res, 200, sanitizeForPublicExplorer({ ned: rpaiNed.stats() }));
+    const god = explorerNedPayload(getSharedNedState());
+    return json(
+      res,
+      200,
+      sanitizeForPublicExplorer({
+        ...god,
+        ned: { ...rpaiNed.stats(), identity: god.identity },
+      }),
+    );
   }
 
   if (req.method === 'POST' && url.pathname === '/api/rpai/learn') {
@@ -784,4 +810,11 @@ server.listen(PORT, bindHost, async () => {
       registerSeed().catch((err) => console.warn('Treasury regen register failed:', err));
     }
   }, TREASURY_REGEN_INTERVAL_MS);
+  startRpaiHourlySeals({
+    getLedger: () => (store.hasLedger() ? store.ledger : null),
+    save: () => {
+      store.revision = (store.revision || 0) + 1;
+      store.save();
+    },
+  });
 });
