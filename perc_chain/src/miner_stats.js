@@ -1,10 +1,14 @@
 /**
- * Live Perc pool miner book. Login / stats / shares → public /api/stats.
+ * Live Perc pool miner book. A submitted hash lists the miner for 72s.
+ * Login / stats / TCP connect alone do not list them.
  */
 const miners = new Map();
 const startedAt = Date.now();
 let poolAccepted = 0;
 let poolRejected = 0;
+
+/** Visible while last submitted hash is at most this old. */
+export const HASH_PRESENCE_MS = 72_000;
 
 export function resetMinerStats() {
   miners.clear();
@@ -36,6 +40,7 @@ function row(username) {
       connected: false,
       connectedAt: null,
       lastSeen: null,
+      lastHashAt: null,
       lastJobId: null,
       height: null,
       threads: 0,
@@ -89,9 +94,11 @@ export function recordMinerStats(body = {}) {
   return rec;
 }
 
-export function recordMinerShare({ username, accepted, percMicro } = {}) {
+export function recordMinerShare({ username, accepted, percMicro, now } = {}) {
   const rec = row(username);
-  rec.lastSeen = Date.now();
+  const at = Number(now) || Date.now();
+  rec.lastSeen = at;
+  rec.lastHashAt = at;
   rec.connected = true;
   rec.sessionShares += 1;
   if (accepted) {
@@ -108,29 +115,32 @@ export function recordMinerShare({ username, accepted, percMicro } = {}) {
 export function recordMinerDisconnect(username) {
   const key = minerKey(username);
   const rec = miners.get(key) || null;
-  if (rec) miners.delete(key);
+  if (rec) rec.connected = false;
   return rec;
 }
 
-/** Public list: first share lists the miner; no share or disconnect omits them. */
-export function minerIsListed(m) {
-  return Boolean(m && m.connected && Number(m.sessionShares) > 0);
+/** Public list: last submitted hash within HASH_PRESENCE_MS. Login does not count. */
+export function minerIsListed(m, now = Date.now()) {
+  const at = Number(m?.lastHashAt);
+  if (!Number.isFinite(at)) return false;
+  return Number(now) - at <= HASH_PRESENCE_MS;
 }
 
-export function listMiners() {
+export function listMiners(now = Date.now()) {
+  const at = Number(now) || Date.now();
   return [...miners.values()]
-    .filter(minerIsListed)
+    .filter((m) => minerIsListed(m, at))
     .map((m) => ({
       ...m,
-      connected: true,
-      staleSeconds: m.lastSeen ? Math.round((Date.now() - m.lastSeen) / 1000) : null,
+      connected: Boolean(m.connected),
+      staleSeconds: m.lastHashAt ? Math.round((at - m.lastHashAt) / 1000) : null,
       perc: (m.percMicro || 0) / 100_000_000,
     }))
     .sort((a, b) => (b.hashrate || 0) - (a.hashrate || 0) || (b.sessionShares || 0) - (a.sessionShares || 0));
 }
 
-export function poolStatsSnapshot() {
-  const rows = listMiners();
+export function poolStatsSnapshot(now = Date.now()) {
+  const rows = listMiners(now);
   const online = rows;
   return {
     ok: true,

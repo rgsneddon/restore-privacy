@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>PERC share confirmations</title>
+  <style>
+    :root { --bg:#0b0d14; --panel:#141824; --line:#252b3d; --text:#e8ecf4; --muted:#9aa3b8; --neon:#f8ff14; --cyan:#00e5ff; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Segoe UI,system-ui,sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { max-width:52rem; margin:0 auto; padding:28px 18px 64px; }
+    h1 { font-size:1.7rem; margin:0 0 6px; }
+    h2 { font-size:1.15rem; margin:28px 0 10px; }
+    .sub, .hint { color:var(--muted); }
+    .sub { margin:0 0 22px; }
+    .hint { font-size:.88rem; }
+    a { color:var(--cyan); }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin:18px 0; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+    .label { color:var(--muted); font-size:.75rem; letter-spacing:.06em; text-transform:uppercase; }
+    .value { font-size:1.15rem; font-weight:700; margin-top:4px; color:var(--neon); }
+    p { line-height:1.5; }
+    table.stats { width:100%; border-collapse:collapse; font-size:.82rem; margin-top:10px; }
+    table.stats th, table.stats td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); word-break:break-all; }
+    table.stats th { color:var(--muted); text-transform:uppercase; letter-spacing:.04em; font-size:.72rem; }
+    .on { color:#00d4aa; }
+    .off { color:#ffb020; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>How PERC shares confirm</h1>
+    <p class="sub"><a href="/">Perccent PERC pool</a> · 72 minutes until a pool-found block is spendable</p>
+    <p>
+      Miners submit hashes to the pool. A valid hash that meets job work is an accepted share.
+      The first accepted solution at a height is the <strong>found block</strong>. That block stays
+      <span class="off">unconfirmed</span> until <strong>72 minutes</strong> have passed. After 72 minutes
+      it is <span class="on">confirmed</span> and the PERC mined at the pool is spendable from the wallet.
+    </p>
+    <div class="grid">
+      <div class="card"><div class="label">Confirmations</div><div class="value" id="stat-window">72 minutes</div></div>
+      <div class="card"><div class="label">Avg block time</div><div class="value" id="stat-avg">—</div></div>
+      <div class="card"><div class="label">Next block ETA</div><div class="value" id="stat-eta">—</div></div>
+      <div class="card"><div class="label">Confirmed</div><div class="value" id="stat-ok">0</div></div>
+      <div class="card"><div class="label">Unconfirmed</div><div class="value" id="stat-wait">0</div></div>
+    </div>
+    <h2>All pool-found blocks</h2>
+    <p class="hint">Every found block and its miner. Status flips to confirmed after 72 minutes.</p>
+    <table class="stats">
+      <thead>
+        <tr>
+          <th>Height</th>
+          <th>Miner</th>
+          <th>Found</th>
+          <th>Status</th>
+          <th>Spendable</th>
+        </tr>
+      </thead>
+      <tbody id="block-body">
+        <tr><td colspan="5" class="hint">No pool-found blocks yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <script type="module">
+    function fmtDur(ms) {
+      if (ms == null || !Number.isFinite(Number(ms))) return '—';
+      const s = Math.max(0, Number(ms) / 1000);
+      if (s >= 3600) return (s / 3600).toFixed(1) + ' h';
+      if (s >= 60) return (s / 60).toFixed(1) + ' min';
+      return s.toFixed(0) + ' s';
+    }
+    async function refresh() {
+      const s = await fetch('/api/confirmations', { cache: 'no-store' }).then((r) => r.json());
+      document.getElementById('stat-window').textContent = (s.confirmationMinutes || 72) + ' minutes';
+      document.getElementById('stat-avg').textContent = fmtDur(s.averageBlockIntervalMs);
+      document.getElementById('stat-eta').textContent = fmtDur(s.etaNextBlockMs);
+      document.getElementById('stat-ok').textContent = s.confirmed ?? 0;
+      document.getElementById('stat-wait').textContent = s.unconfirmed ?? 0;
+      const body = document.getElementById('block-body');
+      const rows = s.blocks || [];
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="5" class="hint">No pool-found blocks yet.</td></tr>';
+        return;
+      }
+      body.innerHTML = rows.map((b) => `<tr>
+        <td>${b.height ?? ''}</td>
+        <td>${b.miner || ''}</td>
+        <td>${b.foundAt ? new Date(b.foundAt).toISOString() : ''}</td>
+        <td class="${b.confirmed ? 'on' : 'off'}">${b.status || ''}</td>
+        <td>${b.spendable ? 'yes' : 'not yet'}</td>
+      </tr>`).join('');
+    }
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>

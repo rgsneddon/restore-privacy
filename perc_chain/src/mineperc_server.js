@@ -30,6 +30,7 @@ import {
   recordMinerShare,
   recordMinerStats,
 } from './miner_stats.js';
+import { confirmationSnapshot, recordPoolBlock } from './perc_block_confirm.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_HTTP_PORT = 8011;
@@ -98,16 +99,21 @@ export function nextJob(ledgerHeight) {
   return seedJob({ height, preWork: defaultPreWork(height) });
 }
 
-export function submitShare({ username, nonce, solution, output, jobId, preWork, input }) {
+export function submitShare({ username, nonce, solution, output, jobId, preWork, input, now } = {}) {
   const job = (jobId && issuedJobs.get(String(jobId))) || lastJob;
   const work = input || preWork || job?.input || job?.preWork;
   const sol = output || solution;
+  const submittedHash = Boolean(nonce || sol);
+  const at = Number(now) || Date.now();
   const checked = checkShare({
     preWork: work,
     nonce,
     solution: sol,
   });
   if (!checked.ok) {
+    if (submittedHash && username) {
+      recordMinerShare({ username, accepted: false, now: at });
+    }
     return { accepted: false, reason: checked.reason, asset: 'PERC' };
   }
   const credit = creditAcceptedShare({
@@ -115,6 +121,20 @@ export function submitShare({ username, nonce, solution, output, jobId, preWork,
     jobId: job?.jobId || jobId,
   });
   credits = applyCredit(credits, credit);
+  if (submittedHash && username) {
+    recordMinerShare({
+      username,
+      accepted: true,
+      percMicro: credit.microUnits,
+      now: at,
+    });
+  }
+  recordPoolBlock({
+    miner: username,
+    height: job?.height,
+    jobId: job?.jobId || jobId,
+    foundAt: at,
+  });
   return { accepted: true, credit, balances: credits, asset: 'PERC' };
 }
 
@@ -139,6 +159,9 @@ export function handleApi(url, method, body) {
   }
   if (url === '/api/stats' || url === '/stats.json') {
     return { status: 200, json: poolStatsSnapshot() };
+  }
+  if (url === '/api/confirmations' || url === '/confirmations.json') {
+    return { status: 200, json: confirmationSnapshot() };
   }
   if (url === '/api/miner-stats' && method === 'POST') {
     try {
@@ -228,11 +251,6 @@ export function attachMiner(sock, { jobFactory } = {}) {
           solution: sol.output,
           jobId: sol.jobId,
         });
-        recordMinerShare({
-          username,
-          accepted: got.accepted,
-          percMicro: got.credit?.microUnits,
-        });
         send({
           ...shareAck(msg.id ?? sol.jobId, got.accepted, got.reason),
           credit: got.credit || undefined,
@@ -305,6 +323,11 @@ export function writePublicFile(res, url, dir = publicDir()) {
     '/mineperc_parts.js': {
       name: 'mineperc_parts.js',
       type: 'text/javascript; charset=utf-8',
+    },
+    '/confirmations': { name: 'confirmations.html', type: 'text/html; charset=utf-8' },
+    '/confirmations.html': {
+      name: 'confirmations.html',
+      type: 'text/html; charset=utf-8',
     },
   };
   const hit = files[clean];

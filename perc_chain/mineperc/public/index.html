@@ -61,6 +61,17 @@
     table.stats th { color:var(--muted); text-transform:uppercase; letter-spacing:.04em; font-size:.72rem; }
     .on { color:#00d4aa; }
     .off { color:var(--muted); }
+    .apps { margin: 28px 0 8px; }
+    .apps h2 { margin: 0 0 8px; }
+    .dl-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+      gap:12px;
+      margin: 12px 0 18px;
+    }
+    .dl-card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+    .dl-card ul { margin:8px 0 0; padding-left:1.1rem; }
+    .dl-card li { margin: 4px 0; }
   </style>
 </head>
 <body>
@@ -98,7 +109,7 @@
       </div>
     </div>
     <h2>Live miners</h2>
-    <p class="hint">Listed on the first submitted share. Dropped immediately on disconnect or if no share is in this session. Refreshes live.</p>
+    <p class="hint">Listed on the first submitted hash (accepted or rejected). Dropped after 72 seconds without a hash. <a href="/confirmations">How shares confirm</a>.</p>
     <div class="grid" id="live-pool-stats">
       <div class="card"><div class="label">Online</div><div class="value" id="stat-online">0</div></div>
       <div class="card"><div class="label">Threads</div><div class="value" id="stat-threads">0</div></div>
@@ -128,11 +139,11 @@
         </tr>
       </thead>
       <tbody id="miner-body">
-        <tr><td colspan="14" class="off">No miners with a share this session.</td></tr>
+        <tr><td colspan="14" class="off">No miners hashing in the last 72 seconds.</td></tr>
       </tbody>
     </table>
     <h2>Connect a miner</h2>
-    <p class="hint">Normal difficulty: port <code>1466</code>. High difficulty: port <code>3334</code>. Username is your Perccent identity. Payouts are PERC. CPU miner: <a href="https://github.com/rgsneddon/perc-mine/releases">perc-mine v1.0.0</a>.</p>
+    <p class="hint">Normal difficulty: port <code>1466</code>. High difficulty: port <code>3334</code>. Username is your Perccent identity. Payouts are PERC. CPU miner: <a href="https://github.com/rgsneddon/perc-mine/releases">perc-mine v1.0.1</a>.</p>
     <div class="cmd-list" id="mineperc-commands">
       <div class="info-box" data-info-box="1">
         <code class="info-value" id="part-perc-mine" data-copy-part="perc-mine">perc-mine --pool mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER</code>
@@ -142,6 +153,39 @@
       </div>
 
     </div>
+    <section class="apps" id="mineperc-apps" aria-label="Perccent apps and installers">
+      <h2>Apps and installers</h2>
+      <p class="hint">Perccent wallet, PERC CPU miner, pool stratum, and the Evolve explorer. Each installer is the newest published asset for that platform.</p>
+      <div class="dl-grid">
+        <div class="dl-card">
+          <div class="label">Perccent standalone wallet</div>
+          <div class="value" style="font-size:1rem"><a href="https://github.com/rgsneddon/perccent-wallet">perccent-wallet</a></div>
+          <ul>
+            <li><a href="https://github.com/rgsneddon/perccent-wallet/releases/download/v1.1.6/perccent-wallet-v1.1.6-windows-x64-setup.exe">perccent-wallet Windows</a></li>
+            <li><a href="https://github.com/rgsneddon/perccent-wallet/releases/download/v1.1.6/perccent-wallet-v1.1.6-android-setup.apk">perccent-wallet Android</a></li>
+            <li><a href="https://github.com/rgsneddon/perccent-wallet/releases/download/v1.1.7/perccent-wallet-v1.1.7-macos-setup.zip">perccent-wallet macOS</a></li>
+            <li><a href="https://github.com/rgsneddon/perccent-wallet/releases/download/v1.1.7/perccent-wallet-v1.1.7-ios-setup.ipa">perccent-wallet iOS</a></li>
+          </ul>
+        </div>
+        <div class="dl-card">
+          <div class="label">PERC CPU miner</div>
+          <div class="value" style="font-size:1rem"><a href="https://github.com/rgsneddon/perc-mine">perc-mine</a></div>
+          <ul>
+            <li><a href="https://github.com/rgsneddon/perc-mine/releases/download/v1.0.1/perc-mine-1.0.1-windows.zip">perc-mine Windows</a></li>
+            <li><a href="https://github.com/rgsneddon/perc-mine/releases/download/v1.0.1/perc-mine-1.0.1-linux.tar.gz">perc-mine Linux</a></li>
+            <li><a href="https://github.com/rgsneddon/perc-mine/releases/download/v1.0.1/perc-mine-1.0.1-macos.tar.gz">perc-mine macOS</a></li>
+          </ul>
+        </div>
+        <div class="dl-card">
+          <div class="label">Related pool software</div>
+          <ul>
+            <li><a href="https://github.com/rgsneddon/perc-stratum-pool">perc-stratum-pool</a></li>
+            <li><a href="https://github.com/rgsneddon/basic">BASiC payments</a></li>
+            <li><a href="https://evolve.restoreprivacy.online/">Evolve explorer</a></li>
+          </ul>
+        </div>
+      </div>
+    </section>
     <p class="hint">Repos: <a href="https://github.com/rgsneddon/perc-mine">perc-mine</a> · <a href="https://github.com/rgsneddon/perc-stratum-pool">perc-stratum-pool</a> · <a href="https://github.com/rgsneddon/basic">basic</a> · JSON <a href="/api/connect">/api/connect</a> · health <a href="/health">/health</a> · explorer <a href="https://evolve.restoreprivacy.online/">evolve.restoreprivacy.online</a></p>
   </div>
   <script type="module">
@@ -172,11 +216,9 @@
         document.getElementById('stat-rejected').textContent = s.rejected ?? 0;
         document.getElementById('stat-perc').textContent = Number(s.perc || 0).toFixed(8);
         const body = document.getElementById('miner-body');
-        const rows = (s.workers || []).filter(
-          (m) => m && m.connected !== false && Number(m.sessionShares || m.accepted || m.rejected || 0) > 0,
-        );
+        const rows = s.workers || [];
         if (!rows.length) {
-          body.innerHTML = '<tr><td colspan="14" class="off">No miners with a share this session.</td></tr>';
+          body.innerHTML = '<tr><td colspan="14" class="off">No miners hashing in the last 72 seconds.</td></tr>';
           return;
         }
         body.innerHTML = rows.map((m) => `<tr>

@@ -15,7 +15,8 @@ import { extractSolution, loginReply, minerJob } from './stratum_protocol.js';
 import { applyPowToLedger, jobFromLedger } from './pow.js';
 import { mineSubmit } from './mine_api.js';
 import { startPercMinePool } from './mine_pool.js';
-import { poolStatsSnapshot, resetMinerStats } from './miner_stats.js';
+import { HASH_PRESENCE_MS, listMiners, poolStatsSnapshot, resetMinerStats } from './miner_stats.js';
+import { confirmationSnapshot, resetPoolBlocks } from './perc_block_confirm.js';
 
 const BH3 = {
   preWork: '990504d96fba29cfd6d9c2f3f8663e511fca10758f33c1e4dea443bbe6c5aac0',
@@ -179,8 +180,9 @@ describe('BeamHash III miner wire', () => {
 });
 
 describe('live miner stats', () => {
-  it('login + stats stay off the list until a share; disconnect drops', async () => {
+  it('login + stats stay off the list until a hash; reject still lists', async () => {
     resetMinerStats();
+    resetPoolBlocks();
     seedJob({ preWork: BH3.preWork, jobId: 'share-list' });
     const srv = createStratumServer({ port: 0, tls: null });
     await new Promise((r) => srv.listen(r));
@@ -212,10 +214,45 @@ describe('live miner stats', () => {
     assert.equal(on.workers[0].worker, 'raskul');
     s.end();
     await new Promise((r) => setTimeout(r, 30));
-    const off = handleApi('/api/stats', 'GET').json;
-    assert.equal(off.minersOnline, 0);
-    assert.equal(off.workers.length, 0);
+    const still = handleApi('/api/stats', 'GET').json;
+    assert.equal(still.minersOnline, 1);
     await srv.close();
+  });
+
+  it('POST /api/submit records a rejected hash on the presence book', () => {
+    resetMinerStats();
+    resetPoolBlocks();
+    seedJob({ preWork: BH3.preWork, jobId: 'api-rej' });
+    const flipped = Buffer.from(BH3.solution, 'hex');
+    flipped[0] ^= 0x01;
+    const t0 = 9_000_000;
+    const got = handleApi(
+      '/api/submit',
+      'POST',
+      JSON.stringify({
+        username: 'eve.rig',
+        nonce: BH3.nonce,
+        output: flipped.toString('hex'),
+        jobId: 'api-rej',
+        now: t0,
+      }),
+    );
+    assert.equal(got.json.accepted, false);
+    assert.ok(listMiners(t0).some((m) => m.username === 'eve.rig'));
+    assert.equal(listMiners(t0 + HASH_PRESENCE_MS + 1).some((m) => m.username === 'eve.rig'), false);
+    const accepted = handleApi(
+      '/api/submit',
+      'POST',
+      JSON.stringify({
+        username: 'eve.rig',
+        nonce: BH3.nonce,
+        output: BH3.solution,
+        jobId: 'api-rej',
+      }),
+    );
+    assert.equal(accepted.json.accepted, true);
+    const conf = confirmationSnapshot(Date.now());
+    assert.ok(conf.blocks.some((b) => String(b.miner).includes('eve')));
   });
 });
 
@@ -261,11 +298,20 @@ describe('createServer launch', () => {
       const js = await fetch(`http://127.0.0.1:${port}/mineperc_parts.js`);
       const jsText = await js.text();
       const health = await fetch(`http://127.0.0.1:${port}/health`).then((r) => r.json());
+      const confPage = await fetch(`http://127.0.0.1:${port}/confirmations`);
+      const confHtml = await confPage.text();
+      const confApi = await fetch(`http://127.0.0.1:${port}/api/confirmations`).then((r) => r.json());
       await srv.close();
-      bodies.push({ text, health, jsStatus: js.status, jsText });
+      bodies.push({ text, health, jsStatus: js.status, jsText, confPage: confPage.status, confHtml, confApi });
     }
-    for (const { text, health, jsStatus, jsText } of bodies) {
+    for (const { text, health, jsStatus, jsText, confPage, confHtml, confApi } of bodies) {
       assert.match(text, /Perccent PERC pool/);
+      assert.match(text, /72 seconds/);
+      assert.match(text, /perc-mine v1\.0\.1/);
+      assert.match(text, /perc-mine-1\.0\.1-windows\.zip/);
+      assert.doesNotMatch(text, /perc-mine v1\.0\.0/);
+      assert.doesNotMatch(text, /perc-mine-1\.0\.0/);
+      assert.match(text, /\/confirmations/);
       assert.match(text, /mineperc\.restoreprivacy\.online:1466/);
       assert.match(text, /copy-icon/);
       assert.match(text, /--mineperc-longest-ch/);
@@ -276,6 +322,11 @@ describe('createServer launch', () => {
       assert.equal(jsStatus, 200);
       assert.match(jsText, /export function copyPayloadForPart/);
       assert.match(jsText, /export function minWidthChFromParts/);
+      assert.equal(confPage, 200);
+      assert.match(confHtml, /72 minutes/);
+      assert.match(confHtml, /spendable/);
+      assert.equal(confApi.confirmationMinutes, 72);
+      assert.ok(Array.isArray(confApi.blocks));
     }
   });
 });

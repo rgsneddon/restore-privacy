@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  HASH_PRESENCE_MS,
   listMiners,
   minerIsListed,
   poolStatsSnapshot,
@@ -28,13 +29,16 @@ describe('miner stats book', () => {
     const beforeShare = poolStatsSnapshot();
     assert.equal(beforeShare.minersOnline, 0);
     assert.equal(beforeShare.workers.length, 0);
-    recordMinerShare({ username: name, accepted: true, percMicro: 1 });
-    assert.equal(minerIsListed({ connected: true, sessionShares: 1 }), true);
-    assert.equal(minerIsListed({ connected: true, sessionShares: 0 }), false);
+    const hashedAt = Date.now();
+    recordMinerShare({ username: name, accepted: true, percMicro: 1, now: hashedAt });
+    assert.equal(minerIsListed({ lastHashAt: hashedAt }, hashedAt), true);
+    assert.equal(minerIsListed({ lastHashAt: hashedAt }, hashedAt + HASH_PRESENCE_MS), true);
+    assert.equal(minerIsListed({ lastHashAt: hashedAt }, hashedAt + HASH_PRESENCE_MS + 1), false);
+    assert.equal(minerIsListed({ connected: true, sessionShares: 1 }), false);
     const split = splitWorker(name);
     assert.equal(split.user, 'percpriv193bfbb92db68043f010592e879396c724d488b30');
     assert.equal(split.worker, 'raskul');
-    const snap = poolStatsSnapshot();
+    const snap = poolStatsSnapshot(hashedAt);
     assert.equal(snap.minersOnline, 1);
     assert.equal(snap.threads, 2);
     assert.equal(snap.accepted, 1);
@@ -54,17 +58,24 @@ describe('miner stats book', () => {
     );
     assert.equal(posted.status, 200);
     assert.equal(posted.json.miner.threads, 4);
-    const rows = listMiners();
+    const rows = listMiners(hashedAt);
     assert.equal(rows[0].threads, 4);
     recordMinerDisconnect(name);
-    const afterDrop = poolStatsSnapshot();
-    assert.equal(afterDrop.minersOnline, 0);
-    assert.equal(afterDrop.workers.length, 0);
-    assert.ok(!afterDrop.workers.some((w) => w.username === name));
-    recordMinerShare({ username: name, accepted: true, percMicro: 1 });
-    const back = handleApi('/api/stats', 'GET');
-    assert.equal(back.json.minersOnline, 1);
-    assert.equal(back.json.workers[0].username, name);
-    assert.equal(listMiners().length, 1);
+    const still = poolStatsSnapshot(hashedAt + 1_000);
+    assert.equal(still.minersOnline, 1);
+    assert.equal(still.workers[0].username, name);
+    assert.equal(listMiners(hashedAt + HASH_PRESENCE_MS + 1).length, 0);
+  });
+
+  it('login-only never lists; rejected hash lists until 72s', () => {
+    resetMinerStats();
+    const t0 = 5_000_000;
+    recordMinerLogin({ username: 'bob.rig' });
+    recordMinerStats({ username: 'bob.rig', threads: 1, hashes: 10, hashrate: 1 });
+    assert.equal(listMiners(t0).length, 0);
+    recordMinerShare({ username: 'bob.rig', accepted: false, now: t0 });
+    assert.equal(listMiners(t0).map((m) => m.username).includes('bob.rig'), true);
+    assert.equal(listMiners(t0 + HASH_PRESENCE_MS).length, 1);
+    assert.equal(listMiners(t0 + HASH_PRESENCE_MS + 1).length, 0);
   });
 });
