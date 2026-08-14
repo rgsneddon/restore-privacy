@@ -8,7 +8,7 @@
 
 ## Product truth (unchanged)
 
-Residual VPN only (IS+DE). Tray exactly `Privacy, Restored`. Quit lower-left disconnect-then-exit. Kill-switch ON requires typing `KILLSWITCH`.
+Residual VPN only (DE). Iceland is not offered until sales. Tray exactly `Privacy, Restored`. Quit lower-left disconnect-then-exit. Kill-switch ON requires typing `KILLSWITCH`.
 
 ## Deltas since 1.2.4 (this PE must pick up)
 

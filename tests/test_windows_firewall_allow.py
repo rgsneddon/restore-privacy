@@ -145,6 +145,12 @@ class TestWindowsFwWiring(unittest.TestCase):
         self.assertIn("run_kill_switch_rollback=True", tun)
         app = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         self.assertIn("windows_firewall_connect_hint", app)
+        # HELLO must not race Defender: apply RPT-FW before client.connect.
+        fw_at = app.find("def _fw_pre_hello")
+        hello_at = app.find("self.client.connect(")
+        self.assertGreater(fw_at, 0)
+        self.assertGreater(hello_at, fw_at)
+        self.assertIn("RestorePrivacy-*.exe", text)
 
     def test_script_profiles_and_port_for_all_users(self):
         body = windows_fw_allow_script(

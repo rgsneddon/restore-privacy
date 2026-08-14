@@ -39,7 +39,11 @@ class TestFlagImages(unittest.TestCase):
         from client.flag_images import flag_image_path
 
         opts = catalog_country_options()
-        self.assertGreaterEqual(len(opts), 3)
+        from client.multihop import offered_catalog_codes
+
+        self.assertEqual([o.code for o in opts], list(offered_catalog_codes()))
+        self.assertNotIn("IS", [o.code for o in opts])
+        self.assertGreaterEqual(len(opts), 1)
         for o in opts:
             self.assertTrue(o.flag.strip(), o.code)
             self.assertTrue(o.label().startswith(o.flag) or o.flag in o.label())

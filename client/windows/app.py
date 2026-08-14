@@ -2044,8 +2044,25 @@ class TunnelClientApp:
             threading.Thread(
                 target=_ipv6_prefetch, name="rpt-ipv6", daemon=True
             ).start()
-            with ThreadPoolExecutor(max_workers=1) as pool:
+
+            def _fw_pre_hello() -> None:
+                # Frozen PE is a new exe path; Defender drops UDP HELLO until
+                # RPT-FW rules exist. Must run *before* client.connect (desktop
+                # 1.2.5: 20s no-reply from DE/IS).
+                try:
+                    from client.windows.firewall_allow import apply_windows_fw_allows
+
+                    apply_windows_fw_allows(timeout=8.0)
+                except Exception:
+                    pass
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
                 gw_fut = pool.submit(physical_default_gateway)
+                fw_fut = pool.submit(_fw_pre_hello)
+                try:
+                    fw_fut.result(timeout=10)
+                except Exception:
+                    pass
                 # Idle auto-reconnect passes force_reconnect so a stale
                 # CONNECTED session never short-circuits re-HELLO.
                 result = self.client.connect(
@@ -3445,8 +3462,8 @@ class TunnelClientApp:
             tk.Label(
                 entry_col,
                 text=(
-                    "Choose residual entry: Iceland or Germany. "
-                    "With multi-hop on, exit is Germany (DE)."
+                    "Residual entry: Germany (DE). "
+                    "Iceland is not available until sales."
                 ),
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
@@ -3478,7 +3495,7 @@ class TunnelClientApp:
             # Friendly labels under the code menu
             tk.Label(
                 entry_col,
-                text="IS = Iceland · DE = Germany (default)",
+                text="DE = Germany (sole residual entry)",
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
                 font=("Segoe UI", 7),

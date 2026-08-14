@@ -37,7 +37,8 @@ class TestOracleResidualPeersAndOps(unittest.TestCase):
             RETIRED_RESIDUAL_PEER_CODES,
         )
 
-        self.assertEqual(tuple(LIVE_RESIDUAL_PEER_CODES), ("IS", "DE"))
+        self.assertEqual(tuple(LIVE_RESIDUAL_PEER_CODES), ("DE",))
+        self.assertNotIn("IS", LIVE_RESIDUAL_PEER_CODES)
         self.assertIn("US", RETIRED_RESIDUAL_PEER_CODES)
         self.assertIn("RO", RETIRED_RESIDUAL_PEER_CODES)
         for bad in RETIRED_RESIDUAL_PEER_CODES:

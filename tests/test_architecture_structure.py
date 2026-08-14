@@ -168,7 +168,8 @@ class TestPublicCatalogNotHidden(unittest.TestCase):
         from client.flyclient_hidden_node import synthetic_hidden_host
 
         codes = {n.code for n in product_country_catalog()}
-        self.assertEqual(codes, {"IS", "DE"})
+        self.assertEqual(codes, {"DE"})
+        self.assertNotIn("IS", codes)
         hosts = public_catalog_hosts()
         for n in PRODUCT_COUNTRY_CATALOG:
             self.assertIn(n.host, hosts)

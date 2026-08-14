@@ -239,11 +239,11 @@ class TestCatalogPubInventory(unittest.TestCase):
     def test_catalog_to_pub_inventory(self):
         # Live residual catalog is IS + DE only (US/RO retired).
         expected = {
-            COUNTRY_IS: (PRODUCT_NODE_HOST, "node_elgamal.pub"),
             COUNTRY_DE: (PRODUCT_DE_HOST, "de_node_elgamal.pub"),
         }
         codes = {n.code for n in PRODUCT_COUNTRY_CATALOG}
-        self.assertEqual(codes, {"IS", "DE"})
+        self.assertEqual(codes, {"DE"})
+        self.assertNotIn("IS", codes)
         self.assertNotIn("US", codes)
         self.assertNotIn("RO", codes)
         for n in PRODUCT_COUNTRY_CATALOG:

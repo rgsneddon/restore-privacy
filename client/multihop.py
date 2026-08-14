@@ -82,15 +82,8 @@ class CountryNode:
         return Endpoint(host=self.host, port=int(self.port))
 
 
-# Shipped residual catalog: Iceland + Germany only (US and RO peers retired).
+# Shipped residual catalog: Germany only until sales (Iceland not offered).
 PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
-    CountryNode(
-        code=COUNTRY_IS,
-        name="Iceland",
-        host=PRODUCT_NODE_HOST,
-        port=PRODUCT_NODE_PORT,
-        pub_name="node_elgamal.pub",
-    ),
     CountryNode(
         code=COUNTRY_DE,
         name="Germany",
@@ -104,6 +97,16 @@ PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
 def product_country_catalog() -> tuple[CountryNode, ...]:
     """Current residual country catalog (extend when new nodes ship)."""
     return PRODUCT_COUNTRY_CATALOG
+
+
+def offered_catalog_codes() -> tuple[str, ...]:
+    """Country codes shown and dialable on the residual connection list."""
+    return tuple(n.code for n in product_country_catalog())
+
+
+def offered_catalog_hosts() -> tuple[str, ...]:
+    """Hosts the residual client may dial from the connection list."""
+    return tuple(n.host for n in product_country_catalog())
 
 
 def cojoined_connect_contact() -> dict:
@@ -120,10 +123,10 @@ def normalize_entry_country(code: str | None) -> str:
     raw = (code or "").strip().upper()
     if not raw:
         return DEFAULT_ENTRY_COUNTRY
-    # Accept full names; retired RO/US map to product default DE.
+    # Accept full names; retired IS/RO/US map to product default DE.
     aliases = {
-        "ICELAND": COUNTRY_IS,
-        "IS": COUNTRY_IS,
+        "ICELAND": DEFAULT_ENTRY_COUNTRY,
+        "IS": DEFAULT_ENTRY_COUNTRY,
         "GERMANY": COUNTRY_DE,
         "DE": COUNTRY_DE,
         "DEU": COUNTRY_DE,
@@ -293,7 +296,7 @@ class MultiHopConfig:
         """
         path = build_hop_path(self.hops)
         if not self.enabled:
-            return [path[0]] if path else [Hop(PRODUCT_NODE_HOST, PRODUCT_NODE_PORT, role="entry")]
+            return [path[0]] if path else [Hop(PRODUCT_DE_HOST, PRODUCT_DE_PORT, role="entry")]
         return path
 
 
@@ -317,7 +320,7 @@ def build_hop_path(hops: Sequence[Hop] | Iterable[Hop] | None) -> list[Hop]:
             role = ""
         cleaned.append(Hop(host=host, port=port, role=role))
     if not cleaned:
-        return [Hop(PRODUCT_NODE_HOST, PRODUCT_NODE_PORT, role=ROLE_ENTRY)]
+        return [Hop(PRODUCT_DE_HOST, PRODUCT_DE_PORT, role=ROLE_ENTRY)]
     # Tag entry/exit when ≥2 hops and roles empty — never overwrite hidden.
     if len(cleaned) >= 2:
         if not cleaned[0].role:
@@ -966,14 +969,14 @@ def parse_hops_csv(text: str) -> list[Hop]:
 
 def default_single_hop() -> MultiHopConfig:
     return MultiHopConfig(
-        hops=[Hop(DEFAULT_ENDPOINT.host, DEFAULT_ENDPOINT.port, role="entry")],
+        hops=[Hop(PRODUCT_DE_HOST, PRODUCT_DE_PORT, role="entry")],
         enabled=False,
     )
 
 
 def entry_hop() -> Hop:
-    """Product entry hop (Iceland / FlokiNET production node)."""
-    return Hop(PRODUCT_NODE_HOST, PRODUCT_NODE_PORT, role="entry")
+    """Product entry hop (Germany — sole offered residual until sales)."""
+    return Hop(PRODUCT_DE_HOST, PRODUCT_DE_PORT, role="entry")
 
 
 def product_exit_hop() -> Hop:
@@ -992,7 +995,7 @@ def build_entry_exit_path(
     exit_h = (exit_host or "").strip()
     if not exit_h:
         raise ValueError("exit_host is required for entry→exit path planning")
-    entry_h = (entry_host or PRODUCT_NODE_HOST).strip() or PRODUCT_NODE_HOST
+    entry_h = (entry_host or PRODUCT_DE_HOST).strip() or PRODUCT_DE_HOST
     return build_hop_path(
         [
             Hop(entry_h, entry_port, role="entry"),

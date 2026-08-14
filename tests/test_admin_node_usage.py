@@ -104,7 +104,7 @@ class TestProductPerPeerCaps(unittest.TestCase):
         from admin_node_usage import build_fleet_usage_rows, product_catalog_peers
 
         peers = product_catalog_peers()
-        self.assertEqual({p["code"] for p in peers}, {"IS", "DE"})
+        self.assertEqual({p["code"] for p in peers}, {"DE"})
         probes = {
             "82.221.101.241": {
                 "live": 10,
@@ -123,16 +123,9 @@ class TestProductPerPeerCaps(unittest.TestCase):
         }
         rows = build_fleet_usage_rows(probes_by_host=probes, peers=peers, env={})
         by = {r.code: r for r in rows}
-        self.assertEqual(set(by), {"IS", "DE"})
+        self.assertEqual(set(by), {"DE"})
         self.assertEqual(by["DE"].sessions_cap, 1024)
-        self.assertEqual(by["IS"].sessions_cap, 512)
-        self.assertGreater(by["DE"].sessions_cap, by["IS"].sessions_cap)
-        # IS/DE product unlimited — no fixed Mbps budget even if node reported one
-        self.assertIsNone(by["IS"].bandwidth_cap_bps)
         self.assertIsNone(by["DE"].bandwidth_cap_bps)
-        self.assertIsNone(by["IS"].bandwidth_util)
-        # Node reported capacity=256 while product soft max is 512 → detail note
-        self.assertIn("capacity=256", by["IS"].detail)
 
 
 class TestFleetRows(unittest.TestCase):
@@ -141,7 +134,8 @@ class TestFleetRows(unittest.TestCase):
 
         peers = product_catalog_peers()
         codes = {p["code"] for p in peers}
-        self.assertEqual(codes, {"IS", "DE"})
+        self.assertEqual(codes, {"DE"})
+        self.assertNotIn("IS", codes)
         self.assertNotIn("RO", codes)
         self.assertNotIn("US", codes)
         probes = {
@@ -161,12 +155,8 @@ class TestFleetRows(unittest.TestCase):
             env={},
         )
         by_code = {r.code: r for r in rows}
-        self.assertEqual(set(by_code), {"IS", "DE"})
-        self.assertEqual(by_code["IS"].status, "ok")
-        self.assertIsNotNone(by_code["IS"].bandwidth_used_bps)
-        self.assertIsNone(by_code["IS"].bandwidth_cap_bps)  # unlimited-class
-        self.assertEqual(by_code["IS"].sessions_cap, 512)
-        self.assertIn(by_code["DE"].status, ("unknown", "error"))
+        self.assertEqual(set(by_code), {"DE"})
+        self.assertIn(by_code["DE"].status, ("unknown", "error", "ok"))
         self.assertEqual(by_code["DE"].sessions_cap, 1024)
         self.assertIsNone(by_code["DE"].bandwidth_cap_bps)
 
@@ -197,15 +187,15 @@ class TestAdminHtmlSection(unittest.TestCase):
         }
         rows = build_fleet_usage_rows(probes_by_host=probes, peers=peers, env={})
         by = {r.code: r for r in rows}
-        self.assertEqual(set(by), {"IS", "DE"})
-        self.assertIsNone(by["IS"].bandwidth_cap_bps)
-        self.assertEqual(by["IS"].sessions_cap, 512)
+        self.assertEqual(set(by), {"DE"})
+        self.assertIsNone(by["DE"].bandwidth_cap_bps)
+        self.assertEqual(by["DE"].sessions_cap, 1024)
         self.assertEqual(
-            format_bandwidth_cap(by["IS"].bandwidth_cap_bps, code="IS", host=by["IS"].host),
+            format_bandwidth_cap(by["DE"].bandwidth_cap_bps, code="DE", host=by["DE"].host),
             "unlimited",
         )
         self.assertEqual(
-            resolve_session_soft_max(code="IS", host=by["IS"].host, env={}), 512
+            resolve_session_soft_max(code="DE", host=by["DE"].host, env={}), 1024
         )
 
         with tempfile.TemporaryDirectory() as td:

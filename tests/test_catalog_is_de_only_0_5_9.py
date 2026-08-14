@@ -17,11 +17,13 @@ class TestLiveCatalogIsDeOnly(unittest.TestCase):
 
         codes = {n.code for n in product_country_catalog()}
         hosts = {n.host for n in product_country_catalog()}
-        self.assertEqual(codes, {"IS", "DE"})
+        self.assertEqual(codes, {"DE"})
+        self.assertNotIn("IS", codes)
         self.assertNotIn("US", codes)
         self.assertNotIn("RO", codes)
         self.assertNotIn(PRODUCT_US_HOST, hosts)
         self.assertNotIn("5.161.242.85", hosts)
+        self.assertNotIn("82.221.101.241", hosts)
 
     def test_normalize_stale_us_and_ro_to_de(self):
         from client.multihop import DEFAULT_ENTRY_COUNTRY, normalize_entry_country
@@ -29,7 +31,8 @@ class TestLiveCatalogIsDeOnly(unittest.TestCase):
         self.assertEqual(DEFAULT_ENTRY_COUNTRY, "DE")
         for raw in ("US", "USA", "United States", "AMERICA", "RO", "Romania", ""):
             self.assertEqual(normalize_entry_country(raw), "DE", msg=repr(raw))
-        self.assertEqual(normalize_entry_country("IS"), "IS")
+        self.assertEqual(normalize_entry_country("IS"), "DE")
+        self.assertEqual(normalize_entry_country("Iceland"), "DE")
         self.assertEqual(normalize_entry_country("DE"), "DE")
 
     def test_us_host_pub_heals_to_de(self):
@@ -48,8 +51,9 @@ class TestLiveCatalogIsDeOnly(unittest.TestCase):
     def test_fleet_order_is_de(self):
         from node.fleet_wipe import PREFERRED_FLEET_ORDER, fleet_country_codes
 
-        self.assertEqual(PREFERRED_FLEET_ORDER, ("IS", "DE"))
-        self.assertEqual(fleet_country_codes(), ["IS", "DE"])
+        self.assertEqual(PREFERRED_FLEET_ORDER, ("DE",))
+        self.assertEqual(fleet_country_codes(), ["DE"])
+        self.assertNotIn("IS", fleet_country_codes())
 
     def test_live_monopin_and_is_de_catalog(self):
         """Live Suite monopin is 1.0.0; IS+DE product catalog peers remain (no US)."""

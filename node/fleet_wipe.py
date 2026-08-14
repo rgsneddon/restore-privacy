@@ -4,8 +4,8 @@ With user-selected entry country, Iceland is **not** a fixed sole entry role —
 every catalog country is a residual-capable peer. Fleet wipedown still runs on
 **every** peer, but **never concurrently**:
 
-1. Iceland (IS) first  
-2. Only after IS wipe+rebuild is complete → Romania (RO)  
+1. Offered residual catalog peers only (Germany / DE today)  
+2. Iceland is not a wipe target (not a connection option until sales)  
 3. New catalog countries append in catalog order (recursive: finish prior first)
 
 Uses the same country catalog as :mod:`client.multihop` (single source of truth).
@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Optional, Sequence
 
 # Preferred wipe order for known peers (others append after, catalog order)
-PREFERRED_FLEET_ORDER: tuple[str, ...] = ("IS", "DE")
+PREFERRED_FLEET_ORDER: tuple[str, ...] = ("DE",)
 
 
 def _load_catalog():
@@ -44,7 +44,6 @@ def _load_catalog():
             port: int = 44044
 
         return [
-            _N("IS", "Iceland", "82.221.101.241"),
             _N("DE", "Germany", "178.105.187.178"),
         ]
 
@@ -52,7 +51,7 @@ def _load_catalog():
 def fleet_country_codes(
     catalog: Sequence[Any] | None = None,
 ) -> list[str]:
-    """Ordered country codes for fleet wipe (IS, RO, then any new peers)."""
+    """Ordered country codes for fleet wipe (offered catalog only)."""
     cat = list(catalog) if catalog is not None else _load_catalog()
     codes = [str(getattr(n, "code", "") or "").strip().upper() for n in cat]
     codes = [c for c in codes if c]
@@ -65,6 +64,11 @@ def fleet_country_codes(
         if c not in ordered:
             ordered.append(c)
     return ordered
+
+
+def wipe_catalog_codes(catalog: Sequence[Any] | None = None) -> list[str]:
+    """Wipe targets = offered residual catalog (never Iceland if not offered)."""
+    return fleet_country_codes(catalog)
 
 
 def fleet_wipe_order(
@@ -361,7 +365,7 @@ def country_code_for_legacy_role(role: str) -> str:
     """
     r = (role or "").strip().lower()
     if r in ("entry", "is", "iceland"):
-        return "IS"
+        return "DE"
     if r in ("ro", "romania"):
         return "RO"
     return (role or "").strip().upper()

@@ -12,7 +12,7 @@ from typing import Optional
 
 # Codes that ship explicit flag bitmaps (product residual catalog).
 # Live peers only: IS, DE. US and Romania are deprecated (stale prefs map to DE).
-CATALOG_FLAG_CODES: tuple[str, ...] = ("IS", "DE")
+CATALOG_FLAG_CODES: tuple[str, ...] = ("DE",)
 
 
 def flag_images_dir() -> Path:

@@ -37,58 +37,46 @@ from node.wipe_preflight import evaluate_catalog_peer_prewipe  # noqa: E402
 
 class TestFleetWipeOrder(unittest.TestCase):
     def test_monopin_order_is_de_us(self):
-        self.assertEqual(PREFERRED_FLEET_ORDER, ("IS", "DE"))
+        self.assertEqual(PREFERRED_FLEET_ORDER, ("DE",))
         codes = fleet_country_codes(PRODUCT_COUNTRY_CATALOG)
-        self.assertEqual(codes, ["IS", "DE"])
+        self.assertEqual(codes, ["DE"])
         nodes = fleet_wipe_order(PRODUCT_COUNTRY_CATALOG)
-        self.assertEqual([n.code for n in nodes], ["IS", "DE"])
-        self.assertEqual(nodes[0].host, PRODUCT_NODE_HOST)
-        self.assertEqual(nodes[1].host, PRODUCT_DE_HOST)
-        self.assertEqual(len(nodes), 2)
+        self.assertEqual([n.code for n in nodes], ["DE"])
+        self.assertEqual(nodes[0].host, PRODUCT_DE_HOST)
+        self.assertEqual(len(nodes), 1)
+        self.assertNotIn("IS", codes)
         self.assertNotIn("RO", codes)
         self.assertNotIn("US", codes)
+        self.assertNotEqual(nodes[0].host, PRODUCT_NODE_HOST)
 
     def test_third_country_appends_after_preferred(self):
         extra = CountryNode(
             code="XX", name="Extra", host="198.51.100.20", port=44044
         )
         cat = list(PRODUCT_COUNTRY_CATALOG) + [extra]
-        self.assertEqual(fleet_country_codes(cat), ["IS", "DE", "XX"])
+        self.assertEqual(fleet_country_codes(cat), ["DE", "XX"])
 
     def test_next_target_and_refuse_concurrent(self):
         self.assertEqual(
-            next_wipe_target(completed=[], in_progress=None), "IS"
+            next_wipe_target(completed=[], in_progress=None), "DE"
         )
-        # DE before IS complete refused
-        d = assert_sequential_fleet_start("DE", completed=[], in_progress=None)
-        self.assertFalse(d.allow)
-        self.assertIn("out-of-order", d.reason.lower())
-        # IS may start
-        d2 = assert_sequential_fleet_start("IS", completed=[], in_progress=None)
+        # Iceland is not a wipe target
+        d_is = assert_sequential_fleet_start("IS", completed=[], in_progress=None)
+        self.assertFalse(d_is.allow)
+        # DE may start as the only offered peer (prewipe gate still fail-closes live)
+        d2 = assert_sequential_fleet_start("DE", completed=[], in_progress=None)
         self.assertTrue(d2.allow)
-        # Concurrent: IS in progress, cannot start DE
-        d3 = assert_sequential_fleet_start(
-            "DE", completed=[], in_progress="IS"
-        )
-        self.assertFalse(d3.allow)
-        self.assertIn("concurrent", d3.reason.lower())
-        # After IS complete, DE is next
-        done, nxt = mark_wipe_complete("IS", completed=[])
-        self.assertEqual(done, ["IS"])
-        self.assertEqual(nxt, "DE")
-        d4 = assert_sequential_fleet_start("DE", completed=done, in_progress=None)
-        self.assertTrue(d4.allow)
-        done2, nxt2 = mark_wipe_complete("DE", completed=done)
-        self.assertIsNone(nxt2)
-        self.assertTrue(is_fleet_cycle_complete(done2))
+        done, nxt = mark_wipe_complete("DE", completed=[])
+        self.assertEqual(done, ["DE"])
+        self.assertIsNone(nxt)
+        self.assertTrue(is_fleet_cycle_complete(done))
 
     def test_appended_country_after_is_de(self):
         extra = CountryNode(
             code="XX", name="Extra", host="198.51.100.20", port=44044
         )
         cat = list(PRODUCT_COUNTRY_CATALOG) + [extra]
-        done, nxt = mark_wipe_complete("IS", completed=[], catalog=cat)
-        done, nxt = mark_wipe_complete("DE", completed=done, catalog=cat)
+        done, nxt = mark_wipe_complete("DE", completed=[], catalog=cat)
         self.assertEqual(nxt, "XX")
         d = assert_sequential_fleet_start(
             "XX", completed=done, in_progress=None, catalog=cat
@@ -99,28 +87,35 @@ class TestFleetWipeOrder(unittest.TestCase):
 class TestPeerPrewipe(unittest.TestCase):
     def test_refuse_without_healthy_peer(self):
         r = evaluate_peer_prewipe_gate(
-            "IS", {"IS": True, "DE": False, "US": False}
+            "DE", {"DE": True, "IS": False, "US": False}
         )
         self.assertFalse(r.allow_wipe)
         self.assertIn("fail closed", r.reasons[0].lower())
 
     def test_allow_with_healthy_peer(self):
+        extra = CountryNode(
+            code="XX", name="Extra", host="198.51.100.20", port=44044
+        )
+        cat = list(PRODUCT_COUNTRY_CATALOG) + [extra]
         r = evaluate_peer_prewipe_gate(
-            "IS", {"IS": True, "DE": True, "US": False}
+            "DE", {"DE": True, "XX": True}, catalog=cat
         )
         self.assertTrue(r.allow_wipe)
-        self.assertIn("DE", r.healthy_peers)
+        self.assertIn("XX", r.healthy_peers)
+        self.assertNotIn("IS", r.healthy_peers)
 
     def test_catalog_peer_prewipe_bridge(self):
-        g = evaluate_catalog_peer_prewipe(
-            "DE",
-            {"IS": True, "DE": False, "US": True},
-            local_ok=True,
+        extra = CountryNode(
+            code="XX", name="Extra", host="198.51.100.20", port=44044
         )
-        self.assertTrue(g.allow_wipe)
+        cat = list(PRODUCT_COUNTRY_CATALOG) + [extra]
+        r = evaluate_peer_prewipe_gate(
+            "DE", {"DE": False, "XX": True}, catalog=cat
+        )
+        self.assertTrue(r.allow_wipe)
         g2 = evaluate_catalog_peer_prewipe(
             "DE",
-            {"IS": False, "DE": True, "US": False},
+            {"DE": True},
             local_ok=True,
         )
         self.assertFalse(g2.allow_wipe)
@@ -129,26 +124,27 @@ class TestPeerPrewipe(unittest.TestCase):
 class TestCatalogAlignment(unittest.TestCase):
     def test_client_residual_and_fleet_share_codes(self):
         fleet = set(fleet_country_codes(PRODUCT_COUNTRY_CATALOG))
-        self.assertEqual(fleet, {COUNTRY_IS, COUNTRY_DE})
+        self.assertEqual(fleet, {COUNTRY_DE})
+        self.assertNotIn(COUNTRY_IS, fleet)
         # DE entry preference (default monopin) resolves
         e, x = resolve_entry_exit(COUNTRY_DE, multihop_enabled=False)
         self.assertEqual(e.host, PRODUCT_DE_HOST)
         cfg = multihop_config_for_entry_country(COUNTRY_DE, multihop_enabled=False)
         self.assertEqual(residual_endpoint(cfg).host, PRODUCT_DE_HOST)
-        # Multihop: entry DE exit not DE
+        # Multihop with sole peer stays single-hop (no Iceland exit)
         e2, x2 = resolve_entry_exit(COUNTRY_DE, multihop_enabled=True)
         self.assertEqual(e2.code, COUNTRY_DE)
-        self.assertIsNotNone(x2)
-        self.assertNotEqual(x2.code, COUNTRY_DE)
+        self.assertIsNone(x2)
 
     def test_fleet_summary_in_ephemeral(self):
         from node.ephemeral_node import build_fleet_sequential_plan_summary
 
         s = build_fleet_sequential_plan_summary(completed=[], in_progress=None)
-        self.assertEqual(s["fleet_order"], ["IS", "DE"])
-        self.assertEqual(s["next_target"], "IS")
-        self.assertFalse(s["decisions"]["DE"]["allow"])
-        self.assertTrue(s["decisions"]["IS"]["allow"])
+        self.assertEqual(s["fleet_order"], ["DE"])
+        self.assertEqual(s["next_target"], "DE")
+        self.assertNotIn("IS", s["fleet_order"])
+        self.assertTrue(s["decisions"]["DE"]["allow"])
+        self.assertNotIn("IS", s["decisions"])
 
 
 class TestWeeklyFleetPlannerWiring(unittest.TestCase):
@@ -156,6 +152,10 @@ class TestWeeklyFleetPlannerWiring(unittest.TestCase):
         from node.ephemeral_node import build_weekly_entry_rebuild_plan
         from node.fleet_wipe import resolve_weekly_target
 
+        d = resolve_weekly_target(completed=[], role_hint="auto")
+        self.assertEqual(d.target_code, "DE")
+        self.assertNotEqual(d.target_code, "IS")
+        # Sole offered peer: planner must not wipe DE (no failover) and never IS.
         p1 = build_weekly_entry_rebuild_plan(
             role="auto",
             completed=[],
@@ -165,67 +165,58 @@ class TestWeeklyFleetPlannerWiring(unittest.TestCase):
             dry_run=True,
         )
         ids = [s.id for s in p1.steps]
+        text = p1.format_text()
         self.assertIn("fleet_target_resolve", ids)
         self.assertIn("peer_failover_preflight", ids)
-        self.assertIn("mark_fleet_peer_complete", ids)
-        self.assertIn("acquire_rebuild_lock('is'", p1.format_text())
-        self.assertEqual(p1.mode, "weekly_fleet_rebuild")
-        # After IS complete, DE is next
+        self.assertNotIn("acquire_rebuild_lock('is'", text)
+        self.assertEqual(p1.mode, "weekly_fleet_rebuild_aborted")
+        self.assertIn("abort_peer_unhealthy", ids)
+        # Iceland role heals to DE, still abort (no second peer)
         p2 = build_weekly_entry_rebuild_plan(
-            role="auto",
-            completed=["IS"],
+            role="is",
+            completed=[],
             in_progress=None,
             exit_healthy=True,
             entry_healthy=True,
             dry_run=True,
         )
-        self.assertIn("acquire_rebuild_lock('de'", p2.format_text())
-        # Out of order DE before IS complete raises
-        with self.assertRaises(ValueError):
-            build_weekly_entry_rebuild_plan(
-                role="de",
-                completed=[],
-                in_progress=None,
-                exit_healthy=True,
-                entry_healthy=True,
-            )
-        # Bulk exit never becomes DE even if IS already complete
-        d_exit = resolve_weekly_target(completed=["IS"], role_hint="exit")
+        self.assertNotIn("acquire_rebuild_lock('is'", p2.format_text())
+        self.assertEqual(p2.mode, "weekly_fleet_rebuild_aborted")
+        # Bulk exit never becomes a wipe target
+        d_exit = resolve_weekly_target(completed=["DE"], role_hint="exit")
         self.assertFalse(d_exit.allow)
         self.assertIsNone(d_exit.target_code)
         with self.assertRaises(ValueError):
             build_weekly_entry_rebuild_plan(
-                role="exit", completed=["IS"], exit_healthy=True, entry_healthy=True
+                role="exit", completed=["DE"], exit_healthy=True, entry_healthy=True
             )
-        # Auto rolls after full cycle
+        # Auto rolls after full cycle (offered DE only) — still not Iceland
         d_roll = resolve_weekly_target(
-            completed=["IS", "DE", "US"], role_hint="auto"
+            completed=["DE"], role_hint="auto"
         )
         self.assertTrue(d_roll.allow)
-        self.assertEqual(d_roll.target_code, "IS")
+        self.assertEqual(d_roll.target_code, "DE")
         self.assertEqual(d_roll.completed, ())
 
     def test_plan_after_cycle_roll_embeds_empty_completed_in_mark_steps(self):
-        """After [IS,DE,US] auto-roll, mark_wipe_complete must not keep stale completed."""
+        """Sole-peer DE cycle: abort wipe; never target Iceland."""
         from node.ephemeral_node import build_weekly_entry_rebuild_plan
 
         plan = build_weekly_entry_rebuild_plan(
             role="auto",
-            completed=["IS", "DE", "US"],
+            completed=["DE"],
             in_progress=None,
             exit_healthy=True,
             entry_healthy=True,
             dry_run=True,
         )
-        self.assertEqual(plan.mode, "weekly_fleet_rebuild")
+        self.assertEqual(plan.mode, "weekly_fleet_rebuild_aborted")
         text = plan.format_text()
-        self.assertIn("target=IS", text)
-        mark_complete = next(
-            s for s in plan.steps if s.id == "mark_fleet_peer_complete"
-        )
-        self.assertIn("mark_wipe_complete('IS'", mark_complete.command)
-        self.assertIn("completed=[]", mark_complete.command)
-        self.assertNotIn("completed=['IS', 'DE', 'US']", mark_complete.command)
+        self.assertNotIn("target=IS", text)
+        self.assertNotIn("acquire_rebuild_lock('is'", text)
+        ids = [s.id for s in plan.steps]
+        self.assertIn("abort_peer_unhealthy", ids)
+        self.assertNotIn("mark_fleet_peer_complete", ids)
 
 
 if __name__ == "__main__":

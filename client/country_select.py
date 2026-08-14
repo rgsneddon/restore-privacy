@@ -101,8 +101,8 @@ def parse_catalog_country_code(
     codes = {str(getattr(n, "code", "") or "").strip().upper() for n in cat}
     upper = raw_s.upper()
     aliases = {
-        "ICELAND": COUNTRY_IS,
-        "IS": COUNTRY_IS,
+        "ICELAND": COUNTRY_DE,
+        "IS": COUNTRY_DE,
         "GERMANY": COUNTRY_DE,
         "DE": COUNTRY_DE,
         "DEU": COUNTRY_DE,

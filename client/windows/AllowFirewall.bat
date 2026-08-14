@@ -20,6 +20,9 @@ set "NODE_DE=178.105.187.178"
 set "PORT=44044"
 set "EXE="
 if exist "%~dp0RestorePrivacy.exe" set "EXE=%~dp0RestorePrivacy.exe"
+if not defined EXE (
+  for %%F in ("%~dp0RestorePrivacy-*.exe") do set "EXE=%%~fF"
+)
 
 echo Adding scoped Windows Defender Firewall allows for Restore Privacy...
 

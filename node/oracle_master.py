@@ -54,7 +54,7 @@ _SURFACE_ALIASES: dict[str, str] = {
 
 # Live residual catalog peers (product monopin post-US retirement).
 # Matches client.multihop / architecture_inventory PUBLIC residual set.
-LIVE_RESIDUAL_PEER_CODES: tuple[str, ...] = ("IS", "DE")
+LIVE_RESIDUAL_PEER_CODES: tuple[str, ...] = ("DE",)
 RETIRED_RESIDUAL_PEER_CODES: frozenset[str] = frozenset({"US", "RO"})
 
 # Peer-code aliases → live or retired canonical codes.

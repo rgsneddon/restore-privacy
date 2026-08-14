@@ -458,7 +458,8 @@ class TestRoDeprecationCatalog(unittest.TestCase):
         )
 
         codes = {n.code for n in product_country_catalog()}
-        self.assertEqual(codes, {"IS", "DE"})
+        self.assertEqual(codes, {"DE"})
+        self.assertNotIn("IS", codes)
         self.assertNotIn("RO", codes)
         self.assertNotIn("US", codes)
         for n in PRODUCT_COUNTRY_CATALOG:
@@ -471,7 +472,8 @@ class TestRoDeprecationCatalog(unittest.TestCase):
     def test_flag_catalog_live_codes(self):
         from client.flag_images import CATALOG_FLAG_CODES
 
-        self.assertEqual(set(CATALOG_FLAG_CODES), {"IS", "DE"})
+        self.assertEqual(set(CATALOG_FLAG_CODES), {"DE"})
+        self.assertNotIn("IS", CATALOG_FLAG_CODES)
         self.assertNotIn("RO", CATALOG_FLAG_CODES)
         self.assertNotIn("US", CATALOG_FLAG_CODES)
 
