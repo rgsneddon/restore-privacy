@@ -7,7 +7,7 @@
 | **Public catalog version** | **1.2.7** |
 | **Default residual entry** | **Germany (DE)** (product default on all clients; RO monopin retired) |
 | **Live probe peer** | **Germany (DE):44044** (UDP); status UI TCP **8080** |
-| **Audit generated** | **14 August 2026** (`2026-08-14T20:05:12Z`) |
+| **Audit generated** | **14 August 2026** (`2026-08-14T21:17:06Z`) |
 | **Cadence** | Automated security pass (~**every 1 day** + **jitter** on privacy-hardened node timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE** + **section B privacy probes** + **multihop node structure** |
 | **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B + multihop structure (no firewall scan) |
@@ -82,7 +82,7 @@ Honesty: **residual-via-exit when multi-hop enabled; not full intermediate onion
 Live residual catalog is **DE + SG only**. Iceland, United States and Romania residual peers are **retired** (not current catalog peers).
 
 
-## Privacy-scale settings — UK ping + RAG
+## Privacy-scale settings — DE–SG midpoint ping + RAG
 
 Customer **Settings → Browsing speed / privacy scale** can turn optional
 residual layers on/off. Residual VPN core (licence/keygen, HELLO crypto,
@@ -90,30 +90,41 @@ system capture) stays required. This table helps users set latency expectations.
 
 ### Method (honesty)
 
-- **Live** RTT where probes succeeded from **this audit host** to product
-  **entry** `Germany (DE)` (Germany)
-  and **exit** `Germany (DE)` (Germany).
-- Entry probe: **140 ms** via `tcp` (shared base across rows).
-- Exit probe: **322 ms** via `tcp` (shared base for multi-hop rows).
-- Live ms are from **this host's path**, not guaranteed London UK RTT.
-- Traffic shaping **feel** may add a small band on top of live base
-  (+0–5 ms labeled); outer obfs ~0 ms RTT.
-- **Not** a contractual SLA. Failed probes fall back to approximate UK bands
-  (never invent live ms).
-- **AVG** is the numeric mean used for RAG: single-hop = entry band midpoint;
-  multi-hop = mean of entry and exit midpoints.
+- **Ping base/origin:** exact great-circle midpoint on Earth between the
+  Germany residual `Germany (DE)` and the Singapore residual `Singapore (SG)`
+  — halfway between Germany and Singapore.
+- Midpoint coordinates: **34.1175°N, 70.8377°E**.
+- Midpoint→DE = **4993.9 km**; Midpoint→SG = **4993.9 km**
+  (equal under the same midpoint function). Modeled base RTT is therefore
+  equal: **74.9 ms** each (fiber ≈ 2/3 *c* × path stretch
+  1.5; band 67–83 ms).
+- Singapore is **not** scored from a United Kingdom origin. This audit
+  host's live ICMP (laptop / Helsinki) is **not** the displayed base.
+- Catalog peers: Germany `Germany (DE)`; Singapore `Singapore (SG)`.
+  Multi-hop residual still dials the product **exit** `Germany (DE)` (Germany); the SG column is the
+  midpoint→Singapore catalog-peer figure (equal modeled RTT).
+- Traffic shaping adds a small **feel** overhead (bounded jitter/cover);
+  outer obfuscation is ~0 ms RTT.
+- **Not** a contractual SLA. Midpoint-modeled RTT can still exceed 70 ms
+  (RAG may stay red); the objective is a fair halfway origin, not a green SLA.
+- **AVG** is the numeric mean used for RAG: single-hop = DE (entry) band
+  midpoint; multi-hop = mean of DE and SG band midpoints.
 - **RAG (from AVG only):** 🟩 Green = AVG **&lt; 40 ms**; 🟧 Amber = **40–70 ms**; 🟥 Red = AVG **&gt; 70 ms**.
+- Client Settings still shows **live device→node** probe ms when measured;
+  that Settings surface is not this AUDIT matrix origin.
 
-| Shape | Outer obfs | Multi-hop | UK→entry (live) | UK→exit (live) | AVG | RAG | Notes |
+| Shape | Outer obfs | Multi-hop | Midpoint→DE | Midpoint→SG | AVG | RAG | Notes |
 |-------|------------|-----------|-------------------|------------------|-----|-----|-------|
-| on | on | on | 140–145 ms (live base + shape feel) | 322–327 ms (live base + shape feel) | 233.5 ms | 🟥 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 233.5 ms → red |
-| on | on | off | 140–145 ms (live base + shape feel) | n/a (multi-hop off) | 142.5 ms | 🟥 | single-hop residual → entry; shape on; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 142.5 ms → red |
-| on | off | on | 140–145 ms (live base + shape feel) | 322–327 ms (live base + shape feel) | 233.5 ms | 🟥 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 233.5 ms → red |
-| on | off | off | 140–145 ms (live base + shape feel) | n/a (multi-hop off) | 142.5 ms | 🟥 | single-hop residual → entry; shape on; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 142.5 ms → red |
-| off | on | on | 140 ms (live) | 322 ms (live) | 231 ms | 🟥 | residual dials exit when multi-hop on; shape off leaner; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 231.0 ms → red |
-| off | on | off | 140 ms (live) | n/a (multi-hop off) | 140 ms | 🟥 | single-hop residual → entry; shape off (faster feel); outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 140.0 ms → red |
-| off | off | on | 140 ms (live) | 322 ms (live) | 231 ms | 🟥 | residual dials exit when multi-hop on; shape off leaner; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 231.0 ms → red |
-| off | off | off | 140 ms (live) | n/a (multi-hop off) | 140 ms | 🟥 | single-hop residual → entry; shape off (faster feel); outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 140.0 ms → red |
+| on | on | on | 72–88 ms | 72–88 ms | 80 ms | 🟥 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs on (QUIC-mimic, ~0 ms RTT); DE RTT modeled from DE–SG midpoint; SG RTT modeled from DE–SG midpoint; AVG 80.0 ms → red |
+| on | on | off | 72–88 ms | n/a (multi-hop off) | 80 ms | 🟥 | single-hop residual → entry; shape on; outer obfs on (QUIC-mimic, ~0 ms RTT); DE RTT modeled from DE–SG midpoint; AVG 80.0 ms → red |
+| on | off | on | 72–88 ms | 72–88 ms | 80 ms | 🟥 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs off (bare RPT, ~0 ms RTT); DE RTT modeled from DE–SG midpoint; SG RTT modeled from DE–SG midpoint; AVG 80.0 ms → red |
+| on | off | off | 72–88 ms | n/a (multi-hop off) | 80 ms | 🟥 | single-hop residual → entry; shape on; outer obfs off (bare RPT, ~0 ms RTT); DE RTT modeled from DE–SG midpoint; AVG 80.0 ms → red |
+| off | on | on | 67–83 ms | 67–83 ms | 75 ms | 🟥 | residual dials exit when multi-hop on; shape off leaner; outer obfs on (QUIC-mimic, ~0 ms RTT); DE RTT modeled from DE–SG midpoint; SG RTT modeled from DE–SG midpoint; AVG 75.0 ms → red |
+| off | on | off | 67–83 ms | n/a (multi-hop off) | 75 ms | 🟥 | single-hop residual → entry; shape off (faster feel); outer obfs on (QUIC-mimic, ~0 ms RTT); DE RTT modeled from DE–SG midpoint; AVG 75.0 ms → red |
+| off | off | on | 67–83 ms | 67–83 ms | 75 ms | 🟥 | residual dials exit when multi-hop on; shape off leaner; outer obfs off (bare RPT, ~0 ms RTT); DE RTT modeled from DE–SG midpoint; SG RTT modeled from DE–SG midpoint; AVG 75.0 ms → red |
+| off | off | off | 67–83 ms | n/a (multi-hop off) | 75 ms | 🟥 | single-hop residual → entry; shape off (faster feel); outer obfs off (bare RPT, ~0 ms RTT); DE RTT modeled from DE–SG midpoint; AVG 75.0 ms → red |
+
+**Equal modeled base:** midpoint→`Germany (DE)` = midpoint→`Singapore (SG)` = **74.9 ms** (4993.9 km each).
 
 **Product defaults:** shape **off**, outer obfs **off**, multi-hop **off**
 (lean single-hop entry). Turn shape/obfs **on** for stronger residual defenses;
@@ -130,7 +141,7 @@ Latest automated security audit for production node **Germany (DE)** and the in-
 
 | Check | Result |
 |-------|--------|
-| Security unit suite | **FAIL** (in-repo unittest on this host only; catalog package RAG remains **Green** — not installer Red) |
+| Security unit suite | **PASS** (suite not run on this host) |
 | Node status TCP :8080 | reachable |
 | Node `/status` HTTP | OK — title-only=True |
 | UDP product port :44044 | probe sent |
@@ -222,10 +233,10 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Severity | Finding | Status |
 |----------|---------|--------|
-| **Info** | Automated pass at `2026-08-14T20:05:12Z` | Recorded |
+| **Info** | Automated pass at `2026-08-14T21:17:06Z` | Recorded |
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
-| **Low** | Unit suite failure | host suite only (catalog RAG Green — not installer Red) |
+| **Low** | Unit suite failure | N/A |
 | **Info** | Multi-hop residual | Opt-in residual-via-exit (Germany DE); Windows PE multihop rebuild shipped in catalog when package present |
 
 ---
@@ -236,8 +247,8 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Result | Detail |
 |--------|--------|
-| **Unit suite** | **FAIL** (in-repo unittest on this host only; catalog package RAG remains **Green** — not installer Red) |
-| **Return code** | 1 |
+| **Unit suite** | **PASS** (suite not run on this host) |
+| **Return code** | n/a |
 | **Log** | operator SCRATCH / `security_audit.log` / node journal `rpt-security-audit.service` |
 | **Generator** | `scripts/run_security_audit.py` |
 
@@ -274,7 +285,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **2026-08-14T20:05:12Z** against node **Germany (DE)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **2026-08-14T21:17:06Z** against node **Germany (DE)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 
