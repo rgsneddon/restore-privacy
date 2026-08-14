@@ -37,11 +37,13 @@ class TestSuitePayHrefBuilders(unittest.TestCase):
         self.assertEqual(free_download_cta_href(default_platform=""), "/downloads-map")
         self.assertEqual(free_download_cta_href(default_platform="unknown"), "/downloads-map")
 
+        from downloads import map_platform_version
+
         rows = list_downloads_map_rows()
         self.assertEqual(len(rows), len(available_downloads()))
         for r in rows:
             self.assertEqual(r["kind"], "suite_client")
-            self.assertEqual(r["version"], RELEASE_VERSION)
+            self.assertEqual(r["version"], map_platform_version(r["platform"]))
             self.assertEqual(r["product"], "Restore Privacy")
             # Map package rows free_direct (like FREE DOWNLOAD), not /pay
             self.assertIn("/suite/download?", r["href"])
@@ -90,7 +92,9 @@ class TestHomeAndMapRender(unittest.TestCase):
             self.assertNotIn('id="suite-free-grid"', suite)
             self.assertNotIn('id="suite-free-primary"', suite)
             self.assertNotIn("Get Suite", suite)
-            self.assertNotIn("/suite/download?platform=", suite)
+            # Detected-platform FREE DOWNLOAD anim watches the Downloads Map.
+            self.assertIn("/suite/download?platform=macos", suite)
+            self.assertIn("free_direct=1", suite)
             # Single KEYGEN cart entry remains (device chosen on /pay cart)
             self.assertIn('action="/pay"', suite)
             self.assertIn("suite-keygen-buy", suite)
@@ -98,7 +102,8 @@ class TestHomeAndMapRender(unittest.TestCase):
 
             map_html = render_downloads_map_page_html().decode("utf-8")
             self.assertIn("Restore Privacy", map_html)
-            self.assertIn(f"v{RELEASE_VERSION}", map_html)
+            self.assertIn("v1.2.5", map_html)
+            self.assertIn("v1.2.4", map_html)
             # Map package rows free_direct; KEYGEN /pay may still be mentioned in blurb only
             for plat in ("windows", "android", "macos", "ios", "linux"):
                 self.assertIn(f"platform={plat}", map_html)

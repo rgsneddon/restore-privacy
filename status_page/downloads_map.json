@@ -1,0 +1,26 @@
+{
+  "updated": "2026-08-14",
+  "note": "Source of truth for FREE DOWNLOAD, /downloads-map, and Helsinki fulfilment. Update this file whenever a client installer is deployed. rpAI/Ned learns the same map.",
+  "platforms": {
+    "windows": {
+      "version": "1.2.5",
+      "filename": "restore-privacy-client-1.2.5-windows-x64-setup.exe"
+    },
+    "android": {
+      "version": "1.2.4",
+      "filename": "restore-privacy-client-1.2.4-android.apk"
+    },
+    "macos": {
+      "version": "1.2.4",
+      "filename": "restore-privacy-client-1.2.4-macos.zip"
+    },
+    "ios": {
+      "version": "1.2.4",
+      "filename": "restore-privacy-client-1.2.4-ios.zip"
+    },
+    "linux": {
+      "version": "1.2.4",
+      "filename": "restore-privacy-client-1.2.4-linux-x64.tar.gz"
+    }
+  }
+}

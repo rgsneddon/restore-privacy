@@ -88,9 +88,9 @@ class TestCtaLinkFallback(unittest.TestCase):
 class TestDownloadsMapPage(unittest.TestCase):
     def test_map_enumerates_brand_products_and_hrefs(self) -> None:
         from downloads import (
-            RELEASE_VERSION,
             available_downloads,
             list_downloads_map_rows,
+            map_platform_version,
             render_downloads_map_page_html,
             suite_free_direct_download_href,
         )
@@ -100,12 +100,13 @@ class TestDownloadsMapPage(unittest.TestCase):
         self.assertEqual(len(rows), len(available_downloads()))
         self.assertEqual(len(rows), 5)
         products = {r["product"] for r in rows}
-        self.assertEqual(products, {"Restore Privacy Suite"})
+        self.assertEqual(products, {"Restore Privacy"})
         kinds = {r["kind"] for r in rows}
         self.assertEqual(kinds, {"suite_client"})
         for r in rows:
-            self.assertEqual(r["version"], RELEASE_VERSION)
+            self.assertEqual(r["version"], map_platform_version(r["platform"]))
             self.assertTrue(r.get("filename"))
+            self.assertIn(r["version"], r["filename"])
             self.assertEqual(r["href"], suite_free_direct_download_href(r["platform"]))
             self.assertIn("/suite/download?", r["href"])
             self.assertIn("free_direct=1", r["href"])
@@ -132,7 +133,8 @@ class TestDownloadsMapPage(unittest.TestCase):
         self.assertNotIn('data-kind="browser"', page)
         self.assertNotIn("data-map-product=\"Pens\"", page)
         self.assertIn("is-detected", page)  # windows suite link marked
-        self.assertIn(RELEASE_VERSION, page)
+        self.assertIn(map_platform_version("windows"), page)
+        self.assertIn("1.2.5", page)
 
 
 class TestFooterCopyrightAndMapLink(unittest.TestCase):

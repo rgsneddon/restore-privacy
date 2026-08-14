@@ -2727,19 +2727,17 @@ class CheckoutRequest:
 
 
 def platform_filename(platform: str) -> str | None:
-    """Current-catalog installer filename for a platform (always latest ship pin)."""
-    from downloads import current_catalog_version
+    """Latest Downloads Map installer filename for a platform."""
+    from downloads import map_platform_filename, map_platform_version
 
     plat = (platform or "").strip().lower()
     if not plat:
         return None
-    for a in available_downloads():
-        if a.platform == plat:
-            # Guard: filename must embed the live catalog version.
-            if current_catalog_version() not in a.filename:
-                return None
-            return a.filename
-    return None
+    fname = map_platform_filename(plat)
+    ver = map_platform_version(plat)
+    if not fname or not ver or ver not in fname:
+        return None
+    return fname
 
 
 def resolve_paid_grant_filename(
@@ -2881,9 +2879,9 @@ def vps_asset_base_url() -> str:
 
 def vps_asset_url(filename: str, *, version: str | None = None) -> str:
     """Full URL for one catalog installer on the Helsinki paid-asset store."""
-    from downloads import RELEASE_VERSION
+    from downloads import RELEASE_VERSION, version_for_catalog_filename
 
-    ver = (version or RELEASE_VERSION).strip()
+    ver = (version or version_for_catalog_filename(filename) or RELEASE_VERSION).strip()
     base = vps_asset_base_url()
     return f"{base}/{ver}/{filename}"
 
@@ -2952,14 +2950,17 @@ def asset_search_dirs() -> list[Path]:
     raw = os.environ.get("RPT_ASSET_DIR", "").strip()
     if raw:
         out.append(Path(raw).expanduser())
-    from downloads import RELEASE_VERSION  # local import avoids cycles at module load
+    from downloads import RELEASE_VERSION, downloads_map_versions  # local import avoids cycles
 
     status = Path(__file__).resolve().parent
     root = status.parent
+    vers = {RELEASE_VERSION, *downloads_map_versions()}
+    vers.discard("")
     # Deploy root-friendly (Render rootDir=status_page)
-    out.append(status / "assets" / RELEASE_VERSION)
-    # Monorepo checkout: releases/{VERSION} (gitignored; local/dev only)
-    out.append(root / "releases" / RELEASE_VERSION)
+    for ver in sorted(vers):
+        out.append(status / "assets" / ver)
+        # Monorepo checkout: releases/{VERSION} (gitignored; local/dev only)
+        out.append(root / "releases" / ver)
     # Brand companion trees (rpOS, apps, node, mail, office, …)
     for sub in (
         f"rpos/0.2.1",
@@ -2977,7 +2978,8 @@ def asset_search_dirs() -> list[Path]:
         "RPT_VPS_ASSET_REMOTE_ROOT", DEFAULT_VPS_ASSET_REMOTE_ROOT
     ).strip()
     if remote_root:
-        out.append(Path(remote_root) / RELEASE_VERSION)
+        for ver in sorted(vers):
+            out.append(Path(remote_root) / ver)
         out.append(Path(remote_root))
     # de-dupe while preserving order
     seen: set[str] = set()

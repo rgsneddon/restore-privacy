@@ -116,7 +116,7 @@ class TestHostDeliveryPure(unittest.TestCase):
 
     def test_build_url_for_catalog_basename(self) -> None:
         from host_delivery import build_host_delivery_url
-        from downloads import WINDOWS_EXE_FILENAME, RELEASE_VERSION
+        from downloads import WINDOWS_EXE_FILENAME, map_platform_version
 
         url = build_host_delivery_url(
             WINDOWS_EXE_FILENAME,
@@ -129,7 +129,7 @@ class TestHostDeliveryPure(unittest.TestCase):
         self.assertIsNotNone(url)
         assert url is not None
         self.assertTrue(url.startswith("https://example.test/paid-assets/"))
-        self.assertIn(RELEASE_VERSION, url)
+        self.assertIn(map_platform_version("windows"), url)
         self.assertIn(WINDOWS_EXE_FILENAME, url)
         self.assertIn("exp=", url)
         self.assertIn("sig=", url)
@@ -205,11 +205,13 @@ class TestHostDeliveryPure(unittest.TestCase):
 
     def test_open_release_asset_fallback_without_host_token(self) -> None:
         """When Helsinki token unset, local staged file still opens (proxy path)."""
-        from downloads import WINDOWS_EXE_FILENAME, RELEASE_VERSION
+        from downloads import WINDOWS_EXE_FILENAME, version_for_catalog_filename
         import payments
 
         # Use a tiny temp staged file under assets/{ver}/
-        assets = ROOT / "status_page" / "assets" / RELEASE_VERSION
+        assets = ROOT / "status_page" / "assets" / version_for_catalog_filename(
+            WINDOWS_EXE_FILENAME
+        )
         assets.mkdir(parents=True, exist_ok=True)
         path = assets / WINDOWS_EXE_FILENAME
         created = False
@@ -359,17 +361,18 @@ class TestHostDeliveryPure(unittest.TestCase):
     def test_thankyou_allows_signed_helsinki_url(self) -> None:
         from payments import render_post_payment_thankyou_html
         from host_delivery import is_signed_helsinki_delivery_url
-        from downloads import WINDOWS_EXE_FILENAME, RELEASE_VERSION
+        from downloads import WINDOWS_EXE_FILENAME, map_platform_version
 
+        win_ver = map_platform_version("windows")
         bad = "https://github.com/rgsneddon/restore-privacy/releases/download/x/y.exe"
         self.assertFalse(is_signed_helsinki_delivery_url(bad))
         http_bad = (
-            f"http://135.181.152.10.sslip.io/paid-assets/{RELEASE_VERSION}/"
+            f"http://135.181.152.10.sslip.io/paid-assets/{win_ver}/"
             f"{WINDOWS_EXE_FILENAME}?exp=999&n=aa&sig=bb"
         )
         self.assertFalse(is_signed_helsinki_delivery_url(http_bad))
         good = (
-            f"https://135.181.152.10.sslip.io/paid-assets/{RELEASE_VERSION}/"
+            f"https://135.181.152.10.sslip.io/paid-assets/{win_ver}/"
             f"{WINDOWS_EXE_FILENAME}?exp=999&n=aa&sig=bb"
         )
         self.assertTrue(is_signed_helsinki_delivery_url(good))

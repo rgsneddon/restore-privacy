@@ -60,7 +60,9 @@ sys.path.insert(0, str(STATUS))
 
 from downloads import (  # noqa: E402
     RELEASE_VERSION,
+    downloads_map_versions,
     list_catalog_platform_packages,
+    record_deployed_client,
 )
 from payments import (  # noqa: E402
     DEFAULT_VPS_ASSET_HOST,
@@ -77,6 +79,36 @@ UNIT_NAME = "rpt-paid-assets.service"
 DEFAULT_SERVE_BACKEND_PORT = 18081
 DEFAULT_SERVE_BACKEND_BIND = "127.0.0.1"
 DEFAULT_BREADCRUMBS_REMOTE_ROOT = "/opt/restore-privacy/breadcrumbs"
+
+
+def _keep_paid_asset_versions(ver: str) -> list[str]:
+    """Version dirs the Helsinki store must keep (Downloads Map + this upload)."""
+    keep = {str(ver or "").strip(), *downloads_map_versions()}
+    keep.discard("")
+    return sorted(keep)
+
+
+def _catalog_serve_pin(ver: str) -> str:
+    """Empty pin when the Downloads Map spans more than one version."""
+    keep = _keep_paid_asset_versions(ver)
+    if len(keep) > 1:
+        return ""
+    return (ver or "").strip()
+
+
+def _tidy_other_version_dirs_script(remote_root: str, ver: str) -> str:
+    keep = " ".join(_keep_paid_asset_versions(ver))
+    return (
+        f"set -e; "
+        f"KEEP=\"{keep}\"; "
+        f"for d in {remote_root}/*; do "
+        f"[ -d \"$d\" ] || continue; "
+        f"bn=$(basename \"$d\"); "
+        f"skip=0; for k in $KEEP; do [ \"$bn\" = \"$k\" ] && skip=1; done; "
+        f"[ \"$skip\" = 1 ] && continue; "
+        f"rm -rf \"$d\"; echo tidy_removed=$bn; "
+        f"done"
+    )
 
 
 def list_packages(version: str | None = None) -> list[dict[str, str]]:
@@ -1114,13 +1146,15 @@ def _sync_remote_catalog_version(
 ) -> None:
     """Patch RPT_CATALOG_VERSION on rpt-paid-assets.service and restart if unit exists.
 
-    Upload without ``--install-serve`` used to leave a stale pin (e.g. 0.5.5) while
-    packages only lived under ``paid_assets/0.5.6/`` — serve then 404'd every paid
-    download. Preserve token/bind/port; only bump the pin.
+    When the Downloads Map lists more than one version (Windows 1.2.5 + others
+    1.2.4), the store pin is cleared so every mapped directory is serveable.
+    A single-version map still pins that directory.
     """
     ver = (ver or "").strip()
-    if not ver:
-        return
+    keep = {v for v in downloads_map_versions() if v}
+    if ver:
+        keep.add(ver)
+    pin = _catalog_serve_pin(ver)
     unit_path = f"/etc/systemd/system/{UNIT_NAME}"
     # sed in-place if key present; else append Environment= under [Service]
     script = (
@@ -1128,14 +1162,14 @@ def _sync_remote_catalog_version(
         f"U={unit_path}; "
         f"test -f \"$U\" || {{ echo no_unit; exit 0; }}; "
         f"if grep -q '^Environment=RPT_CATALOG_VERSION=' \"$U\"; then "
-        f"  sed -i 's/^Environment=RPT_CATALOG_VERSION=.*/Environment=RPT_CATALOG_VERSION={ver}/' \"$U\"; "
+        f"  sed -i 's/^Environment=RPT_CATALOG_VERSION=.*/Environment=RPT_CATALOG_VERSION={pin}/' \"$U\"; "
         f"else "
-        f"  sed -i '/^\\[Service\\]/a Environment=RPT_CATALOG_VERSION={ver}' \"$U\"; "
+        f"  sed -i '/^\\[Service\\]/a Environment=RPT_CATALOG_VERSION={pin}' \"$U\"; "
         f"fi; "
         f"systemctl daemon-reload; "
         f"systemctl restart {UNIT_NAME}; "
         f"systemctl is-active {UNIT_NAME}; "
-        f"echo catalog_pin={ver}"
+        f"echo catalog_pin={pin or 'unpinned_mixed_map'}"
     )
     code, out = _ssh_run_openssh(
         script, host=host, user=user, key_path=key_path, sudo=True
@@ -1239,7 +1273,7 @@ Environment=RPT_VPS_ASSET_REMOTE_ROOT={remote_root}
 Environment=RPT_VPS_ASSET_PORT={port}
 Environment=RPT_VPS_ASSET_BIND={bind}
 Environment=RPT_BREADCRUMBS_REMOTE_ROOT={bc_root}
-Environment=RPT_CATALOG_VERSION={ver}
+Environment=RPT_CATALOG_VERSION={_catalog_serve_pin(ver)}
 ExecStart=/usr/bin/python3 {SERVE_SCRIPT_REMOTE}
 Restart=on-failure
 RestartSec=3
@@ -1250,15 +1284,7 @@ WantedBy=multi-user.target
     import base64
 
     # Drop non-current version trees before (re)starting serve
-    tidy_remote = (
-        f"set -e; "
-        f"for d in {remote_root}/*; do "
-        f"[ -d \"$d\" ] || continue; "
-        f"bn=$(basename \"$d\"); "
-        f"[ \"$bn\" = '{ver}' ] && continue; "
-        f"rm -rf \"$d\"; echo tidy_removed=$bn; "
-        f"done"
-    )
+    tidy_remote = _tidy_other_version_dirs_script(remote_root, ver)
     _tc, tout = _ssh_run_openssh(
         tidy_remote, host=host, user=user, key_path=key_path, sudo=True
     )
@@ -1451,7 +1477,7 @@ Environment=RPT_VPS_ASSET_REMOTE_ROOT={remote_root}
 Environment=RPT_VPS_ASSET_PORT={port}
 Environment=RPT_VPS_ASSET_BIND={bind}
 Environment=RPT_BREADCRUMBS_REMOTE_ROOT={bc_root}
-Environment=RPT_CATALOG_VERSION={ver}
+Environment=RPT_CATALOG_VERSION={_catalog_serve_pin(ver)}
 ExecStart=/usr/bin/python3 {SERVE_SCRIPT_REMOTE}
 Restart=on-failure
 RestartSec=3
@@ -1462,15 +1488,7 @@ WantedBy=multi-user.target
             import base64
 
             b64 = base64.b64encode(unit.encode("utf-8")).decode("ascii")
-            tidy_remote = (
-                f"set -e; "
-                f"for d in {remote_root}/*; do "
-                f"[ -d \"$d\" ] || continue; "
-                f"bn=$(basename \"$d\"); "
-                f"[ \"$bn\" = '{ver}' ] && continue; "
-                f"rm -rf \"$d\"; echo tidy_removed=$bn; "
-                f"done"
-            )
+            tidy_remote = _tidy_other_version_dirs_script(remote_root, ver)
             _tc, tout = _ssh_run_openssh(
                 tidy_remote,
                 host=host,
@@ -1505,15 +1523,7 @@ WantedBy=multi-user.target
             print(f"token_len={len(token)}")
         else:
             # Packages uploaded without unit rewrite — still drop old pin trees
-            tidy_remote = (
-                f"set -e; "
-                f"for d in {remote_root}/*; do "
-                f"[ -d \"$d\" ] || continue; "
-                f"bn=$(basename \"$d\"); "
-                f"[ \"$bn\" = '{ver}' ] && continue; "
-                f"rm -rf \"$d\"; echo tidy_removed=$bn; "
-                f"done"
-            )
+            tidy_remote = _tidy_other_version_dirs_script(remote_root, ver)
             _tc, tout = _ssh_run_openssh(
                 tidy_remote,
                 host=host,
@@ -1529,6 +1539,14 @@ WantedBy=multi-user.target
                 ver, host=host, user=user, key_path=key_path
             )
         print(f"upload complete host={host} version={ver}")
+        for p in present:
+            try:
+                record_deployed_client(
+                    p["platform"], p["version"], filename=p["filename"]
+                )
+                print(f"downloads_map updated platform={p['platform']} v={p['version']}")
+            except Exception as e:  # noqa: BLE001
+                print(f"WARN downloads_map not updated {p['platform']}: {e}", file=sys.stderr)
         return 0
 
     # Password / paramiko fallback path

@@ -17,14 +17,14 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 class TestCatalogDownloadMethods(unittest.TestCase):
     def test_all_five_platforms_have_catalog_filenames(self):
-        from downloads import RELEASE_VERSION, available_downloads
+        from downloads import available_downloads, map_platform_version
 
         assets = list(available_downloads())
         plats = {a.platform for a in assets}
         for p in ("windows", "linux", "macos", "ios", "android"):
             self.assertIn(p, plats)
         for a in assets:
-            self.assertIn(RELEASE_VERSION, a.filename)
+            self.assertIn(map_platform_version(a.platform), a.filename)
             # Paid entry is /pay path — never free GH permanent installer href
             self.assertTrue(
                 a.pay_path.startswith("/pay") or "stripe" in a.pay_path.lower(),
@@ -37,7 +37,7 @@ class TestCatalogDownloadMethods(unittest.TestCase):
             )
 
     def test_vps_asset_url_shape_for_each_platform(self):
-        from downloads import RELEASE_VERSION, available_downloads
+        from downloads import available_downloads, version_for_catalog_filename
         from payments import vps_asset_base_url, vps_asset_url
 
         base = vps_asset_base_url()
@@ -45,8 +45,9 @@ class TestCatalogDownloadMethods(unittest.TestCase):
         self.assertIn("paid-assets", base)
         for a in available_downloads():
             url = vps_asset_url(a.filename)
+            ver = version_for_catalog_filename(a.filename)
             self.assertTrue(url.startswith(base))
-            self.assertIn(f"/{RELEASE_VERSION}/", url)
+            self.assertIn(f"/{ver}/", url)
             self.assertTrue(url.endswith(a.filename))
 
     def test_open_release_asset_vps_spools_full_body(self):

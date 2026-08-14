@@ -227,15 +227,25 @@ def safe_catalog_version_and_filename(
     if not name:
         return None
     try:
-        from downloads import RELEASE_VERSION  # type: ignore
+        from downloads import RELEASE_VERSION, version_for_catalog_filename  # type: ignore
     except Exception:  # noqa: BLE001
         try:
-            from status_page.downloads import RELEASE_VERSION  # type: ignore
+            from status_page.downloads import (  # type: ignore
+                RELEASE_VERSION,
+                version_for_catalog_filename,
+            )
         except Exception:  # noqa: BLE001
             RELEASE_VERSION = ""
-    ver = (version or RELEASE_VERSION or "").strip()
+            version_for_catalog_filename = None  # type: ignore
+    mapped = ""
+    if callable(version_for_catalog_filename):
+        try:
+            mapped = str(version_for_catalog_filename(name) or "").strip()
+        except Exception:  # noqa: BLE001
+            mapped = ""
+    ver = (version or mapped or RELEASE_VERSION or "").strip()
     if not ver or ver not in name:
-        # Require monopin substring in filename (same as Helsinki pin filter)
+        # Require the Downloads Map version (or fallback pin) in the basename
         return None
     return ver, name
 

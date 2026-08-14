@@ -39,13 +39,14 @@ class TestGrantBindsCurrentCatalogVersion(unittest.TestCase):
         return f"t={t},v1={sig}"
 
     def test_platform_filename_contains_current_version_all_devices(self):
+        from downloads import map_platform_version
+
         for a in available_downloads():
             fname = payments.platform_filename(a.platform)
+            ver = map_platform_version(a.platform)
             self.assertEqual(fname, a.filename)
-            self.assertIn(RELEASE_VERSION, fname)
-            self.assertTrue(
-                fname.startswith(f"restore-privacy-client-{RELEASE_VERSION}-")
-            )
+            self.assertIn(ver, fname)
+            self.assertTrue(fname.startswith(f"restore-privacy-client-{ver}-"))
 
     def test_resolve_ignores_stale_metadata_filename(self):
         stale = f"restore-privacy-client-0.0.1-windows-x64-setup.exe"
@@ -54,7 +55,9 @@ class TestGrantBindsCurrentCatalogVersion(unittest.TestCase):
         )
         current = payments.platform_filename("windows")
         self.assertEqual(resolved, current)
-        self.assertIn(RELEASE_VERSION, resolved)
+        from downloads import map_platform_version
+
+        self.assertIn(map_platform_version("windows"), resolved)
         self.assertNotIn("0.0.1", resolved)
 
     def test_webhook_mints_current_filename_despite_stale_meta(self):
@@ -120,7 +123,9 @@ class TestGrantBindsCurrentCatalogVersion(unittest.TestCase):
                 self.assertIsNotNone(grant)
                 assert grant is not None
                 self.assertEqual(grant["filename"], a.filename)
-                self.assertIn(RELEASE_VERSION, grant["filename"])
+                from downloads import map_platform_version
+
+                self.assertIn(map_platform_version(a.platform), grant["filename"])
 
 
 class TestOpenPrefersCurrentVersionStore(unittest.TestCase):
@@ -189,9 +194,12 @@ class TestOpenPrefersCurrentVersionStore(unittest.TestCase):
         self.assertNotEqual(current, stale)
 
     def test_vps_url_uses_current_version_segment(self):
+        from downloads import version_for_catalog_filename
+
         for a in available_downloads():
             url = payments.vps_asset_url(a.filename)
-            self.assertIn(f"/{RELEASE_VERSION}/", url)
+            ver = version_for_catalog_filename(a.filename)
+            self.assertIn(f"/{ver}/", url)
             self.assertTrue(url.endswith(a.filename))
             self.assertNotIn("/0.2.9/", url)
 
@@ -207,10 +215,12 @@ class TestOpenPrefersCurrentVersionStore(unittest.TestCase):
         for a in available_downloads():
             self.assertIn(a.filename, html)
             self.assertNotIn(f'href="{a.url}"', html)
+        from downloads import map_platform_version
+
         pkgs = list_catalog_platform_packages()
         self.assertEqual(len(pkgs), 5)
         for p in pkgs:
-            self.assertEqual(p["version"], RELEASE_VERSION)
+            self.assertEqual(p["version"], map_platform_version(p["platform"]))
 
 
 class TestLookupRebindsStaleGrantFilename(unittest.TestCase):
@@ -250,7 +260,9 @@ class TestLookupRebindsStaleGrantFilename(unittest.TestCase):
         self.assertIsNotNone(grant)
         assert grant is not None
         self.assertEqual(grant["filename"], current)
-        self.assertIn(RELEASE_VERSION, grant["filename"])
+        from downloads import map_platform_version
+
+        self.assertIn(map_platform_version("windows"), grant["filename"])
         self.assertNotIn("0.2.9", grant["filename"])
         self.assertEqual(grant.get("stored_filename"), stale)
         # Delivery helper matches

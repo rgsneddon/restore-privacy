@@ -60,6 +60,7 @@ from downloads import (
     RELEASE_VERSION,
     download_css,
     free_download_cta_css,
+    load_downloads_map_public,
     render_bmc_tip_html,
     render_download_section_html,
     render_downloads_map_page_html,
@@ -1041,6 +1042,11 @@ class Handler(BaseHTTPRequestHandler):
                     pay_error=pay_err, paid=paid_flag, user_agent=ua
                 ),
             )
+            return
+        # Downloads Map JSON — same file FREE DOWNLOAD, fulfilment, and rpAI watch.
+        if path in (f"{DOWNLOADS_MAP_PATH}.json", "/downloads_map.json"):
+            body = json.dumps(load_downloads_map_public(), indent=2).encode("utf-8")
+            self._send(200, "application/json; charset=utf-8", body)
             return
         # Downloads Map (all brand installers) + legacy /free-packages alias
         if path in (

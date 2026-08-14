@@ -14,9 +14,12 @@ iOS IPA-compatible Team-signed sideload zip — rename to ``.ipa``).
 
 from __future__ import annotations
 
+import json
 import urllib.parse
 from dataclasses import dataclass
-from typing import Iterable
+from datetime import date
+from pathlib import Path
+from typing import Any, Iterable
 
 try:
     from coffee_link import (
@@ -60,20 +63,194 @@ def product_client_version() -> str | None:
 
 
 def current_catalog_version() -> str:
-    """Single current catalog version for pay buttons and fulfilment.
+    """Fallback catalog pin when a platform is missing from the Downloads Map.
 
-    This is the **shipped** catalog pin (``RELEASE_VERSION``). When the monorepo
-    ``client/VERSION`` is present it must match - use :func:`catalog_matches_product_pin`.
+    Live FREE DOWNLOAD / fulfilment watch :func:`load_downloads_map` per
+    platform (Windows may be newer than Android). ``RELEASE_VERSION`` remains
+    the default for platforms not listed on the map.
     """
     return RELEASE_VERSION
 
 
+DOWNLOADS_MAP_JSON_NAME = "downloads_map.json"
+_PLATFORM_FILE_SUFFIXES: dict[str, str] = {
+    "windows": "windows-x64-setup.exe",
+    "android": "android.apk",
+    "macos": "macos.zip",
+    "ios": "ios.zip",
+    "linux": "linux-x64.tar.gz",
+}
+_DOWNLOADS_MAP_CACHE: dict[str, Any] | None = None
+_DOWNLOADS_MAP_MTIME: float | None = None
+
+
+def downloads_map_path() -> Path:
+    """On-disk Downloads Map (status_page/downloads_map.json)."""
+    return Path(__file__).resolve().with_name(DOWNLOADS_MAP_JSON_NAME)
+
+
+def catalog_filename_for(platform: str, version: str) -> str:
+    """Canonical Suite installer basename for *platform* at *version*."""
+    plat = (platform or "").strip().lower()
+    ver = (version or "").strip()
+    suf = _PLATFORM_FILE_SUFFIXES.get(plat, "")
+    if not plat or not ver or not suf:
+        return ""
+    return f"restore-privacy-client-{ver}-{suf}"
+
+
+def _default_downloads_map() -> dict[str, Any]:
+    plats: dict[str, dict[str, str]] = {}
+    for plat in _PLATFORM_FILE_SUFFIXES:
+        ver = RELEASE_VERSION
+        fname = catalog_filename_for(plat, ver)
+        plats[plat] = {"version": ver, "filename": fname}
+    return {
+        "updated": date.today().isoformat(),
+        "platforms": plats,
+    }
+
+
+def load_downloads_map() -> dict[str, Any]:
+    """Latest Helsinki installer per platform (Downloads Map source of truth)."""
+    global _DOWNLOADS_MAP_CACHE, _DOWNLOADS_MAP_MTIME
+    path = downloads_map_path()
+    try:
+        mtime = path.stat().st_mtime
+        if _DOWNLOADS_MAP_CACHE is not None and _DOWNLOADS_MAP_MTIME == mtime:
+            return _DOWNLOADS_MAP_CACHE
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        raw = {}
+        mtime = None
+    if not isinstance(raw, dict):
+        raw = {}
+    src = raw.get("platforms") if isinstance(raw.get("platforms"), dict) else {}
+    platforms: dict[str, dict[str, str]] = {}
+    for plat in _PLATFORM_FILE_SUFFIXES:
+        entry = src.get(plat) if isinstance(src.get(plat), dict) else {}
+        ver = str(entry.get("version") or RELEASE_VERSION).strip() or RELEASE_VERSION
+        fname = str(entry.get("filename") or "").strip() or catalog_filename_for(
+            plat, ver
+        )
+        platforms[plat] = {"version": ver, "filename": fname}
+    out: dict[str, Any] = {
+        "updated": str(raw.get("updated") or date.today().isoformat()),
+        "note": str(raw.get("note") or ""),
+        "platforms": platforms,
+    }
+    _DOWNLOADS_MAP_CACHE = out
+    _DOWNLOADS_MAP_MTIME = mtime
+    return out
+
+
+def load_downloads_map_public() -> dict[str, Any]:
+    """JSON-safe map for /downloads-map.json and rpAI/Ned (no secrets)."""
+    data = load_downloads_map()
+    plats = data.get("platforms") if isinstance(data.get("platforms"), dict) else {}
+    return {
+        "updated": data.get("updated") or "",
+        "platforms": {
+            plat: {
+                "version": str((entry or {}).get("version") or ""),
+                "filename": str((entry or {}).get("filename") or ""),
+            }
+            for plat, entry in plats.items()
+            if isinstance(entry, dict)
+        },
+    }
+
+
+def downloads_map_versions() -> frozenset[str]:
+    """Every version currently listed on the Downloads Map."""
+    data = load_downloads_map()
+    plats = data.get("platforms") if isinstance(data.get("platforms"), dict) else {}
+    vers = {
+        str((entry or {}).get("version") or "").strip()
+        for entry in plats.values()
+        if isinstance(entry, dict)
+    }
+    vers.discard("")
+    return frozenset(vers)
+
+
+def map_platform_version(platform: str) -> str:
+    """Latest Downloads Map version for *platform* (fallback RELEASE_VERSION)."""
+    plat = (platform or "").strip().lower()
+    data = load_downloads_map()
+    plats = data.get("platforms") if isinstance(data.get("platforms"), dict) else {}
+    entry = plats.get(plat) if isinstance(plats.get(plat), dict) else {}
+    return str((entry or {}).get("version") or RELEASE_VERSION).strip() or RELEASE_VERSION
+
+
+def map_platform_filename(platform: str) -> str:
+    """Latest Downloads Map installer basename for *platform*."""
+    plat = (platform or "").strip().lower()
+    data = load_downloads_map()
+    plats = data.get("platforms") if isinstance(data.get("platforms"), dict) else {}
+    entry = plats.get(plat) if isinstance(plats.get(plat), dict) else {}
+    fname = str((entry or {}).get("filename") or "").strip()
+    if fname:
+        return fname
+    return catalog_filename_for(plat, map_platform_version(plat))
+
+
+def version_for_catalog_filename(filename: str) -> str:
+    """Version directory for a catalog basename (map first, then parse)."""
+    name = (filename or "").strip()
+    if not name:
+        return ""
+    data = load_downloads_map()
+    plats = data.get("platforms") if isinstance(data.get("platforms"), dict) else {}
+    for entry in plats.values():
+        if isinstance(entry, dict) and str(entry.get("filename") or "") == name:
+            return str(entry.get("version") or "").strip()
+    prefix = "restore-privacy-client-"
+    if name.startswith(prefix):
+        rest = name[len(prefix) :]
+        ver = rest.split("-", 1)[0].strip()
+        if ver and ver[0].isdigit():
+            return ver
+    return ""
+
+
+def record_deployed_client(
+    platform: str,
+    version: str,
+    *,
+    filename: str = "",
+) -> dict[str, Any]:
+    """Write one platform's latest installer onto the Downloads Map (deploy hook)."""
+    global _DOWNLOADS_MAP_CACHE, _DOWNLOADS_MAP_MTIME
+    plat = (platform or "").strip().lower()
+    ver = (version or "").strip()
+    if plat not in _PLATFORM_FILE_SUFFIXES or not ver:
+        raise ValueError(f"unknown platform/version: {plat!r} {ver!r}")
+    fname = (filename or "").strip() or catalog_filename_for(plat, ver)
+    path = downloads_map_path()
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raw = _default_downloads_map()
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        raw = _default_downloads_map()
+    plats = raw.get("platforms") if isinstance(raw.get("platforms"), dict) else {}
+    plats = dict(plats)
+    plats[plat] = {"version": ver, "filename": fname}
+    raw["platforms"] = plats
+    raw["updated"] = date.today().isoformat()
+    path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+    _DOWNLOADS_MAP_CACHE = None
+    _DOWNLOADS_MAP_MTIME = None
+    return load_downloads_map()
+
+
 def catalog_matches_product_pin() -> bool:
-    """True when catalog version matches client/VERSION (or client pin absent)."""
+    """True when client/VERSION is on the Downloads Map (or client pin absent)."""
     pin = product_client_version()
     if pin is None:
         return True
-    return pin == current_catalog_version()
+    return pin in downloads_map_versions()
 
 
 REQUIRED_CATALOG_PLATFORMS: tuple[str, ...] = (
@@ -97,17 +274,18 @@ def assure_current_catalog_packages() -> dict[str, object]:
           "errors": list[str],
         }
 
-    Failures (ok=False) include: catalog pin ≠ client/VERSION, fewer/more than
-    five device platforms, filename missing current version, or stale platform.
-    Safe for every commit (no network, no SSH, no binary rebuild).
+    Failures (ok=False) include: client/VERSION not on the Downloads Map,
+    fewer/more than five device platforms, filename missing that platform's
+    map version, or stale platform. Safe for every commit (no network, no SSH).
     """
     errors: list[str] = []
     catalog = current_catalog_version()
     pin = product_client_version()
-    if pin is not None and pin != catalog:
+    map_vers = downloads_map_versions()
+    if pin is not None and pin not in map_vers:
         errors.append(
-            f"catalog pin {catalog!r} does not match client/VERSION {pin!r} "
-            f" -  bump RELEASE_VERSION / RELEASE_TAG / filenames together"
+            f"client/VERSION {pin!r} is not on the Downloads Map {sorted(map_vers)!r} "
+            f" -  update status_page/downloads_map.json when that client is deployed"
         )
     pkgs = list_catalog_platform_packages()
     platforms = [p["platform"] for p in pkgs]
@@ -123,20 +301,21 @@ def assure_current_catalog_packages() -> dict[str, object]:
         plat = p["platform"]
         fname = p["filename"]
         ver = p["version"]
+        mapped = map_platform_version(plat)
         if plat in seen:
             errors.append(f"duplicate platform entry: {plat}")
         seen.add(plat)
-        if ver != catalog:
-            errors.append(f"platform {plat}: version {ver!r} != catalog {catalog!r}")
-        if catalog not in fname:
+        if ver != mapped:
+            errors.append(f"platform {plat}: version {ver!r} != Downloads Map {mapped!r}")
+        if mapped not in fname:
             errors.append(
-                f"platform {plat}: filename {fname!r} missing catalog version {catalog!r}"
+                f"platform {plat}: filename {fname!r} missing map version {mapped!r}"
             )
-        if not fname.startswith(f"restore-privacy-client-{catalog}-"):
+        if not fname.startswith(f"restore-privacy-client-{mapped}-"):
             errors.append(
-                f"platform {plat}: filename {fname!r} is not current-catalog pattern"
+                f"platform {plat}: filename {fname!r} is not map-catalog pattern"
             )
-        if not is_current_catalog_filename(fname) and ver == RELEASE_VERSION:
+        if not is_current_catalog_filename(fname):
             errors.append(f"platform {plat}: {fname!r} not in current RELEASE_ASSETS")
     # RELEASE_TAG must match catalog for bookkeeping URLs
     if RELEASE_TAG != catalog:
@@ -151,11 +330,11 @@ def assure_current_catalog_packages() -> dict[str, object]:
 
 
 # Canonical public asset filenames (must match GitHub Release 0.4.0 assets).
-WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
-ANDROID_APK_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-android.apk"
-MACOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-macos.zip"
-IOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-ios.zip"
-LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz"
+WINDOWS_EXE_FILENAME = map_platform_filename("windows")
+ANDROID_APK_FILENAME = map_platform_filename("android")
+MACOS_ZIP_FILENAME = map_platform_filename("macos")
+IOS_ZIP_FILENAME = map_platform_filename("ios")
+LINUX_TGZ_FILENAME = map_platform_filename("linux")
 
 # Prefer payments module anchors when available (single source of truth).
 try:
@@ -338,24 +517,19 @@ def list_catalog_platform_packages(
     ``version``, ``platform``, ``filename``, ``relative_path``
     (relative to a version root: ``{version}/{filename}``).
     """
-    ver = (version or RELEASE_VERSION).strip()
     out: list[dict[str, str]] = []
     for a in RELEASE_ASSETS:
-        # Rebuild filename if a different version is requested.
-        if ver == RELEASE_VERSION:
-            fname = a.filename
+        plat = a.platform
+        if version:
+            ver = version.strip()
+            fname = catalog_filename_for(plat, ver) or a.filename
         else:
-            # Canonical pattern: restore-privacy-client-{ver}-…
-            suffix = a.filename.split(f"-{RELEASE_VERSION}-", 1)[-1]
-            if suffix == a.filename:
-                # fallback: replace version substring once
-                fname = a.filename.replace(RELEASE_VERSION, ver, 1)
-            else:
-                fname = f"restore-privacy-client-{ver}-{suffix}"
+            ver = map_platform_version(plat)
+            fname = map_platform_filename(plat) or a.filename
         out.append(
             {
                 "version": ver,
-                "platform": a.platform,
+                "platform": plat,
                 "filename": fname,
                 "relative_path": f"{ver}/{fname}",
             }
@@ -1583,8 +1757,14 @@ def render_free_download_cta_html(
     Unknown/empty → Downloads Map (Suite latest free_direct rows).
     Layout: logo left | FREE DOWNLOAD label | logo right.
     """
-    ver = (version or FREE_DOWNLOAD_FACE_VERSION).strip() or FREE_DOWNLOAD_FACE_VERSION
     def_plat = (default_platform or "").strip().lower()
+    ver = (version or "").strip()
+    if not ver:
+        ver = (
+            map_platform_version(def_plat)
+            if def_plat
+            else (max(downloads_map_versions(), default=FREE_DOWNLOAD_FACE_VERSION))
+        )
     known = {a.platform for a in available_downloads()}
     if def_plat and def_plat not in known:
         def_plat = ""
@@ -1769,15 +1949,16 @@ def list_downloads_map_rows(
 ) -> list[dict[str, str]]:
     """Downloads Map rows: Suite latest clients → free_direct download (like FREE DOWNLOAD).
 
-    Each row is one Suite monopin platform at *version* (default RELEASE_VERSION).
-    Non-Suite products are not listed. Package links use free_direct so selection
-    starts the installer immediately (same path as the homepage FREE DOWNLOAD CTA).
+    Each row is one Suite platform at its Downloads Map version (or *version*
+    when an operator override is passed). Non-Suite products are not listed.
+    Package links use free_direct so selection starts the installer immediately
+    (same path as the homepage FREE DOWNLOAD CTA).
     """
-    ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
     rows: list[dict[str, str]] = []
-    for p in list_catalog_platform_packages(version=ver):
+    for p in list_catalog_platform_packages(version=version):
         plat = str(p.get("platform") or "")
         fname = str(p.get("filename") or "")
+        ver = str(p.get("version") or RELEASE_VERSION)
         rows.append(
             {
                 "product": "Restore Privacy",
@@ -1828,7 +2009,11 @@ def render_downloads_map_page_html(
 
     *default_platform* (User-Agent OS) highlights matching Suite client links.
     """
-    ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
+    ver = (version or "").strip()
+    if not ver:
+        # Face version = newest pin on the Downloads Map (Windows may lead).
+        vers = downloads_map_versions()
+        ver = max(vers, default=RELEASE_VERSION) if vers else RELEASE_VERSION
     def_plat = (default_platform or "").strip().lower()
     known = {a.platform for a in available_downloads()}
     if def_plat and def_plat not in known:
@@ -1842,6 +2027,7 @@ def render_downloads_map_page_html(
             label = str(r.get("label") or r.get("filename") or plat)
             fname = str(r.get("filename") or "")
             kind = str(r.get("kind") or "")
+            row_ver = str(r.get("version") or "")
             is_det = (
                 " is-detected"
                 if def_plat
@@ -1855,6 +2041,7 @@ def render_downloads_map_page_html(
                 f'<li><a class="downloads-map-link free-package-link{_esc_html(is_det)}" '
                 f'id="{_esc_html(pid)}" '
                 f'href="{_esc_html(href)}" data-platform="{_esc_html(plat)}" '
+                f'data-version="{_esc_html(row_ver)}" '
                 f'data-filename="{_esc_html(fname)}" data-product="{_esc_html(product)}" '
                 f'data-kind="{_esc_html(kind)}" data-map-package="1"{det_attr}>'
                 f"{_esc_html(label)}</a></li>"
@@ -1877,12 +2064,15 @@ def render_downloads_map_page_html(
     )
     if def_plat:
         face = platform_face_title(def_plat)
+        plat_ver = map_platform_version(def_plat)
         detect_hint = (
             f'<p class="downloads-map-detect-hint free-packages-detect-hint" '
             f'id="downloads-map-detect-hint" '
-            f'data-detected-platform="{_esc_html(def_plat)}">'
+            f'data-detected-platform="{_esc_html(def_plat)}" '
+            f'data-detected-version="{_esc_html(plat_ver)}">'
             f"Detected your device as <strong>{_esc_html(face)}</strong> - "
-            f"v{_esc_html(ver)} free download link highlighted; all platforms below.</p>"
+            f"latest on the map is <strong>v{_esc_html(plat_ver)}</strong>; "
+            f"that link is highlighted. All platforms below.</p>"
         )
         detect_main_attr = f' data-detected-platform="{_esc_html(def_plat)}"'
     else:
@@ -1920,8 +2110,8 @@ def render_downloads_map_page_html(
       <div class="downloads-map-center free-packages-center" id="downloads-map-center">
         <h1 id="downloads-map-heading">Downloads Map</h1>
         <p class="downloads-map-blurb free-packages-blurb" id="downloads-map-blurb">
-          <strong>Restore Privacy v{_esc_html(ver)}</strong> —
-          free installer for each platform. KEYGEN licences are on
+          <strong>Latest installer per platform</strong> (Downloads Map).
+          FREE DOWNLOAD and fulfilment watch this list. KEYGEN licences are on
           <a href="/pay?product=suite">/pay</a>.
         </p>
         {detect_hint}

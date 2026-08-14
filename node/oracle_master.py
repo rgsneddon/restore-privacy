@@ -1034,6 +1034,33 @@ def ned_learn_oracle(
     if not residual_out["all_live_peers_observed"]:
         s["ready_residual_catalog"] = False
 
+    # --- Downloads Map (latest installer per platform; no user data) ---
+    dm_in = o.get("downloads_map")
+    if not isinstance(dm_in, Mapping):
+        dm_in = caps.get("downloads_map") if isinstance(caps, Mapping) else None
+    if isinstance(dm_in, Mapping):
+        prev_dm = s.get("downloads_map") if isinstance(s.get("downloads_map"), dict) else {}
+        plats_in = dm_in.get("platforms") if isinstance(dm_in.get("platforms"), Mapping) else {}
+        plats_out: dict[str, Any] = {}
+        if isinstance(plats_in, Mapping):
+            for plat, entry in plats_in.items():
+                key = str(plat or "").strip().lower()
+                if not key or not isinstance(entry, Mapping):
+                    continue
+                plats_out[key] = {
+                    "version": str(entry.get("version") or "").strip(),
+                    "filename": str(entry.get("filename") or "").strip(),
+                }
+        learned = {
+            "updated": str(dm_in.get("updated") or ""),
+            "platforms": plats_out,
+        }
+        prev_plats = prev_dm.get("platforms") if isinstance(prev_dm.get("platforms"), dict) else {}
+        if learned["platforms"] != prev_plats:
+            s["learning_epochs"] = int(s.get("learning_epochs") or 0) + 1
+        s["downloads_map"] = learned
+        s["downloads_map_learned"] = True
+
     # --- Ops entitlement counters (non-PII ints only) ---
     ops_in = o.get("ops_entitlement")
     if not isinstance(ops_in, Mapping):

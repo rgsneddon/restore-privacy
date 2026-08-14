@@ -343,7 +343,7 @@ def record_narrative_session(
 def ned_growth_public_snapshot(stats: dict[str, Any] | None = None) -> dict[str, Any]:
     """Safe subset for Suite Ned tab / JSON API (no internal fingerprint list)."""
     s = stats if stats is not None else load_rps_stats()
-    return {
+    snap = {
         "product": s.get("product"),
         "mission": s.get("mission"),
         "nodes_online": int(s.get("nodes_online") or 0),
@@ -381,8 +381,30 @@ def ned_growth_public_snapshot(stats: dict[str, Any] | None = None) -> dict[str,
             "narrative_session",
             "oracle_learn",
             "suite_architecture_surfaces",
+            "downloads_map",
         ],
     }
+    try:
+        from downloads import load_downloads_map_public
+    except ImportError:
+        try:
+            from status_page.downloads import load_downloads_map_public  # type: ignore
+        except ImportError:  # pragma: no cover
+            load_downloads_map_public = None  # type: ignore
+    if callable(load_downloads_map_public):
+        try:
+            snap["downloads_map"] = load_downloads_map_public()
+        except Exception:  # noqa: BLE001
+            snap["downloads_map"] = (
+                s.get("downloads_map")
+                if isinstance(s.get("downloads_map"), dict)
+                else {}
+            )
+    else:
+        snap["downloads_map"] = (
+            s.get("downloads_map") if isinstance(s.get("downloads_map"), dict) else {}
+        )
+    return snap
 
 
 def readiness_parameters(stats: dict[str, Any] | None = None) -> dict[str, bool]:

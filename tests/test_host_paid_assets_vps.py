@@ -91,7 +91,10 @@ class TestVpsAssetOpen(unittest.TestCase):
             self.assertNotIn("82.221.101.241", url)
             self.assertIn("135.181.152.10", url)
             self.assertIn("/paid-assets/", url)
-            self.assertTrue(url.endswith(f"/{RELEASE_VERSION}/{a.filename}"))
+            from downloads import version_for_catalog_filename
+
+            ver = version_for_catalog_filename(a.filename)
+            self.assertTrue(url.endswith(f"/{ver}/{a.filename}"))
 
     def test_default_base_is_helsinki_not_iceland_node(self):
         base = payments.vps_asset_base_url()
