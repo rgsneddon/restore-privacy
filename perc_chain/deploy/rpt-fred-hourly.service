@@ -1,0 +1,11 @@
+[Unit]
+Description=FRED hourly Chronoflux scenario pair (SCS + percent chance) at :52
+After=rpt-perc-chain.service
+Wants=rpt-perc-chain.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/curl -sS -X POST http://127.0.0.1:9478/api/ned/hourly?agent=fred
+StandardOutput=journal
+StandardError=journal

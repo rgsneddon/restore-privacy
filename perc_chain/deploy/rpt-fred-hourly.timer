@@ -1,0 +1,11 @@
+[Unit]
+Description=Run FRED Chronoflux scenarios at minute 52 of every hour
+
+[Timer]
+OnCalendar=*-*-* *:52:00
+Persistent=true
+AccuracySec=1s
+Unit=rpt-fred-hourly.service
+
+[Install]
+WantedBy=timers.target

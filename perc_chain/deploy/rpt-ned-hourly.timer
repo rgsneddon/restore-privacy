@@ -1,0 +1,11 @@
+[Unit]
+Description=Run NED Chronoflux scenarios at minute 14 of every hour
+
+[Timer]
+OnCalendar=*-*-* *:14:00
+Persistent=true
+AccuracySec=1s
+Unit=rpt-ned-hourly.service
+
+[Install]
+WantedBy=timers.target

@@ -50,6 +50,12 @@ import {
 } from './dual_seed_sync.js';
 import { normalizeInternetPathname } from './normalize_internet_path.js';
 import { mineJob, mineStatus, mineSubmit } from './mine_api.js';
+import {
+  activeMinerWallets,
+  applyNedHourlyPair,
+  minerBookIsRunning,
+  observeXHeadlines,
+} from './ned_scenario_bot.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -425,6 +431,64 @@ const server = http.createServer(async (req, res) => {
     const data = await readBody(req);
     const result = rpaiNed.learn(data || {});
     return json(res, 200, result);
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/ned/status') {
+    return json(res, 200, {
+      ok: true,
+      identity: 'NED+FRED',
+      lastScenarioAt: store.hasLedger() ? store.ledger?.lastScenarioAt || null : null,
+      height: store.hasLedger() ? blockHeight(store.ledger) : 0,
+      ned: rpaiNed.stats(),
+    });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/ned/hourly') {
+    const remote = String(req.socket?.remoteAddress || '');
+    const local =
+      remote === '127.0.0.1' ||
+      remote === '::1' ||
+      remote === '::ffff:127.0.0.1';
+    if (!local) return json(res, 403, { ok: false, error: 'loopback only' });
+    if (!store.hasLedger()) return json(res, 503, { ok: false, error: 'ledger not ready' });
+    let minerRunning = false;
+    let minerWallets = [];
+    try {
+      const stats = await fetch('http://127.0.0.1:8011/api/stats', {
+        headers: { Accept: 'application/json' },
+      }).then((r) => r.json());
+      minerRunning = minerBookIsRunning(stats);
+      minerWallets = activeMinerWallets(stats);
+    } catch {
+      minerRunning = false;
+      minerWallets = [];
+    }
+    const headlines = await observeXHeadlines();
+    for (const line of headlines.slice(0, 8)) {
+      rpaiNed.learn({ source: 'evolve-wallet', kind: 'ned_observe_x', payload: line });
+    }
+    const q = new URL(req.url, `http://127.0.0.1:${PORT}`);
+    const agentRaw = String(q.searchParams.get('agent') || 'ned').trim().toLowerCase();
+    const initiator = agentRaw === 'fred' ? 'fred' : 'ned';
+    const result = applyNedHourlyPair(store.ledger, {
+      minerRunning,
+      minerWallets,
+      now: new Date(),
+      headlines,
+      initiator,
+    });
+    rpaiNed.learn({
+      source: 'evolve-wallet',
+      kind: 'ned_percent_chance',
+      payload: result.percent?.label || '',
+    });
+    rpaiNed.learn({
+      source: 'evolve-wallet',
+      kind: 'ned_social_cohesion',
+      payload: result.cohesion?.label || '',
+    });
+    store.save();
+    return json(res, 200, { ok: true, minerRunning, headlines: headlines.length, ...result });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/action-block') {
