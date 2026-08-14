@@ -54,6 +54,7 @@ CORPORATE_CLIENTS_LIMITS = (
     "administered."
 )
 CORPORATE_CLIENTS_FOOT = "This is a yearly subscription."
+CORPORATE_CLIENTS_BARS_HEADING = "rpAI (SDK) progressive learned ability (%)"
 
 # Five CORPORATE CLIENTS parts → NED / rpAI learned signals (not coverage slogans).
 # Surfaces are suite_architecture ids from node.oracle_master.SUITE_SURFACE_IDS.
@@ -496,6 +497,11 @@ def corporate_clients_css() -> str:
 }
 .corp-card p { margin: 0; font-size: 0.8rem; line-height: 1.4; color: var(--rb-muted); }
 .corp-meters { margin: 0 0 1.1rem; }
+.corp-meters-heading {
+  margin: 0 0 0.45rem; font-size: 0.78rem; font-weight: 800;
+  letter-spacing: 0.05em; line-height: 1.35;
+  color: var(--rb-accent-sky, var(--rb-link));
+}
 .corp-meter-row { margin: 0 0 0.55rem; }
 .corp-meter-lab {
   display: flex; justify-content: space-between; gap: 0.6rem;
@@ -799,7 +805,8 @@ def render_corporate_clients_html(
       <div class="corp-icon-grid" id="corporate-clients-icons">
 {''.join(card_html)}
       </div>
-      <div class="corp-meters" id="corporate-clients-graphs" aria-label="rpAI learned percent — NED progress">
+      <h3 class="corp-meters-heading" id="corporate-clients-bars-heading">{_esc(CORPORATE_CLIENTS_BARS_HEADING)}</h3>
+      <div class="corp-meters" id="corporate-clients-graphs" aria-label="{_esc(CORPORATE_CLIENTS_BARS_HEADING)}">
 {''.join(meter_html)}
       </div>
       <div class="corp-price-row" id="corporate-clients-pricing">
