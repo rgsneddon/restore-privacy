@@ -113,6 +113,7 @@
     <div class="grid" id="live-pool-stats">
       <div class="card"><div class="label">Online</div><div class="value" id="stat-online">0</div></div>
       <div class="card"><div class="label">Threads</div><div class="value" id="stat-threads">0</div></div>
+      <div class="card"><div class="label">Block height</div><div class="value" id="stat-height">0</div></div>
       <div class="card"><div class="label">Hashrate</div><div class="value" id="stat-hashrate">0 H/s</div></div>
       <div class="card"><div class="label">Hashes</div><div class="value" id="stat-hashes">0</div></div>
       <div class="card"><div class="label">Accepted</div><div class="value" id="stat-accepted">0</div></div>
@@ -123,6 +124,7 @@
       <thead>
         <tr>
           <th>Wallet</th>
+          <th>Worker</th>
           <th>Hashrate</th>
           <th>Accepted</th>
           <th>Rejected</th>
@@ -130,7 +132,7 @@
         </tr>
       </thead>
       <tbody id="miner-body">
-        <tr><td colspan="5" class="off">No miners connected.</td></tr>
+        <tr><td colspan="6" class="off">No miners connected.</td></tr>
       </tbody>
     </table>
     <h2>Connect a miner</h2>
@@ -191,6 +193,8 @@
         const s = await fetch('/api/stats', { cache: 'no-store' }).then((r) => r.json());
         document.getElementById('stat-online').textContent = s.minersOnline ?? 0;
         document.getElementById('stat-threads').textContent = s.threads ?? 0;
+        const heightEl = document.getElementById('stat-height');
+        if (heightEl) heightEl.textContent = s.blockHeight ?? s.networkHeight ?? 0;
         document.getElementById('stat-hashrate').textContent = fmtRate(s.hashrate);
         document.getElementById('stat-hashes').textContent = s.hashes ?? 0;
         document.getElementById('stat-accepted').textContent = s.accepted ?? 0;
@@ -199,11 +203,12 @@
         const body = document.getElementById('miner-body');
         const rows = s.workers || [];
         if (!rows.length) {
-          body.innerHTML = '<tr><td colspan="5" class="off">No miners connected.</td></tr>';
+          body.innerHTML = '<tr><td colspan="6" class="off">No miners connected.</td></tr>';
           return;
         }
         body.innerHTML = rows.map((m) => `<tr>
           <td>${m.wallet || ''}</td>
+          <td>${m.worker || ''}</td>
           <td>${fmtRate(m.hashrate)}</td>
           <td>${m.accepted || 0}</td>
           <td>${m.rejected || 0}</td>

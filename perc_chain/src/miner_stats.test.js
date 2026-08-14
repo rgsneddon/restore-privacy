@@ -45,6 +45,7 @@ describe('miner stats book', () => {
     assert.equal(snap.threads, 2);
     assert.equal(snap.accepted, 1);
     assert.equal(snap.workers[0].wallet, split.user);
+    assert.equal(snap.workers[0].worker, 'raskul');
     assert.equal(snap.workers[0].threads, 2);
     assert.equal(snap.workers[0].hashes, 262144);
     assert.equal(snap.workers[0].accepted, 1);
@@ -70,7 +71,7 @@ describe('miner stats book', () => {
     assert.equal(listMiners(hashedAt + HASH_PRESENCE_MS + 1).length, 0);
   });
 
-  it('public snapshot is wallet-only and never includes IP', () => {
+  it('public snapshot is wallet + worker and never includes IP', () => {
     resetMinerStats();
     const ip = '203.0.113.77';
     const login = 'percprivWALLETADDR00000000000000000000001.rig1';
@@ -79,12 +80,11 @@ describe('miner stats book', () => {
     const snap = poolStatsSnapshot(8_000);
     const blob = JSON.stringify(snap.workers);
     assert.equal(snap.workers[0].wallet, splitWorker(login).user);
+    assert.equal(snap.workers[0].worker, 'rig1');
     assert.ok(!Object.prototype.hasOwnProperty.call(snap.workers[0], 'remote'));
     assert.ok(!Object.prototype.hasOwnProperty.call(snap.workers[0], 'username'));
-    assert.ok(!Object.prototype.hasOwnProperty.call(snap.workers[0], 'worker'));
     assert.equal(blob.includes(ip), false);
     assert.equal(blob.includes('203.0.113'), false);
-    assert.equal(blob.includes('rig1'), false);
   });
 
   it('login lists immediately; hash keeps them after disconnect for 72s', () => {
@@ -112,17 +112,18 @@ describe('miner stats book', () => {
     const html = hydrateMinepercIndex(`
       <div id="stat-online">0</div>
       <div id="stat-threads">0</div>
+      <div id="stat-height">0</div>
       <div id="stat-hashrate">0 H/s</div>
       <div id="stat-hashes">0</div>
       <div id="stat-accepted">0</div>
       <div id="stat-rejected">0</div>
       <div id="stat-perc">0</div>
       <tbody id="miner-body">
-        <tr><td colspan="5" class="off">No miners connected.</td></tr>
+        <tr><td colspan="6" class="off">No miners connected.</td></tr>
       </tbody>`);
     assert.ok(html.includes('id="stat-online">1'));
     assert.ok(html.includes('percpriv1a2e59c690fa6ad8efb206a40743342fad429823a'));
-    assert.equal(html.includes('raskul'), false);
+    assert.ok(html.includes('raskul'));
   });
 
   it('poolHasRunningMiner is true while connected even if not listed', () => {

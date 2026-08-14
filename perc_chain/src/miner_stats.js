@@ -3,6 +3,7 @@
  * A connected miner is listed immediately. After disconnect, a recent
  * submitted hash (or hashrate report) keeps them listed for 72s.
  */
+import { currentPoolTipHeight } from './chain_tip.js';
 const miners = new Map();
 const startedAt = Date.now();
 let poolAccepted = 0;
@@ -34,12 +35,14 @@ export function percWalletAddress(username) {
   return splitWorker(username).user;
 }
 
-/** Public miner row: wallet only as identity; never IP / remote / worker login. */
+/** Public miner row: wallet + location worker; never IP / remote. */
 export function publicMinerRow(m, now = Date.now()) {
   const wallet = percWalletAddress(m?.username || m?.user || m?.id);
+  const worker = splitWorker(m?.username || m?.user || m?.id).worker;
   const at = Number(now) || Date.now();
   return {
     wallet,
+    worker,
     connected: Boolean(m?.connected),
     threads: m?.threads || 0,
     hashes: m?.hashes || 0,
@@ -177,6 +180,7 @@ export function listMiners(now = Date.now()) {
 export function poolStatsSnapshot(now = Date.now()) {
   const rows = listMiners(now);
   const online = rows;
+  const tip = currentPoolTipHeight();
   return {
     ok: true,
     coin: 'PERC',
@@ -186,6 +190,8 @@ export function poolStatsSnapshot(now = Date.now()) {
     stratum: 'mineperc.restoreprivacy.online:1466',
     startedAt,
     uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
+    blockHeight: tip,
+    networkHeight: tip,
     miners: rows.length,
     minersOnline: online.length,
     threads: online.reduce((s, m) => s + (m.threads || 0), 0),
@@ -207,7 +213,7 @@ export function fmtHashrate(n) {
 }
 
 const EMPTY_MINER_ROW =
-  '<tr><td colspan="5" class="off">No miners connected.</td></tr>';
+  '<tr><td colspan="6" class="off">No miners connected.</td></tr>';
 
 export function minerTableBodyHtml(now = Date.now()) {
   const rows = listMiners(now);
@@ -216,6 +222,7 @@ export function minerTableBodyHtml(now = Date.now()) {
     .map(
       (m) => `<tr>
           <td>${m.wallet || ''}</td>
+          <td>${m.worker || ''}</td>
           <td>${fmtHashrate(m.hashrate)}</td>
           <td>${m.accepted || 0}</td>
           <td>${m.rejected || 0}</td>
@@ -232,6 +239,7 @@ export function hydrateMinepercIndex(html, now = Date.now()) {
   return String(html || '')
     .replace(/(id="stat-online">)[^<]*/g, `$1${snap.minersOnline}`)
     .replace(/(id="stat-threads">)[^<]*/g, `$1${snap.threads}`)
+    .replace(/(id="stat-height">)[^<]*/g, `$1${snap.blockHeight}`)
     .replace(/(id="stat-hashrate">)[^<]*/g, `$1${fmtHashrate(snap.hashrate)}`)
     .replace(/(id="stat-hashes">)[^<]*/g, `$1${snap.hashes}`)
     .replace(/(id="stat-accepted">)[^<]*/g, `$1${snap.accepted}`)

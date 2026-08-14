@@ -33,6 +33,11 @@ import {
   hydrateMinepercIndex,
 } from './miner_stats.js';
 import { confirmationSnapshot, recordPoolBlock } from './perc_block_confirm.js';
+import {
+  currentPoolTipHeight,
+  fetchPercChainTipHeight,
+  setPoolTipHeight,
+} from './chain_tip.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_HTTP_PORT = 8011;
@@ -97,7 +102,12 @@ export function seedJob(opts = {}) {
 }
 
 export function nextJob(ledgerHeight) {
-  height = Number(ledgerHeight ?? height) || 0;
+  if (ledgerHeight == null) {
+    height = currentPoolTipHeight();
+  } else {
+    height = Number(ledgerHeight) || 0;
+    setPoolTipHeight(height);
+  }
   return seedJob({ height, preWork: defaultPreWork(height) });
 }
 
@@ -150,6 +160,8 @@ export function handleApi(url, method, body) {
         algorithm: 'PERC',
         product: 'perc_pool',
         ...poolFacing(),
+        blockHeight: currentPoolTipHeight(),
+        networkHeight: currentPoolTipHeight(),
       },
     };
   }
@@ -297,11 +309,25 @@ export function createStratumServer({
   };
 }
 
+const TIP_POLL_MS = Number(process.env.PERC_TIP_POLL_MS || 15_000);
+
+export async function refreshPoolTipFromChain(opts) {
+  return fetchPercChainTipHeight(opts);
+}
+
 export function startPercMinePool({
   httpPort = Number(process.env.MINEPERC_HTTP_PORT || DEFAULT_HTTP_PORT),
   stratumPorts,
 } = {}) {
   const extra = stratumPorts || percStratumPorts();
+  const pollTip = () => {
+    refreshPoolTipFromChain().catch((err) => {
+      console.error('perc tip poll', err?.message || err);
+    });
+  };
+  pollTip();
+  const tipTimer = setInterval(pollTip, TIP_POLL_MS);
+  if (typeof tipTimer.unref === 'function') tipTimer.unref();
   const httpSrv = createServer({ port: httpPort });
   httpSrv.listen(() => {
     console.log(`mineperc perc pool http://127.0.0.1:${httpPort}/  coin=PERC algo=BeamHash III`);
@@ -315,7 +341,7 @@ export function startPercMinePool({
     });
     return stratum;
   });
-  return { http: httpSrv, strata };
+  return { http: httpSrv, strata, tipTimer };
 }
 
 export { publicDir };

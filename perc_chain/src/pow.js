@@ -4,11 +4,12 @@
  */
 import { buildJob, checkShare, defaultPreWork } from './beamhash_iii.js';
 import { creditAcceptedShare } from './perc_pool_credit.js';
+import { percChainTipHeight } from './chain_tip.js';
 
 export const DEFAULT_DIFFICULTY_BITS = 0;
 
 export function jobFromLedger(ledger, difficultyBits = DEFAULT_DIFFICULTY_BITS) {
-  const height = Array.isArray(ledger?.blocks) ? ledger.blocks.length : 0;
+  const height = percChainTipHeight(ledger);
   const prev =
     height > 0
       ? String(
