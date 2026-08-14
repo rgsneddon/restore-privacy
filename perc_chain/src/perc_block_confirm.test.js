@@ -33,10 +33,24 @@ describe('pool block confirmations', () => {
     assert.equal(eta.averageMs, 600_000);
     assert.equal(eta.etaMs, 600_000);
     const snap = confirmationSnapshot(t0 + CONFIRMATION_MS);
+    assert.equal(CONFIRMATION_MS, 72 * 1000);
+    assert.notEqual(CONFIRMATION_MS, 72 * 60 * 1000);
     assert.equal(snap.confirmationSeconds, 72);
     assert.equal(snap.confirmationMs, 72_000);
     assert.equal(snap.spendableAfter, '72 seconds');
-    assert.equal(snap.confirmationMs, CONFIRMATION_MS);
+    assert.notEqual(snap.spendableAfter, '72 minutes');
+    assert.ok(snap.confirmationMinutes < 2);
+    const stillOpen = blockConfirmation(
+      { foundAt: t0, miner: 'alice.rig', height: 10 },
+      t0 + 71_999,
+    );
+    assert.equal(stillOpen.confirmed, false);
+    const atSeventyTwoSeconds = blockConfirmation(
+      { foundAt: t0, miner: 'alice.rig', height: 10 },
+      t0 + 72_000,
+    );
+    assert.equal(atSeventyTwoSeconds.confirmed, true);
+    assert.equal(atSeventyTwoSeconds.spendable, true);
     assert.equal(snap.confirmed, 1);
     assert.equal(snap.unconfirmed, 1);
     const miners = listPoolBlocks(t0 + CONFIRMATION_MS).map((b) => b.miner);
