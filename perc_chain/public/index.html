@@ -19,6 +19,32 @@
       --danger: #ef4444;
       --rb-cyan: #00e5ff;
       --neon-yellow: #f8ff14;
+      --neon-blue: #1affff;
+    }
+    .perc-mine-bar {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      text-align: center;
+      padding: 10px 16px;
+      margin: 0;
+      background: #05070c;
+      border-bottom: 1px solid var(--border);
+    }
+    .perc-mine-bar a {
+      color: var(--neon-blue);
+      text-align: center;
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: none;
+      text-decoration: none;
+      text-shadow: 0 0 10px rgba(26, 255, 255, 0.75);
+    }
+    .perc-mine-bar a:hover,
+    .perc-mine-bar a:focus-visible {
+      color: #9fffff;
+      text-shadow: 0 0 14px rgba(26, 255, 255, 0.95);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -245,6 +271,9 @@
   </style>
 </head>
 <body>
+  <div class="perc-mine-bar" id="perc-mine-bar">
+    <a href="https://mineperc.restoreprivacy.online">Perc Mine</a>
+  </div>
   <nav class="page-top" aria-label="Explorer">
     <a class="brand-lockup" id="rpt-brand-lockup" href="https://restoreprivacy.online/"
        data-rpt-brand="1" aria-label="Restore Privacy Suite">

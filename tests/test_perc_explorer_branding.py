@@ -47,6 +47,30 @@ class TestPercExplorerBranding(unittest.TestCase):
             html,
         )
 
+    def test_perc_mine_link_is_first_neon_blue_and_centered(self) -> None:
+        html = (PUBLIC / "index.html").read_text(encoding="utf-8")
+        body = html.split("<body>", 1)[1]
+        self.assertIn("Perc Mine", html)
+        self.assertIn('href="https://mineperc.restoreprivacy.online"', html)
+        perc_at = body.find("Perc Mine")
+        page_top_at = body.find('class="page-top"')
+        brand_at = body.find("brand-lockup")
+        downloads_at = body.find("page-downloads")
+        self.assertGreater(perc_at, 0)
+        self.assertLess(perc_at, page_top_at)
+        self.assertLess(perc_at, brand_at)
+        self.assertLess(perc_at, downloads_at)
+        href_at = body.find('href="https://mineperc.restoreprivacy.online"')
+        self.assertLess(href_at, perc_at)
+        self.assertIn("--neon-blue:", html)
+        self.assertIn(".perc-mine-bar", html)
+        bar_css = html.split(".perc-mine-bar {", 1)[1].split("}", 1)[0]
+        self.assertIn("text-align: center", bar_css)
+        self.assertIn("width: 100%", bar_css)
+        link_css = html.split(".perc-mine-bar a {", 1)[1].split("}", 1)[0]
+        self.assertIn("var(--neon-blue)", link_css)
+        self.assertIn("text-align: center", link_css)
+
 
 if __name__ == "__main__":
     unittest.main()
