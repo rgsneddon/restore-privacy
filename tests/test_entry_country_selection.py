@@ -63,22 +63,21 @@ class TestResolveEntryExit(unittest.TestCase):
         )
 
     def test_multihop_iceland_entry_de_exit(self):
-        # Iceland is not offered: stale IS heals to DE; no second catalog peer.
+        # Iceland is not offered: stale IS heals to DE; exit is the other peer (SG).
+        from client.multihop import PRODUCT_SG_HOST
+
         entry, exit_n = resolve_entry_exit(
             COUNTRY_IS, multihop_enabled=True, rng=random.Random(0)
         )
         self.assertEqual(entry.code, COUNTRY_DE)
-        self.assertIsNone(exit_n)
+        self.assertIsNotNone(exit_n)
+        self.assertEqual(exit_n.host, PRODUCT_SG_HOST)
         cfg = multihop_config_for_entry_country(
             COUNTRY_IS, multihop_enabled=True, rng=random.Random(0)
         )
-        self.assertFalse(is_multihop_active(cfg))
+        self.assertTrue(is_multihop_active(cfg))
         self.assertEqual(entry_endpoint(cfg).host, PRODUCT_DE_HOST)
-        self.assertEqual(residual_endpoint(cfg).host, PRODUCT_DE_HOST)
-        from client.multihop import ResidualUnavailable, exit_endpoint
-
-        with self.assertRaises(ResidualUnavailable):
-            exit_endpoint(cfg)
+        self.assertEqual(residual_endpoint(cfg).host, PRODUCT_SG_HOST)
 
     def test_single_hop_germany(self):
         entry, exit_n = resolve_entry_exit(COUNTRY_DE, multihop_enabled=False)
@@ -117,14 +116,14 @@ class TestResolveEntryExit(unittest.TestCase):
                     self.assertNotEqual(e.host, x.host)
 
     def test_single_hop_de_drain_failovers_to_iceland(self):
-        from client.multihop import ResidualUnavailable, select_residual_endpoint
+        from client.multihop import PRODUCT_SG_HOST, select_residual_endpoint
 
         cfg = multihop_config_for_entry_country(COUNTRY_DE, multihop_enabled=False)
         self.assertEqual(entry_endpoint(cfg).host, PRODUCT_DE_HOST)
-        with self.assertRaises(ResidualUnavailable):
-            select_residual_endpoint(
-                cfg, entry_healthy=True, exit_healthy=True, entry_draining=True
-            )
+        sel = select_residual_endpoint(
+            cfg, entry_healthy=True, exit_healthy=True, entry_draining=True
+        )
+        self.assertEqual(sel.endpoint.host, PRODUCT_SG_HOST)
 
     def test_random_among_non_entry_when_catalog_expanded(self):
         extra = CountryNode(
@@ -202,7 +201,7 @@ class TestConnectWiring(unittest.TestCase):
 
     def test_catalog_live_codes_only(self):
         codes = {n.code for n in PRODUCT_COUNTRY_CATALOG}
-        self.assertEqual(codes, {COUNTRY_DE})
+        self.assertEqual(codes, {COUNTRY_DE, "SG"})
         self.assertNotIn(COUNTRY_IS, codes)
         self.assertNotIn(COUNTRY_US, codes)
         self.assertNotIn(COUNTRY_RO, codes)

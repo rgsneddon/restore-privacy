@@ -269,6 +269,8 @@ def _redact_public_doc_text(text: str) -> str:
             ("82.221.101.241", "Iceland (IS)"),
             ("185.146.232.107", "Romania (RO)"),
             ("167.233.224.5", "VPN node"),
+            ("178.105.187.178", "Germany (DE)"),
+            ("5.223.48.8", "Singapore (SG)"),
         ):
             text = text.replace(host, label)
         return text

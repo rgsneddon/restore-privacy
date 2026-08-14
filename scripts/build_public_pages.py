@@ -277,6 +277,7 @@ def build_index() -> str:
       <h2>What the client does</h2>
       <ul class="steps">
         <li>Full-tunnel protection where the OS allows a system VPN (residual path).</li>
+        <li>Choose residual location: Germany (default) or Singapore.</li>
         <li>Lean Settings by default — opt into privacy extras only when you want them.</li>
         <li>Android: optional “auto connect if idle” reopens the tunnel after an unexpected drop (gentle backoff; Disconnect still wins).</li>
         <li>Optional residual IPv6 leak posture, leak test, local connection log, and kill-switch opt-in with confirm.</li>

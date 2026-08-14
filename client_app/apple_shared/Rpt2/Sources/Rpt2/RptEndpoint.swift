@@ -11,6 +11,8 @@ public enum RptEndpoint {
     public static let usHost: String = "5.161.242.85"
     /// Germany residual peer (default entry / multi-hop exit).
     public static let deHost: String = "178.105.187.178"
+    /// Singapore residual peer (selectable entry).
+    public static let sgHost: String = "5.223.48.8"
 
     /// Product UDP listen port (RPT2).
     public static let port: UInt16 = 44044
@@ -19,9 +21,10 @@ public enum RptEndpoint {
 
     public static var hostPortDescription: String { "\(host):\(port)" }
 
-    /// Live residual catalog hosts (Germany only). Retired IS/US are not dialed.
+    /// Live residual catalog hosts (Germany default + Singapore).
     public static let catalogHosts: [String] = [
         deHost,
+        sgHost,
     ]
 
     /// Alternates for wipe-drain / preferred-down failover (never includes preferred).

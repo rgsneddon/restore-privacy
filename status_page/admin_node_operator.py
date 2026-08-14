@@ -125,20 +125,20 @@ def list_operable_nodes() -> list[dict[str, Any]]:
         nodes.extend(
             [
                 {
-                    "id": "IS",
-                    "code": "IS",
-                    "label": "Iceland (IS)",
-                    "kind": "residual",
-                    "host": "82.221.101.241",
-                    "port": 44044,
-                    "operable": True,
-                },
-                {
                     "id": "DE",
                     "code": "DE",
                     "label": "Germany (DE)",
                     "kind": "residual",
                     "host": "178.105.187.178",
+                    "port": 44044,
+                    "operable": True,
+                },
+                {
+                    "id": "SG",
+                    "code": "SG",
+                    "label": "Singapore (SG)",
+                    "kind": "residual",
+                    "host": "5.223.48.8",
                     "port": 44044,
                     "operable": True,
                 },

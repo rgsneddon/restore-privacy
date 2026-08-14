@@ -19,6 +19,7 @@ from typing import Any, Mapping, Optional, Sequence
 _FALLBACK_MONOPIN_HOSTS: tuple[str, ...] = (
     "82.221.101.241",  # IS
     "178.105.187.178",  # DE
+    "5.223.48.8",  # SG
     # Retired monopin hosts — still redact if they appear in old logs/strings
     "185.146.232.107",  # former RO
     "167.233.224.5",  # former DE

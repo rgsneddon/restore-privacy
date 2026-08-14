@@ -1,12 +1,13 @@
 /// Entry-country selector helpers (flags, Germany/DE default, Connect gate).
 ///
-/// Catalog mirrors [client/multihop.py] PRODUCT_COUNTRY_CATALOG (Germany only).
+/// Catalog mirrors [client/multihop.py] PRODUCT_COUNTRY_CATALOG (Germany + Singapore).
 library;
 
 /// Product default residual entry (empty prefs / fresh install).
 const String kDefaultEntryCountry = 'DE';
 const String kCountryIceland = 'IS';
 const String kCountryGermany = 'DE';
+const String kCountrySingapore = 'SG';
 const String kCountryUnitedStates = 'US'; // retired — normalize maps US → DE
 /// Retired residual peer codes — [normalizeEntryCountry] maps IS/RO/US → default DE.
 const String kCountryRomania = 'RO';
@@ -40,6 +41,12 @@ const List<CountryOption> kProductCountryCatalog = [
     flag: '🇩🇪',
     host: '178.105.187.178',
   ),
+  CountryOption(
+    code: kCountrySingapore,
+    name: 'Singapore',
+    flag: '🇸🇬',
+    host: '5.223.48.8',
+  ),
 ];
 
 String defaultEntryCountry() => kDefaultEntryCountry;
@@ -67,6 +74,9 @@ String? parseCatalogCountryCode(String? raw) {
     'DE': kCountryGermany,
     'DEU': kCountryGermany,
     'DEUTSCHLAND': kCountryGermany,
+    'SINGAPORE': kCountrySingapore,
+    'SG': kCountrySingapore,
+    'SGP': kCountrySingapore,
   };
   final want = aliases[upper] ?? upper;
   for (final o in kProductCountryCatalog) {
@@ -188,11 +198,13 @@ String residualNodePubNameForHost(String host) {
   for (final o in kProductCountryCatalog) {
     if (o.host == h) {
       if (o.code == kCountryGermany) return 'de_node_elgamal.pub';
+      if (o.code == kCountrySingapore) return 'sg_node_elgamal.pub';
     }
   }
   if (h == kProductExitHost || h == '178.105.187.178') {
     return 'de_node_elgamal.pub';
   }
+  if (h == '5.223.48.8') return 'sg_node_elgamal.pub';
   // Retired US monopin host — heal to DE pin
   if (h == '5.161.242.85') return 'de_node_elgamal.pub';
   if (h == '82.221.101.241') return 'de_node_elgamal.pub';

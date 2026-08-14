@@ -26,6 +26,8 @@ def residual_node_pub_name_for_host(host: str) -> str:
     h = (host or "").strip()
     if h == "178.105.187.178" or h.endswith("178.105.187.178"):
         return "de_node_elgamal.pub"
+    if h == "5.223.48.8" or h.endswith("5.223.48.8"):
+        return "sg_node_elgamal.pub"
     # Retired US monopin — heal to DE pin (entry prefs normalize US → DE)
     if h == "5.161.242.85" or h.endswith("5.161.242.85"):
         return "de_node_elgamal.pub"
@@ -34,7 +36,7 @@ def residual_node_pub_name_for_host(host: str) -> str:
         return "exit_node_elgamal.pub"
     if h == "82.221.101.241" or h.endswith("82.221.101.241"):
         return "node_elgamal.pub"
-    return "node_elgamal.pub"
+    return "de_node_elgamal.pub"
 
 
 NODE_PUB = "node_elgamal.pub"

@@ -101,7 +101,7 @@ def suite_howto_parts_catalog() -> list[dict[str, str]]:
                 "shows connected. Disconnect when finished — minimizing does not stop "
                 "the tunnel. Quit (lower-left) disconnects, then exits."
             ),
-            "default": "Manual Connect · entry Germany (DE)",
+            "default": "Manual Connect · entry Germany (DE) or Singapore (SG)",
         },
         {
             "id": "suite-settings-gear",
@@ -151,7 +151,7 @@ def settings_parts_catalog() -> list[dict[str, str]]:
         )
         multi = (
             "Multi-hop residual routes via an exit hop so egress IP is the exit. "
-            "OFF (default) = single hop to entry (default Germany). ON = exit path."
+            "OFF (default) = single hop to entry (Germany or Singapore). ON = exit path."
         )
         core = (
             "Always on once you Connect with a valid KEYGEN: cryptographic HELLO/session "

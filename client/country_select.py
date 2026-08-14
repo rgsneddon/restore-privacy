@@ -15,6 +15,7 @@ from typing import Any, Sequence
 
 from .multihop import (
     COUNTRY_DE,
+    COUNTRY_SG,
     COUNTRY_IS,
     COUNTRY_RO,
     COUNTRY_US,
@@ -29,6 +30,7 @@ from .multihop import (
 _FLAG_BY_CODE: dict[str, str] = {
     COUNTRY_IS: "\U0001f1ee\U0001f1f8",  # 🇮🇸
     COUNTRY_DE: "\U0001f1e9\U0001f1ea",  # 🇩🇪
+    COUNTRY_SG: "\U0001f1f8\U0001f1ec",  # 🇸🇬
     COUNTRY_US: "\U0001f1fa\U0001f1f8",  # 🇺🇸
     # Retired RO flag kept for any legacy admin display only
     COUNTRY_RO: "\U0001f1f7\U0001f1f4",  # 🇷🇴
@@ -107,6 +109,9 @@ def parse_catalog_country_code(
         "DE": COUNTRY_DE,
         "DEU": COUNTRY_DE,
         "DEUTSCHLAND": COUNTRY_DE,
+        "SINGAPORE": COUNTRY_SG,
+        "SG": COUNTRY_SG,
+        "SGP": COUNTRY_SG,
         # Stale US/RO are not catalog members (normalize maps → DE)
         "UNITED STATES": COUNTRY_US,
         "UNITED STATES OF AMERICA": COUNTRY_US,

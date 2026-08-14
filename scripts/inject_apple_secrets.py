@@ -4,6 +4,7 @@
 Copies **public** ElGamal keys only (live residual catalog):
   - ``node_elgamal.pub`` (Iceland residual)
   - ``de_node_elgamal.pub`` (Germany residual / default entry)
+  - ``sg_node_elgamal.pub`` (Singapore residual)
   - ``exit_node_elgamal.pub`` (multi-hop exit; DE pin material)
 
 Does **not** inject ``us_node_elgamal.pub`` — United States residual is **retired**
@@ -36,11 +37,12 @@ ROOT = Path(__file__).resolve().parents[1]
 CLIENT_PRIV = "client_ed25519.priv"
 NODE_PUB = "node_elgamal.pub"
 DE_PUB = "de_node_elgamal.pub"
+SG_PUB = "sg_node_elgamal.pub"
 EXIT_PUB = "exit_node_elgamal.pub"
 # Retired monopin name kept for call-site greps / heal docs only — never inject.
 US_PUB = "us_node_elgamal.pub"
-# Live catalog residual public pins only (IS + DE + exit alias). US retired.
-PUBLIC_PUBS = (NODE_PUB, DE_PUB, EXIT_PUB)
+# Live catalog residual public pins (DE + SG + exit alias + legacy IS file).
+PUBLIC_PUBS = (NODE_PUB, DE_PUB, SG_PUB, EXIT_PUB)
 FORBIDDEN = "node_elgamal.priv"
 
 

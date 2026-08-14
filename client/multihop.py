@@ -9,7 +9,7 @@ hop list still names entry → exit for path honesty.
 the user's **selected entry** when healthy; automatically residual-fails over to
 the **other catalog peer** when preferred entry is draining/down; re-prefers
 entry when healthy again. Fail closed if neither path is usable. Live catalog
-peer is **Germany (DE)** only (Iceland is not offered until sales).
+peers are **Germany (DE)** (default) and **Singapore (SG)**.
 
 Node-only zram + LUKS2 applies on multi-hop hosts; clients never run LUKS/zram.
 
@@ -50,10 +50,15 @@ PRODUCT_US_PORT = PRODUCT_NODE_PORT
 PRODUCT_DE_HOST = "178.105.187.178"
 PRODUCT_DE_PORT = PRODUCT_NODE_PORT
 
+# Singapore residual peer (dedicated hop) — selectable entry; unique ElGamal pin.
+PRODUCT_SG_HOST = "5.223.48.8"
+PRODUCT_SG_PORT = PRODUCT_NODE_PORT
+
 # --- Country → node catalog (extensible as more VPS countries ship) ---
 COUNTRY_IS = "IS"
 COUNTRY_US = "US"  # retired code — normalize maps US → DE
 COUNTRY_DE = "DE"
+COUNTRY_SG = "SG"
 # Historical Romania monopin (removed) — normalize maps RO → product default DE.
 COUNTRY_RO = "RO"
 # Product default residual entry (empty prefs / fresh install) — Germany monopin.
@@ -82,7 +87,7 @@ class CountryNode:
         return Endpoint(host=self.host, port=int(self.port))
 
 
-# Shipped residual catalog: Germany only (IS / US / RO peers retired).
+# Shipped residual catalog: Germany (default) + Singapore. IS / US / RO retired.
 PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
     CountryNode(
         code=COUNTRY_DE,
@@ -90,6 +95,13 @@ PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
         host=PRODUCT_DE_HOST,
         port=PRODUCT_DE_PORT,
         pub_name="de_node_elgamal.pub",
+    ),
+    CountryNode(
+        code=COUNTRY_SG,
+        name="Singapore",
+        host=PRODUCT_SG_HOST,
+        port=PRODUCT_SG_PORT,
+        pub_name="sg_node_elgamal.pub",
     ),
 )
 
@@ -131,6 +143,9 @@ def normalize_entry_country(code: str | None) -> str:
         "DE": COUNTRY_DE,
         "DEU": COUNTRY_DE,
         "DEUTSCHLAND": COUNTRY_DE,
+        "SINGAPORE": COUNTRY_SG,
+        "SG": COUNTRY_SG,
+        "SGP": COUNTRY_SG,
         # Stale prefs after US peer removal → product default DE
         "UNITED STATES": DEFAULT_ENTRY_COUNTRY,
         "UNITED STATES OF AMERICA": DEFAULT_ENTRY_COUNTRY,
@@ -1167,9 +1182,11 @@ def node_pub_name_for_endpoint(endpoint: Endpoint) -> str:
             return n.pub_name
     if host == PRODUCT_DE_HOST or host == PRODUCT_EXIT_HOST:
         return "de_node_elgamal.pub"
+    if host == PRODUCT_SG_HOST:
+        return "sg_node_elgamal.pub"
     # Retired US monopin: heal to DE pin (stale prefs normalize entry to DE first)
     if host == PRODUCT_US_HOST:
         return "de_node_elgamal.pub"
     if host == PRODUCT_RO_HOST:
         return "exit_node_elgamal.pub"  # stale RO → exit pin (now DE material)
-    return "node_elgamal.pub"
+    return "de_node_elgamal.pub"

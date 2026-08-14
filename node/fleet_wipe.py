@@ -4,7 +4,7 @@ With user-selected entry country, Iceland is **not** a fixed sole entry role —
 every catalog country is a residual-capable peer. Fleet wipedown still runs on
 **every** peer, but **never concurrently**:
 
-1. Offered residual catalog peers only (Germany / DE today)  
+1. Offered residual catalog peers only (Germany / DE, Singapore / SG)  
 2. Iceland is not a wipe target (not a connection option until sales)  
 3. New catalog countries append in catalog order (recursive: finish prior first)
 
@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Optional, Sequence
 
 # Preferred wipe order for known peers (others append after, catalog order)
-PREFERRED_FLEET_ORDER: tuple[str, ...] = ("DE",)
+PREFERRED_FLEET_ORDER: tuple[str, ...] = ("DE", "SG")
 
 
 def _load_catalog():

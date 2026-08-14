@@ -24,12 +24,12 @@ class TestIcelandNotOfferedCatalog(unittest.TestCase):
         codes = offered_catalog_codes()
         hosts = offered_catalog_hosts()
         self.assertEqual(codes, tuple(n.code for n in product_country_catalog()))
-        self.assertEqual(codes, ("DE",))
+        self.assertEqual(codes, ("DE", "SG"))
         self.assertNotIn("IS", codes)
         self.assertIn(PRODUCT_DE_HOST, hosts)
         self.assertNotIn(PRODUCT_NODE_HOST, hosts)
         offered = catalog_country_options()
-        self.assertEqual([o.code for o in offered], ["DE"])
+        self.assertEqual([o.code for o in offered], ["DE", "SG"])
         self.assertFalse(any("iceland" in o.name.lower() for o in offered))
 
     def test_stale_is_heals_to_de(self) -> None:
@@ -77,7 +77,7 @@ class TestNoIcelandFailoverOrFirewall(unittest.TestCase):
         cfg = default_single_hop()
         order = residual_try_order(cfg)
         hosts = [e.host for e in order]
-        self.assertEqual(hosts, [PRODUCT_DE_HOST])
+        self.assertEqual(hosts[0], PRODUCT_DE_HOST)
         self.assertNotIn(PRODUCT_NODE_HOST, hosts)
         sel = select_residual_endpoint(
             cfg, entry_healthy=True, exit_healthy=True, entry_draining=False
@@ -85,14 +85,16 @@ class TestNoIcelandFailoverOrFirewall(unittest.TestCase):
         self.assertEqual(sel.endpoint.host, PRODUCT_DE_HOST)
         self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
         self.assertEqual(sel.reason, "entry_primary")
-        with self.assertRaises(ResidualUnavailable):
-            select_residual_endpoint(
-                cfg, entry_healthy=True, exit_healthy=True, entry_draining=True
-            )
-        with self.assertRaises(ResidualUnavailable):
-            select_residual_endpoint(
-                cfg, entry_healthy=False, exit_healthy=True, entry_draining=False
-            )
+        # Drain/down of DE failovers to the other catalog peer (Singapore).
+        drain = select_residual_endpoint(
+            cfg, entry_healthy=True, exit_healthy=True, entry_draining=True
+        )
+        self.assertNotEqual(drain.endpoint.host, PRODUCT_DE_HOST)
+        self.assertNotEqual(drain.endpoint.host, PRODUCT_NODE_HOST)
+        down = select_residual_endpoint(
+            cfg, entry_healthy=False, exit_healthy=True, entry_draining=False
+        )
+        self.assertNotEqual(down.endpoint.host, PRODUCT_NODE_HOST)
 
     def test_firewall_hosts_follow_offered_catalog(self) -> None:
         from client.endpoint import PRODUCT_NODE_HOST

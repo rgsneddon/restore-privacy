@@ -8,7 +8,18 @@
 
 ## Product truth (unchanged)
 
-Residual VPN only (DE). Iceland is not offered until sales. Tray exactly `Privacy, Restored`. Quit lower-left disconnect-then-exit. Kill-switch ON requires typing `KILLSWITCH`.
+Residual VPN. Catalog entries: **Germany (DE)** default and **Singapore (SG)** (`5.223.48.8`, pin `sg_node_elgamal.pub`). Iceland is not offered. Tray exactly `Privacy, Restored`. Quit lower-left disconnect-then-exit. Kill-switch ON requires typing `KILLSWITCH`.
+
+## Singapore catalog (added)
+
+The Windows PE **must** ship `product/sg_node_elgamal.pub` and show Singapore in the entry-country menu. Choosing Singapore dials `5.223.48.8:44044` with the SG pin (never the DE pin). Do **not** rebuild or overwrite the Helsinki Windows 1.2.5 PE from a Mac. After this source lands, rebuild the PE on the Windows machine and upload it:
+
+```bat
+python scripts\build_windows_multihop.py --version 1.2.5
+python scripts\host_paid_assets_vps.py --stage --upload --version 1.2.5 --force
+```
+
+Helsinki breadcrumbs (`WINDOWS_HANDOFF.md` in the vault) is the live instruction set — not a GitHub queue.
 
 ## Deltas since 1.2.4 (this PE must pick up)
 

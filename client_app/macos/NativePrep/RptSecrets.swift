@@ -27,6 +27,7 @@ public enum RptSecrets {
     public static let usNodePubName = "us_node_elgamal.pub"
     /// Germany residual hop public key (HELLO when residual host is DE monopin).
     public static let deNodePubName = "de_node_elgamal.pub"
+    public static let sgNodePubName = "sg_node_elgamal.pub"
     /// Product default residual entry (Germany monopin).
     public static let productEntryHost = "178.105.187.178"
     public static let productIcelandHost = "82.221.101.241"
@@ -48,12 +49,15 @@ public enum RptSecrets {
         if h == productUsHost || h.hasSuffix(productUsHost) {
             return deNodePubName
         }
+        if h == "5.223.48.8" || h.hasSuffix("5.223.48.8") {
+            return sgNodePubName
+        }
         return deNodePubName
     }
 
     /// All catalog residual public pin basenames (never private keys).
     public static let catalogPublicPubNames: [String] = [
-        nodePubName, deNodePubName, exitNodePubName,
+        nodePubName, deNodePubName, exitNodePubName, sgNodePubName,
     ]
 
     /// Copy every catalog public pin found in *candidates* into *dest*.

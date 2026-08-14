@@ -240,9 +240,10 @@ class TestCatalogPubInventory(unittest.TestCase):
         # Live residual catalog is IS + DE only (US/RO retired).
         expected = {
             COUNTRY_DE: (PRODUCT_DE_HOST, "de_node_elgamal.pub"),
+            "SG": ("5.223.48.8", "sg_node_elgamal.pub"),
         }
         codes = {n.code for n in PRODUCT_COUNTRY_CATALOG}
-        self.assertEqual(codes, {"DE"})
+        self.assertEqual(codes, {"DE", "SG"})
         self.assertNotIn("IS", codes)
         self.assertNotIn("US", codes)
         self.assertNotIn("RO", codes)
@@ -259,7 +260,8 @@ class TestCatalogPubInventory(unittest.TestCase):
         inject = (ROOT / "scripts" / "inject_apple_secrets.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn("PUBLIC_PUBS = (NODE_PUB, DE_PUB, EXIT_PUB)", inject)
+        self.assertIn("SG_PUB", inject)
+        self.assertIn("sg_node_elgamal.pub", inject)
         self.assertIn("de_node_elgamal.pub", inject)
         self.assertIn("exit_node_elgamal.pub", inject)
         # Retired US must not be in the default inject tuple

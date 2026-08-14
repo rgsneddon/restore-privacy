@@ -17,7 +17,7 @@ class TestLiveCatalogIsDeOnly(unittest.TestCase):
 
         codes = {n.code for n in product_country_catalog()}
         hosts = {n.host for n in product_country_catalog()}
-        self.assertEqual(codes, {"DE"})
+        self.assertEqual(codes, {"DE", "SG"})
         self.assertNotIn("IS", codes)
         self.assertNotIn("US", codes)
         self.assertNotIn("RO", codes)
@@ -51,8 +51,8 @@ class TestLiveCatalogIsDeOnly(unittest.TestCase):
     def test_fleet_order_is_de(self):
         from node.fleet_wipe import PREFERRED_FLEET_ORDER, fleet_country_codes
 
-        self.assertEqual(PREFERRED_FLEET_ORDER, ("DE",))
-        self.assertEqual(fleet_country_codes(), ["DE"])
+        self.assertEqual(PREFERRED_FLEET_ORDER, ("DE", "SG"))
+        self.assertEqual(fleet_country_codes(), ["DE", "SG"])
         self.assertNotIn("IS", fleet_country_codes())
 
     def test_live_monopin_and_is_de_catalog(self):

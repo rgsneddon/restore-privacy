@@ -8,20 +8,25 @@ void main() {
     RptConfig.setRuntimeEntryCountry(kDefaultEntryCountry);
   });
 
-  test('pub name follows residual dial host (DE; retired IS/US→de)', () {
+  test('pub name follows residual dial host (DE; SG; retired IS/US→de)', () {
     expect(residualNodePubNameForHost('82.221.101.241'), 'de_node_elgamal.pub');
     expect(residualNodePubNameForHost('178.105.187.178'), 'de_node_elgamal.pub');
+    expect(residualNodePubNameForHost('5.223.48.8'), 'sg_node_elgamal.pub');
     expect(residualNodePubNameForHost('5.161.242.85'), 'de_node_elgamal.pub');
   });
 
-  test('catalog is Germany only and no retired monopin hosts', () {
+  test('catalog is Germany + Singapore and no retired monopin hosts', () {
     final codes = kProductCountryCatalog.map((o) => o.code).toSet();
-    expect(codes, {'DE'});
+    expect(codes, {'DE', 'SG'});
     expect(kProductCountryCatalog.any((o) => o.name == 'Iceland'), isFalse);
     expect(kProductCountryCatalog.any((o) => o.host == '185.146.232.107'), isFalse);
     expect(kProductCountryCatalog.any((o) => o.host == '5.161.242.85'), isFalse);
     expect(
       kProductCountryCatalog.any((o) => o.host == '178.105.187.178'),
+      isTrue,
+    );
+    expect(
+      kProductCountryCatalog.any((o) => o.host == '5.223.48.8'),
       isTrue,
     );
   });
@@ -59,6 +64,14 @@ void main() {
     expect(normalizeEntryCountry('US'), 'DE');
     expect(RptConfig.host, '178.105.187.178');
     expect(RptConfig.residualNodePubName, 'de_node_elgamal.pub');
+  });
+
+  test('Singapore selection dials SG host and sg pin', () {
+    RptConfig.setRuntimeMultiHop(false);
+    RptConfig.setRuntimeEntryCountry('SG');
+    expect(normalizeEntryCountry('Singapore'), 'SG');
+    expect(RptConfig.host, '5.223.48.8');
+    expect(RptConfig.residualNodePubName, 'sg_node_elgamal.pub');
   });
 
   test('default Germany host and de_node pub', () {

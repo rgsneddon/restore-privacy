@@ -413,12 +413,13 @@ void main() {
     );
   });
 
-  test('macOS Packet Tunnel catalog and residual pin are Germany only', () {
+  test('macOS Packet Tunnel catalog and residual pin are Germany + Singapore', () {
     final endpoint =
         File('macos/NativePrep/Rpt2/RptEndpoint.swift').readAsStringSync();
     expect(endpoint.contains('icelandHost,'), isFalse,
         reason: 'retired Iceland must not be a Connect failover host');
     expect(endpoint.contains('deHost,'), isTrue);
+    expect(endpoint.contains('sgHost,'), isTrue);
     final secrets =
         File('macos/NativePrep/RptSecrets.swift').readAsStringSync();
     final pinFn = secrets.indexOf('func residualNodePubName(forHost');

@@ -22,6 +22,11 @@ client at first run (not shipped shared).
 Public ElGamal key for the **Germany** residual peer (`178.105.187.178:44044`) —
 **default residual entry** for monopin **1.0.0** (and prior 0.5.8+ clients).
 
+## `sg_node_elgamal.pub`
+
+Public ElGamal key for the **Singapore** residual peer (`5.223.48.8:44044`).
+Selectable catalog entry. Unique pin — not the DE key.
+
 ## `exit_node_elgamal.pub`
 
 Public ElGamal key for multi-hop **exit** (same material as DE product pin).

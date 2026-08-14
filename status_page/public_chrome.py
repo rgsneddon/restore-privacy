@@ -1430,7 +1430,8 @@ SUITE_HOME_INTRO_BODY = (
     "Restore Privacy is a virtual private network for your device and personal use. "
     "Download the client free from the link below, try three days free with no "
     "obligation to pay, then keep your privacy restored with a Restore Privacy VPN "
-    "subscription (£3 a month or £30 a year)."
+    "subscription (£3 a month or £30 a year). "
+    "Choose Germany or Singapore as your residual location in the app."
 )
 # Foot retired: closing typewriter is the end line
 SUITE_HOME_INTRO_FOOT = ""

@@ -304,7 +304,7 @@ class TestConnectPathUsesSelection(unittest.TestCase):
         from client.multihop import PRODUCT_COUNTRY_CATALOG, PRODUCT_DE_HOST
 
         codes = {n.code for n in PRODUCT_COUNTRY_CATALOG}
-        self.assertEqual(codes, {COUNTRY_IS, COUNTRY_DE})
+        self.assertEqual(codes, {COUNTRY_DE, "SG"})
         hosts = {n.host for n in PRODUCT_COUNTRY_CATALOG}
         self.assertNotIn(PRODUCT_US_HOST, hosts)
         self.assertIn(PRODUCT_DE_HOST, hosts)
