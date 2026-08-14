@@ -65,6 +65,7 @@ class TestHomeAndMapRender(unittest.TestCase):
             FREE_DOWNLOAD_CTA_ID,
             RELEASE_VERSION,
             free_download_cta_href,
+            map_platform_version,
             render_downloads_map_page_html,
             render_free_download_cta_html,
             render_suite_storefront_html,
@@ -102,13 +103,16 @@ class TestHomeAndMapRender(unittest.TestCase):
 
             map_html = render_downloads_map_page_html().decode("utf-8")
             self.assertIn("Restore Privacy", map_html)
-            self.assertIn("v1.2.6", map_html)
-            self.assertIn("v1.2.5", map_html)
+            self.assertNotIn("v1.2.4", map_html)
+            self.assertNotIn("v1.2.5", map_html)
             # Map package rows free_direct; KEYGEN /pay may still be mentioned in blurb only
             for plat in ("windows", "android", "macos", "ios", "linux"):
+                ver = map_platform_version(plat)
                 self.assertIn(f"platform={plat}", map_html)
+                self.assertIn(f"v{ver}", map_html)
                 self.assertIn("free_direct=1", map_html)
                 self.assertIn("/suite/download?", map_html)
+            self.assertEqual(map_platform_version("linux"), "1.2.6")
             # Package row destinations are not /pay?product=suite&platform=
             self.assertNotIn("/pay?product=suite&amp;platform=", map_html)
             # Map is Suite-only — no companion product sections
