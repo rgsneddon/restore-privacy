@@ -382,7 +382,7 @@
 
     <section id="rpai">
       <h2>GOD · rpAI</h2>
-      <p class="hint" style="margin-bottom:12px">Current helper is GOD. NED and FRED are iterations under GOD, with their own learned stats.</p>
+      <p class="hint" style="margin-bottom:12px">Current helper is GOD. NED leads under GOD. FRED and PEDRO report to NED. Each agent may learn for the betterment of humanity.</p>
       <div class="grid" id="ned-stats"></div>
       <div class="card" style="margin-top:12px;overflow:auto">
         <div class="label">Iterations under GOD</div>
@@ -422,6 +422,7 @@
               <th>Txs</th>
               <th>Treasury</th>
               <th>Label</th>
+              <th>Message</th>
               <th></th>
             </tr>
           </thead>
@@ -562,10 +563,10 @@
         const rows = Array.isArray(ned.iterations) && ned.iterations.length
           ? ned.iterations
           : [
-              { id: 'GOD', name: 'GOD', role: 'current helper', learned: ned.learned ?? 0, height: ned.height ?? 0, intervalSec: 7200, status: 'live' },
-              { id: 'NED', name: 'NED', role: 'prior iteration', learned: ned.learned ?? 0, height: ned.height ?? 0, intervalSec: null, status: 'absorbed', lastLine: '' },
+              { id: 'GOD', name: 'GOD', role: 'root helper', learned: ned.learned ?? 0, height: ned.height ?? 0, intervalSec: 7200, status: 'live' },
+              { id: 'NED', name: 'NED', role: 'hierarchical leader under GOD', learned: ned.learned ?? 0, height: ned.height ?? 0, intervalSec: null, status: 'leading', lastLine: '' },
               { id: 'FRED', name: 'FRED', role: 'Helsinki scenario bot', learned: 0, height: 0, intervalSec: 7200, status: 'running', lastQuestion: '' },
-              { id: 'PED', name: 'PED', role: 'X.com / Grok observer · @rgsneddon wallet', learned: 0, height: 0, intervalSec: 3600, status: 'running', lastQuestion: '' },
+              { id: 'PEDRO', name: 'PEDRO', role: 'X.com / Grok observer · @rgsneddon wallet', learned: 0, height: 0, intervalSec: 3600, status: 'running', lastQuestion: '' },
             ];
         body.innerHTML = rows.map((row) => {
           const interval = row.intervalSec ? `${Math.round(Number(row.intervalSec) / 3600)}h` : '—';
@@ -859,10 +860,11 @@
             <td class="muted">${fmtTime(b.timestamp)}</td>
             <td>${b.txCount}</td>
             <td>${b.treasuryEmitted} PERC</td>
-            <td>${b.displayLabel || '—'}</td>
+            <td>${b.displayLabel || b.scenarioLabel || '—'}</td>
+            <td>${(b.messages && b.messages[0]) || b.memo || b.scenarioLabel || '—'}</td>
             <td><button class="btn secondary" data-block="${b.index}">View</button></td>
           </tr>`).join('')
-        : '<tr><td colspan="6" class="muted">No blocks yet — the Perccent chain will appear here as scenarios advance.</td></tr>';
+        : '<tr><td colspan="7" class="muted">No blocks yet — the Perccent chain will appear here as scenarios advance.</td></tr>';
       $('blocks-meta').textContent = data.total
         ? `Showing ${rows.length} of ${data.total} blocks (newest first)`
         : '';
@@ -921,7 +923,7 @@
       try {
         const [netRes, blocksRes, diagRes, rpaiRes] = await Promise.all([
           fetch(explorerApiUrl('api/network')),
-          fetch(explorerApiUrl('api/blocks?limit=40')),
+          fetch(explorerApiUrl('api/blocks')),
           fetch(explorerApiUrl('api/diagrams')),
           fetch(explorerApiUrl('api/rpai')),
         ]);

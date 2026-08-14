@@ -3,10 +3,15 @@
  * Share check is BeamHash III; accepted work credits PERC, not BEAM.
  */
 import { buildJob, checkShare, defaultPreWork } from './beamhash_iii.js';
-import { creditAcceptedShare } from './perc_pool_credit.js';
+import { creditAcceptedShare, rewardAllOnBlockGen } from './perc_pool_credit.js';
 import { percChainTipHeight } from './chain_tip.js';
+import {
+  MINER_UNLOCK_DIFFICULTY_BITS,
+  TARGET_BLOCK_INTERVAL_MS,
+} from './chain_timing.js';
 
-export const DEFAULT_DIFFICULTY_BITS = 0;
+export const DEFAULT_DIFFICULTY_BITS = MINER_UNLOCK_DIFFICULTY_BITS;
+export { TARGET_BLOCK_INTERVAL_MS, MINER_UNLOCK_DIFFICULTY_BITS };
 
 export function jobFromLedger(ledger, difficultyBits = DEFAULT_DIFFICULTY_BITS) {
   const height = percChainTipHeight(ledger);
@@ -89,12 +94,43 @@ export function applyPowToLedger(ledger, submission) {
     username: credit.username,
     microUnits: (prev.microUnits ?? 0) + credit.microUnits,
   };
+  const unlockHash = String(output || nonce || `unlock-${heightBefore}`);
+  const memo = `Unlocking hash found by ${credit.username}`;
+  state.blocks.push({
+    index: heightBefore,
+    timestamp: new Date().toISOString(),
+    scenarioLabel: `Miner unlock · ${credit.username}`,
+    memo,
+    powHash: unlockHash,
+    triggerUsername: credit.username,
+    minerUnlock: true,
+    targetIntervalMs: TARGET_BLOCK_INTERVAL_MS,
+    transactions: [
+      {
+        id: `mine-unlock-${heightBefore}-${credit.username}`,
+        kind: 'minerUnlock',
+        memo,
+        scenarioLabel: `Miner unlock · ${credit.username}`,
+        from: credit.username,
+        timestamp: new Date().toISOString(),
+        blockIndex: heightBefore,
+      },
+    ],
+  });
+  const rewards = rewardAllOnBlockGen(state, {
+    finder: credit.username,
+    height: heightBefore,
+  });
   return {
     accepted: true,
     height: heightBefore,
+    unlocked: true,
+    unlockingHash: unlockHash,
     error: null,
     credit,
+    rewards,
     asset: 'PERC',
     algorithm: 'beamhashIII',
+    targetIntervalMs: TARGET_BLOCK_INTERVAL_MS,
   };
 }

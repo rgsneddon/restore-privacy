@@ -9,6 +9,7 @@
 import crypto from 'crypto';
 import { acknowledgeRelayTransfers } from './transfer_relay_ack.js';
 import { blockHeight } from './ledger_store.js';
+import { rewardAllOnBlockGen } from './perc_pool_credit.js';
 
 export const ADMIN_ACTION_KIND = 'adminAction';
 export const CHAIN_ID = 'evolve-chronoflux-principia-chain-1';
@@ -127,6 +128,7 @@ export function mintAdminActionBlock(ledger, action, options = {}) {
   if (typeof ledger.nextTxId === 'number') {
     ledger.nextTxId += 1;
   }
+  rewardAllOnBlockGen(ledger, { finder: actor, height: index });
 
   return {
     ok: true,

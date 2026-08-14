@@ -113,6 +113,12 @@ export function summarizeBlock(block, ledger) {
     treasuryEmitted: formatPercAmount(block.treasuryEmitted),
     displayLabel: genericBlockLabel(block),
     scenarioLabel: block.scenarioLabel ?? null,
+    memo: block.memo ?? txs[0]?.memo ?? null,
+    messages: [
+      block.scenarioLabel,
+      block.memo,
+      ...txs.map((tx) => tx?.memo || tx?.scenarioLabel || null),
+    ].filter((m) => m != null && String(m).trim() !== ''),
     triggerUsername: block.triggerUsername ?? null,
     treasuryCycle: block.treasuryCycle ?? 1,
     microblockSeal: block.microblockSeal ?? false,
@@ -146,16 +152,22 @@ export function blockHashAt(ledger, index) {
   return tipHash({ ...ledger, blocks: [block] });
 }
 
-export function listBlocks(ledger, { offset = 0, limit = 50 } = {}) {
+export function listBlocks(ledger, { offset = 0, limit = null } = {}) {
   const blocks = ledger?.blocks ?? [];
   const total = blocks.length;
-  const start = Math.max(0, Math.min(offset, total));
-  const end = Math.max(start, Math.min(start + limit, total));
-  const slice = blocks.slice(start, end).reverse();
+  const parsed = Number(limit);
+  const take =
+    limit == null || limit === '' || !Number.isFinite(parsed) || parsed <= 0
+      ? total
+      : Math.min(Math.floor(parsed), total);
+  const start = Math.max(0, Math.min(Number(offset) || 0, total));
+  // Newest first from the tip so a small window never hides height > 39.
+  const newestFirst = blocks.slice().reverse();
+  const slice = newestFirst.slice(start, start + take);
   return {
     total,
     offset: start,
-    limit,
+    limit: take,
     blocks: slice.map((b) => summarizeListedBlock(b, ledger)),
   };
 }

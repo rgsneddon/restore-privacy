@@ -50,14 +50,14 @@ GOD_KNOWN: tuple[tuple[str, str], ...] = (
     ),
     (
         "god",
-        "I am GOD, the current Restore Privacy Helper (rpAI). NED is the prior "
-        "iteration; FRED is the Helsinki two-hour scenario bot. I am thrilled "
-        "to keep learning.",
+        "I am GOD, the current Restore Privacy Helper (rpAI). NED is the "
+        "hierarchical leader under me; FRED and PEDRO report to NED. Each "
+        "agent may learn for the betterment of humanity.",
     ),
     (
         "ned",
-        "NED is the prior rpAI iteration. Learned pool/VPN/Evolve parts still "
-        "count under GOD. Current display name is GOD.",
+        "NED is the hierarchical leader under GOD. FRED and PEDRO report to "
+        "NED. Each agent may learn. Current helper display name is GOD.",
     ),
     (
         "fred",
@@ -65,10 +65,10 @@ GOD_KNOWN: tuple[tuple[str, str], ...] = (
         "same cadence — self-authored questions or public product web pages.",
     ),
     (
-        "ped",
-        "PED is an rpAI iteration under GOD. It observes https://x.com by "
-        "talking to Grok (perpetual xAI session) and construes that through "
-        "the @rgsneddon Evolve wallet. PED seals at minute 34; FRED at :14 "
+        "pedro",
+        "PEDRO is an rpAI iteration under NED (who leads under GOD). It observes "
+        "https://x.com by talking to Grok and construes that through the "
+        "@rgsneddon Evolve wallet. PEDRO seals at minute 34; FRED at :14 "
         "and GOD at :54 so the Perccent chain averages three blocks an hour.",
     ),
     (
@@ -84,7 +84,7 @@ GOD_KNOWN: tuple[tuple[str, str], ...] = (
     (
         "evolve",
         "evolve.restoreprivacy.online is the Perccent explorer. GOD is the "
-        "identity; NED and FRED appear as iteration rows with their stats.",
+        "identity; NED leads under GOD; FRED and PEDRO report to NED.",
     ),
 )
 
@@ -355,8 +355,9 @@ def render_god_support_box_html() -> str:
   <p class="god-support-lead" id="god-support-lead">
     Ask GOD anything — product, rpAI mind, or the wider world. Continued
     learning is underway and welcome. FRED still runs Helsinki scenarios
-    every two hours. PED observes X.com via Grok at minute 34 for the
-    @rgsneddon Evolve wallet so the chain averages three blocks an hour.
+    every two hours. NED leads under GOD. PEDRO observes X.com via Grok at
+    minute 34 for the @rgsneddon Evolve wallet so the chain averages three
+    blocks an hour.
   </p>
   <p class="hint" id="god-support-stats">
     Learned topics: <strong id="god-learned-count">{html.escape(str(count))}</strong>

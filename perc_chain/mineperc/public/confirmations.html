@@ -30,22 +30,22 @@
 <body>
   <div class="wrap">
     <h1>How PERC shares confirm</h1>
-    <p class="sub"><a href="/">Perccent PERC pool</a> · 72 minutes until a pool-found block is spendable</p>
+    <p class="sub"><a href="/">Perccent PERC pool</a> · 72 seconds until a pool-found block is spendable</p>
     <p>
       Miners submit hashes to the pool. A valid hash that meets job work is an accepted share.
       The first accepted solution at a height is the <strong>found block</strong>. That block stays
-      <span class="off">unconfirmed</span> until <strong>72 minutes</strong> have passed. After 72 minutes
+      <span class="off">unconfirmed</span> until <strong>72 seconds</strong> have passed. After 72 seconds
       it is <span class="on">confirmed</span> and the PERC mined at the pool is spendable from the wallet.
     </p>
     <div class="grid">
-      <div class="card"><div class="label">Confirmations</div><div class="value" id="stat-window">72 minutes</div></div>
+      <div class="card"><div class="label">Confirmations</div><div class="value" id="stat-window">72 seconds</div></div>
       <div class="card"><div class="label">Avg block time</div><div class="value" id="stat-avg">—</div></div>
       <div class="card"><div class="label">Next block ETA</div><div class="value" id="stat-eta">—</div></div>
       <div class="card"><div class="label">Confirmed</div><div class="value" id="stat-ok">0</div></div>
       <div class="card"><div class="label">Unconfirmed</div><div class="value" id="stat-wait">0</div></div>
     </div>
     <h2>All pool-found blocks</h2>
-    <p class="hint">Every found block and its miner. Status flips to confirmed after 72 minutes.</p>
+    <p class="hint">Every found block and its miner. Status flips to confirmed after 72 seconds.</p>
     <table class="stats">
       <thead>
         <tr>
@@ -71,7 +71,7 @@
     }
     async function refresh() {
       const s = await fetch('/api/confirmations', { cache: 'no-store' }).then((r) => r.json());
-      document.getElementById('stat-window').textContent = (s.confirmationMinutes || 72) + ' minutes';
+      document.getElementById('stat-window').textContent = s.spendableAfter || ((s.confirmationSeconds || 72) + ' seconds');
       document.getElementById('stat-avg').textContent = fmtDur(s.averageBlockIntervalMs);
       document.getElementById('stat-eta').textContent = fmtDur(s.etaNextBlockMs);
       document.getElementById('stat-ok').textContent = s.confirmed ?? 0;

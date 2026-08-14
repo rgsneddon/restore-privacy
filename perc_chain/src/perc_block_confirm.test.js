@@ -12,7 +12,7 @@ import {
 } from './perc_block_confirm.js';
 
 describe('pool block confirmations', () => {
-  it('72 minutes until confirmed and spendable; ETA from average interval', () => {
+  it('72 seconds until confirmed and spendable; ETA from average interval', () => {
     resetPoolBlocks();
     const t0 = 1_700_000_000_000;
     recordPoolBlock({ miner: 'alice.rig', height: 10, jobId: 'j10', foundAt: t0 });
@@ -33,7 +33,9 @@ describe('pool block confirmations', () => {
     assert.equal(eta.averageMs, 600_000);
     assert.equal(eta.etaMs, 600_000);
     const snap = confirmationSnapshot(t0 + CONFIRMATION_MS);
-    assert.equal(snap.confirmationMinutes, 72);
+    assert.equal(snap.confirmationSeconds, 72);
+    assert.equal(snap.confirmationMs, 72_000);
+    assert.equal(snap.spendableAfter, '72 seconds');
     assert.equal(snap.confirmationMs, CONFIRMATION_MS);
     assert.equal(snap.confirmed, 1);
     assert.equal(snap.unconfirmed, 1);

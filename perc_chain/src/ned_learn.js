@@ -1,8 +1,9 @@
 /**
  * GOD / rpAI observe-learn + explorer lines (Perccent confirmation log).
  *
- * GOD is the current helper identity. NED and FRED are prior / sibling
- * iterations shown as rows under GOD. Surfaces match node/rpai_learn.py
+ * GOD is the current helper identity. NED is the hierarchical leader under
+ * GOD. FRED and PEDRO report to NED. Each agent may learn for the
+ * betterment of humanity. Surfaces match node/rpai_learn.py
  * and PRIVACY_POLICY.md. Public confirmations store a non-personal part
  * label + confirm id — never raw user prose, KEYGENs, cards, or tunnel
  * payloads.
@@ -11,11 +12,14 @@
 export const GOD_IDENTITY = 'GOD · rpAI';
 export const NED_ITERATION = 'NED';
 export const FRED_ITERATION = 'FRED';
-export const PED_ITERATION = 'PED';
+export const PEDRO_ITERATION = 'PEDRO';
+/** @deprecated Use PEDRO_ITERATION — display name is PEDRO. */
+export const PED_ITERATION = PEDRO_ITERATION;
 /** Helsinki scenario cadence for FRED (and GOD when it opts to run the same bot). */
 export const SCENARIO_INTERVAL_SEC = 7200;
-/** PED X/Grok analysis fires at minute 34. With :14 and :54 seals → ~3 blocks/hour. */
-export const PED_MINUTE = 34;
+/** PEDRO X/Grok analysis fires at minute 34. With :14 and :54 seals → ~3 blocks/hour. */
+export const PEDRO_MINUTE = 34;
+export const PED_MINUTE = PEDRO_MINUTE;
 export const SEAL_MINUTES = Object.freeze([14, 34, 54]);
 export const TARGET_BLOCKS_PER_HOUR = 3;
 
@@ -211,13 +215,13 @@ export function tickPedCalculation(
     return { ok: true, grew: false, due: false, state: st };
   }
   const height = st.scenarios + 1;
-  const q = norm(question) || 'PED observe https://x.com via Grok for @rgsneddon evolve wallet.';
+  const q = norm(question) || 'PEDRO observe https://x.com via Grok for @rgsneddon evolve wallet.';
   const row = {
     id: `ped-${String(height).padStart(6, '0')}`,
     at: Number(now),
     source: source || 'x.com',
     question: q.slice(0, 160),
-    iteration: PED_ITERATION,
+    iteration: PEDRO_ITERATION,
     wallet: String(wallet || 'rgsneddon'),
   };
   st.scenarios = height;
@@ -292,8 +296,10 @@ export function explorerNedPayload(state, fred, ped) {
       {
         id: 'GOD',
         name: 'GOD',
-        role: 'current helper',
-        learned: parts.length + fredCalcs.length,
+        role: 'root helper',
+        reportsTo: null,
+        mayLearn: true,
+        learned: parts.length + fredCalcs.length + pedCalcs.length,
         height: Number(state?.height || 0),
         intervalSec: SCENARIO_INTERVAL_SEC,
         lastAt: lastFred?.at || 0,
@@ -303,19 +309,23 @@ export function explorerNedPayload(state, fred, ped) {
       {
         id: NED_ITERATION,
         name: 'NED',
-        role: 'prior iteration',
+        role: 'hierarchical leader under GOD',
+        reportsTo: 'GOD',
+        mayLearn: true,
         learned: parts.length,
         height: Number(state?.height || 0),
         intervalSec: null,
         lastAt: 0,
         lastLine: lastNed?.line || '',
         lastConfirmId: lastNed?.confirmId || '',
-        status: 'absorbed',
+        status: 'leading',
       },
       {
         id: FRED_ITERATION,
         name: 'FRED',
         role: 'Helsinki scenario bot',
+        reportsTo: 'NED',
+        mayLearn: true,
         learned: fredCalcs.length,
         height: Number(fredSt.scenarios || 0),
         intervalSec: SCENARIO_INTERVAL_SEC,
@@ -326,9 +336,11 @@ export function explorerNedPayload(state, fred, ped) {
         status: 'running',
       },
       {
-        id: PED_ITERATION,
-        name: 'PED',
+        id: PEDRO_ITERATION,
+        name: 'PEDRO',
         role: 'X.com / Grok observer · @rgsneddon wallet',
+        reportsTo: 'NED',
+        mayLearn: true,
         learned: pedCalcs.length,
         height: Number(pedSt.scenarios || 0),
         intervalSec: 3600,

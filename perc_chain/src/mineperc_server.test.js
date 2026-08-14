@@ -334,9 +334,10 @@ describe('createServer launch', () => {
       assert.match(jsText, /export function copyPayloadForPart/);
       assert.match(jsText, /export function minWidthChFromParts/);
       assert.equal(confPage, 200);
-      assert.match(confHtml, /72 minutes/);
+      assert.match(confHtml, /72 seconds/);
       assert.match(confHtml, /spendable/);
-      assert.equal(confApi.confirmationMinutes, 72);
+      assert.equal(confApi.confirmationSeconds, 72);
+      assert.equal(confApi.spendableAfter, '72 seconds');
       assert.ok(Array.isArray(confApi.blocks));
     }
   });

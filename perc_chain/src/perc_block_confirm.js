@@ -1,7 +1,10 @@
 /**
- * Pool-found PERC blocks: 72 minutes until spendable from the wallet.
+ * Pool-found PERC blocks: 72 seconds until spendable from the wallet.
+ * Server-side — Evolve clients / perc wallets do not need a rebuild.
  */
-export const CONFIRMATION_MS = 72 * 60 * 1000;
+import { CONFIRMATION_MS as TIMING_CONFIRMATION_MS } from './chain_timing.js';
+
+export const CONFIRMATION_MS = TIMING_CONFIRMATION_MS;
 
 const blocks = [];
 const heightSeen = new Set();
@@ -75,8 +78,9 @@ export function confirmationSnapshot(now = Date.now()) {
     ok: true,
     coin: 'PERC',
     confirmationMs: CONFIRMATION_MS,
+    confirmationSeconds: CONFIRMATION_MS / 1000,
     confirmationMinutes: CONFIRMATION_MS / 60000,
-    spendableAfter: '72 minutes',
+    spendableAfter: '72 seconds',
     averageBlockIntervalMs: eta.averageMs,
     etaNextBlockMs: eta.etaMs,
     lastFoundAt: eta.lastFoundAt,

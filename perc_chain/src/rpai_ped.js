@@ -1,24 +1,25 @@
 /**
- * PED — rpAI iteration under GOD.
+ * PEDRO — rpAI iteration under NED, who leads under GOD.
  *
  * Observes https://x.com by calling Grok (xAI) with a perpetual API session
  * (XAI_API_KEY). Construes that observation through the @rgsneddon Evolve
  * wallet (or any other evolve wallet on the seed ledger).
  *
- * Seals: minute 14 FRED, minute 34 PED, minute 54 GOD → ~3 blocks/hour.
+ * Seals: minute 14 FRED, minute 34 PEDRO, minute 54 GOD → ~3 blocks/hour.
  */
 
 import { mintAdminActionBlock } from './admin_action_progression.js';
 import {
-  PED_ITERATION,
-  PED_MINUTE,
+  PEDRO_ITERATION,
+  PEDRO_MINUTE,
   SEAL_MINUTES,
   TARGET_BLOCKS_PER_HOUR,
   recordSharedFredCalculation,
   recordSharedPedCalculation,
 } from './ned_learn.js';
 
-export { PED_MINUTE, SEAL_MINUTES, TARGET_BLOCKS_PER_HOUR };
+export { PEDRO_MINUTE, SEAL_MINUTES, TARGET_BLOCKS_PER_HOUR };
+export const PED_MINUTE = PEDRO_MINUTE;
 
 export const PED_WALLET = 'rgsneddon';
 export const X_OBSERVE_URL = 'https://x.com';
@@ -47,7 +48,7 @@ export function pickEvolveWallet(ledger, preferred = PED_WALLET) {
 
 export function sealWho(now = Date.now()) {
   const m = new Date(now).getUTCMinutes();
-  if (m === PED_MINUTE) return 'PED';
+  if (m === PEDRO_MINUTE) return 'PEDRO';
   if (m === 14) return 'FRED';
   if (m === 54) return 'GOD';
   return null;
@@ -74,7 +75,7 @@ export function shouldSealNow(now = Date.now(), lastKey = '') {
 }
 
 function fallbackPedLine(wallet) {
-  return `PED · X.com observe via Grok · wallet @${wallet} · privacy / evolve construe.`;
+  return `PEDRO · X.com observe via Grok · wallet @${wallet} · privacy / evolve construe.`;
 }
 
 export async function pedObserveX(wallet = PED_WALLET, fetchImpl = globalThis.fetch) {
@@ -86,7 +87,7 @@ export async function pedObserveX(wallet = PED_WALLET, fetchImpl = globalThis.fe
   const body = JSON.stringify({
     model: 'grok-4.5',
     input:
-      'You are PED, an rpAI iteration under GOD. Observe public https://x.com discourse ' +
+      'You are PEDRO, an rpAI iteration under NED (who leads under GOD). Observe public https://x.com discourse ' +
       'about privacy, residual networks, and Evolve. Construe one scenario analysis ' +
       `line (max 140 chars) for evolve wallet @${wallet} (rgsneddon). No secrets.`,
   });
@@ -123,7 +124,7 @@ export async function pedObserveX(wallet = PED_WALLET, fetchImpl = globalThis.fe
 export function mintIterationScenario(ledger, { who, label, memo, wallet }) {
   const actor = String(wallet || PED_WALLET);
   return mintAdminActionBlock(ledger, {
-    actionKind: `${String(who || PED_ITERATION).toLowerCase()}_scenario`,
+    actionKind: `${String(who || PEDRO_ITERATION).toLowerCase()}_scenario`,
     label: String(label || `${who} scenario`).slice(0, 80),
     memo: String(memo || label || '').slice(0, 200),
     path: '/rpai/ped',
@@ -149,9 +150,9 @@ export function startRpaiHourlySeals(hooks, { intervalMs = 15_000 } = {}) {
     const wallet = pickEvolveWallet(ledger, PED_WALLET);
     let label = `${gate.who} scenario`;
     let memo = label;
-    if (gate.who === 'PED') {
+    if (gate.who === 'PEDRO') {
       const obs = await pedObserveX(wallet, hooks.fetch || globalThis.fetch);
-      label = `PED · X.com`;
+      label = `PEDRO · X.com`;
       memo = obs.line;
       recordSharedPedCalculation({
         now,
@@ -176,7 +177,7 @@ export function startRpaiHourlySeals(hooks, { intervalMs = 15_000 } = {}) {
       who: gate.who,
       label,
       memo,
-      wallet: gate.who === 'PED' ? wallet : gate.who === 'GOD' ? wallet : wallet,
+      wallet,
     });
     if (minted.ok) {
       lastKey = gate.key;

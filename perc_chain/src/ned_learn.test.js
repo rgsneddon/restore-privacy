@@ -25,10 +25,15 @@ describe('GOD iterations NED + FRED', () => {
     assert.notEqual(payload.identity, 'NED · rpAI');
     assert.ok(payload.learned >= 4);
     const ids = payload.iterations.map((r) => r.id);
-    assert.deepEqual(ids, ['GOD', NED_ITERATION, FRED_ITERATION, 'PED']);
+    assert.deepEqual(ids, ['GOD', NED_ITERATION, FRED_ITERATION, 'PEDRO']);
     const ned = payload.iterations.find((r) => r.id === 'NED');
-    assert.equal(ned.role, 'prior iteration');
+    assert.equal(ned.role, 'hierarchical leader under GOD');
+    assert.equal(ned.reportsTo, 'GOD');
+    assert.equal(ned.mayLearn, true);
     assert.equal(ned.learned, payload.learned);
+    const pedro = payload.iterations.find((r) => r.id === 'PEDRO');
+    assert.equal(pedro.reportsTo, 'NED');
+    assert.equal(pedro.mayLearn, true);
     const fred = payload.iterations.find((r) => r.id === 'FRED');
     assert.equal(fred.intervalSec, SCENARIO_INTERVAL_SEC);
     assert.equal(fred.role, 'Helsinki scenario bot');

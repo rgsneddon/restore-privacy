@@ -3,6 +3,8 @@
  * Beam SBBS / BEAM-coin addresses are not a destination of record.
  */
 
+import { BLOCK_GEN_REWARD_MICRO } from './chain_timing.js';
+
 export const PAYOUT_ASSET = 'PERC';
 export const REJECTED_ASSETS = Object.freeze(['BEAM', 'beam', 'Beam']);
 
@@ -48,6 +50,46 @@ export function creditAcceptedShare({
     algorithm: 'beamhashIII',
     jobId: jobId != null ? String(jobId) : undefined,
   };
+}
+
+/**
+ * Credit every user and miner on the ledger when a block is generated.
+ * Server-side book — wallets do not need a rebuild.
+ */
+export function rewardAllOnBlockGen(ledger, { finder, height } = {}) {
+  const state = ledger && typeof ledger === 'object' ? ledger : {};
+  if (!state.mineCredits || typeof state.mineCredits !== 'object') state.mineCredits = {};
+  const names = new Set();
+  for (const name of Object.keys(state.accounts || {})) {
+    if (name && name !== 'evolve_treasury') names.add(name);
+  }
+  for (const name of Object.keys(state.mineCredits || {})) {
+    if (name) names.add(name);
+  }
+  if (finder) {
+    try {
+      names.add(normalizePercUser(finder));
+    } catch {
+      /* skip invalid finder */
+    }
+  }
+  const rewarded = [];
+  for (const username of names) {
+    let rec;
+    try {
+      rec = creditAcceptedShare({
+        username,
+        microUnits: BLOCK_GEN_REWARD_MICRO,
+        jobId: height != null ? String(height) : 'block_gen',
+      });
+    } catch {
+      continue;
+    }
+    rec.kind = 'block_gen_reward';
+    state.mineCredits = applyCredit(state.mineCredits, rec);
+    rewarded.push(rec.username);
+  }
+  return { rewarded, count: rewarded.length, height: height ?? null };
 }
 
 export function applyCredit(book, credit) {

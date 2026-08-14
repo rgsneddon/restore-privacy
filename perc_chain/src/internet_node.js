@@ -514,7 +514,12 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { total: 0, offset: 0, limit: 50, blocks: [] });
     }
     const offset = Number(url.searchParams.get('offset') ?? 0);
-    const limit = Math.min(Number(url.searchParams.get('limit') ?? 50), 200);
+    const rawLimit = url.searchParams.get('limit');
+    const parsedLimit = rawLimit == null || rawLimit === '' ? null : Number(rawLimit);
+    const limit =
+      parsedLimit == null || !Number.isFinite(parsedLimit) || parsedLimit <= 0
+        ? null
+        : parsedLimit;
     return json(res, 200, sanitizeForPublicExplorer(listBlocks(store.ledger, { offset, limit })));
   }
 
