@@ -32,6 +32,20 @@ class TestPercExplorerBranding(unittest.TestCase):
         self.assertIn('href="#nodes"', html)
         self.assertIn('href="#explorer"', html)
         self.assertIn("FCG white paper", html)
+        self.assertIn("page-downloads", html)
+        self.assertIn("--neon-yellow", html)
+        self.assertIn(
+            "https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-macos-x64.zip",
+            html,
+        )
+        self.assertIn(
+            "https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-windows-x64.zip",
+            html,
+        )
+        self.assertIn(
+            "https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-android-setup.apk",
+            html,
+        )
 
 
 if __name__ == "__main__":

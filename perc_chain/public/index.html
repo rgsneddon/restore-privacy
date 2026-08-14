@@ -18,6 +18,7 @@
       --offline: #f59e0b;
       --danger: #ef4444;
       --rb-cyan: #00e5ff;
+      --neon-yellow: #f8ff14;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -98,6 +99,28 @@
       color: var(--rb-cyan);
     }
     .fcg-link { opacity: 1; }
+    .page-downloads {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 20px 10px;
+      margin: 0;
+      border-bottom: 1px solid var(--border);
+      background: #0d1018;
+    }
+    .page-download-links {
+      width: 100%;
+    }
+    .page-download-links a {
+      color: var(--neon-yellow);
+      text-shadow: 0 0 8px rgba(248, 255, 20, 0.55);
+    }
+    .page-download-links a:hover,
+    .page-download-links a:focus-visible {
+      color: #ffff8a;
+      text-shadow: 0 0 12px rgba(248, 255, 20, 0.95);
+    }
     header { margin-bottom: 28px; }
     header.explorer-header {
       display: flex;
@@ -179,6 +202,7 @@
         font-size: 0.68rem;
         padding: 6px 2px;
       }
+      .page-downloads { padding: 4px 12px 8px; }
     }
     #wallet-pentagon-chart {
       width: 100%;
@@ -241,6 +265,16 @@
       <a href="#rpai">rpAI</a>
       <a href="#explorer">Explorer</a>
       <a class="fcg-link" href="https://rgsneddon.github.io/evolve/fcg_white_paper.html" target="_blank" rel="noopener noreferrer">FCG white paper</a>
+    </div>
+  </nav>
+  <nav class="page-downloads" aria-label="Evolve installers">
+    <div class="page-top-links page-download-links">
+      <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-macos-x64.zip">macOS</a>
+      <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-ios-setup.ipa">iOS</a>
+      <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-linux-x64.tar.gz">Linux</a>
+      <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-archlinux-x86_64.pkg.tar.zst">Arch</a>
+      <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-windows-x64.zip">Windows</a>
+      <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-android-setup.apk">Android</a>
     </div>
   </nav>
   <div class="wrap">
