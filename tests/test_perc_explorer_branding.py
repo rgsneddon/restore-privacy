@@ -35,7 +35,7 @@ class TestPercExplorerBranding(unittest.TestCase):
         self.assertIn("page-downloads", html)
         self.assertIn("--neon-yellow", html)
         self.assertIn(
-            "https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-macos-x64.zip",
+            "https://github.com/rgsneddon/evolve/releases/download/v4.1.10-macos-notarized/evolve-v4.1.10-macos-x64.zip",
             html,
         )
         self.assertIn(
