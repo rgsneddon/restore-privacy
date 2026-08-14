@@ -109,7 +109,7 @@
       </div>
     </div>
     <h2>Live miners</h2>
-    <p class="hint">Listed on the first submitted hash (accepted or rejected). Dropped after 72 seconds without a hash. <a href="/confirmations">How shares confirm</a>.</p>
+    <p class="hint">Listed while the miner is connected. Stays listed for 72 seconds after the last hash if it disconnects. <a href="/confirmations">How shares confirm</a>.</p>
     <div class="grid" id="live-pool-stats">
       <div class="card"><div class="label">Online</div><div class="value" id="stat-online">0</div></div>
       <div class="card"><div class="label">Threads</div><div class="value" id="stat-threads">0</div></div>
@@ -130,7 +130,7 @@
         </tr>
       </thead>
       <tbody id="miner-body">
-        <tr><td colspan="5" class="off">No miners hashing in the last 72 seconds.</td></tr>
+        <tr><td colspan="5" class="off">No miners connected.</td></tr>
       </tbody>
     </table>
     <h2>Connect a miner</h2>
@@ -179,17 +179,7 @@
     </section>
     <p class="hint">Repos: <a href="https://github.com/rgsneddon/perc-mine">perc-mine</a> · <a href="https://github.com/rgsneddon/perc-stratum-pool">perc-stratum-pool</a> · <a href="https://github.com/rgsneddon/basic">basic</a> · JSON <a href="/api/connect">/api/connect</a> · health <a href="/health">/health</a> · explorer <a href="https://evolve.restoreprivacy.online/">evolve.restoreprivacy.online</a></p>
   </div>
-  <script type="module">
-    import {
-      collectPartTexts,
-      copyPayloadForPart,
-      minWidthChFromParts,
-    } from './mineperc_parts.js';
-
-    const parts = document.querySelectorAll('[data-copy-part]');
-    const ch = minWidthChFromParts(collectPartTexts(parts), 1);
-    document.documentElement.style.setProperty('--mineperc-longest-ch', String(ch));
-
+  <script>
     function fmtRate(n) {
       const v = Number(n) || 0;
       if (v >= 1e6) return (v / 1e6).toFixed(2) + ' MH/s';
@@ -209,7 +199,7 @@
         const body = document.getElementById('miner-body');
         const rows = s.workers || [];
         if (!rows.length) {
-          body.innerHTML = '<tr><td colspan="5" class="off">No miners hashing in the last 72 seconds.</td></tr>';
+          body.innerHTML = '<tr><td colspan="5" class="off">No miners connected.</td></tr>';
           return;
         }
         body.innerHTML = rows.map((m) => `<tr>
@@ -223,6 +213,17 @@
     }
     refreshStats();
     setInterval(refreshStats, 1000);
+  </script>
+  <script type="module">
+    import {
+      collectPartTexts,
+      copyPayloadForPart,
+      minWidthChFromParts,
+    } from './mineperc_parts.js';
+
+    const parts = document.querySelectorAll('[data-copy-part]');
+    const ch = minWidthChFromParts(collectPartTexts(parts), 1);
+    document.documentElement.style.setProperty('--mineperc-longest-ch', String(ch));
 
     document.querySelectorAll('[data-copy-target]').forEach((btn) => {
       btn.addEventListener('click', async () => {

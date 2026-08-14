@@ -30,6 +30,7 @@ import {
   recordMinerShare,
   recordMinerStats,
   publicMinerRow,
+  hydrateMinepercIndex,
 } from './miner_stats.js';
 import { confirmationSnapshot, recordPoolBlock } from './perc_block_confirm.js';
 
@@ -338,8 +339,12 @@ export function writePublicFile(res, url, dir = publicDir()) {
   if (!hit) return false;
   const file = path.join(dir, hit.name);
   if (!fs.existsSync(file)) return false;
+  let body = fs.readFileSync(file);
+  if (hit.name === 'index.html') {
+    body = hydrateMinepercIndex(body.toString('utf8'));
+  }
   res.writeHead(200, { 'Content-Type': hit.type, 'Cache-Control': 'no-cache' });
-  res.end(fs.readFileSync(file));
+  res.end(body);
   return true;
 }
 

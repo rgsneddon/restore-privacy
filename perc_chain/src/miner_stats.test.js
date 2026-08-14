@@ -2,8 +2,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   HASH_PRESENCE_MS,
+  hydrateMinepercIndex,
   listMiners,
   minerIsListed,
+  poolHasRunningMiner,
   poolStatsSnapshot,
   recordMinerDisconnect,
   recordMinerLogin,
@@ -27,14 +29,14 @@ describe('miner stats book', () => {
       version: '1.0.1',
     });
     const beforeShare = poolStatsSnapshot();
-    assert.equal(beforeShare.minersOnline, 0);
-    assert.equal(beforeShare.workers.length, 0);
+    assert.equal(beforeShare.minersOnline, 1);
+    assert.equal(beforeShare.workers.length, 1);
     const hashedAt = Date.now();
     recordMinerShare({ username: name, accepted: true, percMicro: 1, now: hashedAt });
     assert.equal(minerIsListed({ lastHashAt: hashedAt }, hashedAt), true);
     assert.equal(minerIsListed({ lastHashAt: hashedAt }, hashedAt + HASH_PRESENCE_MS), true);
     assert.equal(minerIsListed({ lastHashAt: hashedAt }, hashedAt + HASH_PRESENCE_MS + 1), false);
-    assert.equal(minerIsListed({ connected: true, sessionShares: 1 }), false);
+    assert.equal(minerIsListed({ connected: true, sessionShares: 1 }), true);
     const split = splitWorker(name);
     assert.equal(split.user, 'percpriv193bfbb92db68043f010592e879396c724d488b30');
     assert.equal(split.worker, 'raskul');
@@ -55,7 +57,7 @@ describe('miner stats book', () => {
     const posted = handleApi(
       '/api/miner-stats',
       'POST',
-      JSON.stringify({ username: name, threads: 4, hashes: 400000, hashrate: 2000 }),
+      JSON.stringify({ username: name, threads: 4, hashes: 400000, hashrate: 2000, now: hashedAt }),
     );
     assert.equal(posted.status, 200);
     assert.equal(posted.json.miner.threads, 4);
@@ -85,15 +87,50 @@ describe('miner stats book', () => {
     assert.equal(blob.includes('rig1'), false);
   });
 
-  it('login-only never lists; rejected hash lists until 72s', () => {
+  it('login lists immediately; hash keeps them after disconnect for 72s', () => {
     resetMinerStats();
     const t0 = 5_000_000;
     recordMinerLogin({ username: 'bob.rig' });
-    recordMinerStats({ username: 'bob.rig', threads: 1, hashes: 10, hashrate: 1 });
-    assert.equal(listMiners(t0).length, 0);
+    assert.equal(listMiners(t0).map((m) => m.wallet).includes('bob'), true);
+    recordMinerStats({ username: 'bob.rig', threads: 1, hashes: 10, hashrate: 1, now: t0 });
     recordMinerShare({ username: 'bob.rig', accepted: false, now: t0 });
+    recordMinerDisconnect('bob.rig');
     assert.equal(listMiners(t0).map((m) => m.wallet).includes('bob'), true);
     assert.equal(listMiners(t0 + HASH_PRESENCE_MS).length, 1);
     assert.equal(listMiners(t0 + HASH_PRESENCE_MS + 1).length, 0);
+  });
+
+  it('hydrateMinepercIndex writes the connected wallet into the landing table', () => {
+    resetMinerStats();
+    recordMinerLogin({ username: 'percpriv1a2e59c690fa6ad8efb206a40743342fad429823a.raskul' });
+    recordMinerStats({
+      username: 'percpriv1a2e59c690fa6ad8efb206a40743342fad429823a.raskul',
+      threads: 1,
+      hashes: 1000,
+      hashrate: 500,
+    });
+    const html = hydrateMinepercIndex(`
+      <div id="stat-online">0</div>
+      <div id="stat-threads">0</div>
+      <div id="stat-hashrate">0 H/s</div>
+      <div id="stat-hashes">0</div>
+      <div id="stat-accepted">0</div>
+      <div id="stat-rejected">0</div>
+      <div id="stat-perc">0</div>
+      <tbody id="miner-body">
+        <tr><td colspan="5" class="off">No miners connected.</td></tr>
+      </tbody>`);
+    assert.ok(html.includes('id="stat-online">1'));
+    assert.ok(html.includes('percpriv1a2e59c690fa6ad8efb206a40743342fad429823a'));
+    assert.equal(html.includes('raskul'), false);
+  });
+
+  it('poolHasRunningMiner is true while connected even if not listed', () => {
+    resetMinerStats();
+    assert.equal(poolHasRunningMiner(), false);
+    recordMinerLogin({ username: 'rig.a' });
+    assert.equal(poolHasRunningMiner(), true);
+    recordMinerDisconnect('rig.a');
+    assert.equal(poolHasRunningMiner(), false);
   });
 });

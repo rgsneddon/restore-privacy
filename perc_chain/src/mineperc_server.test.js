@@ -15,7 +15,7 @@ import { extractSolution, loginReply, minerJob } from './stratum_protocol.js';
 import { applyPowToLedger, jobFromLedger } from './pow.js';
 import { mineSubmit } from './mine_api.js';
 import { startPercMinePool } from './mine_pool.js';
-import { HASH_PRESENCE_MS, listMiners, poolStatsSnapshot, resetMinerStats } from './miner_stats.js';
+import { HASH_PRESENCE_MS, listMiners, poolStatsSnapshot, recordMinerDisconnect, resetMinerStats } from './miner_stats.js';
 import { confirmationSnapshot, resetPoolBlocks } from './perc_block_confirm.js';
 
 const BH3 = {
@@ -180,7 +180,7 @@ describe('BeamHash III miner wire', () => {
 });
 
 describe('live miner stats', () => {
-  it('login + stats stay off the list until a hash; reject still lists', async () => {
+  it('login + stats list the miner; share stays listed', async () => {
     resetMinerStats();
     resetPoolBlocks();
     seedJob({ preWork: BH3.preWork, jobId: 'share-list' });
@@ -200,8 +200,8 @@ describe('live miner stats', () => {
       version: '1.0.1',
     });
     await s.take(1);
-    assert.equal(poolStatsSnapshot().workers.length, 0);
-    assert.equal(handleApi('/api/stats', 'GET').json.minersOnline, 0);
+    assert.equal(poolStatsSnapshot().workers.length, 1);
+    assert.equal(handleApi('/api/stats', 'GET').json.minersOnline, 1);
     s.write({
       id: 2,
       method: 'solution',
@@ -240,6 +240,8 @@ describe('live miner stats', () => {
     );
     assert.equal(got.json.accepted, false);
     assert.ok(listMiners(t0).some((m) => m.wallet === 'eve'));
+    assert.equal(listMiners(t0 + HASH_PRESENCE_MS + 1).some((m) => m.wallet === 'eve'), true);
+    recordMinerDisconnect('eve.rig');
     assert.equal(listMiners(t0 + HASH_PRESENCE_MS + 1).some((m) => m.wallet === 'eve'), false);
     const accepted = handleApi(
       '/api/submit',
