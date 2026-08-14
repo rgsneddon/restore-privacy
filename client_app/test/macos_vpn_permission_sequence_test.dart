@@ -58,6 +58,17 @@ void main() {
     );
   });
 
+  test('vpn_controller Connect does not open System Settings after prepare', () {
+    final src = File('lib/vpn_controller.dart').readAsStringSync();
+    final start = src.indexOf('Future<MacosVpnPrepOutcome> preparePacketTunnelSequenced');
+    expect(start, greaterThanOrEqualTo(0));
+    final end = src.indexOf('Future<bool> connect(', start);
+    final body = src.substring(start, end > start ? end : src.length);
+    expect(body.contains('openVpnSystemSettings'), isFalse);
+    expect(body.contains('profileRegistered'), isTrue);
+    expect(src.contains('macosConnectShouldInvokeStartTunnel'), isTrue);
+  });
+
   test('connect may open Settings only after prepare sequence completed', () {
     expect(
       macosConnectMayOpenSystemSettingsOnPermissionDenial(
@@ -73,7 +84,7 @@ void main() {
     );
   });
 
-  test('Connect starts tunnel only when prepare is readyForConnect', () {
+  test('Connect starts tunnel for registered profile without Settings visit', () {
     expect(
       macosConnectShouldInvokeStartTunnel(
         MacosVpnAfterPrepareAction.readyForConnect,
@@ -83,21 +94,38 @@ void main() {
     expect(
       macosConnectShouldInvokeStartTunnel(
         MacosVpnAfterPrepareAction.openSystemSettingsThenConnect,
+        profileRegistered: true,
+      ),
+      isTrue,
+      reason: 'disabled-but-registered must enable+start from the app',
+    );
+    expect(
+      macosConnectShouldInvokeStartTunnel(
+        MacosVpnAfterPrepareAction.openSystemSettingsThenConnect,
       ),
       isFalse,
-      reason: 'must not race startTunnel while Allow is still required',
     );
     expect(
       macosConnectShouldInvokeStartTunnel(
         MacosVpnAfterPrepareAction.hostMissingNetworkExtension,
+        profileRegistered: true,
       ),
       isFalse,
     );
     expect(
       macosConnectShouldInvokeStartTunnel(
         MacosVpnAfterPrepareAction.retryPrepare,
+        profileRegistered: true,
       ),
-      isFalse,
+      isTrue,
+    );
+    expect(
+      macosPrepareMapIndicatesRegisteredProfile({
+        'prepared': true,
+        'providerBundleId':
+            'com.restoreprivacy.restorePrivacyClient.PacketTunnel',
+      }),
+      isTrue,
     );
   });
 

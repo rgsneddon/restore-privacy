@@ -136,15 +136,41 @@ bool macosConnectMayOpenSystemSettingsOnPermissionDenial({
 }) =>
     prepareSequenceCompleted;
 
-/// True only when prepare finished successfully and Connect may call startTunnel.
+/// True when Connect must call native startTunnel (enable + start) without a
+/// System Settings visit.
 ///
-/// Product bug (1.2.2 free monopin): Connect always raced startTunnel after a
-/// failed prepare (needs Allow / missing host NE). That stole focus from the
-/// delayed Allow dialog and left residual "no Connect" after the user Allowed.
-/// Fail-fast until [MacosVpnAfterPrepareAction.readyForConnect], then the user
-/// presses Connect again after Allow.
-bool macosConnectShouldInvokeStartTunnel(MacosVpnAfterPrepareAction action) =>
-    action == MacosVpnAfterPrepareAction.readyForConnect;
+/// A **registered** Packet Tunnel profile (prepare `prepared` / OS prefs already
+/// list Restore Privacy) that is merely disabled still starts here — the app
+/// sets `isEnabled=true` and `startTunnel`. Only a build that cannot register
+/// host NE stays fail-closed.
+///
+/// [profileRegistered] is true when prepare saved the product manager or the
+/// native map already names the product provider bundle.
+bool macosConnectShouldInvokeStartTunnel(
+  MacosVpnAfterPrepareAction action, {
+  bool profileRegistered = false,
+}) {
+  if (action == MacosVpnAfterPrepareAction.hostMissingNetworkExtension) {
+    return false;
+  }
+  if (action == MacosVpnAfterPrepareAction.readyForConnect) {
+    return true;
+  }
+  // Registered but Allow-lag / disabled: enable+start from the app.
+  return profileRegistered &&
+      (action == MacosVpnAfterPrepareAction.openSystemSettingsThenConnect ||
+          action == MacosVpnAfterPrepareAction.retryPrepare);
+}
+
+/// True when a prepare map already has the product VPN profile in OS prefs.
+bool macosPrepareMapIndicatesRegisteredProfile(Map? raw) {
+  if (raw == null) return false;
+  if (raw['prepared'] == true) return true;
+  if (raw['enabled'] == true) return true;
+  final bid = raw['providerBundleId']?.toString() ?? '';
+  return bid == 'com.restoreprivacy.restorePrivacyClient.PacketTunnel' &&
+      (raw['ok'] == true || raw['localizedDescription'] != null);
+}
 
 /// Honest status when Connect stops because prepare is not ready for startTunnel.
 String macosConnectBlockedByPrepareMessage(MacosVpnPrepOutcome prep) {
@@ -173,6 +199,7 @@ class MacosVpnPrepOutcome {
     required this.action,
     required this.message,
     this.needsVpnSystemSettingsApproval = false,
+    this.profileRegistered = false,
   });
 
   final bool prepared;
@@ -180,4 +207,6 @@ class MacosVpnPrepOutcome {
   final MacosVpnAfterPrepareAction action;
   final String message;
   final bool needsVpnSystemSettingsApproval;
+  /// Product manager already in OS VPN prefs (enable+start without Settings).
+  final bool profileRegistered;
 }

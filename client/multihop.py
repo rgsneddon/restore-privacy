@@ -82,7 +82,7 @@ class CountryNode:
         return Endpoint(host=self.host, port=int(self.port))
 
 
-# Shipped residual catalog: Germany only until sales (Iceland not offered).
+# Shipped residual catalog: Germany only (IS / US / RO peers retired).
 PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
     CountryNode(
         code=COUNTRY_DE,

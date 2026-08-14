@@ -23,6 +23,7 @@ from node.crypto_session import CoverFrame, SessionCrypto, derive_session_key
 from node.elgamal import ElGamalPublicKey
 from node.handshake import build_client_hello, ed25519_pub_raw
 from node.pedersen import PedersenCommitment, PedersenOpening, open_verified
+from node.rpai_learn import learn_vpn_event
 from node.pfs import (
     EPH_PUB_LEN,
     EphemeralX25519,
@@ -710,6 +711,10 @@ class RptClient:
             self._sock = sock
             sock = None  # ownership transferred; disconnect() closes
             self.state = ConnectState.CONNECTED
+            try:
+                learn_vpn_event("connect", f"{endpoint.host}:{endpoint.port}")
+            except Exception:  # noqa: BLE001
+                pass
             # Background: poll preferred peer drain/ready; hop off / rejoin
             # automatically for scheduled wipe without user interaction.
             try:

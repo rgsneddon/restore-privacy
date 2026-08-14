@@ -19,9 +19,8 @@ public enum RptEndpoint {
 
     public static var hostPortDescription: String { "\(host):\(port)" }
 
-    /// Live residual catalog hosts (IS, DE only) for wipe-drain failover.
+    /// Live residual catalog hosts (Germany only). Retired IS/US are not dialed.
     public static let catalogHosts: [String] = [
-        icelandHost,
         deHost,
     ]
 

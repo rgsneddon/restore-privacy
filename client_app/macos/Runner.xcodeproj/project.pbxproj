@@ -25,7 +25,7 @@
 		09C052CBE47707797A6B0635 /* Subtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE7757DC1D44614B9F182EC /* Subtraction.swift */; };
 		0B9056B0CEC5BB6400D141F6 /* Exponentiation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF51C984E269FE20ED7156D0 /* Exponentiation.swift */; };
 		0C8D5132BD4E5B6596BAAF43 /* RptProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04CCB14F4FC4CB2002E50469 /* RptProtocol.swift */; };
-		14BB4E1787DEDC1CD6D3087F /* PacketTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = ECECDB7E1FD55ACF992D61FC /* PacketTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		14BB4E1787DEDC1CD6D3087F /* PacketTunnel.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = ECECDB7E1FD55ACF992D61FC /* PacketTunnel.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1524FBC2B4332C8E67F54613 /* RptUkIpGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65DE05645D6EFA46643F0242 /* RptUkIpGate.swift */; };
 		16E3A9A0D2B60C0AAA4C7CB5 /* RptSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = D904C7A2719F8BA9B52E2469 /* RptSecrets.swift */; };
 		17C1C22384D11B060F6B37F0 /* RptSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = D904C7A2719F8BA9B52E2469 /* RptSecrets.swift */; };
@@ -79,6 +79,7 @@
 		A0CCEFE479826FBA1091286A /* RptVpnChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66C2ECCCA169DB6C485B5A9 /* RptVpnChannel.swift */; };
 		A11B2C3D4E5F607182930002 /* RptResidualPrivacyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F607182930001 /* RptResidualPrivacyPolicy.swift */; };
 		A11B2C3D4E5F607182930003 /* RptResidualPrivacyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F607182930001 /* RptResidualPrivacyPolicy.swift */; };
+		A1PTMAIN02FILE0000000001 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = A1PTMAIN01FILE0000000001 /* main.m */; };
 		A42AB0C37358264806286F3E /* Multiplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5BAD9B9C6AC449B9C94DC39 /* Multiplication.swift */; };
 		A78DD36D023D41E89CA378CA /* Shifts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385CACA210AE9365F0A0EE85 /* Shifts.swift */; };
 		A7B1C2D3E4F5061728394A5B /* RptTrayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B1C2D3E4F5061728394A5A /* RptTrayController.swift */; };
@@ -144,15 +145,15 @@
 			name = "Bundle Framework";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8512840834DA62035F8C3957 /* Embed Foundation Extensions */ = {
+		8512840834DA62035F8C3957 /* Embed System Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Library/SystemExtensions";
+			dstSubfolderSpec = 16;
 			files = (
-				14BB4E1787DEDC1CD6D3087F /* PacketTunnel.appex in Embed Foundation Extensions */,
+				14BB4E1787DEDC1CD6D3087F /* PacketTunnel.systemextension in Embed System Extensions */,
 			);
-			name = "Embed Foundation Extensions";
+			name = "Embed System Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -208,6 +209,7 @@
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		A11B2C3D4E5F607182930001 /* RptResidualPrivacyPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptResidualPrivacyPolicy.swift; path = NativePrep/Rpt2/RptResidualPrivacyPolicy.swift; sourceTree = "<group>"; };
 		A11B2C3D4E5F6071829300A1 /* RptAppGroupAccessExplainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptAppGroupAccessExplainer.swift; path = NativePrep/RptAppGroupAccessExplainer.swift; sourceTree = "<group>"; };
+		A1PTMAIN01FILE0000000001 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = main.m; path = PacketTunnel/main.m; sourceTree = "<group>"; };
 		A7B1C2D3E4F5061728394A5A /* RptTrayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RptTrayController.swift; sourceTree = "<group>"; };
 		B7FD0844874A9EF9602CB015 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		BA59528E4CF6C43E6F767344 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
@@ -222,7 +224,7 @@
 		DEBBE3B10F9F4019BFE4EB54 /* String Conversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "String Conversion.swift"; path = "NativePrep/Rpt2/VendorBigInt/String Conversion.swift"; sourceTree = "<group>"; };
 		E16A499C273A9871B4C18E26 /* Addition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Addition.swift; path = NativePrep/Rpt2/VendorBigInt/Addition.swift; sourceTree = "<group>"; };
 		E2076CDD9CED44AA459FBEA9 /* RptSessionCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptSessionCrypto.swift; path = NativePrep/Rpt2/RptSessionCrypto.swift; sourceTree = "<group>"; };
-		ECECDB7E1FD55ACF992D61FC /* PacketTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		ECECDB7E1FD55ACF992D61FC /* PacketTunnel.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = PacketTunnel.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED9129F30F6C17D1AF81D2BC /* RptClientEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptClientEngine.swift; path = NativePrep/Rpt2/RptClientEngine.swift; sourceTree = "<group>"; };
 		F5BAD9B9C6AC449B9C94DC39 /* Multiplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Multiplication.swift; path = NativePrep/Rpt2/VendorBigInt/Multiplication.swift; sourceTree = "<group>"; };
 		F66C2ECCCA169DB6C485B5A9 /* RptVpnChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptVpnChannel.swift; path = NativePrep/RptVpnChannel.swift; sourceTree = "<group>"; };
@@ -296,7 +298,7 @@
 		33CC10EE2044A3C60003C045 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				ECECDB7E1FD55ACF992D61FC /* PacketTunnel.appex */,
+				ECECDB7E1FD55ACF992D61FC /* PacketTunnel.systemextension */,
 				33CC10ED2044A3C60003C045 /* restore_privacy_client.app */,
 				331C80D5294CF71000263BE5 /* RunnerTests.xctest */,
 			);
@@ -390,7 +392,7 @@
 			buildConfigurationList = 33CC10FB2044A3C60003C045 /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
 				3D0204375FC096AEE1ABF541 /* [CP] Check Pods Manifest.lock */,
-				8512840834DA62035F8C3957 /* Embed Foundation Extensions */,
+				8512840834DA62035F8C3957 /* Embed System Extensions */,
 				33CC10E92044A3C60003C045 /* Sources */,
 				33CC10EA2044A3C60003C045 /* Frameworks */,
 				33CC10EB2044A3C60003C045 /* Resources */,
@@ -428,8 +430,8 @@
 			);
 			name = PacketTunnel;
 			productName = PacketTunnel;
-			productReference = ECECDB7E1FD55ACF992D61FC /* PacketTunnel.appex */;
-			productType = "com.apple.product-type.app-extension";
+			productReference = ECECDB7E1FD55ACF992D61FC /* PacketTunnel.systemextension */;
+			productType = "com.apple.product-type.system-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -753,6 +755,7 @@
 				CA96DC8988EC3C6A60B2DBED /* Subtraction.swift in Sources */,
 				602DD2747C36B657FB3A7D5C /* Words and Bits.swift in Sources */,
 				F661F120FC8F4711C30E6D53 /* PacketTunnelProvider.swift in Sources */,
+				A1PTMAIN02FILE0000000001 /* main.m in Sources */,
 				16E3A9A0D2B60C0AAA4C7CB5 /* RptSecrets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1089,6 +1092,7 @@
 				INFOPLIST_FILE = PacketTunnel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
@@ -1107,6 +1111,7 @@
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
+				WRAPPER_EXTENSION = systemextension;
 			};
 			name = Release;
 		};
@@ -1124,6 +1129,7 @@
 				INFOPLIST_FILE = PacketTunnel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
@@ -1142,6 +1148,7 @@
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
+				WRAPPER_EXTENSION = systemextension;
 			};
 			name = Profile;
 		};
@@ -1159,6 +1166,7 @@
 				INFOPLIST_FILE = PacketTunnel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
@@ -1177,6 +1185,7 @@
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
+				WRAPPER_EXTENSION = systemextension;
 			};
 			name = Debug;
 		};

@@ -184,7 +184,9 @@ public final class RptClientEngine {
             try sock.connect(host: host, port: port)
         }
         let (frame, clientNonce, clientPub) = try buildClientHello()
-        try sock.send(try RptObfuscation.maybeWrap(frame))
+        // Handshake is always bare RPT2. Outer wrap is DATA-only — wrapping HELLO
+        // makes the node silent-drop and the OS VPN row flips off.
+        try sock.send(try RptObfuscation.maybeWrap(frame, enabled: false))
         let outerReply = try sock.receive(timeout: timeout)
         let reply = try RptObfuscation.maybeUnwrap(outerReply)
         return try completeServerHello(reply: reply, clientNonce: clientNonce, clientPub: clientPub)
@@ -338,6 +340,9 @@ public final class RptUDPTransport {
     public init() throws {
         fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
         if fd < 0 { throw RptProtocol.ProtocolError("UDP socket failed") }
+        // Keep HELLO/DATA on the physical NIC so SERVER_HELLO is not swallowed
+        // by a half-up Packet Tunnel default route.
+        Self.bindFdToPrimaryInterface(fd)
     }
 
     public func close() {
@@ -349,6 +354,24 @@ public final class RptUDPTransport {
     }
 
     deinit { close() }
+
+    /// Bind UDP to en0/en1 so residual HELLO replies land on this socket.
+    public static func bindFdToPrimaryInterface(_ fd: Int32) {
+      for name in ["en0", "en1", "en2"] {
+        let idx = if_nametoindex(name)
+        if idx == 0 { continue }
+        var v = idx
+        if setsockopt(
+          fd,
+          IPPROTO_IP,
+          IP_BOUND_IF,
+          &v,
+          socklen_t(MemoryLayout<UInt32>.size)
+        ) == 0 {
+          return
+        }
+      }
+    }
 
     /// Resolve and connect the datagram socket so subsequent send/recv use one local port
     /// (matches Python `sock` / Android `DatagramSocket` lifecycle).
@@ -433,7 +456,7 @@ public enum RptTrafficShape {
     /// Bounded send-side delay (ms) matching Python product policy (RPT_TRAFFIC_SHAPE).
     /// Mutable residual flags — set from Settings via RptResidualPrivacyPolicy.applyToProductFlags().
     public static var productJitterMsMax: Int = 40
-    public static var productPadding: Bool = true
+    public static var productPadding: Bool = false
     public static var productCover: Bool = true
 
     /// Optional product send jitter (0…productJitterMsMax). Residual DATA send only.
@@ -530,7 +553,7 @@ public enum RptObfuscation {
         return k
     }()
 
-    public static var productObfsEnabled: Bool = true
+    public static var productObfsEnabled: Bool = false
 
     public static func looksLikeBareRpt(_ data: Data) -> Bool {
         data.count >= 5 && data.prefix(4) == rptMagic

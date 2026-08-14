@@ -129,12 +129,13 @@ def inject(app: Path, source: Path, ios: bool) -> Path:
     for proot in plugins_roots:
         if not proot.is_dir():
             continue
-        for appex in sorted(proot.glob("*.appex")):
+        bundles = list(proot.glob("*.appex")) + list(proot.glob("*.systemextension"))
+        for appex in sorted(bundles):
             if ios:
                 ape_dest = appex / "secrets"
             else:
                 ape_dest = appex / "Contents" / "Resources" / "secrets"
-            print(f"inject PacketTunnel appex: {appex.name}")
+            print(f"inject PacketTunnel bundle: {appex.name}")
             _inject_into_secrets_dir(ape_dest, source)
 
     return dest

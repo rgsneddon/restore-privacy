@@ -25,10 +25,23 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
   private var lastCoverSent = Date.distantPast
 
   override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {
+    running = false
+    keepaliveTimer?.cancel()
+    keepaliveTimer = nil
+    coverTimer?.cancel()
+    coverTimer = nil
+    receiveSource?.cancel()
+    receiveSource = nil
+    engine?.closeTransport()
+    engine = nil
+    session = nil
     let proto = protocolConfiguration as? NETunnelProviderProtocol
     let providerCfg = proto?.providerConfiguration ?? [:]
     if let h = options?["host"] as? String ?? providerCfg["host"] as? String {
-      endpointHost = h
+      let trimmed = h.trimmingCharacters(in: .whitespacesAndNewlines)
+      if !trimmed.isEmpty {
+        endpointHost = trimmed
+      }
     }
     if let p = options?["port"] as? Int ?? providerCfg["port"] as? Int {
       endpointPort = UInt16(p)
@@ -54,6 +67,13 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         // Multi-hop residual host is already selected by Flutter Connect host argument.
         let privacy = RptResidualPrivacyPolicy.loadFromAppGroup()
         privacy.applyToProductFlags()
+        // HELLO must stay bare even if Settings later enables wrap/pad on DATA.
+        RptObfuscation.productObfsEnabled = false
+        RptTrafficShape.productPadding = false
+        RptTrafficShape.productCover = false
+        // Do not setTunnelNetworkSettings before HELLO. A placeholder utun
+        // (even with excludedRoutes) swallows SERVER_HELLO; host Swift HELLO
+        // on the physical NIC succeeds in <2s with the same keys.
         // Optional overrides from providerConfiguration (Connect-time)
         if let shape = providerCfg["trafficShape"] as? Bool {
           RptTrafficShape.productPadding = shape
@@ -79,9 +99,19 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         var session: RptClientEngine.Session?
         var engine: RptClientEngine?
         var lastError: Error?
+        let injectedPriv = (options?["clientPriv"] as? Data)
+          ?? (options?["clientPriv"] as? NSData).map { Data(referencing: $0) }
+        let injectedPub = (options?["nodePub"] as? Data)
+          ?? (options?["nodePub"] as? NSData).map { Data(referencing: $0) }
         for host in order {
           do {
-            let material = try RptSecrets.loadAdmissionMaterial(residualHost: host)
+            let material: (clientPriv: Data, nodePub: Data)
+            if let priv = injectedPriv, priv.count == 32,
+               let pub = injectedPub, pub.count == 256 {
+              material = (priv, pub)
+            } else {
+              material = try RptSecrets.loadAdmissionMaterial(residualHost: host)
+            }
             os_log(
               "admission ok host=%{public}@ privBytes=%{public}d",
               log: Self.log,
@@ -124,7 +154,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             ?? "Connect failed: preferred residual and catalog alternates unreachable"
           os_log("startTunnel abort: %{public}@", log: Self.log, type: .error, msg)
           RptSecrets.writePacketTunnelStartTrace("abort \(msg)")
-          Self.completeStartOnMain(completionHandler, lastError ?? Self.error(msg, code: 11))
+          Self.completeStartOnMain(completionHandler, Self.error(msg, code: 11))
           return
         }
         self.engine = engine

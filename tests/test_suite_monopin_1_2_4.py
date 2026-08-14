@@ -85,7 +85,7 @@ class TestSuiteMonopin124(unittest.TestCase):
         self.assertIn("shouldRecreateVpnProfileAfterStartFailure", swift)
         self.assertIn("internal error", swift)
         self.assertIn("nevpnconnectionerrordomain", swift)
-        self.assertIn("maxAttempts: 24", swift)
+        self.assertIn("maxAttempts: 72", swift)
 
 
 if __name__ == "__main__":

@@ -160,17 +160,18 @@ class VpnController {
     final msg = mapPrepareVpnStatusMessage(raw);
     onStatus(msg);
 
-    var opened = false;
-    if (action == MacosVpnAfterPrepareAction.openSystemSettingsThenConnect) {
-      // Step 3: open Settings only after prepare completed.
-      opened = await openVpnSystemSettings(reportStatus: false);
-    }
+    // Never open System Settings on the Connect/prepare path. A registered
+    // profile is enabled + started from the app; OS-owned Allow sheets still
+    // appear if macOS asks. Opening Settings here blocked in-app Settings.
+    const opened = false;
+    final registered = prepared || macosPrepareMapIndicatesRegisteredProfile(raw);
     return MacosVpnPrepOutcome(
       prepared: prepared,
       openedSettings: opened,
       action: action,
       message: msg,
       needsVpnSystemSettingsApproval: needsAllow,
+      profileRegistered: registered,
     );
   }
 
@@ -214,7 +215,10 @@ class VpnController {
       // that steals the delayed Allow dialog and leaves free monopin "no Connect".
       if (applePlatformNeedsVpnPrepare()) {
         final prep = await preparePacketTunnelSequenced();
-        if (!macosConnectShouldInvokeStartTunnel(prep.action)) {
+        if (!macosConnectShouldInvokeStartTunnel(
+          prep.action,
+          profileRegistered: prep.profileRegistered || prep.prepared,
+        )) {
           // prepare already set onStatus; re-assert honest blocked copy.
           onStatus(macosConnectBlockedByPrepareMessage(prep));
           return false;
@@ -333,8 +337,8 @@ class VpnController {
 
   /// Poll native session until full tunnel is up or give up (Android in-progress).
   Future<bool> _waitForFullTunnel({
-    Duration maxWait = const Duration(seconds: 6),
-    Duration pollEvery = const Duration(milliseconds: 250),
+    Duration maxWait = const Duration(seconds: 9),
+    Duration pollEvery = const Duration(milliseconds: 125),
   }) async {
     final deadline = DateTime.now().add(maxWait);
     while (DateTime.now().isBefore(deadline)) {

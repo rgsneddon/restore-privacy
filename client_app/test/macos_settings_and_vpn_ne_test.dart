@@ -88,6 +88,21 @@ void main() {
     );
     expect(body.contains('isEnabled = true'), isTrue);
     expect(body.contains('saveToPreferences'), isTrue);
+    expect(src.contains('ensureEnabledThenStartTunnel'), isTrue);
+    expect(
+      src.contains('System VPN profile is present but still disabled'),
+      isFalse,
+      reason: 'disabled registered profile must startTunnel, not Settings dead-end',
+    );
+    final enIdx = src.indexOf('private static func ensureEnabledThenStartTunnel');
+    expect(enIdx, greaterThanOrEqualTo(0));
+    final enEnd = src.indexOf('private static func hostSideDiagnostic', enIdx);
+    final enBody = src.substring(enIdx, enEnd > enIdx ? enEnd : src.length);
+    expect(enBody.contains('manager.isEnabled = true'), isTrue);
+    expect(enBody.contains('saveToPreferences'), isTrue);
+    expect(enBody.contains('startTunnel'), isTrue);
+    expect(enBody.contains('openVpnSystemSettings'), isFalse);
+    expect(enBody.contains('Do not dead-end on a Settings visit'), isTrue);
     // Save errors must not be ignored; success stamp only after save OK + host NE.
     expect(body.contains('if let saveErr'), isTrue);
     expect(body.contains('lastSuccessfulPrepareAt = Date()'), isTrue);
@@ -171,6 +186,34 @@ void main() {
       reason: 'monopin uses DevID distribution seal, not residual-only audit',
     );
     expect(src.contains('Apple could not verify') || src.contains('Gatekeeper'), isTrue);
+  });
+
+  test('DevID catalog remaps PacketTunnel appex to a Network system extension', () {
+    final sign = File('../scripts/sign_and_notarize_macos.py').readAsStringSync();
+    expect(sign.contains('remap_packettunnel_appex_to_systemextension'), isTrue);
+    expect(sign.contains('Library/SystemExtensions'), isTrue);
+    expect(
+      sign.contains('com.restoreprivacy.restorePrivacyClient.PacketTunnel.systemextension'),
+      isTrue,
+    );
+    expect(sign.contains('CFBundlePackageType'), isTrue);
+    expect(sign.contains('NSSystemExtensionUsageDescription'), isTrue);
+    expect(sign.contains("data.pop(\"XPCService\", None)"), isTrue);
+    expect(sign.contains('ne.pop("NEMachServiceName", None)'), isTrue);
+    final tunMain = File('macos/PacketTunnel/main.m').readAsStringSync();
+    expect(tunMain.contains('startSystemExtensionMode'), isTrue);
+    expect(tunMain.contains('NSExtensionMain('), isFalse);
+    final tunInfo = File('macos/PacketTunnel/Info.plist').readAsStringSync();
+    expect(tunInfo.contains('XPCService'), isFalse);
+    expect(tunInfo.contains('NSExtension'), isFalse);
+    expect(tunInfo.contains('NEProviderClasses'), isTrue);
+    final hostInfo = File('macos/Runner/Info.plist').readAsStringSync();
+    expect(hostInfo.contains('NSSystemExtensionUsageDescription'), isTrue);
+    final vpn = File('macos/NativePrep/RptVpnChannel.swift').readAsStringSync();
+    expect(vpn.contains('import SystemExtensions'), isTrue);
+    expect(vpn.contains('OSSystemExtensionRequest.activationRequest'), isTrue);
+    expect(vpn.contains('RptPacketTunnelSystemExtension.activateIfEmbedded'), isTrue);
+    expect(vpn.contains('not installed'), isTrue);
   });
 
   test('DevID residual entitlements use systemextension NE tokens', () {
@@ -263,7 +306,7 @@ void main() {
   );
 
   test(
-    'startTunnel: 6s Connect poll + recreate only on DR mismatch (not Allow lag)',
+    'startTunnel: 9s Connect poll + recreate only on DR mismatch (not Allow lag)',
     () {
       final src =
           File('macos/NativePrep/RptVpnChannel.swift').readAsStringSync();
@@ -272,10 +315,16 @@ void main() {
         isTrue,
         reason: 'recreate must be gated — unconditional wipe races Allow',
       );
-      // Product Connect budget: 24×0.25s = 6s.
-      expect(src.contains('maxAttempts: 24'), isTrue);
-      expect(src.contains('interval: 0.25'), isTrue);
+      // Fail budget 9s: 72×0.125s poll; Flutter maxWait is 9s.
+      expect(src.contains('maxAttempts: 72'), isTrue);
+      expect(src.contains('interval: 0.125'), isTrue);
       expect(src.contains('maxAttempts: 100'), isFalse);
+      expect(
+        src.contains('packetTunnelStartTraceTail() == nil'),
+        isFalse,
+        reason: 'nil start-trace must not wipe and recreate the VPN profile',
+      );
+      expect(src.contains('stopVPNTunnel'), isTrue);
       final startIdx = src.indexOf('private static func startTunnel');
       expect(startIdx, greaterThanOrEqualTo(0));
       final startBody = src.substring(
@@ -298,6 +347,9 @@ void main() {
         startBody.contains('shouldRecreateVpnProfileAfterStartFailure(disc)'),
         isTrue,
       );
+      expect(startBody.contains('opts["clientPriv"]'), isTrue,
+          reason: 'host must inject device key; sysex as root cannot read user home');
+      expect(startBody.contains('opts["nodePub"]'), isTrue);
       // Upgrade 1.2.0→1.2.3 wrapped DR mismatch as generic internal error.
       final recreateFn = src.indexOf(
         'static func shouldRecreateVpnProfileAfterStartFailure',
@@ -309,6 +361,11 @@ void main() {
       );
       expect(recreateBody.contains('internal error'), isTrue);
       expect(src.contains('packetTunnelStartTraceTail'), isTrue);
+      expect(
+        src.contains('valueForKey: "error"') || src.contains("valueForKey(\"error\")"),
+        isFalse,
+        reason: 'KVC error on NEVPNConnection aborts (NSUnknownKeyException)',
+      );
       expect(src.contains('RptSecrets.packetTunnelStartTraceTail'), isTrue);
       expect(recreateBody.contains('nevpnconnectionerrordomain'), isTrue);
       expect(
@@ -328,17 +385,50 @@ void main() {
     final src =
         File('macos/NativePrep/PacketTunnelProvider.swift').readAsStringSync();
     expect(src.contains('timeout: 3'), isTrue);
+    expect(src.contains('options?["clientPriv"]'), isTrue);
+    expect(src.contains('/dev/console') ||
+            File('macos/NativePrep/RptSecrets.swift')
+                .readAsStringSync()
+                .contains('/dev/console'),
+        isTrue);
+    expect(src.contains('keepaliveTimer?.cancel()'), isTrue);
+    final engine = File('macos/NativePrep/Rpt2/RptClientEngine.swift').readAsStringSync();
+    expect(engine.contains('maybeWrap(frame, enabled: false)'), isTrue);
+    expect(engine.contains('IP_BOUND_IF'), isTrue);
     expect(src.contains('DispatchQueue.main.async'), isTrue);
     expect(src.contains('setTunnelNetworkSettings(settings)'), isTrue);
     expect(src.contains('writePacketTunnelStartTrace'), isTrue);
-    // Off-thread setTunnelNetworkSettings is the Plugin internal-error path.
+    // Placeholder utun before HELLO swallows SERVER_HELLO (host Swift HELLO works).
+    expect(src.contains('applyBootstrapNetworkSettings'), isFalse);
+    final helloIdx = src.indexOf('eng.handshake(');
     final settingsIdx = src.indexOf('self.setTunnelNetworkSettings(settings)');
-    expect(settingsIdx, greaterThanOrEqualTo(0));
+    expect(helloIdx, greaterThanOrEqualTo(0));
+    expect(settingsIdx, greaterThan(helloIdx),
+        reason: 'HELLO must complete before any setTunnelNetworkSettings');
     final before = src.substring(0, settingsIdx);
     expect(
       before.contains('DispatchQueue.main.async'),
       isTrue,
       reason: 'setTunnelNetworkSettings must hop to main',
+    );
+  });
+
+  test('macOS Packet Tunnel catalog and residual pin are Germany only', () {
+    final endpoint =
+        File('macos/NativePrep/Rpt2/RptEndpoint.swift').readAsStringSync();
+    expect(endpoint.contains('icelandHost,'), isFalse,
+        reason: 'retired Iceland must not be a Connect failover host');
+    expect(endpoint.contains('deHost,'), isTrue);
+    final secrets =
+        File('macos/NativePrep/RptSecrets.swift').readAsStringSync();
+    final pinFn = secrets.indexOf('func residualNodePubName(forHost');
+    expect(pinFn, greaterThanOrEqualTo(0));
+    final pinBody = secrets.substring(pinFn, pinFn + 900);
+    expect(pinBody.contains('return deNodePubName'), isTrue);
+    expect(
+      pinBody.contains('return nodePubName'),
+      isFalse,
+      reason: 'empty/IS host must not load Iceland node_elgamal.pub',
     );
   });
 }

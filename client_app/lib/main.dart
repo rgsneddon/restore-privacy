@@ -47,8 +47,7 @@ void main() {
   // Startup identity for operators / logs.
   // ignore: avoid_print
   print(kSuiteDisplayVersion);
-  // Loopback loft (http://127.0.0.1:18765) — quiet easter egg while the app runs.
-  startEasterEggServer();
+  // Loft binds on first Settings open — not at launch (idle CPU).
   runApp(const RestorePrivacyApp());
 }
 

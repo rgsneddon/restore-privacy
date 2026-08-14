@@ -47,9 +47,9 @@ public enum RptSecrets {
             return deNodePubName
         }
         if h == productIcelandHost || h.hasSuffix(productIcelandHost) {
-            return nodePubName
+            return deNodePubName
         }
-        return nodePubName
+        return deNodePubName
     }
 
     public static var appGroupId: String { "group.com.restoreprivacy.shared" }

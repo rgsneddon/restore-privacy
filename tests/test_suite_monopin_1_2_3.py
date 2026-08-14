@@ -99,7 +99,7 @@ class TestSuiteMonopin123(unittest.TestCase):
             ROOT / "client_app" / "macos" / "NativePrep" / "RptVpnChannel.swift"
         ).read_text(encoding="utf-8")
         self.assertIn("shouldRecreateVpnProfileAfterStartFailure", swift)
-        self.assertIn("maxAttempts: 24", swift)
+        self.assertIn("maxAttempts: 72", swift)
 
 
 if __name__ == "__main__":

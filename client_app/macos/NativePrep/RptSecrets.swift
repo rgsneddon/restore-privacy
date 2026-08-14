@@ -40,18 +40,15 @@ public enum RptSecrets {
     /// IS → node; DE → de; retired US → de (never invent pin from entry code alone).
     public static func residualNodePubName(forHost host: String) -> String {
         let h = host.trimmingCharacters(in: .whitespacesAndNewlines)
-        if h == productDeHost || h.hasSuffix(productDeHost)
-            || h == productExitHost || h.hasSuffix(productExitHost) {
+        // Empty / unknown / retired IS/US all use the live Germany pin.
+        // Iceland `node_elgamal.pub` against the DE node is a silent-drop HELLO.
+        if h == productIcelandHost || h.hasSuffix(productIcelandHost) {
             return deNodePubName
         }
-        // Retired US monopin — heal to DE pin
         if h == productUsHost || h.hasSuffix(productUsHost) {
             return deNodePubName
         }
-        if h == productIcelandHost || h.hasSuffix(productIcelandHost) {
-            return nodePubName
-        }
-        return nodePubName
+        return deNodePubName
     }
 
     /// All catalog residual public pin basenames (never private keys).
@@ -256,22 +253,46 @@ public enum RptSecrets {
     public static func packetTunnelStartTraceURL(
         fileManager: FileManager = .default
     ) -> URL? {
-        fileManager
-            .containerURL(forSecurityApplicationGroupIdentifier: appGroupId)?
-            .appendingPathComponent(packetTunnelStartTraceName)
+        if let group = fileManager
+            .containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
+            return group.appendingPathComponent(packetTunnelStartTraceName)
+        }
+        #if os(macOS)
+        if let home = realUserHomeDirectory() {
+            return home
+                .appendingPathComponent(".restore-privacy")
+                .appendingPathComponent(packetTunnelStartTraceName)
+        }
+        #endif
+        return nil
     }
 
     public static func writePacketTunnelStartTrace(_ message: String) {
-        guard let url = packetTunnelStartTraceURL() else { return }
         let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
         guard let data = line.data(using: .utf8) else { return }
-        if FileManager.default.fileExists(atPath: url.path),
-           let handle = try? FileHandle(forWritingTo: url) {
-            handle.seekToEndOfFile()
-            handle.write(data)
-            try? handle.close()
-        } else {
-            try? data.write(to: url, options: .atomic)
+        var urls: [URL] = []
+        if let u = packetTunnelStartTraceURL() { urls.append(u) }
+        #if os(macOS)
+        if let home = realUserHomeDirectory() {
+            let fallback = home
+                .appendingPathComponent(".restore-privacy")
+                .appendingPathComponent(packetTunnelStartTraceName)
+            if !urls.contains(fallback) { urls.append(fallback) }
+        }
+        #endif
+        for url in urls {
+            try? FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            if FileManager.default.fileExists(atPath: url.path),
+               let handle = try? FileHandle(forWritingTo: url) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                try? handle.close()
+            } else {
+                try? data.write(to: url, options: .atomic)
+            }
         }
     }
 
@@ -290,9 +311,20 @@ public enum RptSecrets {
     // MARK: - Path resolution
 
     /// Real login-user home (not the App Sandbox container home).
+    ///
+    /// Packet Tunnel system extension runs as root (`getuid()==0`); HOME and
+    /// getpwuid(0) are /var/root, which has no entitled device key. Use the
+    /// console session owner so HELLO is signed with the same key as host.
     public static func realUserHomeDirectory() -> URL? {
         #if os(macOS)
-        if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
+        var uid = getuid()
+        if uid == 0 {
+            var st = stat()
+            if stat("/dev/console", &st) == 0, st.st_uid != 0 {
+                uid = st.st_uid
+            }
+        }
+        if let pw = getpwuid(uid), let dir = pw.pointee.pw_dir {
             return URL(fileURLWithPath: String(cString: dir), isDirectory: true)
         }
         #endif

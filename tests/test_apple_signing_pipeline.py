@@ -38,6 +38,11 @@ class TestMacosSignNotarizeScript(unittest.TestCase):
         self.assertIn("strip_development_profiles", text)
         self.assertIn("DeveloperID.entitlements", text)
         self.assertIn("embedded.provisionprofile", text)
+        # TN3134: Developer ID packet tunnel must be a system extension, not PlugIns/*.appex
+        self.assertIn("remap_packettunnel_appex_to_systemextension", text)
+        self.assertIn("Library/SystemExtensions", text)
+        self.assertIn(".systemextension", text)
+        self.assertIn("NSSystemExtensionUsageDescription", text)
 
     def test_release_package_script_calls_sign_and_notarize(self):
         rel = ROOT / "scripts" / "build_release_0.3.4.py"
@@ -72,6 +77,48 @@ class TestGatekeeperDocsMentionNotarize(unittest.TestCase):
             or "Gatekeeper" in combined
             or "notar" in combined.lower()
         )
+
+
+class TestRemapPacketTunnelToSystemExtension(unittest.TestCase):
+    def test_remap_moves_appex_and_sets_sysx_package_type(self):
+        import plistlib
+        import sys
+        import tempfile
+
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import sign_and_notarize_macos as sign  # noqa: E402
+
+        with tempfile.TemporaryDirectory() as td:
+            app = Path(td) / "restore_privacy_client.app"
+            appex = app / "Contents" / "PlugIns" / "PacketTunnel.appex"
+            (appex / "Contents" / "MacOS").mkdir(parents=True)
+            info = {
+                "CFBundleIdentifier": "com.restoreprivacy.restorePrivacyClient.PacketTunnel",
+                "CFBundlePackageType": "XPC!",
+            }
+            with (appex / "Contents" / "Info.plist").open("wb") as fh:
+                plistlib.dump(info, fh)
+            host_info = {"CFBundleIdentifier": "com.restoreprivacy.restorePrivacyClient"}
+            (app / "Contents").mkdir(parents=True, exist_ok=True)
+            with (app / "Contents" / "Info.plist").open("wb") as fh:
+                plistlib.dump(host_info, fh)
+            dest = sign.remap_packettunnel_appex_to_systemextension(app)
+            self.assertIsNotNone(dest)
+            self.assertTrue(dest.is_dir())
+            self.assertFalse(appex.exists())
+            with (dest / "Contents" / "Info.plist").open("rb") as fh:
+                data = plistlib.load(fh)
+            self.assertEqual(data["CFBundlePackageType"], "SYSX")
+            self.assertIn("NSSystemExtensionUsageDescription", data)
+            self.assertNotIn("XPCService", data)
+            self.assertNotIn("NSExtension", data)
+            self.assertNotIn(
+                "NEMachServiceName",
+                data.get("NetworkExtension", {}),
+            )
+            with (app / "Contents" / "Info.plist").open("rb") as fh:
+                host = plistlib.load(fh)
+            self.assertIn("NSSystemExtensionUsageDescription", host)
 
 
 if __name__ == "__main__":

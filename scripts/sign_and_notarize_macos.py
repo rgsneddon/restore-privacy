@@ -62,18 +62,28 @@ def codesign_identity() -> str:
     return os.environ.get("RP_CODESIGN_IDENTITY", DEFAULT_IDENTITY)
 
 
+DEVID_TUNNEL_SYSEX_NAME = (
+    "com.restoreprivacy.restorePrivacyClient.PacketTunnel.systemextension"
+)
+HOST_SYSEX_USAGE = (
+    "Restore Privacy needs a Network system extension to create the residual "
+    "Packet Tunnel. Choose Allow if macOS asks."
+)
+
+
 def find_signables(app: Path) -> list[Path]:
-    """Inside-out order: nested frameworks/dylibs/appex, then main executable, then .app."""
+    """Inside-out order: nested frameworks/dylibs/appex/sysex, then main executable, then .app."""
     items: list[Path] = []
     # Nested code first
     for pattern in (
         "Contents/Frameworks/**/*.framework",
         "Contents/Frameworks/**/*.dylib",
         "Contents/PlugIns/**/*.appex",
+        "Contents/Library/SystemExtensions/**/*.systemextension",
         "Contents/MacOS/*",
     ):
         for p in sorted(app.glob(pattern)):
-            if p.is_file() or p.suffix in {".framework", ".appex"}:
+            if p.is_file() or p.suffix in {".framework", ".appex", ".systemextension"}:
                 if p not in items:
                     items.append(p)
     # Whole app last
@@ -126,7 +136,11 @@ def host_ne_for_residual_catalog() -> bool:
 def entitlements_for(path: Path) -> Path | None:
     """Optional entitlements file for host app / PacketTunnel."""
     name = path.name
-    if name.endswith(".appex") or name == "PacketTunnel":
+    if (
+        name.endswith(".appex")
+        or name.endswith(".systemextension")
+        or name == "PacketTunnel"
+    ):
         if host_ne_for_residual_catalog():
             devid_tun = (
                 ROOT / "client_app/macos/PacketTunnel/PacketTunnelDeveloperID.entitlements"
@@ -174,7 +188,7 @@ def sign_path(path: Path, identity: str) -> None:
     ent = entitlements_for(path)
     if ent is not None:
         # For frameworks, don't force host entitlements
-        if path.suffix in {".app", ".appex"} or path.name in {
+        if path.suffix in {".app", ".appex", ".systemextension"} or path.name in {
             "restore_privacy_client",
             "PacketTunnel",
         }:
@@ -250,27 +264,136 @@ def embed_devid_ne_profiles(app: Path) -> None:
     host_src = d / "host.provisionprofile"
     tun_src = d / "PacketTunnel.provisionprofile"
     host_dst = app / "Contents" / "embedded.provisionprofile"
-    appex = app / "Contents" / "PlugIns" / "PacketTunnel.appex"
-    tun_dst = appex / "Contents" / "embedded.provisionprofile"
     shutil.copy2(host_src, host_dst)
     print(f"embedded host DevID NE profile → {host_dst}", flush=True)
-    if appex.is_dir():
+    tun_bundles = [
+        app / "Contents" / "Library" / "SystemExtensions" / DEVID_TUNNEL_SYSEX_NAME,
+        app / "Contents" / "PlugIns" / "PacketTunnel.appex",
+    ]
+    for tun in tun_bundles:
+        if not tun.is_dir():
+            continue
+        tun_dst = tun / "Contents" / "embedded.provisionprofile"
         tun_dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(tun_src, tun_dst)
         print(f"embedded PacketTunnel DevID NE profile → {tun_dst}", flush=True)
+        break
+
+
+def remap_packettunnel_appex_to_systemextension(app: Path) -> Path | None:
+    """TN3134: Developer ID packet tunnel must be a system extension.
+
+    Flutter still builds PacketTunnel as PlugIns/PacketTunnel.appex so the
+    residual-team copy can keep the Team ``packet-tunnel-provider`` appex.
+    Catalog DevID seals ``packet-tunnel-provider-systemextension`` — NESM
+    rejects that token on an appex (Plugin internal error, startTunnel never
+    runs). Move the bundle to Contents/Library/SystemExtensions.
+    """
+    if not host_ne_for_residual_catalog():
+        return None
+    dest_dir = app / "Contents" / "Library" / "SystemExtensions"
+    dest = dest_dir / DEVID_TUNNEL_SYSEX_NAME
+    appex = app / "Contents" / "PlugIns" / "PacketTunnel.appex"
+    xcode_sysex = dest_dir / "PacketTunnel.systemextension"
+    if dest.is_dir() and not appex.is_dir():
+        print(f"PacketTunnel already a system extension: {dest}", flush=True)
+        _ensure_systemextension_info_plist(dest)
+        _ensure_host_system_extension_usage(app)
+        return dest
+    if xcode_sysex.is_dir() and xcode_sysex.resolve() != dest.resolve():
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.move(str(xcode_sysex), str(dest))
+        _ensure_systemextension_info_plist(dest)
+        _ensure_host_system_extension_usage(app)
+        print(f"renamed Xcode PacketTunnel.systemextension → {dest}", flush=True)
+        return dest
+    if not appex.is_dir():
+        print(
+            "WARNING: PacketTunnel.appex missing; cannot remap to system extension",
+            flush=True,
+        )
+        return dest if dest.is_dir() else None
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.move(str(appex), str(dest))
+    plugins = app / "Contents" / "PlugIns"
+    if plugins.is_dir() and not any(plugins.iterdir()):
+        plugins.rmdir()
+    _ensure_systemextension_info_plist(dest)
+    _ensure_host_system_extension_usage(app)
+    print(f"remapped PacketTunnel.appex → {dest}", flush=True)
+    return dest
+
+
+def _ensure_systemextension_info_plist(sysex: Path) -> None:
+    import plistlib
+
+    info = sysex / "Contents" / "Info.plist"
+    if not info.is_file():
+        return
+    with info.open("rb") as fh:
+        data = plistlib.load(fh)
+    data["CFBundlePackageType"] = "SYSX"
+    data["NSSystemExtensionUsageDescription"] = HOST_SYSEX_USAGE
+    # XPCService makes sysextd classify this as an XPC service, not a Network
+    # system extension ("extension category returned error"). Entry is
+    # NEProvider.startSystemExtensionMode in PacketTunnel/main.m.
+    data.pop("XPCService", None)
+    # startSystemExtensionMode + NEProviderClasses; NSExtension makes NESM
+    # treat this as an appex and startTunnel never reaches the Swift provider.
+    data.pop("NSExtension", None)
+    ne = data.get("NetworkExtension")
+    if not isinstance(ne, dict):
+        ne = {}
+        data["NetworkExtension"] = ne
+    # 1.2.4 activated without NEMachServiceName. An application-identifier
+    # Mach name (not app-group prefixed) makes the NE category validator
+    # return "extension category returned error".
+    if isinstance(ne, dict):
+        ne.pop("NEMachServiceName", None)
+    providers = ne.get("NEProviderClasses")
+    if not isinstance(providers, dict):
+        providers = {}
+        ne["NEProviderClasses"] = providers
+    providers.setdefault(
+        "com.apple.networkextension.packet-tunnel",
+        "PacketTunnel.PacketTunnelProvider",
+    )
+    with info.open("wb") as fh:
+        plistlib.dump(data, fh, sort_keys=False)
+
+
+def _ensure_host_system_extension_usage(app: Path) -> None:
+    import plistlib
+
+    info = app / "Contents" / "Info.plist"
+    if not info.is_file():
+        return
+    with info.open("rb") as fh:
+        data = plistlib.load(fh)
+    if data.get("NSSystemExtensionUsageDescription"):
+        return
+    data["NSSystemExtensionUsageDescription"] = HOST_SYSEX_USAGE
+    with info.open("wb") as fh:
+        plistlib.dump(data, fh, sort_keys=False)
+    print(f"added NSSystemExtensionUsageDescription → {info}", flush=True)
 
 
 def sign_app(app: Path, identity: str) -> None:
     if not app.is_dir():
         raise FileNotFoundError(f"app not found: {app}")
     strip_development_profiles(app)
+    remap_packettunnel_appex_to_systemextension(app)
     embed_devid_ne_profiles(app)
     # Sign deepest nested first
     nested: list[Path] = []
     for root, dirs, files in os.walk(app / "Contents"):
         for d in dirs:
             p = Path(root) / d
-            if p.suffix in {".framework", ".appex"}:
+            if p.suffix in {".framework", ".appex", ".systemextension"}:
                 nested.append(p)
         for f in files:
             p = Path(root) / f
@@ -306,10 +429,14 @@ def sign_app(app: Path, identity: str) -> None:
                     str(p),
                 ]
             )
-    # Explicitly sign each .framework and .appex
+    # Explicitly sign each .framework, leftover .appex, and .systemextension
     for p in sorted(app.glob("Contents/Frameworks/*.framework"), reverse=True):
         sign_path(p, identity)
     for p in sorted(app.glob("Contents/PlugIns/*.appex"), reverse=True):
+        sign_path(p, identity)
+    for p in sorted(
+        app.glob("Contents/Library/SystemExtensions/*.systemextension"), reverse=True
+    ):
         sign_path(p, identity)
     # Main binary then app bundle
     main_bin = app / "Contents/MacOS/restore_privacy_client"

@@ -23,7 +23,7 @@ void main() {
     expect(src.contains('preparePacketTunnelSequenced'), isTrue);
     // Fail-fast: do not race startTunnel when prepare still needs Allow / re-sign.
     expect(src.contains('macosConnectShouldInvokeStartTunnel'), isTrue);
-    expect(src.contains('Duration(seconds: 6)'), isTrue);
+    expect(src.contains('Duration(seconds: 9)'), isTrue);
     expect(src.contains('macosConnectBlockedByPrepareMessage'), isTrue);
     // Forbidden: macOS-only prepare gate that excludes iOS.
     expect(

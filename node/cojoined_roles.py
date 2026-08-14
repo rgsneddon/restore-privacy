@@ -173,9 +173,16 @@ class CojoinedRoleRegistry:
 
     def _rpai_loop(self) -> None:
         """Ned/rpAI co-located helper — learns oracle parameters via counters."""
+        from node.rpai_learn import get_learner, learn_vpn_event
+
         epochs = 0
         while not self._stop.is_set():
             epochs += 1
+            try:
+                learn_vpn_event("heartbeat", f"epoch-{epochs}")
+            except Exception:
+                pass
+            ned = get_learner().stats()
             self.mark_role(
                 ROLE_RPAI,
                 ready=True,
@@ -185,6 +192,7 @@ class CojoinedRoleRegistry:
                     "learning_epochs_local": epochs,
                     "oracle_sync": True,
                     "housework_pending": 0,
+                    "ned": ned,
                 },
             )
             self._stop.wait(30.0)

@@ -46,6 +46,25 @@ class TestNodePaymentHelloGate(unittest.TestCase):
         )
         self.assertTrue(device_may_connect(pub, require=False, fetch=fetch_no))
 
+    def test_entitlement_http_timeout_does_not_block_hello(self):
+        from node.payment_entitlement_gate import (
+            HELLO_ENTITLEMENT_TIMEOUT_SEC,
+            HELLO_REPLY_BUDGET_SEC,
+            device_may_connect,
+        )
+
+        self.assertLessEqual(HELLO_ENTITLEMENT_TIMEOUT_SEC, 1.5)
+        self.assertEqual(HELLO_REPLY_BUDGET_SEC, 3.0)
+        pub = bytes(range(32))
+
+        def fetch_timeout(hex_pub: str):
+            return {"connect_allowed": False, "error": "timed out"}
+
+        self.assertTrue(
+            device_may_connect(pub, require=True, fetch=fetch_timeout, use_cache=False),
+            msg="status-host timeout must not swallow residual HELLO",
+        )
+
     def test_hello_refuses_when_not_entitled(self):
         try:
             from cryptography.hazmat.primitives.asymmetric.ed25519 import (

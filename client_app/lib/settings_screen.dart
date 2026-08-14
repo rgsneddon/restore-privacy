@@ -140,10 +140,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _processUsageText = formatSuiteProcessPercent(seed.processPercent);
     }
     RptConfig.setRuntimeMultiHop(_settings.privacyMultihop);
+    startEasterEggServer();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _ensureLog();
       await _refreshLicenceAndPayment();
-      await _refreshPings();
       await _loadParts();
       await _refreshUsage();
       await _refreshPosture();

@@ -8,6 +8,7 @@ import NetworkExtension
 import CryptoKit
 import AppKit
 import Security
+import SystemExtensions
 
 enum RptVpnChannel {
   static let name = "restore_privacy/vpn"
@@ -36,6 +37,9 @@ enum RptVpnChannel {
     _ = try? RptSecrets.seedApplicationSupportFromBundleIfNeeded()
     _ = try? RptSecrets.seedAppGroupFromKnownSourcesIfNeeded()
     _ = try? RptSecrets.seedHomeRestorePrivacyFromKnownSourcesIfNeeded()
+    // DevID catalog Packet Tunnel is a Network system extension (TN3134).
+    // Kick activation at launch so Allow can appear before the first Connect.
+    RptPacketTunnelSystemExtension.activateIfEmbedded()
     let channel = FlutterMethodChannel(name: name, binaryMessenger: messenger)
     channel.setMethodCallHandler { call, result in
       switch call.method {
@@ -290,6 +294,7 @@ enum RptVpnChannel {
     // can list Restore Privacy Packet Tunnel and show Allow when required.
     // Do **not** short-circuit solely on host entitlement probe — some residual
     // builds still register the profile; if registration fails, report honestly.
+    RptPacketTunnelSystemExtension.activateIfEmbedded()
     let hostHasNe = hostHasPacketTunnelNetworkExtensionEntitlement()
     // Debounce only after a real save with host NE present. Never debounce
     // prepared:true on catalog DevID (no host NE) — that skipped System VPN apply.
@@ -867,7 +872,13 @@ enum RptVpnChannel {
     completion: @escaping ([String: Any]) -> Void
   ) {
     let start = {
-      startTunnel(manager: manager, host: host, port: port, completion: completion)
+      // Always stop leftover PacketTunnel first. A prior failed/half session
+      // leaves the system-extension process in dispatch_main sending DATA
+      // without a new HELLO — Settings flips on then off, Connect never lands.
+      manager.connection.stopVPNTunnel()
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        startTunnel(manager: manager, host: host, port: port, completion: completion)
+      }
     }
     // Always re-apply protocol + isEnabled and save so System Settings lists
     // Restore Privacy and macOS can prompt Allow when the profile is new.
@@ -899,18 +910,9 @@ enum RptVpnChannel {
           )
           return
         }
-        if !manager.isEnabled {
-          completion(
-            RptFullTunnelResult.productConnectMap(
-              packetTunnelActive: false,
-              detailMessage:
-                "System VPN profile is present but still disabled. "
-                + "Allow Restore Privacy under System Settings → Network → VPN & Filters, "
-                + "then press Connect — the app will start the tunnel automatically."
-            )
-          )
-          return
-        }
+        // Disabled-but-registered: still startTunnel. saveToPreferences already
+        // set isEnabled=true; NESM turns the OS VPN row on with this start.
+        // Do not dead-end on a Settings visit.
         start()
       }
     }
@@ -1183,10 +1185,27 @@ enum RptVpnChannel {
           }
           return
         }
-        // Connecting already — wait for connected instead of double-start.
+        // Stale Connecting (no provider / previous crash) — stop and start from
+        // this Connect. Polling a zombie session never turns the OS VPN row on.
+        if allowProfileRecreate,
+           manager.connection.status == .connecting
+           || manager.connection.status == .reasserting
+           || manager.connection.status == .disconnecting {
+          manager.connection.stopVPNTunnel()
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            startTunnel(
+              manager: manager,
+              host: host,
+              port: port,
+              allowProfileRecreate: false,
+              completion: completion
+            )
+          }
+          return
+        }
         if manager.connection.status == .connecting
           || manager.connection.status == .reasserting {
-          pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 24, interval: 0.25) {
+          pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 72, interval: 0.125) {
             connected in
             if connected {
               queryProviderSession(manager: manager) { ip, v4, v6 in
@@ -1199,19 +1218,29 @@ enum RptVpnChannel {
                   )
                 )
               }
+            } else if allowProfileRecreate,
+                      hostHasPacketTunnelNetworkExtensionEntitlement(),
+                      shouldRecreateVpnProfileAfterStartFailure(
+                        lastDisconnectErrorDescription(manager.connection)
+                      ) {
+              recreateProductVpnProfileAndStart(
+                stale: manager,
+                host: host,
+                port: port,
+                completion: completion
+              )
             } else {
               let stMsg =
-                "Packet Tunnel still connecting/failed (status "
+                "Packet Tunnel did not become Connected (status "
                 + "\(statusName(manager.connection.status))). "
-                + "Open System Settings → Network → VPN & Filters, enable Restore Privacy, "
-                + "Allow if prompted, then press Connect again."
+                + "Press Connect again — the app re-enables the system VPN itself."
               var map = RptFullTunnelResult.productConnectMap(
                 packetTunnelActive: false,
                 detailMessage: stMsg
               )
               map["hostHasPacketTunnelEntitlement"] =
                 hostHasPacketTunnelNetworkExtensionEntitlement()
-              completion(annotateNeedsVpnSettings(map, openSettings: true))
+              completion(annotateNeedsVpnSettings(map, openSettings: false))
             }
           }
           return
@@ -1219,19 +1248,25 @@ enum RptVpnChannel {
         // Pass dual-stack residual prefs into the extension (parity with App Group).
         let stack = residualStackOptionsForTunnel()
         let alts = RptEndpoint.alternateHosts(excluding: host)
-        let opts: [String: NSObject] = [
+        var opts: [String: NSObject] = [
           "host": host as NSString,
           "port": NSNumber(value: port),
           "residual_ipv4": NSNumber(value: stack.ipv4),
           "residual_ipv6": NSNumber(value: stack.ipv6),
           "alternateHosts": alts as NSArray,
         ]
+        // Sysex runs as root and often cannot read the user's App Group / home
+        // device key. Host can — inject the same material so HELLO is entitled.
+        if let material = try? RptSecrets.loadAdmissionMaterial(residualHost: host) {
+          opts["clientPriv"] = material.clientPriv as NSData
+          opts["nodePub"] = material.nodePub as NSData
+        }
         // This enables the system VPN connection in Network settings (when allowed).
         try session.startTunnel(options: opts)
         // Packet Tunnel handshake + setTunnelNetworkSettings can take several seconds;
         // first run may show the system Allow VPN configuration dialog (OS-owned).
-        // Product Connect budget is 6s (HELLO 3s + NE settings). Poll 24×0.25s.
-        pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 24, interval: 0.25) {
+        // Fail budget 9s (HELLO ≤3s + NE settings). Poll 72×0.125s = 9s.
+        pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 72, interval: 0.125) {
           connected in
           if connected {
             queryProviderSession(manager: manager) { ip, v4, v6 in
@@ -1259,7 +1294,8 @@ enum RptVpnChannel {
             // One-shot recreate only for stale designated-requirement / signing
             // mismatches (residual-team → monopin). Do **not** recreate on ordinary
             // Allow lag / HELLO timeout — that deletes the profile the user just Allowed.
-            if allowProfileRecreate, hostHasNe, shouldRecreateVpnProfileAfterStartFailure(disc) {
+            if allowProfileRecreate, hostHasNe,
+               shouldRecreateVpnProfileAfterStartFailure(disc) {
               recreateProductVpnProfileAndStart(
                 stale: manager,
                 host: host,
@@ -1270,10 +1306,7 @@ enum RptVpnChannel {
             }
             var detail =
               "Packet Tunnel did not become Connected (status \(statusName(st))/\(st.rawValue)). "
-              + "Open System Settings → Network → VPN & Filters, enable Restore Privacy, "
-              + "choose Allow if macOS asks, then press Connect again. "
-              + "Do not add L2TP, Cisco IPsec, or IKEv2. "
-              + "Residual Connect needs the OS tunnel on (host HELLO alone is not enough)."
+              + "Press Connect again — the app re-enables the system VPN itself."
             if let disc, !disc.isEmpty {
               detail += " Extension: \(disc)"
             }
@@ -1298,7 +1331,10 @@ enum RptVpnChannel {
         map["hostHasPacketTunnelEntitlement"] =
           hostHasPacketTunnelNetworkExtensionEntitlement()
         completion(
-          annotateNeedsVpnSettings(map, openSettings: true)
+          annotateNeedsVpnSettings(
+            map,
+            openSettings: isNePermissionFailureDetail(describeNePreferencesError(error))
+          )
         )
       }
     }
@@ -1311,20 +1347,16 @@ enum RptVpnChannel {
 
   /// Best-effort extension failure text after startTunnel leaves status disconnected.
   static func lastDisconnectErrorDescription(_ connection: NEVPNConnection) -> String? {
-    // Prefer modern API when linked; fall back to KVC for broader macOS SDKs.
+    // NEVPNConnection has no KVC error key. Querying an undefined key
+    // raises NSUnknownKeyException and aborts the host (SIGABRT on main).
     var base: String?
+    // Mirror only — do not KVC undefined keys (NSUnknownKeyException abort).
     let mirror = Mirror(reflecting: connection)
     for child in mirror.children {
       if child.label == "lastDisconnectError", let err = child.value as? Error {
         base = err.localizedDescription
         break
       }
-    }
-    if base == nil, let err = connection.value(forKey: "lastDisconnectError") as? Error {
-      base = err.localizedDescription
-    }
-    if base == nil, let err = connection.value(forKey: "error") as? Error {
-      base = err.localizedDescription
     }
     if let trace = RptSecrets.packetTunnelStartTraceTail() {
       if let base, !base.isEmpty {
@@ -1353,6 +1385,8 @@ enum RptVpnChannel {
       || (d.contains("provider") && d.contains("invalid"))
       || d.contains("internal error")
       || d.contains("nevpnconnectionerrordomain")
+      || d.contains("not installed")
+      || d.contains("configuration is not installed")
   }
 
   /// Remove a stale system VPN profile and re-register free monopin protocol once.
@@ -1727,5 +1761,79 @@ enum RptVpnChannel {
     }
     _ = sem.wait(timeout: .now() + timeout)
     return resultMap
+  }
+}
+
+/// DevID catalog Packet Tunnel must be a Network *system* extension (TN3134).
+/// NESM rejects PlugIns/*.appex signed with packet-tunnel-provider-systemextension
+/// before startTunnel (NEVPNConnectionErrorDomain Plugin "internal error").
+///
+/// saveToPreferences on a packet-tunnel manager also triggers install. This
+/// request is best-effort: MAC_APP_DIRECT profiles authorize the NE token but
+/// not com.apple.developer.system-extension.install — a missing-entitlement
+/// failure must not block prepare/Connect.
+final class RptPacketTunnelSystemExtension: NSObject, OSSystemExtensionRequestDelegate {
+  static let shared = RptPacketTunnelSystemExtension()
+
+  static func activateIfEmbedded() {
+    shared.submit()
+  }
+
+  private var lastSubmitAt: Date?
+
+  private func submit() {
+    if let last = lastSubmitAt, Date().timeIntervalSince(last) < 30 { return }
+    lastSubmitAt = Date()
+    Self.trace("submit \(RptVpnChannel.providerBundleId)")
+    let req = OSSystemExtensionRequest.activationRequest(
+      forExtensionWithIdentifier: RptVpnChannel.providerBundleId,
+      queue: .main
+    )
+    req.delegate = self
+    OSSystemExtensionManager.shared.submitRequest(req)
+  }
+
+  func request(
+    _ request: OSSystemExtensionRequest,
+    actionForReplacingExtension existing: OSSystemExtensionProperties,
+    withExtension ext: OSSystemExtensionProperties
+  ) -> OSSystemExtensionRequest.ReplacementAction {
+    .replace
+  }
+
+  func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {
+    Self.trace("needsUserApproval")
+  }
+
+  func request(
+    _ request: OSSystemExtensionRequest,
+    didFinishWithResult result: OSSystemExtensionRequest.Result
+  ) {
+    Self.trace("finished result=\(result.rawValue)")
+  }
+
+  func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
+    let ns = error as NSError
+    Self.trace("failed domain=\(ns.domain) code=\(ns.code) \(error.localizedDescription)")
+  }
+
+  private static func trace(_ message: String) {
+    let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
+    let url = FileManager.default.homeDirectoryForCurrentUser
+      .appendingPathComponent(".restore-privacy/sysex_activate.txt")
+    try? FileManager.default.createDirectory(
+      at: url.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    if let data = line.data(using: .utf8) {
+      if FileManager.default.fileExists(atPath: url.path),
+         let handle = try? FileHandle(forWritingTo: url) {
+        handle.seekToEndOfFile()
+        handle.write(data)
+        try? handle.close()
+      } else {
+        try? data.write(to: url, options: .atomic)
+      }
+    }
   }
 }

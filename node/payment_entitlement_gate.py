@@ -59,6 +59,11 @@ def device_pub_hex(client_pub: bytes) -> str:
 # Short TTL cache: device_pub_hex -> (allowed, expires_at)
 _cache: dict[str, tuple[bool, float]] = {}
 _CACHE_TTL_SEC = float(os.environ.get("RPT_ENTITLEMENT_CACHE_SEC", "45") or "45")
+# HELLO must get a UDP reply within 3s. Entitlement HTTP cannot eat that budget.
+HELLO_REPLY_BUDGET_SEC = 3.0
+HELLO_ENTITLEMENT_TIMEOUT_SEC = float(
+    os.environ.get("RPT_ENTITLEMENT_TIMEOUT_SEC", "1.0") or "1.0"
+)
 
 
 def clear_entitlement_cache() -> None:
@@ -69,7 +74,7 @@ def fetch_device_entitlement(
     device_pub_hex: str,
     *,
     base_url: str | None = None,
-    timeout: float = 4.0,
+    timeout: float = HELLO_ENTITLEMENT_TIMEOUT_SEC,
 ) -> dict[str, Any]:
     """GET status host device entitlement JSON."""
     pub = (device_pub_hex or "").strip().lower()
@@ -124,6 +129,10 @@ def device_may_connect(
     else:
         remote = fetch_device_entitlement(pub, base_url=base_url)
     allowed = bool(remote.get("connect_allowed"))
+    # Transport / timeout errors must not swallow HELLO — residual replies in ≤3s.
+    # Explicit unpaid/revoked (no error) still refuse.
+    if not allowed and remote.get("error"):
+        allowed = True
     if use_cache:
         _cache[pub] = (allowed, t + max(5.0, _CACHE_TTL_SEC))
     return allowed
