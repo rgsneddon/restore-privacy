@@ -1,44 +1,72 @@
 # Windows brand breadcrumbs — monopin 1.2.6
 
-**Audience:** Windows x64 build machine. Native-rebuild the Windows PE for 1.2.6.
+**Audience:** Windows x64 build machine only.
 
-**Catalog monopin:** `1.2.6`
+**Do not build or Authenticode-sign this PE on a Mac.** Helsinki
+`paid_assets/1.2.5/restore-privacy-client-1.2.5-windows-x64-setup.exe` stays
+until **this** machine uploads `paid_assets/1.2.6/`.
 
-**Target PE:** `releases\1.2.6\restore-privacy-client-1.2.6-windows-x64-setup.exe`
+Helsinki breadcrumbs (`WINDOWS_HANDOFF.md` in the vault) is the live
+instruction set — not a GitHub queue.
 
-Helsinki breadcrumbs (`WINDOWS_HANDOFF.md` in the vault) is the live instruction set — not a GitHub queue.
+| | |
+|--|--|
+| **Catalog monopin** | `1.2.6` |
+| **Target PE** | `releases\1.2.6\restore-privacy-client-1.2.6-windows-x64-setup.exe` |
+| **Live residual menu** | Germany (DE) default + Singapore (SG) |
+| **Singapore host** | `5.223.48.8:44044` UDP |
+| **Singapore pin** | `product/sg_node_elgamal.pub` |
+| **Germany host** | `178.105.187.178:44044` UDP |
+| **Germany pin** | `product/de_node_elgamal.pub` |
+| **Not offered** | Iceland, United States, Romania |
 
-## Product truth
+## 0. Fetch this brief from Helsinki
 
-Residual VPN. Catalog entries: **Germany (DE)** default and **Singapore (SG)** (`5.223.48.8`, pin `sg_node_elgamal.pub`). Iceland / United States / Romania are **not** offered. Tray exactly `Privacy, Restored`. Quit lower-left disconnect-then-exit. Kill-switch ON requires typing `KILLSWITCH`.
-
-## Singapore catalog (required on this PE)
-
-The Windows PE **must** ship `product/sg_node_elgamal.pub` and show Singapore in the entry-country menu. Choosing Singapore dials `5.223.48.8:44044` with the SG pin (never the DE pin or Iceland `node_elgamal.pub`).
-
-Python seed lists that must include `sg_node_elgamal.pub`:
-
-- `client/residual_pub_ensure.py` `CATALOG_PUBLIC_PUBS`
-- `client/secrets_loader.py` `CATALOG_NODE_PUB_NAMES`
-
-Do **not** overwrite the Helsinki **1.2.5** Windows PE from a Mac. This 1.2.6 PE is built only on the Windows machine and uploaded to `paid_assets/1.2.6/` (new folder). Helsinki `paid_assets/1.2.5/restore-privacy-client-1.2.5-windows-x64-setup.exe` stays until this 1.2.6 upload replaces the Downloads Map Windows row.
+On the Windows machine:
 
 ```bat
-python scripts\build_windows_multihop.py --version 1.2.6
-python scripts\host_paid_assets_vps.py --stage --upload --version 1.2.6 --force
+git pull
+type client\VERSION
+rem MUST print: 1.2.6
+type client\windows\WINDOWS_HANDOFF_1.2.6.md
 ```
 
-## Deltas since 1.2.5
+Or pull the live vault (source of truth):
 
-| Area | Change |
-|------|--------|
-| Catalog pin | `client/VERSION` **1.2.6** |
-| Live residual peers | Germany (default) + Singapore; Iceland forgotten as a live connectivity option |
-| HELLO pin | `5.223.48.8` → `sg_node_elgamal.pub` on every client surface |
-| Audit | Probe schedule / fail-safe / published view = DE+SG only |
-| Attach / DATA / IPv6 / tray / DNS | Same 1.2.5 attach honesty — keep those PE fixes |
+`/opt/restore-privacy/breadcrumbs/current/WINDOWS_HANDOFF.md`
 
-## Build
+## 1. Product truth (this PE)
+
+- Residual VPN only. Tray text exactly `Privacy, Restored`.
+- Quit (lower-left) disconnects then exits.
+- Kill-switch ON requires typing `KILLSWITCH`.
+- Settings country menu: **Germany** and **Singapore** only.
+- Choosing Singapore dials `5.223.48.8:44044` with `sg_node_elgamal.pub`.
+  Never the DE pin. Never Iceland `node_elgamal.pub`.
+- Flag decoration is emoji (`🇸🇬` / `🇩🇪`); no extra `flags\sg.png` is required.
+
+## 2. What the Mac already did (do not repeat)
+
+- Catalog pin 1.2.6 committed (`c1b0da5` and follow-ups).
+- Android / macOS / iOS 1.2.6 uploaded to Helsinki `paid_assets/1.2.6/`.
+- Downloads Map: Windows still **1.2.5**; Android/macOS/iOS **1.2.6**.
+- Audit schedule is DE+SG (Iceland is not a live connectivity peer).
+- **No** Windows PE was built or restamped on the Mac.
+
+## 3. Source gates before freeze
+
+```bat
+cd /d C:\Users\rgsne\restore_privacy
+python scripts\build_windows_multihop.py --check-only --version 1.2.6
+```
+
+Must be OK. Must see `product\sg_node_elgamal.pub` present (256 bytes).
+
+Recipe `scripts\build_release_0.0.8.py` `inject_product_secrets` now **requires**
+`sg_node_elgamal.pub` (same as `de_node_elgamal.pub`). A PE without that file
+must not be uploaded.
+
+## 4. Native PE freeze (Windows x64 only)
 
 ```bat
 cd /d C:\Users\rgsne\restore_privacy
@@ -52,16 +80,45 @@ Output: `releases\1.2.6\restore-privacy-client-1.2.6-windows-x64-setup.exe`
 
 Unsigned PE is allowed when Authenticode funds are unavailable (same as 1.2.5).
 
-## Host
+After freeze, confirm the setup (or onedir `product\` / `secrets\`) contains:
+
+- `sg_node_elgamal.pub`
+- `de_node_elgamal.pub`
+- no `*.priv`
+
+## 5. Upload to Helsinki (1.2.6 folder only)
 
 ```bat
 python scripts\host_paid_assets_vps.py --stage --upload --version 1.2.6 --force
 ```
 
-Helsinki: `/opt/restore-privacy/paid_assets/1.2.6/restore-privacy-client-1.2.6-windows-x64-setup.exe`
+Remote: `/opt/restore-privacy/paid_assets/1.2.6/restore-privacy-client-1.2.6-windows-x64-setup.exe`
 
-After upload, the Downloads Map Windows row moves from 1.2.5 to 1.2.6. Do **not** delete or overwrite `paid_assets/1.2.5/` Windows from this Mac.
+That upload should move the Downloads Map **Windows** row from 1.2.5 to 1.2.6.
 
-## Observe (same as 1.2.5)
+**Do not** overwrite or delete
+`paid_assets/1.2.5/restore-privacy-client-1.2.5-windows-x64-setup.exe`.
 
-After KEYGEN/trial Connect, hash `client_ed25519.priv` under `%USERPROFILE%\.restore-privacy\secrets` and `%LOCALAPPDATA%\Programs\RestorePrivacy\secrets` — they must match. Singapore Connect must HELLO with `sg_node_elgamal.pub`.
+## 6. Observe after first Connect
+
+1. Menu shows Germany + Singapore; default Germany.
+2. Germany Connect → HELLO to `178.105.187.178` with `de_node_elgamal.pub`.
+3. Singapore Connect → HELLO to `5.223.48.8` with `sg_node_elgamal.pub`.
+4. Hash `client_ed25519.priv` under
+   `%USERPROFILE%\.restore-privacy\secrets` and
+   `%LOCALAPPDATA%\Programs\RestorePrivacy\secrets` — they must match.
+5. Tray: `Privacy, Restored`. Quit lower-left disconnects then exits.
+
+## 7. Deltas this PE must pick up (1.2.5 attach + 1.2.6 catalog)
+
+| Area | Change |
+|------|--------|
+| Pin | `client/VERSION` **1.2.6** |
+| Catalog | DE default + SG; Iceland forgotten as live |
+| HELLO | `5.223.48.8` → `sg_node_elgamal.pub` |
+| Secrets seed | `CATALOG_PUBLIC_PUBS` + `CATALOG_NODE_PUB_NAMES` include SG |
+| Attach | Session-ready → Connected fail-fast; LUID IF index |
+| DATA gate | `seal_unicast_probe`; fail-closed if `udp_to_tun=0` |
+| IPv6 | Fast `route -6 delete ::/0` on Connect |
+| Tray | Per-PID class; `GetClassInfoW` before `RegisterClassW` |
+| DNS | IF DNS stamped off-thread (`rpt-dns`) |

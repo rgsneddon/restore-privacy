@@ -98,6 +98,7 @@ def rebuild_windows_setup() -> Path:
     (ROOT / "client" / "VERSION").write_text(VERSION + "\n", encoding="utf-8")
     entry = ROOT / "product" / "node_elgamal.pub"
     de_p = ROOT / "product" / "de_node_elgamal.pub"
+    sg_p = ROOT / "product" / "sg_node_elgamal.pub"
     exit_p = ROOT / "product" / "exit_node_elgamal.pub"
     us_p = ROOT / "product" / "us_node_elgamal.pub"
     if not entry.is_file() or entry.stat().st_size < 32:
@@ -105,6 +106,10 @@ def rebuild_windows_setup() -> Path:
     if not de_p.is_file() or de_p.stat().st_size < 32:
         raise FileNotFoundError(
             f"missing DE residual pub (product default entry): {de_p}"
+        )
+    if not sg_p.is_file() or sg_p.stat().st_size < 32:
+        raise FileNotFoundError(
+            f"missing SG residual pub (Singapore catalog peer): {sg_p}"
         )
     if not exit_p.is_file() or exit_p.stat().st_size < 32:
         raise FileNotFoundError(
@@ -163,6 +168,13 @@ def _post_check(setup: Path) -> None:
             "WARNING: setup.exe missing DE residual markers; "
             "confirm product/de_node_elgamal.pub was injected "
             "(default entry HELLO will fail without it).",
+            file=sys.stderr,
+        )
+    if b"sg_node_elgamal" not in raw and b"5.223.48.8" not in raw:
+        print(
+            "WARNING: setup.exe missing SG residual markers; "
+            "confirm product/sg_node_elgamal.pub was injected "
+            "(Singapore HELLO will silent-drop without it).",
             file=sys.stderr,
         )
     if b"us_node_elgamal" not in raw and b"5.161.242.85" not in raw:
@@ -286,6 +298,8 @@ def _source_readiness_check() -> list[str]:
             errors.append(f"missing {wintun}")
     for p in (
         ROOT / "product" / "node_elgamal.pub",
+        ROOT / "product" / "de_node_elgamal.pub",
+        ROOT / "product" / "sg_node_elgamal.pub",
         ROOT / "product" / "exit_node_elgamal.pub",
         ROOT / "client" / "multihop.py",
         ROOT / "client" / "windows" / "app.py",
