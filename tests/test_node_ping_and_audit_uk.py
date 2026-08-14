@@ -351,7 +351,7 @@ class TestAuditUkPingSection(unittest.TestCase):
         """Shipped AUDIT must name live monopin; package RAG uses catalog basenames."""
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
         # Live Suite catalog monopin (not a frozen historical pin).
-        self.assertEqual(ver, "1.0.0")
+        self.assertEqual(ver, "1.2.7")
         paths = [
             ROOT / "AUDIT.md",
             ROOT / "status_page" / "AUDIT.md",
@@ -384,7 +384,7 @@ class TestAuditUkPingSection(unittest.TestCase):
 class TestVersionMonopin(unittest.TestCase):
     def test_version_pin_matches_catalog(self) -> None:
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "1.2.6")
+        self.assertEqual(ver, "1.2.7")
         from status_page import downloads as dl
 
         self.assertEqual(dl.RELEASE_VERSION, ver)

@@ -30,9 +30,9 @@ class TestDownloadsMapLatest(unittest.TestCase):
             self.assertIn(ver, fname)
             self.assertEqual(pub["platforms"][plat]["version"], ver)
             self.assertEqual(pub["platforms"][plat]["filename"], fname)
-        self.assertEqual(map_platform_version("linux"), "1.2.6")
-        self.assertIn("1.2.6", map_platform_filename("linux"))
-        self.assertEqual(map_platform_version("windows"), "1.2.6")
+        self.assertEqual(map_platform_version("linux"), "1.2.7")
+        self.assertIn("1.2.7", map_platform_filename("linux"))
+        self.assertEqual(map_platform_version("windows"), "1.2.7")
 
     def test_fulfilment_and_host_delivery_watch_map(self) -> None:
         from downloads import map_platform_filename, map_platform_version
@@ -51,7 +51,7 @@ class TestDownloadsMapLatest(unittest.TestCase):
         self.assertIn(f"/{win_ver}/", url)
         self.assertTrue(url.endswith(win))
         linux_ver = map_platform_version("linux")
-        self.assertEqual(linux_ver, "1.2.6")
+        self.assertEqual(linux_ver, "1.2.7")
         linux = map_platform_filename("linux")
         self.assertIn(f"/{linux_ver}/", vps_asset_url(linux))
 
@@ -65,7 +65,7 @@ class TestDownloadsMapLatest(unittest.TestCase):
         win_ver = snap["downloads_map"]["platforms"]["windows"]["version"]
         linux_ver = snap["downloads_map"]["platforms"]["linux"]["version"]
         self.assertEqual(win_ver, map_platform_version("windows"))
-        self.assertEqual(linux_ver, "1.2.6")
+        self.assertEqual(linux_ver, "1.2.7")
         learned = ned_learn_oracle(
             {"learning_epochs": 0},
             {"downloads_map": snap["downloads_map"]},
@@ -75,7 +75,7 @@ class TestDownloadsMapLatest(unittest.TestCase):
             learned["downloads_map"]["platforms"]["windows"]["version"], win_ver
         )
         self.assertEqual(
-            learned["downloads_map"]["platforms"]["linux"]["version"], "1.2.6"
+            learned["downloads_map"]["platforms"]["linux"]["version"], "1.2.7"
         )
         self.assertGreaterEqual(int(learned.get("learning_epochs") or 0), 1)
 
@@ -108,7 +108,7 @@ class TestDownloadsMapLatest(unittest.TestCase):
             ver = map_platform_version(plat)
             self.assertIn(f"{face} - v{ver}", html)
             self.assertIn(f'data-platform="{plat}"', html)
-        self.assertEqual(map_platform_version("linux"), "1.2.6")
+        self.assertEqual(map_platform_version("linux"), "1.2.7")
 
 
 if __name__ == "__main__":

@@ -112,7 +112,7 @@ class TestHomeAndMapRender(unittest.TestCase):
                 self.assertIn(f"v{ver}", map_html)
                 self.assertIn("free_direct=1", map_html)
                 self.assertIn("/suite/download?", map_html)
-            self.assertEqual(map_platform_version("linux"), "1.2.6")
+            self.assertEqual(map_platform_version("linux"), "1.2.7")
             # Package row destinations are not /pay?product=suite&platform=
             self.assertNotIn("/pay?product=suite&amp;platform=", map_html)
             # Map is Suite-only — no companion product sections

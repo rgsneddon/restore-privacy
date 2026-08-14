@@ -136,7 +136,7 @@ class TestDownloadsMapPage(unittest.TestCase):
         self.assertIn(map_platform_version("windows"), page)
         self.assertIn(map_platform_version("linux"), page)
         self.assertIn(f"Linux - v{map_platform_version('linux')}", page)
-        self.assertEqual(map_platform_version("linux"), "1.2.6")
+        self.assertEqual(map_platform_version("linux"), "1.2.7")
 
 
 class TestFooterCopyrightAndMapLink(unittest.TestCase):

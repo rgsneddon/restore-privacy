@@ -1,7 +1,7 @@
 {
   "generated_at": "2026-08-14T15:56:25Z",
   "node_host": "Germany (DE)",
-  "catalog_version": "1.2.6",
+  "catalog_version": "1.2.7",
   "probe_schedule": [
     {
       "code": "DE",
@@ -121,30 +121,31 @@
     ]
   },
   "package_rag": {
-    "catalog_version": "1.2.6",
+    "catalog_version": "1.2.7",
     "pin": "1b126abfae737c66ce99670b730e123f2831ce5beb2868d7865324f391280bbe",
     "exit_pin": "ea0c7fa338612386cbe666a0ca64a6a69e3471b03db1848e7df4be2ed6823b18",
     "packages": [
       {
         "platform": "windows",
         "label": "Windows",
-        "filename": "restore-privacy-client-1.2.6-windows-x64-setup.exe",
-        "state": "Amber",
+        "filename": "restore-privacy-client-1.2.7-windows-x64-setup.exe",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-1.2.6-windows-x64-setup.exe / relative_path 1.2.6/restore-privacy-client-1.2.6-windows-x64-setup.exe under status_page/assets/1.2.6/, releases/1.2.6/, /opt/restore-privacy/paid_assets/1.2.6/, dist/1.2.6/, status_page/assets/, https://135.181.152.10.sslip.io/paid-assets/1.2.6/; default paid store is Helsinki https://135.181.152.10.sslip.io/paid-assets/ \u2014 set RPT_ASSET_FETCH_TOKEN to probe, or stage under paid_assets/1.2.6/)",
-          "Windows PE pending native rebuild on Windows host (see client/windows/WINDOWS_HANDOFF_1.2.6.md; not seal-claimed \u2014 catalog ticker is Amber, not Red, while handoff is open)"
+          "present on Helsinki paid_assets store (https://135.181.152.10.sslip.io/paid-assets/1.2.7/restore-privacy-client-1.2.7-windows-x64-setup.exe; 39073712 bytes)",
+          "native Windows PE built on Windows host 2026-08-14"
         ],
-        "path": null,
+        "path": "C:\\Users\\rgsne\\restore_privacy\\releases\\1.2.7\\restore-privacy-client-1.2.7-windows-x64-setup.exe",
         "search_roots": [
-          "status_page/assets/1.2.6/",
-          "releases/1.2.6/",
-          "/opt/restore-privacy/paid_assets/1.2.6/",
-          "dist/1.2.6/",
+          "status_page/assets/1.2.7/",
+          "releases/1.2.7/",
+          "/opt/restore-privacy/paid_assets/1.2.7/",
+          "dist/1.2.7/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.2.6/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.2.7/"
         ],
-        "handoff_pending": true,
-        "relative_path": "1.2.6/restore-privacy-client-1.2.6-windows-x64-setup.exe"
+        "handoff_pending": false,
+        "relative_path": "1.2.7/restore-privacy-client-1.2.7-windows-x64-setup.exe",
+        "bytes": 39073712
       },
       {
         "platform": "android",
@@ -215,27 +216,29 @@
       {
         "platform": "linux",
         "label": "Linux",
-        "filename": "restore-privacy-client-1.2.6-linux-x64.tar.gz",
-        "state": "Red",
+        "filename": "restore-privacy-client-1.2.7-linux-x64.tar.gz",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-1.2.6-linux-x64.tar.gz / relative_path 1.2.6/restore-privacy-client-1.2.6-linux-x64.tar.gz under status_page/assets/1.2.6/, releases/1.2.6/, /opt/restore-privacy/paid_assets/1.2.6/, dist/1.2.6/, status_page/assets/, https://135.181.152.10.sslip.io/paid-assets/1.2.6/; default paid store is Helsinki https://135.181.152.10.sslip.io/paid-assets/ \u2014 set RPT_ASSET_FETCH_TOKEN to probe, or stage under paid_assets/1.2.6/)"
+          "present on Helsinki paid_assets store (https://135.181.152.10.sslip.io/paid-assets/1.2.7/restore-privacy-client-1.2.7-linux-x64.tar.gz; 14689272 bytes)",
+          "packaged on Windows host 2026-08-14"
         ],
-        "path": null,
+        "path": "C:\\Users\\rgsne\\restore_privacy\\releases\\1.2.7\\restore-privacy-client-1.2.7-linux-x64.tar.gz",
         "search_roots": [
-          "status_page/assets/1.2.6/",
-          "releases/1.2.6/",
-          "/opt/restore-privacy/paid_assets/1.2.6/",
-          "dist/1.2.6/",
+          "status_page/assets/1.2.7/",
+          "releases/1.2.7/",
+          "/opt/restore-privacy/paid_assets/1.2.7/",
+          "dist/1.2.7/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.2.6/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.2.7/"
         ],
-        "relative_path": "1.2.6/restore-privacy-client-1.2.6-linux-x64.tar.gz"
+        "relative_path": "1.2.7/restore-privacy-client-1.2.7-linux-x64.tar.gz",
+        "bytes": 14689272
       }
     ],
-    "staged_count": 3,
-    "helsinki_remote_count": 0,
+    "staged_count": 2,
+    "helsinki_remote_count": 2,
     "helsinki_paid_asset_base": "https://135.181.152.10.sslip.io/paid-assets",
-    "overall": "Red",
+    "overall": "Amber",
     "legend": {
       "Green": "Present (local monorepo/releases/paid_assets or Helsinki paid store), no *.priv when scanned, product node pub pin match when scanned, platform structural gate pass (Windows multihop markers when PE scanned)",
       "Amber": "Present but pin/structural check incomplete or soft warning",
@@ -378,9 +381,9 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "IS pub present (/Users/russellsneddon/restore-privacy/product/node_elgamal.pub) sha=1b126abfae737c66\u2026",
-          "exit/DE pub present (/Users/russellsneddon/restore-privacy/product/exit_node_elgamal.pub) sha=ea0c7fa338612386\u2026",
-          "US pub present (/Users/russellsneddon/restore-privacy/product/us_node_elgamal.pub) sha=9864211dc29e8b21\u2026",
+          "IS pub present (/Users/russellsneddon/restore-privacy/product/node_elgamal.pub) sha=1b126abfae737c66…",
+          "exit/DE pub present (/Users/russellsneddon/restore-privacy/product/exit_node_elgamal.pub) sha=ea0c7fa338612386…",
+          "US pub present (/Users/russellsneddon/restore-privacy/product/us_node_elgamal.pub) sha=9864211dc29e8b21…",
           "IS/exit-DE/US pubs present and pairwise distinct"
         ],
         "entry_pub": "/Users/russellsneddon/restore-privacy/product/node_elgamal.pub",
@@ -392,12 +395,12 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "is_multihop_active=True for SG\u2192DE entry\u2192exit path",
+          "is_multihop_active=True for SG→DE entry→exit path",
           "residual_endpoint dials exit Germany (DE) (residual-via-exit)",
           "multi-hop disabled residual stays entry Germany (DE) (default single-hop DE)",
-          "status text: multi-hop active (2 hops): Singapore (SG) \u2192 Germany (DE) (residual via Germany (DE))"
+          "status text: multi-hop active (2 hops): Singapore (SG) → Germany (DE) (residual via Germany (DE))"
         ],
-        "status_text": "multi-hop active (2 hops): Singapore (SG) \u2192 Germany (DE) (residual via Germany (DE))"
+        "status_text": "multi-hop active (2 hops): Singapore (SG) → Germany (DE) (residual via Germany (DE))"
       },
       "multihop_node_host_layout": {
         "ok": true,

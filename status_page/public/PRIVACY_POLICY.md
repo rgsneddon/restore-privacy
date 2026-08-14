@@ -36,7 +36,7 @@ Before residual Connect, you **accept the end-user licence** on this device (loc
 ### Downloads Map and device platform
 
 - The homepage **FREE DOWNLOAD** button and `/downloads-map` read your browser **User-Agent** only to guess OS (Windows, macOS, iOS, Android, Linux). That string is used for the current request so we can highlight and start the matching installer. We do not store User-Agent as an account profile.
-- You get the **latest installer for that OS that is listed on the Downloads Map** (fulfilled from the Helsinki package store). Platforms can be on different versions (for example Windows 1.2.5 while Android is still 1.2.4) until that platform is rebuilt and the map is updated.
+- You get the **latest installer for that OS that is listed on the Downloads Map** (fulfilled from the Helsinki package store). Platforms can be on different versions (for example Windows 1.2.7 while Android is still 1.2.6) until that platform is rebuilt and the map is updated.
 - **Platform requirements we check against:** Windows 10 or later, 64-bit (x64) for the `.exe` installer; Android 8+ for the APK; macOS 12+ x86_64/arm64 for the notarized zip; iOS 15+ for the Team-signed sideload zip (rename to `.ipa`); Linux x86_64 for the `.tar.gz`. We do not collect hardware inventories. If your device does not match, the installer may refuse to run — we do not silently give you another OS package.
 - The same map is published at `/downloads-map.json` (version + filename per platform, no personal data).
 
