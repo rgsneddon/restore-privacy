@@ -30,6 +30,8 @@ const String kDeviceOnlyRetentionSentence =
 
 const String kAuditVisitKind = 'audit_visit';
 const String kAuditVisitMessage = 'AUDIT.md visit (device-only log)';
+const String kConnectedSessionLine = 'session: residual connected';
+const String kDisconnectedSessionLine = 'session: residual not connected';
 
 const List<String> kDefaultProjectFileNames = [
   'AUDIT.md',
@@ -95,6 +97,7 @@ Map<String, dynamic> buildUserBrowsingStats({
   PingResult? ping,
   String platform = '',
   double? now,
+  bool residualConnected = false,
 }) {
   var visitCount = 0;
   var lastVisit = '';
@@ -118,6 +121,9 @@ Map<String, dynamic> buildUserBrowsingStats({
     'audit_visit_count': visitCount,
     'last_connect': lastConnect,
     'last_visit': lastVisit,
+    'residual_connected': residualConnected,
+    'session_line':
+        residualConnected ? kConnectedSessionLine : kDisconnectedSessionLine,
     'retention': kDeviceOnlyRetentionSentence,
     'device_only': true,
     'sampled_at': now ?? DateTime.now().millisecondsSinceEpoch / 1000.0,
@@ -196,15 +202,47 @@ Future<ConnectionLogEvent> appendAuditVisitToDeviceLog(
   ConnectionLog log, {
   String platform = '',
   double? pingMs,
+  bool residualConnected = false,
 }) {
   final detail = <String, String>{
     'surface': 'AUDIT.md',
     'device_only': 'true',
     'uploaded': 'false',
+    'residual_connected': residualConnected ? 'true' : 'false',
+    'session_line':
+        residualConnected ? kConnectedSessionLine : kDisconnectedSessionLine,
   };
   if (platform.isNotEmpty) detail['platform'] = platform;
   if (pingMs != null) detail['ping_ms'] = pingMs.toString();
   return log.appendEvent(kAuditVisitKind, kAuditVisitMessage, detail: detail);
+}
+
+/// Shipped connected-visit entry: append device log + return visible stats.
+Future<Map<String, dynamic>> recordConnectedAuditVisit(
+  ConnectionLog log, {
+  required bool residualConnected,
+  PingResult? ping,
+  String platform = '',
+}) async {
+  final ev = await appendAuditVisitToDeviceLog(
+    log,
+    platform: platform,
+    pingMs: ping?.rttMs,
+    residualConnected: residualConnected,
+  );
+  final events = await log.readEvents();
+  final stats = buildUserBrowsingStats(
+    events: events,
+    ping: ping,
+    platform: platform,
+    residualConnected: residualConnected,
+  );
+  return {
+    'event': ev,
+    'stats': stats,
+    'visible_session': stats['session_line'],
+    'device_only': true,
+  };
 }
 
 /// In-client two-pane AUDIT surface (opened instead of the public AUDIT.md URL).
@@ -213,6 +251,7 @@ class AuditSplitView extends StatefulWidget {
     super.key,
     required this.connectionLog,
     this.platformLabel = 'flutter',
+    this.residualConnected = false,
     this.multihopOn = false,
     this.auditText = '',
     this.fileNames = kDefaultProjectFileNames,
@@ -224,6 +263,7 @@ class AuditSplitView extends StatefulWidget {
 
   final ConnectionLog connectionLog;
   final String platformLabel;
+  final bool residualConnected;
   final bool multihopOn;
   final String auditText;
   final List<String> fileNames;
@@ -275,10 +315,11 @@ class _AuditSplitViewState extends State<AuditSplitView> {
 
   Future<void> _openVisit() async {
     final ping = await _probe();
-    await appendAuditVisitToDeviceLog(
+    await recordConnectedAuditVisit(
       widget.connectionLog,
+      residualConnected: widget.residualConnected,
+      ping: ping,
       platform: widget.platformLabel,
-      pingMs: ping.rttMs,
     );
     await _refreshLeft(ping: ping);
     await _refreshRight();
@@ -305,6 +346,7 @@ class _AuditSplitViewState extends State<AuditSplitView> {
       events: events,
       ping: p,
       platform: widget.platformLabel,
+      residualConnected: widget.residualConnected,
     );
     if (!mounted) return;
     setState(() {
@@ -366,6 +408,11 @@ class _AuditSplitViewState extends State<AuditSplitView> {
                   const SizedBox(height: 8),
                   Text(
                     'dedicated ping: ${pingMs == null ? 'n/a' : '$pingMs ms'}',
+                    style: TextStyle(color: suiteTextOf(context)),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${left['session_line'] ?? kDisconnectedSessionLine}',
                     style: TextStyle(color: suiteTextOf(context)),
                   ),
                   const SizedBox(height: 8),

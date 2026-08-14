@@ -39,6 +39,33 @@ void main() {
     expect(state['right_generation'], 2);
   });
 
+  test('connected visit shows ping/session and writes those stats to the device log',
+      () async {
+    final log = ConnectionLog(MemoryConnectionLogBackend());
+    final ping = const PingResult(
+      host: 'de',
+      port: kStatusTcpPort,
+      ok: true,
+      rttMs: 41,
+    );
+    final out = await recordConnectedAuditVisit(
+      log,
+      residualConnected: true,
+      ping: ping,
+      platform: 'macos',
+    );
+    expect(out['visible_session'], kConnectedSessionLine);
+    expect(out['device_only'], isTrue);
+    final ev = out['event'] as ConnectionLogEvent;
+    expect(ev.kind, kAuditVisitKind);
+    expect(ev.detail['residual_connected'], 'true');
+    expect(ev.detail['ping_ms'], '41.0');
+    final export = await log.formatExport();
+    expect(export.toLowerCase(), contains('local only'));
+    expect(export, contains('AUDIT.md visit'));
+    expect(export, contains('residual_connected=true'));
+  });
+
   test('AUDIT visit is appended to the device connection log', () async {
     final log = ConnectionLog(MemoryConnectionLogBackend());
     final ev = await appendAuditVisitToDeviceLog(

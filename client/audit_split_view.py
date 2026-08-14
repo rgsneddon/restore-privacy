@@ -38,6 +38,8 @@ DEVICE_ONLY_RETENTION_SENTENCE = (
 # Local connection-log kind for an in-client AUDIT visit (device only).
 KIND_AUDIT_VISIT = "audit_visit"
 AUDIT_VISIT_MESSAGE = "AUDIT.md visit (device-only log)"
+CONNECTED_SESSION_LINE = "session: residual connected"
+DISCONNECTED_SESSION_LINE = "session: residual not connected"
 
 WEEKLY_WIPE_MAX_AGE_SEC = 7 * 24 * 3600
 
@@ -248,6 +250,7 @@ def build_user_browsing_stats(
     *,
     now: float | None = None,
     platform: str = "",
+    residual_connected: bool = False,
 ) -> dict[str, Any]:
     """Left-pane payload from **local** events + dedicated ping (no upload)."""
     import time
@@ -289,6 +292,10 @@ def build_user_browsing_stats(
         "audit_visit_count": visit_count,
         "last_connect": last_connect,
         "last_visit": last_visit,
+        "residual_connected": bool(residual_connected),
+        "session_line": (
+            CONNECTED_SESSION_LINE if residual_connected else DISCONNECTED_SESSION_LINE
+        ),
         "recent": [
             {
                 "kind": str(e.get("kind") or ""),
@@ -340,12 +347,21 @@ def default_project_file_names() -> list[str]:
     ]
 
 
-def visit_log_detail(*, platform: str = "", ping_ms: Any = None) -> dict[str, Any]:
+def visit_log_detail(
+    *,
+    platform: str = "",
+    ping_ms: Any = None,
+    residual_connected: bool = False,
+) -> dict[str, Any]:
     """Safe local-only detail for an AUDIT visit append."""
     out: dict[str, Any] = {
         "surface": "AUDIT.md",
         "device_only": True,
         "uploaded": False,
+        "residual_connected": bool(residual_connected),
+        "session_line": (
+            CONNECTED_SESSION_LINE if residual_connected else DISCONNECTED_SESSION_LINE
+        ),
     }
     if platform:
         out["platform"] = str(platform)
@@ -362,12 +378,13 @@ def append_audit_visit_to_device_log(
     path: Any = None,
     platform: str = "",
     ping_ms: Any = None,
+    residual_connected: bool = False,
     ts: float | None = None,
 ) -> Any:
     """Append this AUDIT visit to the **on-device** connection log (never upload).
 
     Imperative: a user opening AUDIT.md in the RPT client must leave a local
-    visit record on their device.
+    visit record on their device, including this visit’s ping/session stats.
     """
     from client.connection_log import append_event
 
@@ -376,8 +393,59 @@ def append_audit_visit_to_device_log(
         AUDIT_VISIT_MESSAGE,
         path=path,
         ts=ts,
-        detail=visit_log_detail(platform=platform, ping_ms=ping_ms),
+        detail=visit_log_detail(
+            platform=platform,
+            ping_ms=ping_ms,
+            residual_connected=residual_connected,
+        ),
     )
+
+
+def record_connected_audit_visit(
+    *,
+    path: Any = None,
+    residual_connected: bool,
+    ping: Mapping[str, Any] | None = None,
+    platform: str = "",
+    ts: float | None = None,
+    events: Sequence[Any] | None = None,
+) -> dict[str, Any]:
+    """Shipped connected-visit entry: append device log + return visible stats.
+
+    Tests and UI both call this with *residual_connected* set from Connect
+    state. Disconnected visits still work; they are not required for the
+    connected path.
+    """
+    ping_map = dict(ping or {})
+    ping_ms = ping_map.get("rtt_ms")
+    if ping_ms is None:
+        ping_ms = ping_map.get("rttMs")
+    ev = append_audit_visit_to_device_log(
+        path=path,
+        platform=platform,
+        ping_ms=ping_ms,
+        residual_connected=residual_connected,
+        ts=ts,
+    )
+    if events is None:
+        from client.connection_log import read_events
+
+        rows = list(read_events(path=path))
+    else:
+        rows = list(events) + [ev]
+    stats = build_user_browsing_stats(
+        rows,
+        ping_map,
+        platform=platform,
+        residual_connected=residual_connected,
+        now=ts,
+    )
+    return {
+        "event": ev,
+        "stats": stats,
+        "visible": paint_left_visible(stats),
+        "device_only": True,
+    }
 
 
 def render_split_markup(state: AuditSplitState) -> str:
@@ -401,6 +469,7 @@ def render_split_markup(state: AuditSplitState) -> str:
          aria-label="{LEFT_PANE_LABEL}">
     <h2 class="rpt-audit-pane-label">{LEFT_PANE_LABEL}</h2>
     <p class="rpt-audit-ping">dedicated ping: {_esc(ping_txt)}</p>
+    <p class="rpt-audit-session">{_esc(str(left.get('session_line') or ''))}</p>
     <ul class="rpt-audit-recent">{rec_lis}</ul>
     <p class="rpt-audit-retention">{prefix}<span class="suite-typewriter suite-typewriter-welcome neon-type"
        data-typewriter="1" data-typewriter-role="welcome"
@@ -427,6 +496,7 @@ def paint_left_visible(sample: Mapping[str, Any] | None) -> dict[str, str]:
     return {
         "label": LEFT_PANE_LABEL,
         "ping": f"dedicated ping: {ping_txt}",
+        "session": str(left.get("session_line") or DISCONNECTED_SESSION_LINE),
         "visits": f"visits on this device: {left.get('audit_visit_count') or 0}",
         "retention": DEVICE_ONLY_RETENTION_SENTENCE,
     }
@@ -513,10 +583,12 @@ class AuditSplitSession:
         ping_probe: Any = None,
         project_loader: Any = None,
         events_reader: Any = None,
+        residual_connected: bool = False,
     ) -> None:
         self.connection_log_path = connection_log_path
         self.platform = str(platform or "")
         self._ping_probe = ping_probe
+        self.residual_connected = bool(residual_connected)
         self._project_loader = project_loader or (
             lambda: load_project_files_snapshot(platform=self.platform)
         )
@@ -541,10 +613,11 @@ class AuditSplitSession:
     def open_visit(self) -> AuditSplitState:
         """Record the device visit, seed both panes (right via project loader)."""
         ping = self._probe_ping()
-        append_audit_visit_to_device_log(
+        record_connected_audit_visit(
             path=self.connection_log_path,
+            residual_connected=self.residual_connected,
+            ping=ping,
             platform=self.platform,
-            ping_ms=ping.get("rtt_ms"),
         )
         self.poll_left(ping=ping)
         self.refresh_right()
@@ -556,6 +629,7 @@ class AuditSplitSession:
             self._read_events(),
             ping if ping is not None else self._probe_ping(),
             platform=self.platform,
+            residual_connected=self.residual_connected,
         )
         self.state = apply_pane_refresh(
             self.state, LEFT_PANE_ID, sample, explicit=False
@@ -584,6 +658,7 @@ def show_audit_split_window(
     ping: Mapping[str, Any] | None = None,
     project_loader: Any = None,
     ping_probe: Any = None,
+    residual_connected: bool = False,
     session: AuditSplitSession | None = None,
 ) -> AuditSplitSession:
     """Open the in-client two-pane AUDIT view and **append the visit to device log**.
@@ -605,6 +680,7 @@ def show_audit_split_window(
         platform=platform,
         ping_probe=probe,
         project_loader=loader,
+        residual_connected=residual_connected,
     )
     sess.open_visit()
     if parent is None:
@@ -629,8 +705,12 @@ def show_audit_split_window(
             anchor="w"
         )
         left_ping = tk.StringVar(master=win, value=sess.visible_left.get("ping", ""))
+        left_session = tk.StringVar(
+            master=win, value=sess.visible_left.get("session", "")
+        )
         left_visits = tk.StringVar(master=win, value=sess.visible_left.get("visits", ""))
         ttk.Label(left_fr, textvariable=left_ping).pack(anchor="w", pady=(8, 0))
+        ttk.Label(left_fr, textvariable=left_session).pack(anchor="w")
         ttk.Label(left_fr, textvariable=left_visits).pack(anchor="w")
         ttk.Label(
             left_fr,
@@ -666,6 +746,7 @@ def show_audit_split_window(
                 return
             sess.poll_left()
             left_ping.set(sess.visible_left.get("ping", ""))
+            left_session.set(sess.visible_left.get("session", ""))
             left_visits.set(sess.visible_left.get("visits", ""))
             win.after(AuditSplitSession.LEFT_POLL_MS, _tick_left)
 

@@ -679,6 +679,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             builder: (_) => AuditSplitView(
               connectionLog: log,
               platformLabel: connectionLogPlatformLabel(),
+              residualConnected: widget.residualConnected,
               multihopOn: _settings.privacyMultihop,
             ),
           ),

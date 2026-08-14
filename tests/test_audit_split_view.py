@@ -32,7 +32,9 @@ from client.audit_split_view import (  # noqa: E402
     render_split_markup,
     show_audit_split_window,
     AuditSplitSession,
+    CONNECTED_SESSION_LINE,
     load_project_files_snapshot,
+    record_connected_audit_visit,
 )
 from client.connection_log import format_export, read_events  # noqa: E402
 
@@ -210,6 +212,45 @@ class TestSplitMarkupAndStats(unittest.TestCase):
         self.assertIn("data-typewriter-role=\"welcome\"", html)
         self.assertIn("AUDIT.md", html)
         self.assertNotIn("client_ip", html)
+
+class TestConnectedAuditVisit(unittest.TestCase):
+    def test_connected_visit_shows_and_logs_stats(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / ".rpt_support_log.jsonl"
+            out = record_connected_audit_visit(
+                path=path,
+                residual_connected=True,
+                ping={"ok": True, "rtt_ms": 41, "host": "de"},
+                platform="macos",
+                ts=1_900_000_000.0,
+            )
+            vis = out["visible"]
+            self.assertIn("dedicated ping: 41 ms", vis["ping"])
+            self.assertEqual(vis["session"], CONNECTED_SESSION_LINE)
+            ev = out["event"]
+            self.assertEqual(ev.kind, KIND_AUDIT_VISIT)
+            self.assertTrue(ev.detail.get("residual_connected"))
+            self.assertEqual(ev.detail.get("ping_ms"), 41)
+            self.assertEqual(ev.detail.get("session_line"), CONNECTED_SESSION_LINE)
+            events = read_events(path=path)
+            self.assertEqual(len(events), 1)
+            export = format_export(path=path)
+            self.assertIn("AUDIT.md visit", export)
+            self.assertIn("local only", export.lower())
+            self.assertIn("residual_connected=True", export)
+            self.assertIn("ping_ms=41", export)
+
+    def test_disconnected_visit_is_contrast_not_required(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / ".rpt_support_log.jsonl"
+            out = record_connected_audit_visit(
+                path=path,
+                residual_connected=False,
+                ping={"ok": True, "rtt_ms": 9},
+            )
+            self.assertNotEqual(out["visible"]["session"], CONNECTED_SESSION_LINE)
+            self.assertFalse(out["event"].detail.get("residual_connected"))
+
 
 class TestAuditSplitSessionVisiblePanes(unittest.TestCase):
     def test_left_poll_does_not_change_right_until_manual_refresh(self) -> None:

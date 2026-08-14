@@ -4194,6 +4194,7 @@ class TunnelClientApp:
                         self.root,
                         connection_log_path=default_log_path(),
                         platform="windows",
+                        residual_connected=bool(getattr(self, "_connected", False)),
                     )
                     self._log("AUDIT visit recorded on this device (not uploaded).")
                     return
