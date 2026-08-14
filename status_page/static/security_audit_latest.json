@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-08-14T08:44:17Z",
+  "generated_at": "2026-08-14T14:40:27Z",
   "node_host": "Germany (DE)",
-  "catalog_version": "1.2.4",
+  "catalog_version": "1.2.5",
   "probe_schedule": [
     {
       "code": "IS",
@@ -68,8 +68,8 @@
   ],
   "unit_suite": {
     "ran": true,
-    "ok": true,
-    "returncode": 0,
+    "ok": false,
+    "returncode": 1,
     "modules": [
       "tests.test_legal_links",
       "tests.test_legal_docs",
@@ -84,7 +84,8 @@
       "tests.test_audit_package_rag",
       "tests.test_oracle_no_user_data",
       "tests.test_oracle_suite_architecture"
-    ]
+    ],
+    "error": "missing_cryptography"
   },
   "tcp_status": {
     "host": "Germany (DE)",
@@ -119,124 +120,125 @@
     ]
   },
   "package_rag": {
-    "catalog_version": "1.2.4",
+    "catalog_version": "1.2.5",
     "pin": "1b126abfae737c66ce99670b730e123f2831ce5beb2868d7865324f391280bbe",
     "exit_pin": "ea0c7fa338612386cbe666a0ca64a6a69e3471b03db1848e7df4be2ed6823b18",
     "packages": [
       {
         "platform": "windows",
         "label": "Windows",
-        "filename": "restore-privacy-client-1.2.4-windows-x64-setup.exe",
-        "state": "Amber",
+        "filename": "restore-privacy-client-1.2.5-windows-x64-setup.exe",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-1.2.4-windows-x64-setup.exe / relative_path 1.2.4/restore-privacy-client-1.2.4-windows-x64-setup.exe under status_page/assets/1.2.4/, releases/1.2.4/, /opt/restore-privacy/paid_assets/1.2.4/, dist/1.2.4/, status_page/assets/, https://135.181.152.10.sslip.io/paid-assets/1.2.4/; default paid store is Helsinki https://135.181.152.10.sslip.io/paid-assets/ \u2014 set RPT_ASSET_FETCH_TOKEN to probe, or stage under paid_assets/1.2.4/)",
-          "Windows PE pending native rebuild on Windows host (see client/windows/WINDOWS_HANDOFF_1.2.4.md; not seal-claimed \u2014 catalog ticker is Amber, not Red, while handoff is open)"
+          "present on Helsinki paid_assets store (https://135.181.152.10.sslip.io/paid-assets/1.2.5/restore-privacy-client-1.2.5-windows-x64-setup.exe; 39034011 bytes)",
+          "structural pin/PE gates not re-scanned over HTTP (inventory presence from fulfilment host)"
         ],
-        "path": null,
+        "path": "https://135.181.152.10.sslip.io/paid-assets/1.2.5/restore-privacy-client-1.2.5-windows-x64-setup.exe",
+        "bytes": 39034011,
+        "remote_store": "helsinki",
         "search_roots": [
-          "status_page/assets/1.2.4/",
-          "releases/1.2.4/",
-          "/opt/restore-privacy/paid_assets/1.2.4/",
-          "dist/1.2.4/",
+          "status_page/assets/1.2.5/",
+          "releases/1.2.5/",
+          "/opt/restore-privacy/paid_assets/1.2.5/",
+          "dist/1.2.5/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.2.4/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.2.5/"
         ],
-        "handoff_pending": true,
-        "relative_path": "1.2.4/restore-privacy-client-1.2.4-windows-x64-setup.exe"
+        "relative_path": "1.2.5/restore-privacy-client-1.2.5-windows-x64-setup.exe"
       },
       {
         "platform": "android",
         "label": "Android",
-        "filename": "restore-privacy-client-1.2.4-android.apk",
+        "filename": "restore-privacy-client-1.2.5-android.apk",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "Android residual wire (PFS + outer obfs) present",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.4/restore-privacy-client-1.2.4-android.apk",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.5/restore-privacy-client-1.2.5-android.apk",
         "bytes": 85339202,
-        "relative_path": "1.2.4/restore-privacy-client-1.2.4-android.apk",
+        "relative_path": "1.2.5/restore-privacy-client-1.2.5-android.apk",
         "search_roots": [
-          "status_page/assets/1.2.4/",
-          "releases/1.2.4/",
-          "/opt/restore-privacy/paid_assets/1.2.4/",
-          "dist/1.2.4/",
+          "status_page/assets/1.2.5/",
+          "releases/1.2.5/",
+          "/opt/restore-privacy/paid_assets/1.2.5/",
+          "dist/1.2.5/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.2.4/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.2.5/"
         ]
       },
       {
         "platform": "macos",
         "label": "macOS",
-        "filename": "restore-privacy-client-1.2.4-macos.zip",
+        "filename": "restore-privacy-client-1.2.5-macos.zip",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.4/restore-privacy-client-1.2.4-macos.zip",
-        "bytes": 27860772,
-        "relative_path": "1.2.4/restore-privacy-client-1.2.4-macos.zip",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.5/restore-privacy-client-1.2.5-macos.zip",
+        "bytes": 27898297,
+        "relative_path": "1.2.5/restore-privacy-client-1.2.5-macos.zip",
         "search_roots": [
-          "status_page/assets/1.2.4/",
-          "releases/1.2.4/",
-          "/opt/restore-privacy/paid_assets/1.2.4/",
-          "dist/1.2.4/",
+          "status_page/assets/1.2.5/",
+          "releases/1.2.5/",
+          "/opt/restore-privacy/paid_assets/1.2.5/",
+          "dist/1.2.5/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.2.4/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.2.5/"
         ]
       },
       {
         "platform": "ios",
         "label": "iOS",
-        "filename": "restore-privacy-client-1.2.4-ios.zip",
+        "filename": "restore-privacy-client-1.2.5-ios.zip",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.4/restore-privacy-client-1.2.4-ios.zip",
-        "bytes": 13251170,
-        "relative_path": "1.2.4/restore-privacy-client-1.2.4-ios.zip",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.5/restore-privacy-client-1.2.5-ios.zip",
+        "bytes": 13251882,
+        "relative_path": "1.2.5/restore-privacy-client-1.2.5-ios.zip",
         "search_roots": [
-          "status_page/assets/1.2.4/",
-          "releases/1.2.4/",
-          "/opt/restore-privacy/paid_assets/1.2.4/",
-          "dist/1.2.4/",
+          "status_page/assets/1.2.5/",
+          "releases/1.2.5/",
+          "/opt/restore-privacy/paid_assets/1.2.5/",
+          "dist/1.2.5/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.2.4/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.2.5/"
         ]
       },
       {
         "platform": "linux",
         "label": "Linux",
-        "filename": "restore-privacy-client-1.2.4-linux-x64.tar.gz",
+        "filename": "restore-privacy-client-1.2.5-linux-x64.tar.gz",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.4/restore-privacy-client-1.2.4-linux-x64.tar.gz",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.2.5/restore-privacy-client-1.2.5-linux-x64.tar.gz",
         "bytes": 14667758,
-        "relative_path": "1.2.4/restore-privacy-client-1.2.4-linux-x64.tar.gz",
+        "relative_path": "1.2.5/restore-privacy-client-1.2.5-linux-x64.tar.gz",
         "search_roots": [
-          "status_page/assets/1.2.4/",
-          "releases/1.2.4/",
-          "/opt/restore-privacy/paid_assets/1.2.4/",
-          "dist/1.2.4/",
+          "status_page/assets/1.2.5/",
+          "releases/1.2.5/",
+          "/opt/restore-privacy/paid_assets/1.2.5/",
+          "dist/1.2.5/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.2.4/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.2.5/"
         ]
       }
     ],
-    "staged_count": 4,
-    "helsinki_remote_count": 0,
+    "staged_count": 5,
+    "helsinki_remote_count": 1,
     "helsinki_paid_asset_base": "https://135.181.152.10.sslip.io/paid-assets",
-    "overall": "Amber",
+    "overall": "Green",
     "legend": {
       "Green": "Present (local monorepo/releases/paid_assets or Helsinki paid store), no *.priv when scanned, product node pub pin match when scanned, platform structural gate pass (Windows multihop markers when PE scanned)",
       "Amber": "Present but pin/structural check incomplete or soft warning",
@@ -352,17 +354,17 @@
   "multihop_structure": {
     "probes": {
       "multihop_module_flags": {
-        "ok": true,
+        "ok": false,
         "warn": false,
         "skipped": false,
         "reasons": [
           "MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit)",
-          "Iceland peer Iceland (IS) (IS monopin)",
+          "Iceland peer VPN node (IS monopin)",
           "Germany peer Germany (DE) (DE monopin / RO replacement)",
-          "live catalog peers IS+DE only (United States residual peer retired)",
+          "product_country_catalog codes ['DE'] expected to include IS and DE",
           "DEFAULT_ENTRY_COUNTRY=DE (product default residual entry = Germany)"
         ],
-        "entry_host": "Iceland (IS)",
+        "entry_host": "VPN node",
         "exit_host": "Germany (DE)",
         "us_host": "5.161.242.85",
         "de_host": "Germany (DE)",
@@ -393,9 +395,9 @@
           "is_multihop_active=True for IS\u2192DE entry\u2192exit path",
           "residual_endpoint dials exit Germany (DE) (residual-via-exit)",
           "multi-hop disabled residual stays entry Germany (DE) (default single-hop DE)",
-          "status text: multi-hop active (2 hops): Iceland (IS) \u2192 Germany (DE) (residual via Germany (DE))"
+          "status text: multi-hop active (2 hops): VPN node \u2192 Germany (DE) (residual via Germany (DE))"
         ],
-        "status_text": "multi-hop active (2 hops): Iceland (IS) \u2192 Germany (DE) (residual via Germany (DE))"
+        "status_text": "multi-hop active (2 hops): VPN node \u2192 Germany (DE) (residual via Germany (DE))"
       },
       "multihop_node_host_layout": {
         "ok": true,
@@ -408,7 +410,7 @@
         ]
       }
     },
-    "ok": true,
+    "ok": false,
     "section": "multihop_node_structure",
     "honesty": "residual-via-exit when multi-hop enabled; not full intermediate onion encapsulation; default single-hop Germany (DE) entry (RO replaced)"
   },
@@ -423,7 +425,7 @@
     "multihop_structure": true,
     "firewall_probe_excluded": true
   },
-  "overall_ok": true,
+  "overall_ok": false,
   "privacy": {
     "redacted": true,
     "no_suite_tails": true,
