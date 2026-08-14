@@ -1369,7 +1369,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(
                 200,
                 "text/html; charset=utf-8",
-                render_settings_explainer_page_html(),
+                render_settings_explainer_page_html(
+                    active="sdk" if path == "/sdk" else "settings",
+                ),
             )
             return
         # App testers (direct URL only — not linked from public pages)

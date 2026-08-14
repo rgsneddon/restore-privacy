@@ -44,7 +44,7 @@ class TestSettingsExplainerPage(unittest.TestCase):
         self.assertNotIn('class="tagline"', explainers_box)
         # Suite intro + how-to parts before Settings catalog
         self.assertIn('id="suite-guide-intro"', html)
-        self.assertIn("How to use Restore Privacy Suite", html)
+        self.assertIn("How to use Restore Privacy", html)
         self.assertIn('id="suite-howto-parts"', html)
         # Explainers box + required Settings parts
         self.assertIn('id="settings-explainers-box"', html)
@@ -121,12 +121,15 @@ class TestHomepageSettingsGuideNav(unittest.TestCase):
         self.assertIn('id="settings-guide-link"', html)
         self.assertIn(f'href="{SETTINGS_EXPLAINER_PATH}"', html)
         self.assertIn("SETTINGS GUIDE", html)
-        # Settings Guide sits immediately after Home in main nav
+        # Settings Guide sits immediately after Home; SDK after Settings Guide
         i_home = html.index('id="home-link"')
         i_sg = html.index('id="settings-guide-link"')
+        i_sdk = html.index('id="sdk-link"')
         i_lic = html.index('id="licence-link"')
         self.assertLess(i_home, i_sg)
-        self.assertLess(i_sg, i_lic)
+        self.assertLess(i_sg, i_sdk)
+        self.assertLess(i_sdk, i_lic)
+        self.assertIn('href="/settings-explainer#corporate-clients"', html)
         # Dedicated homepage banner box must not appear
         self.assertNotIn("settings-explainer-banner", html)
         self.assertNotIn("settings-explainer-banner-link", html)

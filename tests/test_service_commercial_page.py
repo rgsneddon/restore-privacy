@@ -40,6 +40,7 @@ class TestServiceNav(unittest.TestCase):
         for peer_id in (
             "home-link",
             "settings-guide-link",
+            "sdk-link",
             "licence-link",
             "audit-link",
             "privacy-link",

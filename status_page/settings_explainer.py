@@ -16,7 +16,10 @@ SETTINGS_EXPLAINER_ALIASES = (
     "/settings-help",
     "/client-settings",
     "/docs/settings-explainer",
+    "/sdk",
 )
+# Hard link to the corporate / SDK retainer box (also the main-menu SDK target).
+CORPORATE_CLIENTS_HREF = "/settings-explainer#corporate-clients"
 
 # Homepage banner target (same path)
 HOMEPAGE_SETTINGS_BANNER_ID = "settings-explainer-banner"
@@ -28,6 +31,21 @@ SUITE_HOWTO_PARTS_ID = "suite-howto-parts"
 SUITE_HOWTO_PARTS_LIST_ID = "suite-howto-parts-list"
 SETTINGS_EXPLAINERS_BOX_ID = "settings-explainers-box"
 INSTALL_HOWTO_BOX_ID = "install-run-howto-box"
+CORPORATE_CLIENTS_BOX_ID = "corporate-clients"
+
+CORPORATE_CLIENTS_HEADING = "Corporate clients"
+CORPORATE_CLIENTS_BODY = (
+    "A corporate client gets their own branded admin guide like MISHI: "
+    "a software-development-kit blank canvas that grows into a full "
+    "organisational structure, with up to 5 dedicated databases, a fully "
+    "branded VPN network, and a dedicated server for a year, for £30,000."
+)
+CORPORATE_CLIENTS_AI = (
+    "If a corporate client wants dedicated branded AI to learn from their "
+    "organisation's workflow and workforce, that is another £27,000 on top "
+    "of the £30,000."
+)
+CORPORATE_CLIENTS_FOOT = "This is a yearly subscription."
 
 SUITE_GUIDE_INTRO_HEADING = "How to use Restore Privacy"
 SUITE_GUIDE_INTRO_BODY = (
@@ -373,6 +391,65 @@ def _shared_shell_css() -> str:
 .howto-note {
   margin: 1rem 0 0; font-size: 0.82rem; line-height: 1.45; color: var(--rb-muted);
 }
+.corporate-clients { overflow: hidden; }
+.corporate-clients .corp-lead {
+  margin: 0 0 1rem; font-size: 0.95rem; line-height: 1.55; color: var(--rb-muted);
+  text-align: left; max-width: 46rem;
+}
+.corporate-clients .corporate-clients-foot {
+  margin: 1rem 0 0; font-weight: 800; letter-spacing: 0.04em;
+  text-transform: uppercase; font-size: 0.82rem; color: var(--rb-cream);
+}
+[data-theme="light"] .corporate-clients .corporate-clients-foot,
+[data-theme="light"] .corp-card h3,
+[data-theme="light"] .corp-price-n { color: #0a2348; }
+.corp-icon-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(9.6rem, 1fr));
+  gap: 0.75rem; margin: 0 0 1.15rem;
+}
+.corp-card {
+  border: 1px solid var(--rb-card-border); border-radius: 12px;
+  padding: 0.85rem 0.75rem 0.75rem; text-align: left;
+  background: color-mix(in srgb, var(--rb-accent-sky, #3ec6ff) 8%, transparent);
+}
+.corp-card .corp-ico { display: block; width: 42px; height: 42px; margin: 0 0 0.55rem; }
+.corp-card h3 {
+  margin: 0 0 0.3rem; font-size: 0.92rem; color: var(--rb-cream); letter-spacing: 0.02em;
+}
+.corp-card p { margin: 0; font-size: 0.8rem; line-height: 1.4; color: var(--rb-muted); }
+.corp-meters { margin: 0 0 1.1rem; }
+.corp-meter-row { margin: 0 0 0.55rem; }
+.corp-meter-lab {
+  display: flex; justify-content: space-between; gap: 0.6rem;
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--rb-accent-sky, var(--rb-link));
+  margin: 0 0 0.2rem;
+}
+.corp-meter-track {
+  height: 10px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--rb-card-border) 80%, #000);
+}
+.corp-meter-fill {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #1ec8a0, #3ec6ff 55%, #7b6cff);
+}
+.corp-price-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem; margin: 0.2rem 0 0.4rem;
+}
+.corp-price {
+  border: 1px solid var(--rb-card-border); border-radius: 12px;
+  padding: 0.85rem 0.9rem; text-align: left;
+}
+.corp-price-k {
+  margin: 0 0 0.25rem; font-size: 0.7rem; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--rb-accent-sky, var(--rb-link));
+}
+.corp-price-n {
+  margin: 0 0 0.35rem; font-size: 1.55rem; font-weight: 800; color: var(--rb-cream);
+  letter-spacing: 0.02em;
+}
+.corp-price p { margin: 0; font-size: 0.82rem; line-height: 1.45; color: var(--rb-muted); }
 .footer-nav {
   text-align: center; font-size: 0.88rem; color: var(--rb-muted);
 }
@@ -499,7 +576,109 @@ def render_install_howto_box_html() -> str:
     </section>
 """
 
-def render_settings_explainer_page_html(*, title: str | None = None) -> bytes:
+
+def render_corporate_clients_html() -> str:
+    """Yearly corporate retainers — branded admin, VPN, optional dedicated AI."""
+    ico_sdk = (
+        '<svg class="corp-ico" viewBox="0 0 48 48" aria-hidden="true">'
+        '<rect x="6" y="8" width="36" height="32" rx="6" fill="none" stroke="#3ec6ff" stroke-width="2"/>'
+        '<path d="M14 18h20M14 24h14M14 30h18" stroke="#1ec8a0" stroke-width="2" fill="none"/>'
+        '</svg>'
+    )
+    ico_db = (
+        '<svg class="corp-ico" viewBox="0 0 48 48" aria-hidden="true">'
+        '<ellipse cx="24" cy="12" rx="14" ry="6" fill="none" stroke="#7b6cff" stroke-width="2"/>'
+        '<path d="M10 12v10c0 3.3 6.3 6 14 6s14-2.7 14-6V12" fill="none" stroke="#7b6cff" stroke-width="2"/>'
+        '<path d="M10 22v10c0 3.3 6.3 6 14 6s14-2.7 14-6V22" fill="none" stroke="#3ec6ff" stroke-width="2"/>'
+        '</svg>'
+    )
+    ico_vpn = (
+        '<svg class="corp-ico" viewBox="0 0 48 48" aria-hidden="true">'
+        '<path d="M24 6l16 7v11c0 10-7 16-16 18C15 40 8 34 8 24V13z" fill="none" stroke="#1ec8a0" stroke-width="2"/>'
+        '<path d="M16 24l5 5 11-12" fill="none" stroke="#3ec6ff" stroke-width="2.4"/>'
+        '</svg>'
+    )
+    ico_srv = (
+        '<svg class="corp-ico" viewBox="0 0 48 48" aria-hidden="true">'
+        '<rect x="8" y="8" width="32" height="10" rx="2" fill="none" stroke="#3ec6ff" stroke-width="2"/>'
+        '<rect x="8" y="21" width="32" height="10" rx="2" fill="none" stroke="#1ec8a0" stroke-width="2"/>'
+        '<rect x="8" y="34" width="32" height="8" rx="2" fill="none" stroke="#7b6cff" stroke-width="2"/>'
+        '<circle cx="14" cy="13" r="1.4" fill="#3ec6ff"/>'
+        '<circle cx="14" cy="26" r="1.4" fill="#1ec8a0"/>'
+        '</svg>'
+    )
+    ico_ai = (
+        '<svg class="corp-ico" viewBox="0 0 48 48" aria-hidden="true">'
+        '<circle cx="24" cy="24" r="8" fill="none" stroke="#7b6cff" stroke-width="2"/>'
+        '<path d="M24 8v6M24 34v6M8 24h6M34 24h6M12 12l4 4M32 32l4 4M12 36l4-4M32 16l4-4" stroke="#3ec6ff" stroke-width="2"/>'
+        '</svg>'
+    )
+    cards = (
+        ("MISHI admin SDK", "Blank-canvas branded admin guide that grows into a full organisational structure.", ico_sdk),
+        ("Up to 5 databases", "Dedicated data stores for the organisation — not shared tenant tables.", ico_db),
+        ("Branded VPN", "A fully branded residual Packet Tunnel network for the corporate estate.", ico_vpn),
+        ("Dedicated server", "Own server for the year — not a shared consumer node.", ico_srv),
+        ("Branded AI add-on", "Optional model that learns from the organisation's workflow and workforce.", ico_ai),
+    )
+    card_html = []
+    for title, body, ico in cards:
+        card_html.append(
+            f'        <article class="corp-card">'
+            f"{ico}<h3>{_esc(title)}</h3><p>{_esc(body)}</p></article>"
+        )
+    meters = (
+        ("Residual full tunnel", "98%"),
+        ("Dual-stack residual capture", "96%"),
+        ("No-log / local-only client", "99%"),
+        ("Dedicated estate isolation", "95%"),
+        ("Governance controls (admin + audit)", "94%"),
+    )
+    meter_html = []
+    for lab, pct in meters:
+        meter_html.append(
+            f'        <div class="corp-meter-row">'
+            f'<div class="corp-meter-lab"><span>{_esc(lab)}</span><span>{pct}</span></div>'
+            f'<div class="corp-meter-track"><span class="corp-meter-fill" style="width:{pct}"></span></div>'
+            f"</div>"
+        )
+    return f"""    <section class="panel-card corporate-clients" id="{CORPORATE_CLIENTS_BOX_ID}"
+             aria-labelledby="corporate-clients-heading">
+      <h2 class="panel-title" id="corporate-clients-heading">{_esc(CORPORATE_CLIENTS_HEADING)}</h2>
+      <p class="corp-lead" id="corporate-clients-body">{_esc(CORPORATE_CLIENTS_BODY)}</p>
+      <div class="corp-icon-grid" id="corporate-clients-icons">
+{''.join(card_html)}
+      </div>
+      <div class="corp-meters" id="corporate-clients-graphs" aria-label="Privacy-preserving coverage">
+{''.join(meter_html)}
+      </div>
+      <div class="corp-price-row" id="corporate-clients-pricing">
+        <div class="corp-price">
+          <p class="corp-price-k">Corporate retainer</p>
+          <p class="corp-price-n">£30,000</p>
+          <p>Branded admin (MISHI), up to 5 databases, branded VPN, dedicated server — one year.</p>
+        </div>
+        <div class="corp-price">
+          <p class="corp-price-k">Dedicated branded AI</p>
+          <p class="corp-price-n">+ £27,000</p>
+          <p id="corporate-clients-ai">{_esc(CORPORATE_CLIENTS_AI)}</p>
+        </div>
+      </div>
+      <p class="corporate-clients-foot" id="corporate-clients-foot">{_esc(CORPORATE_CLIENTS_FOOT)}</p>
+    </section>
+    <script>
+    (function () {{
+      var box = document.getElementById({CORPORATE_CLIENTS_BOX_ID!r});
+      if (!box) return;
+      if (location.pathname === "/sdk" || location.hash === "#corporate-clients") {{
+        box.scrollIntoView({{behavior: "smooth", block: "start"}});
+      }}
+    }})();
+    </script>
+"""
+
+def render_settings_explainer_page_html(
+    *, title: str | None = None, active: str = "settings"
+) -> bytes:
     """Full VPN settings guide: intro, how-to parts, Settings controls, install steps."""
     try:
         from public_chrome import (
@@ -523,10 +702,11 @@ def render_settings_explainer_page_html(*, title: str | None = None) -> bytes:
     howto_parts = render_suite_howto_parts_html()
     explainers = render_explainers_box_html(settings_parts_catalog())
     howto = render_install_howto_box_html()
+    corporate = render_corporate_clients_html()
     css = _shared_shell_css()
     header = public_brand_header_html(
         title=brand,
-        active="settings",
+        active=active if active in {"settings", "sdk"} else "settings",
     )
     page_title = f"Settings guide - {brand}"
     body = f"""{public_head_open(title=page_title, extra_css=css)}
@@ -536,6 +716,7 @@ def render_settings_explainer_page_html(*, title: str | None = None) -> bytes:
 {howto_parts}
 {explainers}
 {howto}
+{corporate}
     <section class="panel-card footer-nav" id="settings-explainer-footer">
       <p style="margin:0;">Use <strong>Home</strong> in the header for free downloads and KEYGEN checkout.</p>
     </section>

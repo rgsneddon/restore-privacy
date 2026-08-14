@@ -25,6 +25,7 @@ AUDIT_LINK_ID = "audit-link"
 README_LINK_ID = "readme-link"
 SUPPORT_LINK_ID = "support-link"
 SETTINGS_GUIDE_LINK_ID = "settings-guide-link"
+SDK_LINK_ID = "sdk-link"
 SERVICE_LINK_ID = "service-link"
 
 # Public website brand / page identity (document <title> + default page title).
@@ -73,6 +74,8 @@ AUDIT_PATH = "/AUDIT.md"
 README_PATH = "/README.md"
 SUPPORT_PATH = "/support"
 SETTINGS_GUIDE_PATH = "/settings-explainer"
+SDK_PATH = "/settings-explainer#corporate-clients"
+SDK_ALIAS_PATH = "/sdk"
 SERVICE_PATH = "/service"
 
 # Product family landings (paths; optional Host aliases for browser./vault.)
@@ -1341,12 +1344,13 @@ def public_product_tabs_html(*, active: str = PRODUCT_VPN_KEY) -> str:
 
 
 def public_nav_links_html(*, active: str | None = None) -> str:
-    """Button-style nav: Home → Settings Guide → Licence →
+    """Button-style nav: Home → Settings Guide → SDK → Licence →
     Security Audit → Privacy Policy → Support.
 
-    *active* is one of: home, licence, privacy, audit, support, settings
+    *active* is one of: home, licence, privacy, audit, support, settings, sdk
     (or None). README is not a main-menu control (``/README.md`` may still be
     served as a document). Settings Guide remains in the top brand nav.
+    SDK jumps to the corporate / MISHI retainer box on the Settings guide.
 
     Service (``SERVICE_PATH`` / ``/service``) is intentionally **not** in the
     public main menu - the page module and route are retained for private use.
@@ -1354,6 +1358,7 @@ def public_nav_links_html(*, active: str | None = None) -> str:
     items = (
         ("HOME", HOME_PATH, HOME_LINK_ID, "home"),
         ("SETTINGS GUIDE", SETTINGS_GUIDE_PATH, SETTINGS_GUIDE_LINK_ID, "settings"),
+        ("SDK", SDK_PATH, SDK_LINK_ID, "sdk"),
         ("LICENCE", LICENSE_PATH, LICENCE_LINK_ID, "licence"),
         ("SECURITY AUDIT", AUDIT_PATH, AUDIT_LINK_ID, "audit"),
         ("PRIVACY POLICY", PRIVACY_PATH, PRIVACY_LINK_ID, "privacy"),

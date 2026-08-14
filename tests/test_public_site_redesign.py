@@ -84,16 +84,18 @@ class TestPublicChromeRedesign(unittest.TestCase):
             "audit-link",
             "support-link",
             "settings-guide-link",
+            "sdk-link",
             "doc-links",
         ):
             self.assertIn(f'id="{el}"', nav)
         self.assertNotIn("readme-link", nav)
         self.assertIn('href="/support"', nav)
         self.assertIn("is-active", nav)
-        # Order: Home → Settings Guide → Licence → Audit → Privacy → Support
+        # Order: Home → Settings Guide → SDK → Licence → Audit → Privacy → Support
         order_ids = (
             "home-link",
             "settings-guide-link",
+            "sdk-link",
             "licence-link",
             "audit-link",
             "privacy-link",
@@ -141,6 +143,7 @@ class TestPublicPagesShareRedesign(unittest.TestCase):
         order_ids = (
             "home-link",
             "settings-guide-link",
+            "sdk-link",
             "licence-link",
             "audit-link",
             "privacy-link",

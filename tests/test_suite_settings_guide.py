@@ -117,6 +117,17 @@ class TestSuiteSettingsGuideHtml(unittest.TestCase):
         self.assertIn('id="setting-suite-manual-update"', html)
         self.assertIn('id="install-run-howto-box"', html)
         self.assertIn("install-howto-steps", html)
+        self.assertIn('id="corporate-clients"', html)
+        self.assertIn("Corporate clients", html)
+        self.assertIn("£30,000", html)
+        self.assertIn("£27,000", html)
+        self.assertIn("yearly subscription", html.lower())
+        self.assertIn("MISHI", html)
+        self.assertIn('id="corporate-clients-icons"', html)
+        self.assertIn('id="corporate-clients-graphs"', html)
+        self.assertIn('id="sdk-link"', html)
+        self.assertIn('href="/settings-explainer#corporate-clients"', html)
+        self.assertIn("/sdk", html)
         low = html.lower()
         self.assertIn("free", low)
         self.assertIn("keygen", low)
@@ -130,14 +141,16 @@ class TestSuiteSettingsGuideHtml(unittest.TestCase):
         self.assertNotIn("pay on the status page", low)
         self.assertTrue(suite_guide_copy_is_valid(html))
 
-        # Order: intro → howto → settings catalog → install
+        # Order: intro → howto → settings catalog → install → corporate
         i_intro = html.index('id="suite-guide-intro"')
         i_parts = html.index('id="suite-howto-parts"')
         i_set = html.index('id="settings-explainers-box"')
         i_how = html.index('id="install-run-howto-box"')
+        i_corp = html.index('id="corporate-clients"')
         self.assertLess(i_intro, i_parts)
         self.assertLess(i_parts, i_set)
         self.assertLess(i_set, i_how)
+        self.assertLess(i_how, i_corp)
 
         # Pure builders also non-empty
         self.assertIn("suite-guide-lead", render_suite_guide_intro_html())

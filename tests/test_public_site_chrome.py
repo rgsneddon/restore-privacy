@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 class TestPublicChromeModule(unittest.TestCase):
     def test_nav_main_menu_order_and_button_classes(self) -> None:
-        """Main nav: Home → Settings Guide → Licence → Audit → Privacy → Support."""
+        """Main nav: Home → Settings Guide → SDK → Licence → Audit → Privacy → Support."""
         from public_chrome import public_nav_links_html
 
         html = public_nav_links_html(active="home")
@@ -36,10 +36,14 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertNotIn('href="/service/"', html)
         self.assertIn('id="doc-links"', html)
         self.assertIn("nav-btn", html)
-        # Exact sequential order of the six main controls
+        self.assertIn('id="sdk-link"', html)
+        self.assertIn("SDK", html)
+        self.assertIn('href="/settings-explainer#corporate-clients"', html)
+        # Exact sequential order of the seven main controls
         order_ids = (
             "home-link",
             "settings-guide-link",
+            "sdk-link",
             "licence-link",
             "audit-link",
             "privacy-link",
@@ -71,6 +75,7 @@ class TestPublicChromeModule(unittest.TestCase):
             "audit",
             "support",
             "settings",
+            "sdk",
         )
         expected = {
             "home": "home-link",
@@ -79,6 +84,7 @@ class TestPublicChromeModule(unittest.TestCase):
             "audit": "audit-link",
             "support": "support-link",
             "settings": "settings-guide-link",
+            "sdk": "sdk-link",
         }
         for key in keys:
             html = public_nav_links_html(active=key)
@@ -346,6 +352,7 @@ class TestHomepageChrome(unittest.TestCase):
         order_ids = (
             "home-link",
             "settings-guide-link",
+            "sdk-link",
             "licence-link",
             "audit-link",
             "privacy-link",
@@ -409,6 +416,7 @@ class TestDocsShareChrome(unittest.TestCase):
             order_ids = (
                 "home-link",
                 "settings-guide-link",
+                "sdk-link",
                 "licence-link",
                 "audit-link",
                 "privacy-link",

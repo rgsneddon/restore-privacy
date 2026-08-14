@@ -51,10 +51,11 @@ class TestTitleLegalLinks(unittest.TestCase):
         self.assertIn('id="privacy-link"', html)
         self.assertIn('id="audit-link"', html)
         self.assertIn("nav-btn", html)
-        # Order: Home → Settings Guide → Licence → Audit → Privacy → Support
+        # Order: Home → Settings Guide → SDK → Licence → Audit → Privacy → Support
         order_ids = (
             "home-link",
             "settings-guide-link",
+            "sdk-link",
             "licence-link",
             "audit-link",
             "privacy-link",
