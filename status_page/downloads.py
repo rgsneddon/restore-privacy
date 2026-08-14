@@ -1,4 +1,4 @@
-"""Release download catalog + paid download UI (Restore Privacy residual VPN v1.2.3).
+"""Release download catalog + paid download UI (Restore Privacy residual VPN v1.2.4).
 
 Primary path: pay **£3.00** (GBP) via Stripe Checkout per package, then a
 time-limited download token (default **12 hours**, reusable until expiry).
@@ -7,7 +7,7 @@ the status host **proxies** the installer (authenticated GitHub API / local
 assets) so fulfilment works when the restore-privacy repo is **private**.
 Buy Me a Coffee is tip/support only.
 
-Current catalog packages: Restore Privacy residual VPN **1.2.3**
+Current catalog packages: Restore Privacy residual VPN **1.2.4**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
 iOS IPA-compatible Team-signed sideload zip — rename to ``.ipa``).
 """
@@ -33,10 +33,10 @@ except ImportError:  # package import path (status_page as package)
         site_copyright_text,
     )
 
-RELEASE_VERSION = "1.2.3"
+RELEASE_VERSION = "1.2.4"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "1.2.3"
+RELEASE_TAG = "1.2.4"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )

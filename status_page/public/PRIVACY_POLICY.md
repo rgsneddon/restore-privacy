@@ -1,8 +1,8 @@
 # Privacy Policy — Restore Privacy
 
 **Last updated:** 3 August 2026  
-**Product:** Restore Privacy **v1.2.3** — a dedicated residual virtual private network and the public shop  
-**Current packages (catalog v1.2.3):** free installers on [restoreprivacy.online](https://restoreprivacy.online/). Residual Connect needs a free device trial or a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **Linux**, **Android**, **macOS**, **iOS**, and **Windows** monopin **1.2.3** packages are fulfilled from the product host. **macOS** is **Developer ID** + notarized when sealed (Team **SFCBP95595**). **iOS** ships as an **Apple Distribution** Team-signed **Runner.app** zip for sideload (same Team). Public GitHub Pages ship docs only — not operator admin.
+**Product:** Restore Privacy **v1.2.4** — a dedicated residual virtual private network and the public shop  
+**Current packages (catalog v1.2.4):** free installers on [restoreprivacy.online](https://restoreprivacy.online/). Residual Connect needs a free device trial or a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **Linux**, **Android**, **macOS**, and **iOS** monopin **1.2.4** packages are fulfilled from the product host; **Windows** native PE remains **1.2.3** until the Windows-host rebuild. **macOS** is **Developer ID** + notarized when sealed (Team **SFCBP95595**). **iOS** ships as an IPA-compatible Team-signed zip (`Payload/Runner.app` + embedded provisions; rename to `.ipa` for sideload; same Team **SFCBP95595**). Public GitHub Pages ship docs only — not operator admin.
 
 ---
 
@@ -66,4 +66,4 @@ You can export local connection logs and stop using residual Connect by not rene
 
 Related: end-user **LICENSE**, product **README**, and the public security **AUDIT**.
 
-This policy describes product behaviour for catalog **v1.2.3**. It is not a substitute for formal legal advice.
+This policy describes product behaviour for catalog **v1.2.4**. It is not a substitute for formal legal advice.
