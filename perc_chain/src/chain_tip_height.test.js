@@ -11,7 +11,10 @@ import {
   percChainTipHeight,
   resetPoolTip,
   setPoolTipHeight,
+  tallestTipHeight,
 } from './chain_tip.js';
+import { compactLedgerForSeed } from './ledger_compact.js';
+import { shouldImportLedger } from './ledger_store.js';
 import { jobFromLedger } from './pow.js';
 import { nextJob, handleApi } from './mineperc_server.js';
 import { hydrateMinepercIndex, poolStatsSnapshot, resetMinerStats } from './miner_stats.js';
@@ -107,6 +110,16 @@ describe('perc_chain tip height binds pool, mineperc, and explorer', () => {
     const calc = networkCalculationsFromLedger(ledger);
     const shippedCalc = buildDynamicEmissionStats(ledger);
     assert.equal(calc.emissionPerMinute, shippedCalc.emissionPerMinute);
+
+    const shorter = fixtureLedger(H - 3);
+    assert.equal(shouldImportLedger(shorter, ledger), true);
+    const exported = compactLedgerForSeed(ledger);
+    assert.equal(percChainTipHeight(exported), H);
+    assert.equal(exported.blocks.length, ledger.blocks.length);
+    assert.equal(
+      tallestTipHeight(percChainTipHeight(shorter), percChainTipHeight(exported)),
+      H,
+    );
     assert.equal(calc.loadFactorPercent, shippedCalc.loadFactorPercent);
     assert.equal(calc.blockTimeFactorPercent, shippedCalc.blockTimeFactorPercent);
     assert.equal(calc.walletLoadCount, shippedCalc.walletLoadCount);

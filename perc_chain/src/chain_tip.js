@@ -15,6 +15,16 @@ export function percChainTipHeight(ledger) {
   return blockHeight(ledger);
 }
 
+/** Highest of local / seed / peer heights — same unit as percChainTipHeight. */
+export function tallestTipHeight(...heights) {
+  let max = 0;
+  for (const h of heights) {
+    const n = Number(h) || 0;
+    if (n > max) max = n;
+  }
+  return max;
+}
+
 export function percChainTipFromHealth(payload) {
   if (!payload || typeof payload !== 'object') return 0;
   return Number(payload.blockHeight ?? payload.networkHeight ?? 0) || 0;

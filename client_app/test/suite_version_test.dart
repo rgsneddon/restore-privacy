@@ -55,6 +55,23 @@ void main() {
     );
   });
 
+  test('Suite % and EVOLVE tabs use the shipped perc coordinator sync path', () {
+    final wallet = File('lib/suite_wallet_tab.dart').readAsStringSync();
+    final evolve = File('lib/suite_evolve_tab.dart').readAsStringSync();
+    expect(wallet.contains('PercNetworkCoordinator'), isTrue);
+    expect(evolve.contains('PercNetworkCoordinator'), isTrue);
+    expect(wallet.contains('disableLiveNodesForTests = false'), isTrue);
+    expect(evolve.contains('disableLiveNodesForTests = false'), isTrue);
+    expect(
+      wallet.contains('package:perccent_wallet/perc/services/perc_network_coordinator.dart'),
+      isTrue,
+    );
+    expect(
+      evolve.contains('package:evolve/perc/services/perc_network_coordinator.dart'),
+      isTrue,
+    );
+  });
+
   test('suite network config source rejects Render as required default', () {
     final net = File('lib/suite_network_config.dart').readAsStringSync();
     expect(net.contains('135.181.152.10'), isTrue);
