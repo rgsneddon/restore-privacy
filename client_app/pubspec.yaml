@@ -58,7 +58,7 @@ flutter:
     - assets/flags/us.png
     - assets/flags/eu.png
     - assets/branding/my_perc_logo.png
-    # Ned / rpAI faces: resting base + ERROR / EXCITED / CONFUSED / SLEEP gallery
+    # GOD / rpAI faces: resting base + ERROR / EXCITED / CONFUSED / SLEEP gallery
     - assets/ned/ned_face_resting.png
     - assets/ned/ned_face_error.png
     - assets/ned/ned_face_excited.png

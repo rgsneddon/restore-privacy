@@ -64,7 +64,7 @@ NODE_PRIVACY_PY = (
     "config.py",
     "key_backend.py",
     "key_rotation.py",
-    # Co-joined stack: VPN residual + rpAI (Ned) + Perccent on one host unit
+    # Co-joined stack: VPN residual + rpAI (GOD) + Perccent on one host unit
     "cojoined_roles.py",
     "oracle_master.py",
 )

@@ -1,7 +1,7 @@
-/// Ned (rpAI) face icon set + phase→stimulus mapping.
+/// GOD (rpAI) face icon set + phase→stimulus mapping.
 ///
 /// **Base / resting** face (Imagine resting post) is the idle menu state when
-/// Ned is not enacting tasks. Task faces come from the Preview Gallery
+/// GOD is not enacting tasks. Task faces come from the Preview Gallery
 /// (ERROR / EXCITED / CONFUSED / SLEEP).
 ///
 /// Pure helpers — unit-tested without widgets. Faces decorate the guide only;
@@ -10,12 +10,12 @@ library;
 
 import 'suite_ned_guide.dart';
 
-/// Named visual stimulus for Ned chrome (maps 1:1 to a discrete face asset).
+/// Named visual stimulus for GOD chrome (maps 1:1 to a discrete face asset).
 enum NedIconStimulus {
   /// Menu / idle base — resting face (not enacting tasks).
   idle,
 
-  /// Ned is asking a yes/no or primary choice — CONFUSED face.
+  /// GOD is asking a yes/no or primary choice — CONFUSED face.
   asking,
 
   /// Register sheet / busy work — SLEEP face ("working").
@@ -51,7 +51,7 @@ const List<String> kNedFaceAssetPaths = [
   kNedFaceAssetSleep,
 ];
 
-/// Alias: primary packaged Ned chrome paths are the face set.
+/// Alias: primary packaged GOD chrome paths are the face set.
 const List<String> kNedIconAssetPaths = kNedFaceAssetPaths;
 
 // Backward-compatible constants (older tests / secondary chrome).
@@ -133,17 +133,17 @@ String nedIconAssetForState(
 String nedIconSemanticsLabel(NedIconStimulus stimulus) {
   switch (stimulus) {
     case NedIconStimulus.idle:
-      return 'Ned idle — resting face';
+      return 'GOD idle — resting face';
     case NedIconStimulus.asking:
-      return 'Ned asking — confused face';
+      return 'GOD asking — confused face';
     case NedIconStimulus.processing:
-      return 'Ned processing — sleep face';
+      return 'GOD processing — sleep face';
     case NedIconStimulus.explaining:
-      return 'Ned explaining — excited face';
+      return 'GOD explaining — excited face';
     case NedIconStimulus.ready:
-      return 'Ned ready — excited face';
+      return 'GOD ready — excited face';
     case NedIconStimulus.error:
-      return 'Ned error — error face';
+      return 'GOD error — error face';
   }
 }
 

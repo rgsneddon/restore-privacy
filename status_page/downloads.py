@@ -145,7 +145,7 @@ def load_downloads_map() -> dict[str, Any]:
 
 
 def load_downloads_map_public() -> dict[str, Any]:
-    """JSON-safe map for /downloads-map.json and rpAI/Ned (no secrets)."""
+    """JSON-safe map for /downloads-map.json and rpAI/GOD (no secrets)."""
     data = load_downloads_map()
     plats = data.get("platforms") if isinstance(data.get("platforms"), dict) else {}
     return {

@@ -60,10 +60,10 @@ Primary control: **`RESTORE_rpOS`** (Unix) or **`RESTORE_rpOS.cmd`** (Windows).
 2. **Gate** — type exact `RESTORE` or abort  
 3. **Wipe intent** — absolute format intent; default **dry-run**  
 4. **Install** — foundation + free **Pens · Tables · Slides** → **user Desktop** launchers  
-5. **Ned OOBE** — timezone → language → email → **rpMail**  
-6. **Ned locked guide** — **Pens → Tables → Slides** before full OS unlock  
+5. **GOD OOBE** — timezone → language → email → **rpMail**  
+6. **GOD locked guide** — **Pens → Tables → Slides** before full OS unlock  
 
-Full utilisation stays **locked** until Ned finishes showing all three Desktop apps.
+Full utilisation stays **locked** until GOD finishes showing all three Desktop apps.
 
 ```bash
 python3 -m rpos.installer smoke   # safe dry-run of full path

@@ -86,7 +86,7 @@ def render_admin_rpos_deploy_howto_html() -> str:
   <code>RESTORE_rpOS.cmd</code>. Flow: multi-layer advisories (careful /
   irreversible / data loss) → exact phrase <code>RESTORE</code> → absolute wipe
   <em>intent</em> (default dry-run adapter; never silent) → foundation install →
-  <strong>Ned</strong> OOBE (timezone → language → email into rpMail). Packages do
+  <strong>GOD</strong> OOBE (timezone → language → email into rpMail). Packages do
   <strong>not</strong> silent-format disks without confirmation.</p>
 
   <h3>3. SDK whitewash (built per requirements)</h3>
@@ -113,7 +113,7 @@ def render_admin_rpos_deploy_howto_html() -> str:
   <ol>
     <li>Run the security audit modelled on the monorepo original; surface as
         Rx browser homepage content where configured.</li>
-    <li>Enable Ned (rpAI) narrative helper for install storytelling.</li>
+    <li>Enable GOD (rpAI) narrative helper for install storytelling.</li>
     <li>Record commercial handoff in admin accounting / support tickets.</li>
   </ol>
 </section>

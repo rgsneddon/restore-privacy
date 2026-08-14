@@ -2456,7 +2456,7 @@ class Handler(BaseHTTPRequestHandler):
             body = json.dumps({"ok": True, "ned": snap}, indent=2).encode("utf-8")
             self._send(200, "application/json; charset=utf-8", body)
             return
-        # Public Ned growth counters (honest stats only — no fingerprints / paths).
+        # Public GOD growth counters (honest stats only — no fingerprints / paths).
         if path in ("/api/ned-growth", "/api/ned-growth/"):
             try:
                 from admin_rps import (

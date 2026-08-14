@@ -1,6 +1,6 @@
-"""Admin rpS page — Restore Privacy Server computational power / Ned growth stats.
+"""Admin rpS page — Restore Privacy Server computational power / GOD growth stats.
 
-Route ``/admin/rps`` — statistical growth of the rpAI (Ned) helper as nodes join
+Route ``/admin/rps`` — statistical growth of the rpAI (GOD) helper as nodes join
 the load-balanced server pool **and** as Evolve ChronoFlux blocks are confirmed
 (admin seals / mint path). Admin auth required.
 
@@ -26,9 +26,19 @@ NARRATIVE_GROWTH_POINTS = 2
 # Cap remembered fingerprints so the stats file stays small.
 _MAX_GROWN_FINGERPRINTS = 64
 
+# User-visible helper name (routes/files may still say ned).
+RPAI_HELPER_DISPLAY_NAME = "GOD"
+
+
+def apply_current_helper_display_name(stats: dict[str, Any]) -> dict[str, Any]:
+    """Force current helper product label so stale Ned stats files do not advertise."""
+    out = dict(stats or {})
+    out["product"] = f"{RPAI_HELPER_DISPLAY_NAME} · rpAI · Restore Privacy Helper"
+    return out
+
 # Default seed stats (adaptive learning begin surface — not trained weights).
 _DEFAULT_STATS: dict[str, Any] = {
-    "product": "Ned · rpAI · Restore Privacy Helper",
+    "product": f"{RPAI_HELPER_DISPLAY_NAME} · rpAI · Restore Privacy Helper",
     "mission": "adaptive learning for the good of all humanity",
     "rps_label": "rpS — Restore Privacy Server computational power",
     "nodes_online": 0,
@@ -45,7 +55,7 @@ _DEFAULT_STATS: dict[str, Any] = {
     "grown_fingerprints": [],
     "load_balance": (
         "round-robin across available project servers; expands as nodes join; "
-        "grows on each confirmed ChronoFlux admin seal + node heartbeat + Ned OOBE"
+        "grows on each confirmed ChronoFlux admin seal + node heartbeat + GOD OOBE"
     ),
     # Co-joined node readiness parameters (admin wants all true when stack is up)
     "ready_vpn": False,
@@ -68,7 +78,7 @@ _DEFAULT_STATS: dict[str, Any] = {
     "ready_suite_architecture": False,
     "role_capabilities": {
         "vpn": "Residual HELLO/session, nolog, multi-hop structure",
-        "rpai": "Ned co-located learning + oracle housework + Suite surface map",
+        "rpai": "GOD co-located learning + oracle housework + Suite surface map",
         "perccent": "Perccent seed heartbeat co-located with residual",
     },
     "updated_unix": 0,
@@ -102,13 +112,13 @@ def load_rps_stats(*, stats_path: Path | None = None) -> dict[str, Any]:
                 fps = out.get("grown_fingerprints")
                 if not isinstance(fps, list):
                     out["grown_fingerprints"] = []
-                return out
+                return apply_current_helper_display_name(out)
         except (OSError, json.JSONDecodeError):
             pass
     out = dict(_DEFAULT_STATS)
     out["grown_fingerprints"] = []
     out["updated_unix"] = int(time.time())
-    return out
+    return apply_current_helper_display_name(out)
 
 
 def save_rps_stats(
@@ -119,7 +129,7 @@ def save_rps_stats(
     """Persist stats dict; returns written snapshot.
 
     Forbidden user-secret keys (connection logs, mnemonics, passphrases, backup
-    bytes, licence prose) are stripped before write — oracle/Ned never durably
+    bytes, licence prose) are stripped before write — oracle/GOD never durably
     store user data (CERBERUS privacy contract).
     """
     try:
@@ -135,6 +145,7 @@ def save_rps_stats(
 
     out = dict(_DEFAULT_STATS)
     out.update(sanitize_stats_for_persist(stats or {}))
+    out = apply_current_helper_display_name(out)
     out["capability_tier"] = int(int(out.get("growth_score") or 0) // 10)
     out["updated_unix"] = int(time.time())
     # Second strip after merge defaults (defensive)
@@ -162,7 +173,7 @@ def apply_confirmed_block_growth(
     label: str = "",
     points: int = BLOCK_GROWTH_POINTS,
 ) -> dict[str, Any]:
-    """Pure: advance Ned growth from one confirmed ChronoFlux block.
+    """Pure: advance GOD growth from one confirmed ChronoFlux block.
 
     Idempotent on *fingerprint* (same seal cannot double-count). When fingerprint
     is empty, grows if *height* is strictly greater than ``last_chronoflux_height``.
@@ -229,7 +240,7 @@ def record_chronoflux_block_growth(
     stats_path: Path | None = None,
     block: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Persist Ned growth for a confirmed ChronoFlux block (admin seal path).
+    """Persist GOD growth for a confirmed ChronoFlux block (admin seal path).
 
     Accepts either explicit height/fingerprint or a *block* dict from
     :func:`admin_chronoflux.mint_admin_action_block` / progress result.
@@ -312,7 +323,7 @@ def apply_narrative_session_growth(
     *,
     points: int = NARRATIVE_GROWTH_POINTS,
 ) -> dict[str, Any]:
-    """Pure: secondary growth — Ned OOBE / narrative install session completed."""
+    """Pure: secondary growth — GOD OOBE / narrative install session completed."""
     s = dict(_DEFAULT_STATS)
     s.update(stats or {})
     pts = max(0, int(points))
@@ -331,7 +342,7 @@ def record_narrative_session(
     stats_path: Path | None = None,
     points: int = NARRATIVE_GROWTH_POINTS,
 ) -> dict[str, Any]:
-    """Persist Ned growth when a narrative / OOBE session completes."""
+    """Persist GOD growth when a narrative / OOBE session completes."""
     current = load_rps_stats(stats_path=stats_path)
     next_s = apply_narrative_session_growth(current, points=points)
     next_s.pop("grew", None)
@@ -341,8 +352,10 @@ def record_narrative_session(
 
 
 def ned_growth_public_snapshot(stats: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Safe subset for Suite Ned tab / JSON API (no internal fingerprint list)."""
-    s = stats if stats is not None else load_rps_stats()
+    """Safe subset for Suite GOD tab / JSON API (no internal fingerprint list)."""
+    s = apply_current_helper_display_name(
+        stats if stats is not None else load_rps_stats()
+    )
     snap = {
         "product": s.get("product"),
         "mission": s.get("mission"),
@@ -423,7 +436,7 @@ def ned_growth_public_snapshot(stats: dict[str, Any] | None = None) -> dict[str,
 def readiness_parameters(stats: dict[str, Any] | None = None) -> dict[str, bool]:
     """Explicit co-join readiness matrix for /admin/rps (all true when stack healthy).
 
-    Suite architecture completeness lives on stats / public Ned snapshot as
+    Suite architecture completeness lives on stats / public GOD snapshot as
     ``ready_suite_architecture`` — it is intentionally NOT part of this matrix
     so three-role residual readiness stays honest without inventing Suite UX map.
     """
@@ -464,7 +477,7 @@ def record_oracle_collation(
     stats_path: Path | None = None,
     lab_ready: bool = False,
 ) -> dict[str, Any]:
-    """Collate satellite heartbeats (or lab ready co-join) into rpS + Ned learn.
+    """Collate satellite heartbeats (or lab ready co-join) into rpS + GOD learn.
 
     When *lab_ready* is True (unit/lab without live fleet), inject two synthetic
     ready satellites so admin readiness can report true for co-joined stack.
@@ -723,7 +736,7 @@ def ensure_admin_rps_ready_surface(
 
 
 def render_admin_rps_stats_html(stats: dict[str, Any] | None = None) -> str:
-    """Stats panel HTML for Ned / rpS growth + co-joined readiness."""
+    """Stats panel HTML for GOD / rpS growth + co-joined readiness."""
     s = stats if stats is not None else load_rps_stats()
     ready = readiness_parameters(s)
 
@@ -780,8 +793,8 @@ def render_admin_rps_stats_html(stats: dict[str, Any] | None = None) -> str:
         ("Oracle satellites seen", s.get("oracle_satellites_seen")),
         ("Oracle satellites ready", s.get("oracle_satellites_ready")),
         ("Load balance", s.get("load_balance")),
-        ("Ned findings", "; ".join(s.get("oracle_findings") or []) or "—"),
-        ("Ned housework", "; ".join(s.get("ned_housework_done") or []) or "—"),
+        ("GOD findings", "; ".join(s.get("oracle_findings") or []) or "—"),
+        ("GOD housework", "; ".join(s.get("ned_housework_done") or []) or "—"),
         ("Updated (unix)", s.get("updated_unix")),
     ]
     trs = "".join(
@@ -804,10 +817,10 @@ def render_admin_rps_stats_html(stats: dict[str, Any] | None = None) -> str:
          data-ready-cojoined="{yn(bool(ready.get('ready_cojoined')))}"
          data-all-ready="{yn(all_true)}"
          data-compute-score="{esc(s.get('compute_score'))}">
-  <h2>Ned · rpAI growth (rpS)</h2>
+  <h2>GOD · rpAI growth (rpS)</h2>
   <p>Statistical data for the Restore Privacy Helper. Co-joined residual nodes run
   <strong>VPN + rpAI + Perccent</strong> together. Growth advances on ChronoFlux seals,
-  node heartbeats, Ned OOBE, and Helsinki oracle collation. Counters and capability
+  node heartbeats, GOD OOBE, and Helsinki oracle collation. Counters and capability
   tiers only — not a fully trained fleet model claim.</p>
   <h3 id="admin-rps-readiness-heading">Co-joined readiness</h3>
   <table class="admin-table" id="admin-rps-readiness-table"
@@ -851,7 +864,7 @@ def render_admin_rps_page_html() -> bytes:
 </div>
 """
     return _admin_page_shell(
-        title="rpS · Ned — Admin",
+        title="rpS · GOD — Admin",
         active="rps",
         main_html=body,
     )

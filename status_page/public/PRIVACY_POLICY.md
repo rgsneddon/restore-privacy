@@ -67,19 +67,21 @@ Force-on for operators/tests (not opt-out of defaults): set **`RPT_TRAFFIC_SHAPE
 
 ---
 
-## rpAI (Ned) — honest description
+## rpAI (GOD) — honest description
 
 rpAI is **not** a chatbot in the residual Windows/macOS/Linux/Android/iOS VPN app, and it does **not** read your tunnel traffic.
 
 | What people hear | What is actually shipped |
 |------------------|--------------------------|
-| “An AI that uses my VPN data” | Residual clients are **VPN-only**. There is no Ned/rpAI tab, prompt box, or cloud-model call on the residual Connect path. |
-| “Ned learns about me” | On residual **nodes**, a co-located helper thread (`rpAI · Ned`) ticks local counters (learning epochs, ChronoFlux growth, node heartbeats). Those are operator/product stats, not packet contents and not browsing history. |
+| “An AI that uses my VPN data” | Residual clients are **VPN-only**. There is no GOD/rpAI tab, prompt box, or cloud-model call on the residual Connect path. |
+| “GOD learns about me” | On residual **nodes**, a co-located helper thread (`rpAI · GOD`) ticks local counters (learning epochs, ChronoFlux growth, node heartbeats). Those are operator/product stats, not packet contents and not browsing history. |
 | “My chats go to OpenAI / Anthropic / xAI” | They do not. Residual Connect does not send prompts or page contents to third-party AI APIs. |
-| “Ned is a real assistant” | The historical Suite Flutter surface is a **scripted** helper (install/how-to narrative, like a privacy-first Clippy). It is **retired from residual client chrome**. It does not train a model on you. |
-| “What can Ned learn from the shop?” | Ned may absorb the public **Downloads Map** (which installer version each OS is on). That file has no names, emails, IPs, or User-Agents. |
+| “GOD is a real assistant” | The historical Suite Flutter surface is a **scripted** helper (install/how-to narrative, like a privacy-first Clippy). It is **retired from residual client chrome**. It does not train a model on you. |
+| “What can GOD learn from the shop?” | GOD may absorb the public **Downloads Map** (which installer version each OS is on). That file has no names, emails, IPs, or User-Agents. |
 
 Private node hook `/api/private/rpai` is operator/token gated. Public `/api/ned-growth` exposes only non-personal growth counters plus the Downloads Map when present.
+
+The helper was previously named **Ned**. Current user-facing name is **GOD**. Internal route and file names (`/api/ned-growth`, `suite_ned_guide.dart`) stay as identifiers.
 
 ---
 

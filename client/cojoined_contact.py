@@ -1,6 +1,6 @@
 """Single client contact for co-joined residual node (VPN + rpAI + Perccent).
 
-Clients use one residual host:port for Connect; Ned/rpAI and Perccent ride
+Clients use one residual host:port for Connect; GOD/rpAI and Perccent ride
 private hooks on the same monopin host (ui_port), not separate peer lists.
 """
 
@@ -52,7 +52,7 @@ def cojoined_single_contact(
         },
         "note": (
             "One residual monopin contact. VPN HELLO uses host:port; "
-            "Ned/rpAI and Perccent use private UI hooks on the same host."
+            "GOD/rpAI and Perccent use private UI hooks on the same host."
         ),
     }
 

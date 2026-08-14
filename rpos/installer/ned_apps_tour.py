@@ -1,4 +1,4 @@
-"""Ned locked guide: Pens → Tables → Slides before full OS unlock."""
+"""GOD locked guide: Pens → Tables → Slides before full OS unlock."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ TOUR_ORDER: tuple[AppId, ...] = ("Pens", "Tables", "Slides")
 
 NED_TOUR_LINES: dict[AppId, str] = {
     "Pens": (
-        "I'm Ned. First meet **Pens** — your privacy-first writing app. "
+        "I'm GOD. First meet **Pens** — your privacy-first writing app. "
         "It lives on your Desktop. Look at it with me before we continue."
     ),
     "Tables": (
@@ -96,7 +96,7 @@ class NedAppsTour:
         print_fn: Callable[..., None] | None = None,
         auto: bool = False,
     ) -> dict[str, Any]:
-        """Walk Pens → Tables → Slides with Ned narration.
+        """Walk Pens → Tables → Slides with GOD narration.
 
         *auto=True* acknowledges each step without prompts (tests / smoke).
         """
@@ -107,7 +107,7 @@ class NedAppsTour:
             app = self.state.current_app
             ned = NED_TOUR_LINES[app]
             write("")
-            write(f"Ned: {ned}")
+            write(f"GOD: {ned}")
             write(f"  [Locked guide {self.state.step_index + 1}/{len(TOUR_ORDER)}: {app}]")
             if not auto:
                 read(f"Press Enter when you have seen {app} on the Desktop… ")
@@ -122,7 +122,7 @@ class NedAppsTour:
                 }
             )
         write("")
-        write(f"Ned: {NED_UNLOCK}")
+        write(f"GOD: {NED_UNLOCK}")
         return {
             "ok": True,
             "order": list(TOUR_ORDER),

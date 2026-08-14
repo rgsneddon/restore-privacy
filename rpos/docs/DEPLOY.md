@@ -28,7 +28,7 @@ Each archive includes:
   2. Exact confirmation phrase `RESTORE` (anything else aborts)
   3. Absolute wipe **intent** via dry-run adapter by default (no silent format)
   4. Foundation install from scratch
-  5. **Ned** OOBE: timezone → language → email into **rpMail**
+  5. **GOD** OOBE: timezone → language → email into **rpMail**
 
 ```bash
 # From extracted package root (or monorepo with PYTHONPATH=.)
@@ -45,5 +45,5 @@ python3 -m rpos.installer smoke
 3. Build/ship rpOS desktop packages (`package_rpos.py` → `releases/rpos/0.2.1/`, includes RxShell).
 4. Customer install via platform entry; RESTORE path only after wipe warning.
 5. Configure custom network via separate company SDK admin installer.
-6. Enable Ned (rpAI) narrative helper for install storytelling.
+6. Enable GOD (rpAI) narrative helper for install storytelling.
 7. Record handoff in admin accounting.

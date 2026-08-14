@@ -10,7 +10,7 @@ import 'suite_ned_guide.dart';
 import 'suite_ned_icons.dart';
 import 'theme.dart';
 
-/// Ned — Restore Privacy Helper (rpAI) tab surface.
+/// GOD — Restore Privacy Helper (rpAI) tab surface.
 ///
 /// Adaptive learning narrative plus **scripted** help for deferred Suite
 /// wallet/Evolve registration and stepped how-tos (wallet, Evolve, optional VPN).
@@ -35,14 +35,14 @@ class SuiteRpaiTab extends StatefulWidget {
   /// Injectable register/login apply (tests).
   final SuiteAccountAuthRunner? applyCredentials;
 
-  static const String kNedName = 'Ned';
+  static const String kNedName = 'GOD';
   static const String kRpaiLabel = 'rpAI';
   static const String kRpsLabel = 'rpS';
   static const String kMission =
       'Adaptive learning for the good of all humanity.';
 
   static const String kDefaultNarrative =
-      'Hello — I\'m Ned, your Restore Privacy Helper. '
+      'Hello — I\'m GOD, your Restore Privacy Helper. '
       'I guide Suite installs and the rpOS story with a calm narrative, '
       'like a privacy-first Clippy. My core runs across rpS '
       '(Restore Privacy Server computational power) and grows as project '
@@ -52,7 +52,7 @@ class SuiteRpaiTab extends StatefulWidget {
   /// Pure formatter for growth counters (unit-testable; no network).
   static String formatGrowthSummary(Map<String, dynamic>? stats) {
     if (stats == null || stats.isEmpty) {
-      return 'Growth: waiting for ChronoFlux seals, node heartbeats, or Ned OOBE.';
+      return 'Growth: waiting for ChronoFlux seals, node heartbeats, or GOD OOBE.';
     }
     final score = stats['growth_score'] ?? stats['growthScore'] ?? 0;
     final blocks =
@@ -70,7 +70,7 @@ class SuiteRpaiTab extends StatefulWidget {
   State<SuiteRpaiTab> createState() => SuiteRpaiTabState();
 }
 
-/// Public state for tests that drive Ned controls.
+/// Public state for tests that drive GOD controls.
 class SuiteRpaiTabState extends State<SuiteRpaiTab> {
   SuiteAccountStore? _store;
   bool _loading = true;
@@ -209,7 +209,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
           children: [
             Row(
               children: [
-                // Imagine-derived Ned face chrome (default / CONFUSED / SLEEP /
+                // Imagine-derived GOD face chrome (default / CONFUSED / SLEEP /
                 // EXCITED / ERROR) tracks real [NedGuidePhase] (+ busy).
                 _NedIconAvatar(
                   key: const Key('ned_icon_avatar'),
@@ -224,7 +224,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Ned · Restore Privacy Helper',
+                        'GOD · Restore Privacy Helper',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -311,7 +311,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
             ] else ...[
               const SizedBox(height: 18),
               Text(
-                'Ned says',
+                'GOD says',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
@@ -468,7 +468,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
   }
 }
 
-/// Rounded Ned avatar that swaps Imagine icons with guide phase.
+/// Rounded GOD avatar that swaps Imagine icons with guide phase.
 class _NedIconAvatar extends StatelessWidget {
   const _NedIconAvatar({
     super.key,

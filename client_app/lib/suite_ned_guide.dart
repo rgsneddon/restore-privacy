@@ -1,4 +1,4 @@
-/// Ned (rpAI) scripted helper: resume Suite account setup + stepped how-tos.
+/// GOD (rpAI) scripted helper: resume Suite account setup + stepped how-tos.
 ///
 /// Pure state machine — unit-tested without widgets. VPN Connect never depends
 /// on Suite account registration.
@@ -16,18 +16,18 @@ enum NedAccountBranch {
   offerSetup,
 }
 
-/// Interactive Ned script phase.
+/// Interactive GOD script phase.
 enum NedGuidePhase {
   /// Waiting for user to pick a primary action (resume / how-to).
   menu,
 
-  /// Ned asked: continue setting up wallet + analyser?
+  /// GOD asked: continue setting up wallet + analyser?
   askContinueSetup,
 
   /// User is in unified register/login (handled by UI sheet).
   registering,
 
-  /// Ned offered how-to for wallet/Evolve.
+  /// GOD offered how-to for wallet/Evolve.
   askHowTo,
 
   /// Stepping through wallet then Evolve explainers.
@@ -43,7 +43,7 @@ enum NedGuidePhase {
   done,
 }
 
-/// One typed Ned line (or multi-sentence part).
+/// One typed GOD line (or multi-sentence part).
 class NedGuidePart {
   const NedGuidePart({
     required this.id,
@@ -98,7 +98,7 @@ const List<NedGuidePart> kNedEvolveHowToParts = [
     id: 'evolve_2',
     title: 'EVOLVE — sign-in',
     body:
-        'One Suite account covers both % and EVOLVE. If Ned helped you register, '
+        'One Suite account covers both % and EVOLVE. If GOD helped you register, '
         'open EVOLVE and continue — you should not be forced through a second '
         'independent register wall for the same identity.',
   ),
@@ -198,7 +198,7 @@ bool shouldShowNedHowToOffer({required bool registered}) {
   return registered;
 }
 
-/// Immutable Ned guide machine state.
+/// Immutable GOD guide machine state.
 class NedGuideState {
   const NedGuideState({
     required this.phase,
@@ -216,7 +216,7 @@ class NedGuideState {
   /// Active part list for the current explaining phase.
   final List<NedGuidePart> parts;
 
-  /// Lines Ned has already "typed" (newest last).
+  /// Lines GOD has already "typed" (newest last).
   final List<String> lines;
 
   /// Last part fully shown (for UI title).
@@ -333,7 +333,7 @@ NedGuideState nedGuideDeclineHowTo(NedGuideState s) {
     phase: NedGuidePhase.done,
     lines: [
       ...s.lines,
-      'Alright — skip the guides for now. You can return to Ned anytime.',
+      'Alright — skip the guides for now. You can return to GOD anytime.',
       kNedDoneLabel,
     ],
   );

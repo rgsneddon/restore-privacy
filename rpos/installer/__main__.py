@@ -1,4 +1,4 @@
-"""CLI: single-click RESTORE + Ned OOBE + Pens/Tables/Slides locked tour."""
+"""CLI: single-click RESTORE + GOD OOBE + Pens/Tables/Slides locked tour."""
 
 from __future__ import annotations
 
@@ -222,7 +222,7 @@ def cmd_smoke() -> int:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="rpos.installer",
-        description="rpOS RESTORE + Ned OOBE + Pens/Tables/Slides tour",
+        description="rpOS RESTORE + GOD OOBE + Pens/Tables/Slides tour",
     )
     ap.add_argument("--version", action="store_true")
     sub = ap.add_subparsers(dest="cmd")
@@ -236,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
     p_rest.add_argument("--smoke", action="store_true")
     p_rest.add_argument("--run-oobe", action="store_true")
 
-    p_oobe = sub.add_parser("oobe", help="Ned timezone/language/email (interactive)")
+    p_oobe = sub.add_parser("oobe", help="GOD timezone/language/email (interactive)")
     p_oobe.add_argument("--timezone", default="")
     p_oobe.add_argument("--language", default="")
     p_oobe.add_argument("--email", default="")
@@ -246,10 +246,10 @@ def main(argv: list[str] | None = None) -> int:
     p_oobe.add_argument(
         "--run-apps-tour",
         action="store_true",
-        help="After personal OOBE, run Ned locked Pens→Tables→Slides tour",
+        help="After personal OOBE, run GOD locked Pens→Tables→Slides tour",
     )
 
-    p_tour = sub.add_parser("apps-tour", help="Ned locked guide: Pens → Tables → Slides")
+    p_tour = sub.add_parser("apps-tour", help="GOD locked guide: Pens → Tables → Slides")
     p_tour.add_argument("--prefix", default=None)
     p_tour.add_argument("--smoke", action="store_true")
     p_tour.add_argument("--auto", action="store_true", help="Acknowledge steps without Enter")

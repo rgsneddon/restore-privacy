@@ -53,7 +53,7 @@ describe('action blocks + confirm + diagrams + mint', () => {
     );
   });
 
-  it('diagrams produce non-empty series plus NED stats', () => {
+  it('diagrams produce non-empty series plus GOD stats', () => {
     const chain = createActionChain();
     chain.recordTabClick('wallet');
     chain.recordKeystroke('x');
@@ -69,7 +69,7 @@ describe('action blocks + confirm + diagrams + mint', () => {
     assert.ok(diagrams.graphs.wards.length > 0);
     assert.ok(diagrams.graphs.mint.length > 0);
     assert.ok(diagrams.graphs.rpai.length > 0);
-    assert.equal(diagrams.ned.identity, 'NED');
+    assert.equal(diagrams.ned.identity, 'GOD');
     assert.equal(diagrams.ned.learned, 2);
   });
 

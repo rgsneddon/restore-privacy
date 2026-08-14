@@ -1,4 +1,4 @@
-/** NED / rpAI ingest + stats for explorer and Mishi. */
+/** GOD / rpAI ingest + stats for explorer and Mishi. */
 
 export const RPAI_SOURCE_WALLET = 'evolve-wallet';
 export const RPAI_SOURCE_VPN = 'restore-privacy-vpn';
@@ -11,7 +11,7 @@ export const RPAI_SOTA = {
   latencyMs: 40,
 };
 
-export function createRpaiLearner(identity = 'NED') {
+export function createRpaiLearner(identity = 'GOD') {
   const accepted = [];
   const rejected = [];
   let seq = 0;

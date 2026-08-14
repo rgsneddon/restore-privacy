@@ -2,7 +2,7 @@ import { TREASURY_MINT_MICRO_PER_COOLDOWN } from './chain_constants.js';
 import { wardsForVotingEpoch } from './block_confirm.js';
 
 /**
- * Graphs / diagrams for every explorer piece: blocks, wards, mint, rpAI + NED.
+ * Graphs / diagrams for every explorer piece: blocks, wards, mint, rpAI + GOD.
  * Always returns non-empty series.
  */
 export function buildExplorerDiagrams({
@@ -21,7 +21,7 @@ export function buildExplorerDiagrams({
   const wardSeries = wards.length ? wards.map((w) => w.wardIndex) : [1];
   const mintTick = Number(TREASURY_MINT_MICRO_PER_COOLDOWN || 1);
   const mintSeries = blockSeries.map((_, i) => (i + 1) * Math.max(1, Math.floor(mintTick / 1_000_000)));
-  const stats = rpaiStats || { learned: 0, byKind: {}, identity: 'NED' };
+  const stats = rpaiStats || { learned: 0, byKind: {}, identity: 'GOD' };
   const kindValues = Object.values(stats.byKind || {});
   const rpaiSeries = kindValues.length ? kindValues.map((n) => Number(n) || 0) : [Number(stats.learned) || 0];
 

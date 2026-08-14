@@ -1,4 +1,4 @@
-"""Co-joined residual node roles: VPN + rpAI (Ned) + Perccent blockchain.
+"""Co-joined residual node roles: VPN + rpAI (GOD) + Perccent blockchain.
 
 One host process stack — not three unrelated services. Roles share lifecycle
 and a single contact surface for clients (residual monopin host:port).
@@ -20,7 +20,7 @@ COJOINED_ROLES: tuple[str, ...] = (ROLE_VPN, ROLE_RPAI, ROLE_PERC)
 
 ROLE_LABELS: dict[str, str] = {
     ROLE_VPN: "Residual VPN node",
-    ROLE_RPAI: "rpAI · Ned helper",
+    ROLE_RPAI: "rpAI · GOD helper",
     ROLE_PERC: "Perccent blockchain seed",
 }
 
@@ -172,7 +172,7 @@ class CojoinedRoleRegistry:
         self._stop.set()
 
     def _rpai_loop(self) -> None:
-        """Ned/rpAI co-located helper — learns oracle parameters via counters."""
+        """GOD/rpAI co-located helper — learns oracle parameters via counters."""
         from node.rpai_learn import get_learner, learn_vpn_event
 
         epochs = 0
@@ -187,7 +187,7 @@ class CojoinedRoleRegistry:
                 ROLE_RPAI,
                 ready=True,
                 running=True,
-                detail="Ned co-located learning loop",
+                detail="GOD co-located learning loop",
                 stats={
                     "learning_epochs_local": epochs,
                     "oracle_sync": True,

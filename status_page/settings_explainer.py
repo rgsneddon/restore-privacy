@@ -56,7 +56,7 @@ CORPORATE_CLIENTS_LIMITS = (
 CORPORATE_CLIENTS_FOOT = "This is a yearly subscription."
 CORPORATE_CLIENTS_BARS_HEADING = "rpAI (SDK) progressive learned ability (%)"
 
-# Five CORPORATE CLIENTS parts → NED / rpAI learned signals (not coverage slogans).
+# Five CORPORATE CLIENTS parts → GOD / rpAI learned signals (not coverage slogans).
 # Surfaces are suite_architecture ids from node.oracle_master.SUITE_SURFACE_IDS.
 CORPORATE_NED_PARTS: tuple[dict[str, Any], ...] = (
     {
@@ -116,7 +116,7 @@ def clamp_learned_percent(value: Any) -> int:
 
 
 def _surface_learned_percent(snapshot: Mapping[str, Any] | None, sid: str) -> int:
-    """Honest 0–100 for one NED suite surface (observed counts + learned flag)."""
+    """Honest 0–100 for one GOD suite surface (observed counts + learned flag)."""
     snap = snapshot if isinstance(snapshot, Mapping) else {}
     arch = snap.get("suite_architecture")
     surfaces = (
@@ -144,10 +144,10 @@ def _surface_learned_percent(snapshot: Mapping[str, Any] | None, sid: str) -> in
 def corporate_ned_bar_values(
     snapshot: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Map public NED / rpAI growth snapshot → five CORPORATE CLIENTS bars.
+    """Map public GOD / rpAI growth snapshot → five CORPORATE CLIENTS bars.
 
     Each bar is one named corporate part's learned progress (0–100). Fill can
-    reach 100 when NED has fully learned that part. Does not invent 94–99%
+    reach 100 when GOD has fully learned that part. Does not invent 94–99%
     coverage slogans.
     """
     snap = snapshot if isinstance(snapshot, Mapping) else {}

@@ -1993,7 +1993,7 @@ def _admin_sidebar_html(*, active: str = "home") -> str:
   <a class="{rpos_cls}" id="admin-nav-rpos" href="/admin/rpos"><span class="sb-ico">&#128187;</span>
     <span class="sb-label">rpOS deploy</span></a>
   <a class="{rps_cls}" id="admin-nav-rps" href="/admin/rps"><span class="sb-ico">&#129302;</span>
-    <span class="sb-label">rpS · Ned</span></a>
+    <span class="sb-label">rpS · GOD</span></a>
   <a class="{perc_cls}" id="admin-nav-perc" href="/admin/perc"><span class="sb-ico">&#9673;</span>
     <span class="sb-label">Perc network</span></a>
   <a class="{support_cls}" id="admin-nav-support-tickets" href="/admin/support-tickets"><span class="sb-ico">&#9993;</span>

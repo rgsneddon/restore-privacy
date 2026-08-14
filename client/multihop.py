@@ -124,7 +124,7 @@ def offered_catalog_hosts() -> tuple[str, ...]:
 def cojoined_connect_contact() -> dict:
     """Single point of contact for residual Connect to the co-joined stack.
 
-    Primary residual host:port for VPN HELLO; same host carries Ned/rpAI and
+    Primary residual host:port for VPN HELLO; same host carries GOD/rpAI and
     Perccent private hooks (see client.cojoined_contact).
     """
     return cojoined_primary_contact()

@@ -230,7 +230,7 @@ def progress_admin_action(
     result["ledgerPath"] = str(lp)
     result["blockCount"] = len(ledger.get("blocks") or [])
 
-    # Ned · rpAI grows on each confirmed ChronoFlux seal (same block just minted).
+    # GOD · rpAI grows on each confirmed ChronoFlux seal (same block just minted).
     try:
         from admin_rps import record_chronoflux_block_growth
     except ImportError:  # pragma: no cover

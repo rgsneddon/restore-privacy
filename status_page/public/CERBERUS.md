@@ -20,7 +20,7 @@ parameters.
 
 ```text
 cerberus/
-  oracle_master.py   # collate + Ned learn + strip
+  oracle_master.py   # collate + GOD learn + strip
   cojoined_roles.py  # three-role residual stack helpers
 tests/
   test_cerberus_privacy.py

@@ -6,9 +6,9 @@ peer catalog (**IS + DE only** post-1.0.8), Suite architecture learn parameters
 non-PII trial/entitlement **ops counters**. Produces an aggregate snapshot for
 admin rpS.
 
-Ned learns oracle parameters as honest counters (not a claim of full ML training).
+GOD learns oracle parameters as honest counters (not a claim of full ML training).
 Never stores KEYGEN strings, payment cards, seed phrases, or reinstall-trial
-attack-surface prose in durable oracle/Ned state.
+attack-surface prose in durable oracle/GOD state.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ SUITE_SURFACE_LABELS: dict[str, str] = {
     "analysis": "Evolve analysis",
     "voting": "Evolve voting",
     "credit": "Credit",
-    "rpai": "rpAI · Ned",
+    "rpai": "rpAI · GOD",
 }
 
 # Alias map so heartbeats can use enum-like or legacy names.
@@ -87,7 +87,7 @@ OPS_ENTITLEMENT_COUNTER_KEYS: frozenset[str] = frozenset(
     }
 )
 
-# Forbidden user-data keys — never retained in collate snapshot or durable Ned stats.
+# Forbidden user-data keys — never retained in collate snapshot or durable GOD stats.
 # CERBERUS / Helsinki oracle is fleet orchestration only (no PII persistence).
 FORBIDDEN_USER_DATA_KEYS: frozenset[str] = frozenset(
     {
@@ -844,7 +844,7 @@ def collate_satellite_heartbeats(
         "residual_peers": peers,
         "ops_entitlement": dict(ops_total),
     }
-    # Per-surface capability counters for admin / Ned absorb
+    # Per-surface capability counters for admin / GOD absorb
     for sid in SUITE_SURFACE_IDS:
         out["capabilities"][f"suite_{sid}_observed"] = int(
             arch["surfaces"][sid]["observed"]
@@ -865,10 +865,10 @@ def ned_learn_oracle(
     *,
     points: int = 2,
 ) -> dict[str, Any]:
-    """Pure: Ned growth + housework log from oracle collation.
+    """Pure: GOD growth + housework log from oracle collation.
 
     Absorbs co-join readiness, Suite architecture, live residual peer catalog
-    (IS+DE), and non-PII trial/entitlement ops counters so Ned can continue
+    (IS+DE), and non-PII trial/entitlement ops counters so GOD can continue
     learning product surfaces and fleet shape over time.
     Returns a new stats dict with oracle parameters absorbed.
     Never copies forbidden user-secret keys into the learned stats dict.
@@ -1106,7 +1106,7 @@ def ned_learn_oracle(
 
 
 def sanitize_stats_for_persist(stats: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Strip forbidden user-data keys before any durable Ned/oracle write."""
+    """Strip forbidden user-data keys before any durable GOD/oracle write."""
     cleaned = strip_user_data(dict(stats or {}))
     return cleaned if isinstance(cleaned, dict) else {}
 

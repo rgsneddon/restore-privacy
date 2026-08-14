@@ -22,16 +22,16 @@ Each residual **node server** runs **three co-located roles** as one deploy unit
 | Part | What it does |
 |------|----------------|
 | **VPN residual** | HELLO / sessions / TUN path — residual privacy tunnel (public status stays **title-only**) |
-| **rpAI · Ned** | Co-located Ned helper loop — learns oracle/housework counters for admin rpS (not a full LLM fleet claim) |
+| **rpAI · GOD** | Co-located GOD helper loop — learns oracle/housework counters for admin rpS (not a full LLM fleet claim) |
 | **Perccent blockchain** | Co-located chain seed heartbeat — same host as residual, private hooks on the node UI port |
 
 They start together with `python3 -m node` / `rpt-node.service` and
 `scripts/deploy_rpt_node.py`. Clients keep a **single residual contact**
-(`host:44044` for Connect); Ned and Perccent use private UI hooks on that same
+(`host:44044` for Connect); GOD and Perccent use private UI hooks on that same
 host (default UI port **8080**), not a second peer list.
 
 Optional **Helsinki oracle** (master) collates satellite heartbeats for admin
-**rpS** (`/admin/rps`) — readiness, compute score, Ned findings/housework.
+**rpS** (`/admin/rps`) — readiness, compute score, GOD findings/housework.
 
 ---
 

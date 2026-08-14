@@ -201,7 +201,7 @@ class TestAdminRposRps(unittest.TestCase):
         raw = render_admin_rps_page_html()
         html = raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else str(raw)
         self.assertIn("admin-rps-stats", html)
-        self.assertIn("Ned", html)
+        self.assertIn("GOD", html)
         self.assertIn("rpS", html)
 
 

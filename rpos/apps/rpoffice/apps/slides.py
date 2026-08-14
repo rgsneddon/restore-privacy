@@ -26,7 +26,7 @@ def smoke() -> dict[str, Any]:
     ed.set_body(0, "Restore Privacy Suite")
     ed.set_notes(0, "Open with residual honesty.")
     ed.set_bullets(0, ["No MS branding", "Raskul-made", "Local-first"])
-    ed.add_slide("Ned", "Your helper", notes="Second slide notes", bullets=["Helpful", "Local"])
+    ed.add_slide("GOD", "Your helper", notes="Second slide notes", bullets=["Helpful", "Local"])
     ed.add_slide("Roadmap", "Next steps")
     # structure ops
     ed.duplicate_slide(1)

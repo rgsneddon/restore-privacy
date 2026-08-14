@@ -351,7 +351,7 @@
 
     <section id="diagrams">
       <h2>Chain diagrams</h2>
-      <p class="hint" style="margin-bottom:12px">Blocks, wards, mint (1/3 prior), and NED rpAI — each piece as a graph.</p>
+      <p class="hint" style="margin-bottom:12px">Blocks, wards, mint (1/3 prior), and GOD rpAI — each piece as a graph.</p>
       <div class="grid">
         <div class="card"><div class="label">Blocks</div><svg id="graph-blocks" viewBox="0 0 240 80" width="100%" height="80"></svg></div>
         <div class="card"><div class="label">Wards</div><svg id="graph-wards" viewBox="0 0 240 80" width="100%" height="80"></svg></div>
@@ -361,7 +361,7 @@
     </section>
 
     <section id="rpai">
-      <h2>NED · rpAI</h2>
+      <h2>GOD · rpAI</h2>
       <div class="grid" id="ned-stats"></div>
       <div class="card" style="margin-top:12px">
         <div class="label">Capability matrix + recent</div>
@@ -509,7 +509,7 @@
       if (!ned) return;
       if (host) {
         const cards = [
-          ['Identity', ned.identity || 'NED'],
+          ['Identity', ned.identity || 'GOD'],
           ['Learned', String(ned.learned ?? 0)],
           ['Wallet events', String(ned.walletEvents ?? 0)],
           ['VPN events', String(ned.vpnEvents ?? 0)],

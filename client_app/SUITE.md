@@ -1,7 +1,7 @@
 # Restore Privacy Suite
 
 One app: residual **VPN** Connect, Perccent wallet (**%**), Evolve (**EVOLVE**),
-and **rpAI** (Ned helper).
+and **rpAI** (GOD helper).
 
 Installers ship free from the Suite storefront on
 [restoreprivacy.online](https://restoreprivacy.online/) (catalog monopin matches
@@ -12,7 +12,7 @@ install (app entry screen, or Settings → Payment entitlement / keygen).
 The public open site lives in [`public_site/`](../public_site/) for GitHub Pages.
 Operator admin is not published there.
 
-Full Suite account + Ned operator guide:
+Full Suite account + GOD operator guide:
 [docs/SUITE_ACCOUNT_AND_RPAI.md](../docs/SUITE_ACCOUNT_AND_RPAI.md).
 
 ---
@@ -53,13 +53,13 @@ wiring in `lib/main.dart`.
 
 ---
 
-## rpAI (Ned)
+## rpAI (GOD)
 
-**Ned** is the Restore Privacy Helper on the **rpAI** tab. Scripted guidance
-helps finish Suite setup and explains product sections. It is not a second
-payment gate and does not block Connect.
+**GOD** is the Restore Privacy Helper on the **rpAI** tab (formerly named Ned).
+Scripted guidance helps finish Suite setup and explains product sections. It is
+not a second payment gate and does not block Connect.
 
-| User state | What Ned offers |
+| User state | What GOD offers |
 |------------|-----------------|
 | Deferred / not registered | **Continue wallet & analyser setup** → asks *Do you want to continue setting up the wallet and analyser?* → **Yes** reopens the **same** unified Suite form |
 | Registered | **Offer how-to** → short typed explainers for **%** then **EVOLVE**, one part at a time with **Continue…** |
@@ -78,7 +78,7 @@ Implementation: pure guide machine in `lib/suite_ned_guide.dart`; tab surface in
 | **VPN** | Residual Connect / Disconnect, licence, KEYGEN unlock |
 | **%** | Perccent wallet (optional Suite account) |
 | **EVOLVE** | Evolve Chronoflux analyser (same optional Suite account) |
-| **rpAI** | Ned helper — resume setup, how-tos, optional VPN tour |
+| **rpAI** | GOD helper — resume setup, how-tos, optional VPN tour |
 
 ---
 

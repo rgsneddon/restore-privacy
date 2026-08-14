@@ -158,7 +158,7 @@ class TestNedOobe(unittest.TestCase):
             self.assertFalse(out["oobe_pending"])
             # Ned lines shown interactively
             blob = "\n".join(spoken).lower()
-            self.assertIn("ned:", blob)
+            self.assertIn("god:", blob)
             self.assertIn("timezone", blob)
             # Prefix binding
             self.assertTrue(oobe_state_path(prefix).is_file())

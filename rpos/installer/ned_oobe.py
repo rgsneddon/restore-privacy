@@ -1,4 +1,4 @@
-"""Ned-guided first setup: timezone → language → email into rpMail."""
+"""GOD-guided first setup: timezone → language → email into rpMail."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ OOBE_STEPS: tuple[StepId, ...] = ("timezone", "language", "email_rpmail", "compl
 
 NED_LINES: dict[StepId, str] = {
     "timezone": (
-        "Hello — I'm Ned, your Restore Privacy Helper. "
+        "Hello — I'm GOD, your Restore Privacy Helper. "
         "We'll set your timezone first so clocks and mail stay honest."
     ),
     "language": (
@@ -51,7 +51,7 @@ class OobeState:
 
 
 class NedOobe:
-    """Ordered first-boot machine with Ned narration at every step."""
+    """Ordered first-boot machine with GOD narration at every step."""
 
     def __init__(self, state: OobeState | None = None) -> None:
         self.state = state or OobeState()
@@ -162,7 +162,7 @@ def mark_oobe_complete_on_prefix(prefix: Path, oobe_payload: dict[str, Any]) -> 
     data["rpmail"] = oobe_payload.get("rpmail")
     data["oobe_state"] = str(state_path)
     marker.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    # Secondary Ned growth signal: completed narrative / OOBE session.
+    # Secondary GOD growth signal: completed narrative / OOBE session.
     try:
         import sys
         from pathlib import Path as _P
@@ -265,7 +265,7 @@ def run_oobe_interactive(
     input_fn=None,
     print_fn=None,
 ) -> dict[str, Any]:
-    """Product OOBE: Ned prints each line; user supplies timezone, language, email.
+    """Product OOBE: GOD prints each line; user supplies timezone, language, email.
 
     *input_fn* / *print_fn* default to builtins so tests can inject fakes.
     """
@@ -282,7 +282,7 @@ def run_oobe_interactive(
         step = oobe.state.step
         ned = oobe.state.current_ned_line()
         write("")
-        write(f"Ned: {ned}")
+        write(f"GOD: {ned}")
         prompt = prompts.get(step, f"{step}: ")
         while True:
             try:
@@ -310,5 +310,5 @@ def run_oobe_interactive(
             }
         )
     write("")
-    write(f"Ned: {NED_LINES['complete']}")
+    write(f"GOD: {NED_LINES['complete']}")
     return _finish_oobe(oobe, steps_out, persist_path=persist_path, prefix=prefix)
