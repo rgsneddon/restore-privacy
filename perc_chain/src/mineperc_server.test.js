@@ -180,7 +180,7 @@ describe('BeamHash III miner wire', () => {
 });
 
 describe('live miner stats', () => {
-  it('login + stats stay off the list until a hash; reject still lists', async () => {
+  it('login + stats list immediately; reject still lists after drop', async () => {
     resetMinerStats();
     resetPoolBlocks();
     seedJob({ preWork: BH3.preWork, jobId: 'share-list' });
@@ -200,8 +200,9 @@ describe('live miner stats', () => {
       version: '1.0.1',
     });
     await s.take(1);
-    assert.equal(poolStatsSnapshot().workers.length, 0);
-    assert.equal(handleApi('/api/stats', 'GET').json.minersOnline, 0);
+    assert.equal(poolStatsSnapshot().workers.length, 1);
+    assert.equal(handleApi('/api/stats', 'GET').json.minersOnline, 1);
+    assert.equal(handleApi('/api/stats', 'GET').json.workers[0].worker, 'raskul');
     s.write({
       id: 2,
       method: 'solution',

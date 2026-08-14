@@ -109,7 +109,7 @@
       </div>
     </div>
     <h2>Live miners</h2>
-    <p class="hint">Listed on the first submitted hash (accepted or rejected). Dropped after 72 seconds without a hash. <a href="/confirmations">How shares confirm</a>.</p>
+    <p class="hint">Listed while connected (login and hashing). After disconnect, stay for 72 seconds after the last hash. <a href="/confirmations">How shares confirm</a>.</p>
     <div class="grid" id="live-pool-stats">
       <div class="card"><div class="label">Online</div><div class="value" id="stat-online">0</div></div>
       <div class="card"><div class="label">Threads</div><div class="value" id="stat-threads">0</div></div>
@@ -139,7 +139,7 @@
         </tr>
       </thead>
       <tbody id="miner-body">
-        <tr><td colspan="14" class="off">No miners hashing in the last 72 seconds.</td></tr>
+        <tr><td colspan="14" class="off">No miners connected.</td></tr>
       </tbody>
     </table>
     <h2>Connect a miner</h2>
@@ -218,7 +218,7 @@
         const body = document.getElementById('miner-body');
         const rows = s.workers || [];
         if (!rows.length) {
-          body.innerHTML = '<tr><td colspan="14" class="off">No miners hashing in the last 72 seconds.</td></tr>';
+          body.innerHTML = '<tr><td colspan="14" class="off">No miners connected.</td></tr>';
           return;
         }
         body.innerHTML = rows.map((m) => `<tr>

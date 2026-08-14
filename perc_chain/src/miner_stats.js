@@ -1,6 +1,7 @@
 /**
- * Live Perc pool miner book. A submitted hash lists the miner for 72s.
- * Login / stats / TCP connect alone do not list them.
+ * Live Perc pool miner book.
+ * Connected miners are listed. After disconnect they stay for 72s if they
+ * submitted a hash; login-only workers drop as soon as the socket closes.
  */
 const miners = new Map();
 const startedAt = Date.now();
@@ -99,7 +100,6 @@ export function recordMinerShare({ username, accepted, percMicro, now } = {}) {
   const at = Number(now) || Date.now();
   rec.lastSeen = at;
   rec.lastHashAt = at;
-  rec.connected = true;
   rec.sessionShares += 1;
   if (accepted) {
     rec.accepted += 1;
@@ -119,8 +119,9 @@ export function recordMinerDisconnect(username) {
   return rec;
 }
 
-/** Public list: last submitted hash within HASH_PRESENCE_MS. Login does not count. */
+/** Public list: connected now, or last hash within HASH_PRESENCE_MS. */
 export function minerIsListed(m, now = Date.now()) {
+  if (m?.connected) return true;
   const at = Number(m?.lastHashAt);
   if (!Number.isFinite(at)) return false;
   return Number(now) - at <= HASH_PRESENCE_MS;
