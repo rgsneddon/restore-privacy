@@ -2,7 +2,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   listMiners,
+  minerIsListed,
   poolStatsSnapshot,
+  recordMinerDisconnect,
   recordMinerLogin,
   recordMinerShare,
   recordMinerStats,
@@ -23,7 +25,12 @@ describe('miner stats book', () => {
       hashrate: 1200,
       version: '1.0.1',
     });
+    const beforeShare = poolStatsSnapshot();
+    assert.equal(beforeShare.minersOnline, 0);
+    assert.equal(beforeShare.workers.length, 0);
     recordMinerShare({ username: name, accepted: true, percMicro: 1 });
+    assert.equal(minerIsListed({ connected: true, sessionShares: 1 }), true);
+    assert.equal(minerIsListed({ connected: true, sessionShares: 0 }), false);
     const split = splitWorker(name);
     assert.equal(split.user, 'percpriv193bfbb92db68043f010592e879396c724d488b30');
     assert.equal(split.worker, 'raskul');
@@ -49,5 +56,15 @@ describe('miner stats book', () => {
     assert.equal(posted.json.miner.threads, 4);
     const rows = listMiners();
     assert.equal(rows[0].threads, 4);
+    recordMinerDisconnect(name);
+    const afterDrop = poolStatsSnapshot();
+    assert.equal(afterDrop.minersOnline, 0);
+    assert.equal(afterDrop.workers.length, 0);
+    assert.ok(!afterDrop.workers.some((w) => w.username === name));
+    recordMinerShare({ username: name, accepted: true, percMicro: 1 });
+    const back = handleApi('/api/stats', 'GET');
+    assert.equal(back.json.minersOnline, 1);
+    assert.equal(back.json.workers[0].username, name);
+    assert.equal(listMiners().length, 1);
   });
 });

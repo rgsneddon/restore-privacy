@@ -179,35 +179,42 @@ describe('BeamHash III miner wire', () => {
 });
 
 describe('live miner stats', () => {
-  it('login + stats land on /api/stats', async () => {
+  it('login + stats stay off the list until a share; disconnect drops', async () => {
     resetMinerStats();
+    seedJob({ preWork: BH3.preWork, jobId: 'share-list' });
     const srv = createStratumServer({ port: 0, tls: null });
     await new Promise((r) => srv.listen(r));
     const { port } = srv.address();
     const s = minerSession(port);
-    s.write({
-      id: 1,
-      method: 'login',
-      api_key: 'percpriv193bfbb92db68043f010592e879396c724d488b30.raskul',
-    });
+    const name = 'percpriv193bfbb92db68043f010592e879396c724d488b30.raskul';
+    s.write({ id: 1, method: 'login', api_key: name });
     await s.take(2);
     s.write({
       method: 'stats',
-      login: 'percpriv193bfbb92db68043f010592e879396c724d488b30.raskul',
+      login: name,
       threads: 2,
       hashes: 131072,
       hashrate: 800,
       version: '1.0.1',
     });
     await s.take(1);
-    const snap = poolStatsSnapshot();
-    assert.equal(snap.minersOnline, 1);
-    assert.equal(snap.threads, 2);
-    assert.equal(snap.workers[0].worker, 'raskul');
-    assert.equal(snap.workers[0].hashes, 131072);
-    const api = handleApi('/api/stats', 'GET');
-    assert.equal(api.json.minersOnline, 1);
+    assert.equal(poolStatsSnapshot().workers.length, 0);
+    assert.equal(handleApi('/api/stats', 'GET').json.minersOnline, 0);
+    s.write({
+      id: 2,
+      method: 'solution',
+      nonce: BH3.nonce,
+      output: BH3.solution,
+    });
+    await s.take(1);
+    const on = handleApi('/api/stats', 'GET').json;
+    assert.equal(on.minersOnline, 1);
+    assert.equal(on.workers[0].worker, 'raskul');
     s.end();
+    await new Promise((r) => setTimeout(r, 30));
+    const off = handleApi('/api/stats', 'GET').json;
+    assert.equal(off.minersOnline, 0);
+    assert.equal(off.workers.length, 0);
     await srv.close();
   });
 });

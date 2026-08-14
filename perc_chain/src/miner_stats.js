@@ -43,6 +43,7 @@ function row(username) {
       hashrate: 0,
       accepted: 0,
       rejected: 0,
+      sessionShares: 0,
       percMicro: 0,
       version: '',
       remote: '',
@@ -92,6 +93,7 @@ export function recordMinerShare({ username, accepted, percMicro } = {}) {
   const rec = row(username);
   rec.lastSeen = Date.now();
   rec.connected = true;
+  rec.sessionShares += 1;
   if (accepted) {
     rec.accepted += 1;
     poolAccepted += 1;
@@ -104,33 +106,32 @@ export function recordMinerShare({ username, accepted, percMicro } = {}) {
 }
 
 export function recordMinerDisconnect(username) {
-  const rec = miners.get(minerKey(username));
-  if (rec) {
-    rec.connected = false;
-    rec.lastSeen = Date.now();
-  }
-  return rec || null;
+  const key = minerKey(username);
+  const rec = miners.get(key) || null;
+  if (rec) miners.delete(key);
+  return rec;
 }
 
-export function listMiners({ staleMs = 120000 } = {}) {
-  const now = Date.now();
+/** Public list: first share lists the miner; no share or disconnect omits them. */
+export function minerIsListed(m) {
+  return Boolean(m && m.connected && Number(m.sessionShares) > 0);
+}
+
+export function listMiners() {
   return [...miners.values()]
-    .map((m) => {
-      const age = m.lastSeen ? now - m.lastSeen : Infinity;
-      const connected = Boolean(m.connected && age <= staleMs);
-      return {
-        ...m,
-        connected,
-        staleSeconds: m.lastSeen ? Math.round(age / 1000) : null,
-        perc: (m.percMicro || 0) / 100_000_000,
-      };
-    })
-    .sort((a, b) => Number(b.connected) - Number(a.connected) || (b.hashrate || 0) - (a.hashrate || 0));
+    .filter(minerIsListed)
+    .map((m) => ({
+      ...m,
+      connected: true,
+      staleSeconds: m.lastSeen ? Math.round((Date.now() - m.lastSeen) / 1000) : null,
+      perc: (m.percMicro || 0) / 100_000_000,
+    }))
+    .sort((a, b) => (b.hashrate || 0) - (a.hashrate || 0) || (b.sessionShares || 0) - (a.sessionShares || 0));
 }
 
 export function poolStatsSnapshot() {
   const rows = listMiners();
-  const online = rows.filter((m) => m.connected);
+  const online = rows;
   return {
     ok: true,
     coin: 'PERC',
