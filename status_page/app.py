@@ -59,9 +59,11 @@ from downloads import (
     FREE_PACKAGES_PATH,
     RELEASE_VERSION,
     download_css,
+    corporate_deposit_cta_css,
     free_download_cta_css,
     load_downloads_map_public,
     render_bmc_tip_html,
+    render_corporate_deposit_cta_html,
     render_download_section_html,
     render_downloads_map_page_html,
     render_free_download_cta_html,
@@ -95,6 +97,8 @@ def upgrade_download_form_html(platform: str) -> str:
         "</body></html>"
     )
 from settings_explainer import (
+    corporate_clients_css,
+    render_corporate_clients_html,
     render_settings_explainer_page_html,
     settings_explainer_paths,
 )
@@ -633,6 +637,7 @@ def render_html(
         + suite_storefront_css()
         + suite_home_intro_css()
         + free_download_cta_css()
+        + corporate_deposit_cta_css()
     )
     free_cta_html = render_free_download_cta_html(
         default_platform=default_platform,
@@ -649,11 +654,14 @@ def render_html(
         )
     countdown_html = render_audit_countdown_html()
     node_wipe_html = render_node_wipe_countdown_html()
+    corporate_html = render_corporate_clients_html()
+    corporate_deposit_html = render_corporate_deposit_cta_html()
     bmc_tip_html = render_bmc_tip_html()
     # public_head_open already injects public_site_css — only page-specific extras here
     # Settings Guide is main-nav only (no dedicated homepage banner box).
     page_css = (
         dl_css
+        + corporate_clients_css()
         + """
     /* Suite + client download boxes: equal halves side-by-side at top of home */
     .home-shop-row {
@@ -758,8 +766,9 @@ def render_html(
         active="home",
         product_active="vpn",
     )
-    # Shop dual-row first (Suite + client downloads as halves), then Node data
-    # clear timer. Full business package box is not mounted on the homepage.
+    # Shop dual-row first, then Corporate clients, then the £3000 deposit
+    # banner, then Node data clear timer. Full business package box is not
+    # mounted on the homepage.
     shop_row_html = f"""
     <div class="home-shop-row" id="home-shop-row" data-home-shop-row="1"
          data-layout="two-halves" aria-label="Suite and client downloads">
@@ -780,6 +789,8 @@ def render_html(
 {suite_intro_html}
 {free_cta_html}
 {shop_row_html}
+{corporate_html}
+{corporate_deposit_html}
 {node_wipe_html}
     <section class="panel-card" id="audit-panel" aria-label="Security audit countdown" data-chrome="pro">
 {countdown_html}

@@ -336,61 +336,9 @@ def homepage_settings_banner_css() -> str:
     return "/* settings banner styles: public_chrome.public_site_css */\n"
 
 
-def _shared_shell_css() -> str:
-    """Page-specific explainer CSS (shared shell CSS comes from public_head_open)."""
+def corporate_clients_css() -> str:
+    """Corporate retainer box styles — used on Settings guide and homepage."""
     return """
-.suite-guide-intro { text-align: center; }
-.suite-guide-intro .suite-guide-lead {
-  margin: 0 auto 0.75rem; max-width: 40rem; line-height: 1.55;
-  font-size: clamp(0.95rem, 2.2vw, 1.08rem); color: var(--rb-soft, #aed0ea);
-  font-weight: 500;
-}
-.suite-guide-intro .suite-guide-foot {
-  margin: 0 auto; max-width: 36rem; font-size: 0.9rem;
-  color: var(--rb-muted); line-height: 1.45;
-}
-.suite-howto-list { margin: 0; padding: 0; list-style: none; }
-.suite-howto-item {
-  border-top: 1px solid var(--rb-card-border);
-  padding: 0.95rem 0.15rem;
-  text-align: left;
-}
-.suite-howto-item:first-child { border-top: none; padding-top: 0.15rem; }
-.suite-howto-item h3 {
-  margin: 0 0 0.35rem; font-size: 1.05rem; color: var(--rb-cream);
-  letter-spacing: 0.02em;
-}
-.suite-howto-item .howto-label {
-  margin: 0.35rem 0 0.15rem; font-size: 0.72rem; font-weight: 800;
-  letter-spacing: 0.07em; text-transform: uppercase;
-  color: var(--rb-accent-sky, var(--rb-link));
-}
-.suite-howto-item p {
-  margin: 0 0 0.35rem; font-size: 0.92rem; line-height: 1.5; color: var(--rb-muted);
-}
-.explainer-list { margin: 0; padding: 0; list-style: none; }
-.explainer-item {
-  border-top: 1px solid var(--rb-card-border);
-  padding: 0.85rem 0.15rem;
-}
-.explainer-item:first-child { border-top: none; padding-top: 0.15rem; }
-.explainer-item h3 {
-  margin: 0 0 0.25rem; font-size: 1rem; color: var(--rb-cream);
-  letter-spacing: 0.02em;
-}
-.explainer-default {
-  margin: 0 0 0.4rem; font-size: 0.75rem; font-weight: 700;
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--rb-accent-sky, var(--rb-link));
-}
-.explainer-item p {
-  margin: 0; font-size: 0.9rem; line-height: 1.5; color: var(--rb-muted);
-}
-.howto-steps { margin: 0; padding-left: 1.2rem; color: var(--rb-muted); }
-.howto-steps li { margin: 0.55rem 0; line-height: 1.5; font-size: 0.92rem; }
-.howto-steps strong { color: var(--rb-cream); }
-.howto-note {
-  margin: 1rem 0 0; font-size: 0.82rem; line-height: 1.45; color: var(--rb-muted);
-}
 .corporate-clients { overflow: hidden; }
 .corporate-clients .corp-lead {
   margin: 0 0 1rem; font-size: 0.95rem; line-height: 1.55; color: var(--rb-muted);
@@ -450,6 +398,65 @@ def _shared_shell_css() -> str:
   letter-spacing: 0.02em;
 }
 .corp-price p { margin: 0; font-size: 0.82rem; line-height: 1.45; color: var(--rb-muted); }
+"""
+
+
+def _shared_shell_css() -> str:
+    """Page-specific explainer CSS (shared shell CSS comes from public_head_open)."""
+    return """
+.suite-guide-intro { text-align: center; }
+.suite-guide-intro .suite-guide-lead {
+  margin: 0 auto 0.75rem; max-width: 40rem; line-height: 1.55;
+  font-size: clamp(0.95rem, 2.2vw, 1.08rem); color: var(--rb-soft, #aed0ea);
+  font-weight: 500;
+}
+.suite-guide-intro .suite-guide-foot {
+  margin: 0 auto; max-width: 36rem; font-size: 0.9rem;
+  color: var(--rb-muted); line-height: 1.45;
+}
+.suite-howto-list { margin: 0; padding: 0; list-style: none; }
+.suite-howto-item {
+  border-top: 1px solid var(--rb-card-border);
+  padding: 0.95rem 0.15rem;
+  text-align: left;
+}
+.suite-howto-item:first-child { border-top: none; padding-top: 0.15rem; }
+.suite-howto-item h3 {
+  margin: 0 0 0.35rem; font-size: 1.05rem; color: var(--rb-cream);
+  letter-spacing: 0.02em;
+}
+.suite-howto-item .howto-label {
+  margin: 0.35rem 0 0.15rem; font-size: 0.72rem; font-weight: 800;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--rb-accent-sky, var(--rb-link));
+}
+.suite-howto-item p {
+  margin: 0 0 0.35rem; font-size: 0.92rem; line-height: 1.5; color: var(--rb-muted);
+}
+.explainer-list { margin: 0; padding: 0; list-style: none; }
+.explainer-item {
+  border-top: 1px solid var(--rb-card-border);
+  padding: 0.85rem 0.15rem;
+}
+.explainer-item:first-child { border-top: none; padding-top: 0.15rem; }
+.explainer-item h3 {
+  margin: 0 0 0.25rem; font-size: 1rem; color: var(--rb-cream);
+  letter-spacing: 0.02em;
+}
+.explainer-default {
+  margin: 0 0 0.4rem; font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--rb-accent-sky, var(--rb-link));
+}
+.explainer-item p {
+  margin: 0; font-size: 0.9rem; line-height: 1.5; color: var(--rb-muted);
+}
+.howto-steps { margin: 0; padding-left: 1.2rem; color: var(--rb-muted); }
+.howto-steps li { margin: 0.55rem 0; line-height: 1.5; font-size: 0.92rem; }
+.howto-steps strong { color: var(--rb-cream); }
+.howto-note {
+  margin: 1rem 0 0; font-size: 0.82rem; line-height: 1.45; color: var(--rb-muted);
+}
+""" + corporate_clients_css() + """
 .footer-nav {
   text-align: center; font-size: 0.88rem; color: var(--rb-muted);
 }

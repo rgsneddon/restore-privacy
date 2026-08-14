@@ -108,6 +108,30 @@ class TestHomepageTwoHalves(unittest.TestCase):
         self.assertNotIn("node-pref-deposit-btn", main)
         self.assertNotIn('data-business-package="1"', main)
 
+    def test_corporate_clients_above_node_wipe(self) -> None:
+        """Corporate retainer box is copied onto home, just above node wipe."""
+        from app import render_html
+
+        page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
+        main = _main_html(page)
+        self.assertIn('id="corporate-clients"', main)
+        self.assertIn("Corporate clients", main)
+        self.assertIn("£30,000", main)
+        self.assertIn("£27,000", main)
+        self.assertIn('id="corporate-clients-icons"', main)
+        self.assertIn('id="corporate-clients-graphs"', main)
+        self.assertIn(".corporate-clients", page)
+        i_row = main.index('id="home-shop-row"')
+        i_corp = main.index('id="corporate-clients"')
+        i_nw = main.index("node-wipe")
+        i_audit = main.index("audit-panel")
+        self.assertLess(i_row, i_corp)
+        self.assertLess(i_corp, i_nw)
+        self.assertLess(i_nw, i_audit)
+        i_dep = main.index('id="corporate-deposit-cta"')
+        self.assertLess(i_corp, i_dep)
+        self.assertLess(i_dep, i_nw)
+
 
 if __name__ == "__main__":
     unittest.main()

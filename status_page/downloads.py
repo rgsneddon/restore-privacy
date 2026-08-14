@@ -1579,7 +1579,7 @@ def free_download_cta_css() -> str:
       width: 100%; max-width: 100%; box-sizing: border-box;
       margin: 0 0 clamp(0.85rem, 2vw, 1.2rem);
     }}
-    a.free-download-cta, a#{FREE_DOWNLOAD_CTA_ID} {{
+    .free-download-cta, a#{FREE_DOWNLOAD_CTA_ID} {{
       display: flex;
       flex-direction: row;
       align-items: center;
@@ -1624,7 +1624,7 @@ def free_download_cta_css() -> str:
       transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.12s ease;
     }}
     /* Circuit motif wash (same public data-path graphic language) */
-    a.free-download-cta::before {{
+    .free-download-cta::before {{
       content: "";
       position: absolute;
       inset: 0;
@@ -1636,16 +1636,16 @@ def free_download_cta_css() -> str:
       background-size: min(52%, 18rem) auto;
       z-index: 0;
     }}
-    a.free-download-cta::after {{
+    .free-download-cta::after {{
       content: none !important;
       display: none !important;
     }}
     /* Transparent logo flanks (far left + far right); hide freebie/other faces */
-    a.free-download-cta img:not(.{FREE_DOWNLOAD_CTA_LOGO_CLASS}) {{
+    .free-download-cta img:not(.{FREE_DOWNLOAD_CTA_LOGO_CLASS}) {{
       display: none !important;
     }}
-    a.free-download-cta img.{FREE_DOWNLOAD_CTA_LOGO_CLASS},
-    a.free-download-cta .{FREE_DOWNLOAD_CTA_LOGO_CLASS} {{
+    .free-download-cta img.{FREE_DOWNLOAD_CTA_LOGO_CLASS},
+    .free-download-cta .{FREE_DOWNLOAD_CTA_LOGO_CLASS} {{
       display: block !important;
       position: relative;
       z-index: 1;
@@ -1658,13 +1658,13 @@ def free_download_cta_css() -> str:
       pointer-events: none;
       user-select: none;
     }}
-    a.free-download-cta .free-download-cta-logo-left {{
+    .free-download-cta .free-download-cta-logo-left {{
       margin-right: 0;
     }}
-    a.free-download-cta .free-download-cta-logo-right {{
+    .free-download-cta .free-download-cta-logo-right {{
       margin-left: 0;
     }}
-    a.free-download-cta .free-download-cta-label {{
+    .free-download-cta .free-download-cta-label {{
       position: relative;
       z-index: 1;
       display: block;
@@ -1706,14 +1706,15 @@ def free_download_cta_css() -> str:
       }}
     }}
     @media (prefers-reduced-motion: reduce) {{
-      a.free-download-cta .free-download-cta-label {{
+      .free-download-cta .free-download-cta-label {{
         animation: none;
         opacity: 1;
       }}
     }}
     a.free-download-cta:active,
-    a.free-download-cta.is-pressed,
-    a.free-download-cta:focus-visible {{
+    .free-download-cta:active,
+    .free-download-cta.is-pressed,
+    .free-download-cta:focus-visible {{
       transform: scale(0.985) translateY(2px);
       box-shadow:
         0 2px 8px rgba(0,0,0,0.45) inset,
@@ -1721,7 +1722,7 @@ def free_download_cta_css() -> str:
       filter: brightness(0.96);
       outline: none;
     }}
-    a.free-download-cta:hover {{
+    .free-download-cta:hover {{
       filter: brightness(1.06);
       box-shadow:
         0 0 0 1px color-mix(in srgb, var(--rb-neon-green, #39ff6a) 22%, transparent),
@@ -1813,6 +1814,91 @@ def render_free_download_cta_html(
              alt="" width="64" height="64" decoding="async"
              data-free-download-logo="right" aria-hidden="true"/>
       </a>
+    </div>
+"""
+
+
+# Homepage banner under Corporate clients — same chrome as FREE DOWNLOAD,
+# posts into the existing one-time £3000 commercial Checkout.
+CORPORATE_DEPOSIT_CTA_ID = "corporate-deposit-cta"
+CORPORATE_DEPOSIT_CTA_WRAP_ID = "corporate-deposit-cta-wrap"
+CORPORATE_DEPOSIT_CTA_FORM_ID = "corporate-deposit-cta-form"
+CORPORATE_DEPOSIT_CTA_LABEL = "pay corporate deposit £3000"
+CORPORATE_DEPOSIT_CTA_NOTE = "A deposit so we can start the work promptly."
+
+
+def corporate_deposit_cta_css() -> str:
+    """Button reset + spoken-cadence label; neon banner look comes from FREE DOWNLOAD CSS."""
+    return f"""
+    .corporate-deposit-cta-wrap {{
+      width: 100%; max-width: 100%; box-sizing: border-box;
+      margin: 0 0 clamp(0.85rem, 2vw, 1.2rem);
+    }}
+    button.corporate-deposit-cta {{
+      appearance: none;
+      -webkit-appearance: none;
+      font: inherit;
+      color: inherit;
+    }}
+    button.corporate-deposit-cta .corporate-deposit-cta-label {{
+      text-transform: none;
+      letter-spacing: 0.06em;
+      font-size: clamp(1.02rem, 3.1vw, 1.65rem);
+    }}
+    .corporate-deposit-cta-note {{
+      margin: 0.45rem 0 0;
+      text-align: center;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      color: var(--rb-muted);
+    }}
+    [data-theme="light"] .corporate-deposit-cta-note {{
+      color: #0a2348;
+    }}
+"""
+
+
+def render_corporate_deposit_cta_html() -> str:
+    """Full-width FREE DOWNLOAD-style banner that starts the £3000 deposit Checkout."""
+    logo_src = _esc_html(FREE_DOWNLOAD_CTA_LOGO_SRC)
+    logo_cls = FREE_DOWNLOAD_CTA_LOGO_CLASS
+    action = _esc_html(NODE_PREFERENCE_COMMERCIAL_CHECKOUT)
+    product = _esc_html(NODE_PREFERENCE_PRODUCT_KEY)
+    line = _esc_html(NODE_PREFERENCE_PRODUCT_LINE)
+    pence = int(NODE_PREFERENCE_DEPOSIT_PENCE)
+    label = _esc_html(CORPORATE_DEPOSIT_CTA_LABEL)
+    note = _esc_html(CORPORATE_DEPOSIT_CTA_NOTE)
+    return f"""
+    <div class="free-download-cta-wrap corporate-deposit-cta-wrap" id="{CORPORATE_DEPOSIT_CTA_WRAP_ID}"
+         data-corporate-deposit-cta="1" data-cta-shape="rectangle"
+         data-cta-face="typewriter-logo-flanks" data-commercial-deposit="1"
+         data-price-pence="{pence}" data-billing="one_time">
+      <form class="corporate-deposit-cta-form" id="{CORPORATE_DEPOSIT_CTA_FORM_ID}"
+            method="post" action="{action}"
+            data-pay-via="commercial-suite" data-billing="one_time"
+            data-product="{product}" data-price-pence="{pence}"
+            data-commercial-deposit-form="1">
+        <input type="hidden" name="product" value="{product}"/>
+        <input type="hidden" name="product_line" value="{line}"/>
+        <input type="hidden" name="billing" value="one_time"/>
+        <input type="hidden" name="amount_pence" value="{pence}"/>
+        <button type="submit"
+                class="free-download-cta free-download-cta-rect neon-type corporate-deposit-cta"
+                id="{CORPORATE_DEPOSIT_CTA_ID}"
+                data-corporate-deposit="1" data-commercial-deposit="1"
+                data-price-pence="{pence}" data-cta-shape="rectangle"
+                data-cta-face="typewriter-logo-flanks"
+                aria-label="{label}">
+          <img class="{logo_cls} free-download-cta-logo-left" src="{logo_src}"
+               alt="" width="64" height="64" decoding="async"
+               data-corporate-deposit-logo="left" aria-hidden="true"/>
+          <span class="free-download-cta-label corporate-deposit-cta-label">{label}</span>
+          <img class="{logo_cls} free-download-cta-logo-right" src="{logo_src}"
+               alt="" width="64" height="64" decoding="async"
+               data-corporate-deposit-logo="right" aria-hidden="true"/>
+        </button>
+      </form>
+      <p class="corporate-deposit-cta-note" id="corporate-deposit-cta-note">{note}</p>
     </div>
 """
 
