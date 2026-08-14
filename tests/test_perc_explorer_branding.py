@@ -34,7 +34,7 @@ class TestPercExplorerBranding(unittest.TestCase):
         self.assertIn("FCG white paper", html)
         self.assertIn("page-downloads", html)
         self.assertIn("--neon-yellow", html)
-        self.assertIn("Evolve 4.1.10", html)
+        self.assertIn("Evolve 4.1.11", html)
         self.assertIn("MY PERC", html)
         self.assertIn(
             "https://github.com/rgsneddon/evolve/releases/download/v4.1.10-macos-notarized/evolve-v4.1.10-macos-x64.zip",
@@ -45,7 +45,7 @@ class TestPercExplorerBranding(unittest.TestCase):
             html,
         )
         self.assertIn(
-            "https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-windows-x64.zip",
+            "https://github.com/rgsneddon/evolve/releases/download/v4.1.11/evolve-v4.1.11-windows-x64-setup.exe",
             html,
         )
         self.assertIn(
