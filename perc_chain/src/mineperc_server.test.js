@@ -15,6 +15,7 @@ import { extractSolution, loginReply, minerJob } from './stratum_protocol.js';
 import { applyPowToLedger, jobFromLedger } from './pow.js';
 import { mineSubmit } from './mine_api.js';
 import { startPercMinePool } from './mine_pool.js';
+import { poolStatsSnapshot, resetMinerStats } from './miner_stats.js';
 
 const BH3 = {
   preWork: '990504d96fba29cfd6d9c2f3f8663e511fca10758f33c1e4dea443bbe6c5aac0',
@@ -174,6 +175,40 @@ describe('BeamHash III miner wire', () => {
       s.end();
       await srv.close();
     }
+  });
+});
+
+describe('live miner stats', () => {
+  it('login + stats land on /api/stats', async () => {
+    resetMinerStats();
+    const srv = createStratumServer({ port: 0, tls: null });
+    await new Promise((r) => srv.listen(r));
+    const { port } = srv.address();
+    const s = minerSession(port);
+    s.write({
+      id: 1,
+      method: 'login',
+      api_key: 'percpriv193bfbb92db68043f010592e879396c724d488b30.raskul',
+    });
+    await s.take(2);
+    s.write({
+      method: 'stats',
+      login: 'percpriv193bfbb92db68043f010592e879396c724d488b30.raskul',
+      threads: 2,
+      hashes: 131072,
+      hashrate: 800,
+      version: '1.0.1',
+    });
+    await s.take(1);
+    const snap = poolStatsSnapshot();
+    assert.equal(snap.minersOnline, 1);
+    assert.equal(snap.threads, 2);
+    assert.equal(snap.workers[0].worker, 'raskul');
+    assert.equal(snap.workers[0].hashes, 131072);
+    const api = handleApi('/api/stats', 'GET');
+    assert.equal(api.json.minersOnline, 1);
+    s.end();
+    await srv.close();
   });
 });
 

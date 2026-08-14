@@ -56,6 +56,11 @@
     .copy-icon:hover { border-color:var(--cyan); }
     .copy-icon svg { display:block; width:1.05rem; height:1.05rem; margin:0 auto; fill:currentColor; }
     .cmd-list { display:flex; flex-direction:column; gap:10px; }
+    table.stats { width:100%; border-collapse:collapse; font-size:.82rem; margin-top:10px; }
+    table.stats th, table.stats td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); word-break:break-all; }
+    table.stats th { color:var(--muted); text-transform:uppercase; letter-spacing:.04em; font-size:.72rem; }
+    .on { color:#00d4aa; }
+    .off { color:var(--muted); }
   </style>
 </head>
 <body>
@@ -92,6 +97,40 @@
         </div>
       </div>
     </div>
+    <h2>Live miners</h2>
+    <p class="hint">Connected perc-mine workers and full pool statistics. Refreshes every 4 seconds.</p>
+    <div class="grid" id="live-pool-stats">
+      <div class="card"><div class="label">Online</div><div class="value" id="stat-online">0</div></div>
+      <div class="card"><div class="label">Threads</div><div class="value" id="stat-threads">0</div></div>
+      <div class="card"><div class="label">Hashrate</div><div class="value" id="stat-hashrate">0 H/s</div></div>
+      <div class="card"><div class="label">Hashes</div><div class="value" id="stat-hashes">0</div></div>
+      <div class="card"><div class="label">Accepted</div><div class="value" id="stat-accepted">0</div></div>
+      <div class="card"><div class="label">Rejected</div><div class="value" id="stat-rejected">0</div></div>
+      <div class="card"><div class="label">PERC paid</div><div class="value" id="stat-perc">0</div></div>
+    </div>
+    <table class="stats" id="miner-table">
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Worker</th>
+          <th>User</th>
+          <th>Threads</th>
+          <th>Hashrate</th>
+          <th>Hashes</th>
+          <th>Accepted</th>
+          <th>Rejected</th>
+          <th>PERC</th>
+          <th>Job</th>
+          <th>Height</th>
+          <th>Version</th>
+          <th>Remote</th>
+          <th>Last seen</th>
+        </tr>
+      </thead>
+      <tbody id="miner-body">
+        <tr><td colspan="14" class="off">No miners connected yet.</td></tr>
+      </tbody>
+    </table>
     <h2>Connect a miner</h2>
     <p class="hint">Normal difficulty: port <code>1466</code>. High difficulty: port <code>3334</code>. Username is your Perccent identity. Payouts are PERC. CPU miner: <a href="https://github.com/rgsneddon/perc-mine/releases">perc-mine v1.0.0</a>.</p>
     <div class="cmd-list" id="mineperc-commands">
@@ -115,6 +154,49 @@
     const parts = document.querySelectorAll('[data-copy-part]');
     const ch = minWidthChFromParts(collectPartTexts(parts), 1);
     document.documentElement.style.setProperty('--mineperc-longest-ch', String(ch));
+
+    function fmtRate(n) {
+      const v = Number(n) || 0;
+      if (v >= 1e6) return (v / 1e6).toFixed(2) + ' MH/s';
+      if (v >= 1e3) return (v / 1e3).toFixed(2) + ' kH/s';
+      return v.toFixed(1) + ' H/s';
+    }
+    async function refreshStats() {
+      try {
+        const s = await fetch('/api/stats', { cache: 'no-store' }).then((r) => r.json());
+        document.getElementById('stat-online').textContent = s.minersOnline ?? 0;
+        document.getElementById('stat-threads').textContent = s.threads ?? 0;
+        document.getElementById('stat-hashrate').textContent = fmtRate(s.hashrate);
+        document.getElementById('stat-hashes').textContent = s.hashes ?? 0;
+        document.getElementById('stat-accepted').textContent = s.accepted ?? 0;
+        document.getElementById('stat-rejected').textContent = s.rejected ?? 0;
+        document.getElementById('stat-perc').textContent = Number(s.perc || 0).toFixed(8);
+        const body = document.getElementById('miner-body');
+        const rows = s.workers || [];
+        if (!rows.length) {
+          body.innerHTML = '<tr><td colspan="14" class="off">No miners connected yet.</td></tr>';
+          return;
+        }
+        body.innerHTML = rows.map((m) => `<tr>
+          <td class="${m.connected ? 'on' : 'off'}">${m.connected ? 'online' : 'offline'}</td>
+          <td>${m.worker || ''}</td>
+          <td>${m.user || m.username || ''}</td>
+          <td>${m.threads || 0}</td>
+          <td>${fmtRate(m.hashrate)}</td>
+          <td>${m.hashes || 0}</td>
+          <td>${m.accepted || 0}</td>
+          <td>${m.rejected || 0}</td>
+          <td>${Number(m.perc || 0).toFixed(8)}</td>
+          <td>${m.lastJobId || ''}</td>
+          <td>${m.height ?? ''}</td>
+          <td>${m.version || ''}</td>
+          <td>${m.remote || ''}</td>
+          <td>${m.lastSeen ? new Date(m.lastSeen).toISOString() : ''}</td>
+        </tr>`).join('');
+      } catch (_) { /* keep last table */ }
+    }
+    refreshStats();
+    setInterval(refreshStats, 4000);
 
     document.querySelectorAll('[data-copy-target]').forEach((btn) => {
       btn.addEventListener('click', async () => {

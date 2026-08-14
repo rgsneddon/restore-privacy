@@ -107,3 +107,7 @@ export function isLoginMethod(method) {
 export function isSolutionMethod(method) {
   return method === 'solution' || method === 'submit' || method === 'mining.submit';
 }
+
+export function isStatsMethod(method) {
+  return method === 'stats' || method === 'miner.stats';
+}

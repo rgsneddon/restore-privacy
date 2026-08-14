@@ -14,6 +14,7 @@ import {
   extractSolution,
   isLoginMethod,
   isSolutionMethod,
+  isStatsMethod,
   loginIdentity,
   loginReply,
   minerJob,
@@ -21,6 +22,14 @@ import {
   nextNoncePrefix,
   shareAck,
 } from './stratum_protocol.js';
+import {
+  poolStatsSnapshot,
+  recordMinerDisconnect,
+  recordMinerJob,
+  recordMinerLogin,
+  recordMinerShare,
+  recordMinerStats,
+} from './miner_stats.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_HTTP_PORT = 8011;
@@ -128,6 +137,18 @@ export function handleApi(url, method, body) {
   if (url === '/api/job') {
     return { status: 200, json: nextJob() };
   }
+  if (url === '/api/stats' || url === '/stats.json') {
+    return { status: 200, json: poolStatsSnapshot() };
+  }
+  if (url === '/api/miner-stats' && method === 'POST') {
+    try {
+      const payload = typeof body === 'string' ? JSON.parse(body || '{}') : body || {};
+      const rec = recordMinerStats(payload);
+      return { status: 200, json: { ok: true, miner: rec, pool: poolStatsSnapshot() } };
+    } catch (err) {
+      return { status: 400, json: { ok: false, reason: err.message } };
+    }
+  }
   if (url === '/api/submit' && method === 'POST') {
     try {
       const got = submitShare(typeof body === 'string' ? JSON.parse(body || '{}') : body || {});
@@ -146,6 +167,7 @@ function publicDir() {
 export function attachMiner(sock, { jobFactory } = {}) {
   let buf = '';
   let username = 'anon';
+  const remote = sock.remoteAddress || '';
   const send = (obj) => sock.write(`${JSON.stringify(obj)}\n`);
   const issueJob = () => {
     const built = jobFactory ? jobFactory() : lastJob || nextJob();
@@ -153,8 +175,14 @@ export function attachMiner(sock, { jobFactory } = {}) {
       issuedJobs.set(String(built.jobId || built.id), built);
       lastJob = built;
     }
+    recordMinerJob({
+      username,
+      jobId: built?.jobId || built?.id,
+      height: built?.height,
+    });
     return minerJob(built);
   };
+  sock.on('close', () => recordMinerDisconnect(username));
   sock.on('data', (chunk) => {
     buf += chunk.toString('utf8');
     let idx;
@@ -172,8 +200,23 @@ export function attachMiner(sock, { jobFactory } = {}) {
       const method = msg.method;
       if (isLoginMethod(method)) {
         username = loginIdentity(msg) || username;
+        recordMinerLogin({ username, remote, port: sock.localPort });
         send(loginReply(msg, { nonceprefix: nextNoncePrefix(nonceCounter++) }));
         send(issueJob());
+        continue;
+      }
+      if (isStatsMethod(method)) {
+        recordMinerStats({
+          username: loginIdentity(msg) || username,
+          threads: msg.threads ?? msg.params?.threads,
+          hashes: msg.hashes ?? msg.params?.hashes,
+          hashrate: msg.hashrate ?? msg.params?.hashrate,
+          version: msg.version,
+          jobId: msg.jobId,
+          height: msg.height,
+          remote,
+        });
+        send({ id: msg.id ?? 'stats', method: 'result', description: 'stats ok', asset: 'PERC' });
         continue;
       }
       if (isSolutionMethod(method)) {
@@ -184,6 +227,11 @@ export function attachMiner(sock, { jobFactory } = {}) {
           output: sol.output,
           solution: sol.output,
           jobId: sol.jobId,
+        });
+        recordMinerShare({
+          username,
+          accepted: got.accepted,
+          percMicro: got.credit?.microUnits,
         });
         send({
           ...shareAck(msg.id ?? sol.jobId, got.accepted, got.reason),
@@ -283,14 +331,20 @@ export function createServer({ port = DEFAULT_HTTP_PORT } = {}) {
           res.end('not found');
           return;
         }
-        res.writeHead(hit.status, { 'Content-Type': 'application/json' });
+        res.writeHead(hit.status, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        });
         res.end(JSON.stringify(hit.json));
       });
       return;
     }
     const hit = handleApi(url, req.method || 'GET');
     if (hit) {
-      res.writeHead(hit.status, { 'Content-Type': 'application/json' });
+      res.writeHead(hit.status, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      });
       res.end(JSON.stringify(hit.json));
       return;
     }
