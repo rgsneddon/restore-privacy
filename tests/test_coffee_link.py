@@ -18,6 +18,10 @@ from coffee_link import (  # noqa: E402
     COFFEE_LINK_TEXT,
     COFFEE_LINK_URL,
     SITE_COPYRIGHT_TEXT,
+    SITE_FOOTER_FACEBOOK_HREF,
+    SITE_FOOTER_LINKEDIN_HREF,
+    SITE_FOOTER_X_HANDLE,
+    SITE_FOOTER_X_HREF,
     coffee_link_css,
     coffee_tip_url,
     render_coffee_link_html,
@@ -58,6 +62,22 @@ class TestCoffeeLinkBuilder(unittest.TestCase):
         self.assertIn("site-footer-inner", html)
         self.assertIn("site-footer-copyright", html)
         self.assertIn("site-footer-downloads-map", html)
+        self.assertIn('id="site-footer-socials"', html)
+        self.assertIn(SITE_FOOTER_X_HREF, html)
+        self.assertIn(SITE_FOOTER_FACEBOOK_HREF, html)
+        self.assertIn(SITE_FOOTER_LINKEDIN_HREF, html)
+        self.assertIn("https://www.linkedin.com/in/raskul", html)
+        self.assertNotIn("russell-sneddon-2b3869429", html)
+        self.assertIn(SITE_FOOTER_X_HANDLE, html)
+        self.assertIn("<svg", html)
+        # Icons, not word labels, for the three platforms
+        i_soc = html.index('id="site-footer-socials"')
+        i_map = html.index("site-footer-downloads-map")
+        cluster = html[i_soc:i_map]
+        self.assertIn("<svg", cluster)
+        self.assertNotIn(">Facebook<", cluster)
+        self.assertNotIn(">LinkedIn<", cluster)
+        self.assertNotIn(">X<", cluster)
 
     def test_public_page_footer_copyright_no_bmc(self):
         page = status_app.render_html(
@@ -74,6 +94,48 @@ class TestCoffeeLinkBuilder(unittest.TestCase):
         self.assertNotIn("clients_connected", page)
         self.assertIn("RESTORE PRIVACY", page)
         self.assertIn("Download", page)
+        foot = page[page.index('id="site-footer"') :]
+        self.assertIn(SITE_FOOTER_X_HREF, foot)
+        self.assertIn(SITE_FOOTER_FACEBOOK_HREF, foot)
+        self.assertIn(SITE_FOOTER_LINKEDIN_HREF, foot)
+        self.assertIn("https://www.linkedin.com/in/raskul", foot)
+        self.assertNotIn("russell-sneddon-2b3869429", foot)
+        i_copy = foot.index("site-footer-copyright")
+        i_soc = foot.index("site-footer-socials")
+        i_map = foot.index("site-footer-downloads-map")
+        self.assertLess(i_copy, i_soc)
+        self.assertLess(i_soc, i_map)
+        x_snip = foot[foot.index('id="site-footer-social-x"') : foot.index('id="site-footer-social-facebook"')]
+        self.assertIn(SITE_FOOTER_X_HANDLE, x_snip)
+        self.assertIn(SITE_FOOTER_X_HREF, x_snip)
+        self.assertIn("<svg", x_snip)
+
+
+class TestFooterSocialIconsMiddle(unittest.TestCase):
+    def test_shipped_footer_and_homepage_order_and_hrefs(self) -> None:
+        frag = render_site_copyright_footer_html()
+        page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
+        for html in (frag, page):
+            foot = html[html.index('id="site-footer"') :]
+            self.assertIn(SITE_FOOTER_X_HREF, foot)
+            self.assertIn(SITE_FOOTER_FACEBOOK_HREF, foot)
+            self.assertIn(SITE_FOOTER_LINKEDIN_HREF, foot)
+            self.assertIn("https://www.linkedin.com/in/raskul", foot)
+            self.assertNotIn("russell-sneddon-2b3869429", foot)
+            self.assertIn(SITE_FOOTER_X_HANDLE, foot)
+            self.assertIn('data-handle="@restorepriv"', foot)
+            self.assertIn('data-social="x"', foot)
+            self.assertIn('data-social="facebook"', foot)
+            self.assertIn('data-social="linkedin"', foot)
+            i_copy = foot.index("site-footer-copyright")
+            i_soc = foot.index("site-footer-socials")
+            i_map = foot.index("site-footer-downloads-map")
+            self.assertLess(i_copy, i_soc)
+            self.assertLess(i_soc, i_map)
+            cluster = foot[i_soc:i_map]
+            self.assertGreaterEqual(cluster.lower().count("<svg"), 3)
+            self.assertNotIn(">Facebook<", cluster)
+            self.assertNotIn(">LinkedIn<", cluster)
 
 
 class TestCoffeeLinkHttp(unittest.TestCase):
@@ -103,6 +165,12 @@ class TestCoffeeLinkHttp(unittest.TestCase):
                 self.assertIn("Raskul", html)
                 self.assertIn("Download", html)
                 self.assertIn("download map", html)
+                self.assertIn(SITE_FOOTER_X_HREF, html)
+                self.assertIn(SITE_FOOTER_FACEBOOK_HREF, html)
+                self.assertIn(SITE_FOOTER_LINKEDIN_HREF, html)
+                self.assertIn("https://www.linkedin.com/in/raskul", html)
+                self.assertNotIn("russell-sneddon-2b3869429", html)
+                self.assertIn("<svg", html[html.index('id="site-footer"') :])
 
 
 if __name__ == "__main__":
