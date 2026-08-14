@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-14T00:08:41Z",
+  "generated_at": "2026-08-14T02:27:38Z",
   "node_host": "Germany (DE)",
   "catalog_version": "1.2.3",
   "probe_schedule": [
@@ -68,8 +68,8 @@
   ],
   "unit_suite": {
     "ran": true,
-    "ok": false,
-    "returncode": 1,
+    "ok": true,
+    "returncode": 0,
     "modules": [
       "tests.test_legal_links",
       "tests.test_legal_docs",
@@ -424,7 +424,7 @@
     "multihop_structure": true,
     "firewall_probe_excluded": true
   },
-  "overall_ok": false,
+  "overall_ok": true,
   "privacy": {
     "redacted": true,
     "no_suite_tails": true,
