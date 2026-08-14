@@ -24,16 +24,14 @@ const BH3 = {
 };
 
 describe('poolFacing', () => {
-  it('names PERC + BeamHash III and does not brand a Beam coin pool', () => {
+  it('names PERC only on the public facing payload', () => {
     const f = poolFacing();
     assert.match(f.product, /Perccent PERC pool/);
     assert.equal(f.coin, 'PERC');
-    assert.equal(f.algorithm, 'BeamHash III');
+    assert.equal(f.algorithm, 'PERC');
     assert.match(f.stratum, /mineperc\.restoreprivacy\.online:1466/);
-    assert.match(f.note, /Do not use --coin BEAM/);
     const blob = JSON.stringify(f);
-    assert.doesNotMatch(blob, /Beam mining pool/);
-    assert.doesNotMatch(blob, /--coin BEAM --/);
+    assert.doesNotMatch(blob, /beam/i);
   });
 });
 
@@ -50,14 +48,16 @@ describe('percStratumPorts', () => {
 });
 
 describe('handleApi', () => {
-  it('health and connect expose PERC + BeamHash III', () => {
+  it('health and connect expose PERC only', () => {
     const h = handleApi('/health', 'GET');
     assert.equal(h.status, 200);
     assert.equal(h.json.ok, true);
     assert.equal(h.json.coin, 'PERC');
-    assert.equal(h.json.algorithm, 'BeamHash III');
+    assert.equal(h.json.algorithm, 'PERC');
+    assert.doesNotMatch(JSON.stringify(h.json), /beam/i);
     const c = handleApi('/api/connect', 'GET');
     assert.match(c.json.stratum, /1466/);
+    assert.doesNotMatch(JSON.stringify(c.json), /beam/i);
   });
 });
 
@@ -208,7 +208,7 @@ describe('mine submit forwards output + username', () => {
 });
 
 describe('createServer launch', () => {
-  it('serves the landing page twice with PERC + BeamHash III + stratum', async () => {
+  it('serves the landing page twice with PERC + stratum and no beam copy', async () => {
     const bodies = [];
     for (let i = 0; i < 2; i++) {
       const srv = createServer({ port: 0 });
@@ -224,13 +224,13 @@ describe('createServer launch', () => {
     }
     for (const { text, health, jsStatus, jsText } of bodies) {
       assert.match(text, /Perccent PERC pool/);
-      assert.match(text, /BeamHash III/);
       assert.match(text, /mineperc\.restoreprivacy\.online:1466/);
       assert.match(text, /copy-icon/);
       assert.match(text, /--mineperc-longest-ch/);
-      assert.doesNotMatch(text, /Beam mining pool/);
+      assert.doesNotMatch(text, /beam/i);
       assert.equal(health.coin, 'PERC');
-      assert.equal(health.algorithm, 'BeamHash III');
+      assert.equal(health.algorithm, 'PERC');
+      assert.doesNotMatch(JSON.stringify(health), /beam/i);
       assert.equal(jsStatus, 200);
       assert.match(jsText, /export function copyPayloadForPart/);
       assert.match(jsText, /export function minWidthChFromParts/);

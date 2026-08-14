@@ -58,18 +58,17 @@ export function poolFacing({
     product: 'Perccent PERC pool',
     coin: 'PERC',
     asset: 'PERC',
-    algorithm: 'BeamHash III',
-    algorithmId: 'beamhashIII',
+    algorithm: 'PERC',
     host,
     stratum: `stratum+tcp://${host}:${stratumPort}`,
     stratumTls: `stratum+ssl://${host}:${stratumPort}`,
     httpPort,
     username: 'PERC_USERNAME.WORKER',
-    note: 'Mine Perccent (PERC) with BeamHash III. Do not use --coin BEAM.',
+    note: 'Mine Perccent (PERC). Username is your Perccent identity.',
     connect: [
-      `lolMiner --algo BEAM-III --pool ${host}:${stratumPort} --user PERC_USERNAME.WORKER`,
-      `miniZ --url ${host}:${stratumPort} --user PERC_USERNAME.WORKER --algo beamhashiii`,
-      `gminer --algo beamhashIII --server ${host}:${stratumPort} --user PERC_USERNAME.WORKER`,
+      `pool ${host}:${stratumPort}`,
+      `user PERC_USERNAME.WORKER`,
+      `coin PERC`,
     ],
   };
 }
@@ -117,7 +116,7 @@ export function handleApi(url, method, body) {
       json: {
         ok: true,
         coin: 'PERC',
-        algorithm: 'BeamHash III',
+        algorithm: 'PERC',
         product: 'perc_pool',
         ...poolFacing(),
       },
@@ -192,7 +191,7 @@ export function attachMiner(sock, { jobFactory } = {}) {
         });
         continue;
       }
-      send({ id: msg.id ?? null, result: { coin: 'PERC', algorithm: 'BeamHash III' } });
+      send({ id: msg.id ?? null, result: { coin: 'PERC' } });
     }
   });
 }

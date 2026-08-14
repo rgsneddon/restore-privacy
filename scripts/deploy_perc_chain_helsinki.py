@@ -41,6 +41,8 @@ PAUSED_RENDER = "evolve-perc-internet.onrender.com"
 # evolve-perc-internet (Render) is paused to save money — never default to it.
 # Public path is nginx /perc on sslip.io (cloud firewall blocks raw :9478).
 DEFAULT_PUBLIC_ENDPOINT = f"https://{DEFAULT_HOST}.sslip.io/perc"
+EVOLVE_EXPLORER_HOST = "evolve.restoreprivacy.online"
+EVOLVE_EXPLORER_URL = f"https://{EVOLVE_EXPLORER_HOST}"
 
 
 def _stage_dir(out: Path) -> Path:
@@ -54,6 +56,7 @@ def _stage_dir(out: Path) -> Path:
         "Dockerfile",
         "src",
         "public",
+        "mineperc",
         "fixtures",
         "deploy",
         "DEPLOY_HELSINKI.md",
@@ -281,6 +284,11 @@ def upload_and_install(tarball: Path, install_service: bool) -> None:
                 f"systemctl is-enabled {UNIT_NAME}",
                 f"systemctl is-active {UNIT_NAME}",
                 f"curl -fsS {DEFAULT_PUBLIC_ENDPOINT}/health || curl -fsS http://127.0.0.1:{DEFAULT_PORT}/health || true",
+                f"cp -f {DEFAULT_REMOTE_ROOT}/deploy/nginx-evolve.restoreprivacy.online.conf /etc/nginx/sites-available/evolve.restoreprivacy.online.conf",
+                "ln -sfn /etc/nginx/sites-available/evolve.restoreprivacy.online.conf /etc/nginx/sites-enabled/evolve.restoreprivacy.online.conf",
+                "nginx -t && systemctl reload nginx || true",
+                f"curl -fsS -H 'Host: {EVOLVE_EXPLORER_HOST}' http://127.0.0.1/health || true",
+                f"curl -fsS {EVOLVE_EXPLORER_URL}/health || true",
             ]
         )
     ssh = _ssh_base() + [" && ".join(remote_cmds)]

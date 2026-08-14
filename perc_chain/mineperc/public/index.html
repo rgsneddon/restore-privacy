@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Perccent PERC pool · BeamHash III</title>
+  <title>Perccent PERC pool</title>
   <style>
     :root { --bg:#0b0d14; --panel:#141824; --line:#252b3d; --text:#e8ecf4; --muted:#9aa3b8; --neon:#f8ff14; --cyan:#00e5ff; --mineperc-longest-ch: 88; }
     * { box-sizing:border-box; }
@@ -61,10 +61,9 @@
 <body>
   <div class="wrap">
     <h1>Perccent PERC pool</h1>
-    <p class="sub">mineperc.restoreprivacy.online · BeamHash III · perc-mine + perc-stratum-pool + BASiC · not a Beam coin pool</p>
+    <p class="sub">mineperc.restoreprivacy.online · Perccent users · payouts in PERC</p>
     <div class="grid" id="mineperc-fact-grid">
       <div class="card"><div class="label">Coin</div><div class="value">PERC</div></div>
-      <div class="card"><div class="label">Algorithm</div><div class="value">BeamHash III</div></div>
       <div class="card">
         <div class="label">Normal</div>
         <div class="info-box" data-info-box="1">
@@ -94,7 +93,7 @@
       </div>
     </div>
     <h2>Connect a miner</h2>
-    <p class="hint">Normal difficulty: port <code>1466</code>. High difficulty: port <code>3334</code>. Ports <code>1690</code> and <code>1974</code> stay on Beam. Username is your Perccent identity. Payouts are PERC. Do not pass <code>--coin BEAM</code>. CPU miner: <a href="https://github.com/rgsneddon/perc-mine/releases">perc-mine v1.0.0</a>.</p>
+    <p class="hint">Normal difficulty: port <code>1466</code>. High difficulty: port <code>3334</code>. Username is your Perccent identity. Payouts are PERC. CPU miner: <a href="https://github.com/rgsneddon/perc-mine/releases">perc-mine v1.0.0</a>.</p>
     <div class="cmd-list" id="mineperc-commands">
       <div class="info-box" data-info-box="1">
         <code class="info-value" id="part-perc-mine" data-copy-part="perc-mine">perc-mine --pool mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER</code>
@@ -102,24 +101,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v12h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
         </button>
       </div>
-      <div class="info-box" data-info-box="1">
-        <code class="info-value" id="part-lolminer" data-copy-part="lolminer">lolMiner --algo BEAM-III --pool mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER</code>
-        <button type="button" class="copy-icon" data-copy-target="lolminer" aria-label="Copy lolMiner command" title="Copy lolMiner command">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v12h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-        </button>
-      </div>
-      <div class="info-box" data-info-box="1">
-        <code class="info-value" id="part-miniz" data-copy-part="miniz">miniZ --url mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER --algo beamhashiii</code>
-        <button type="button" class="copy-icon" data-copy-target="miniz" aria-label="Copy miniZ command" title="Copy miniZ command">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v12h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-        </button>
-      </div>
-      <div class="info-box" data-info-box="1">
-        <code class="info-value" id="part-gminer" data-copy-part="gminer">gminer --algo beamhashIII --server mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER</code>
-        <button type="button" class="copy-icon" data-copy-target="gminer" aria-label="Copy gminer command" title="Copy gminer command">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v12h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-        </button>
-      </div>
+
     </div>
     <p class="hint">Repos: <a href="https://github.com/rgsneddon/perc-mine">perc-mine</a> · <a href="https://github.com/rgsneddon/perc-stratum-pool">perc-stratum-pool</a> · <a href="https://github.com/rgsneddon/basic">basic</a> · JSON <a href="/api/connect">/api/connect</a> · health <a href="/health">/health</a> · explorer <a href="https://evolve.restoreprivacy.online/">evolve.restoreprivacy.online</a></p>
   </div>
