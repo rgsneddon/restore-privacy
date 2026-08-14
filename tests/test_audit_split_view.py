@@ -6,6 +6,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -35,6 +37,7 @@ from client.audit_split_view import (  # noqa: E402
     CONNECTED_SESSION_LINE,
     load_project_files_snapshot,
     record_connected_audit_visit,
+    default_dedicated_ping_probe,
 )
 from client.connection_log import format_export, read_events  # noqa: E402
 
@@ -212,6 +215,41 @@ class TestSplitMarkupAndStats(unittest.TestCase):
         self.assertIn("data-typewriter-role=\"welcome\"", html)
         self.assertIn("AUDIT.md", html)
         self.assertNotIn("client_ip", html)
+
+class TestDefaultDedicatedPingOnShippedOpen(unittest.TestCase):
+    def test_default_probe_uses_measure_settings_pings(self) -> None:
+        entry = SimpleNamespace(ok=True, rtt_ms=22.0, host="178.105.187.178", method="tcp", error="")
+        snap = SimpleNamespace(entry=entry)
+        with mock.patch(
+            "client.node_ping.measure_settings_pings", return_value=snap
+        ) as probed:
+            out = default_dedicated_ping_probe(timeout_s=0.2)
+        probed.assert_called_once()
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["rtt_ms"], 22.0)
+        self.assertEqual(out["host"], "178.105.187.178")
+
+    def test_windows_style_open_without_injected_ping_records_rtt(self) -> None:
+        """Documents intercept calls show_audit_split_window with no ping=."""
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / ".rpt_support_log.jsonl"
+            with mock.patch(
+                "client.audit_split_view.default_dedicated_ping_probe",
+                return_value={"ok": True, "rtt_ms": 37, "host": "de"},
+            ):
+                sess = show_audit_split_window(
+                    None,
+                    connection_log_path=path,
+                    platform="windows",
+                    residual_connected=True,
+                )
+            self.assertIn("37", sess.visible_left["ping"])
+            self.assertNotIn("n/a", sess.visible_left["ping"])
+            self.assertEqual(sess.visible_left["session"], CONNECTED_SESSION_LINE)
+            events = read_events(path=path)
+            self.assertEqual(events[0].detail.get("ping_ms"), 37)
+            self.assertTrue(events[0].detail.get("residual_connected"))
+
 
 class TestConnectedAuditVisit(unittest.TestCase):
     def test_connected_visit_shows_and_logs_stats(self) -> None:

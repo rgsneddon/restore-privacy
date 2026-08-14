@@ -401,6 +401,27 @@ def append_audit_visit_to_device_log(
     )
 
 
+def default_dedicated_ping_probe(*, timeout_s: float = 1.5) -> dict[str, Any]:
+    """Shipped default probe when Documents opens AUDIT.md with no injected ping.
+
+    Uses :func:`client.node_ping.measure_settings_pings` (UDP then TCP status
+    RTT to the residual entry). A connected visit must still record ``rtt_ms``.
+    """
+    from client.node_ping import measure_settings_pings
+
+    snap = measure_settings_pings(multihop_enabled=False, timeout_s=timeout_s)
+    entry = getattr(snap, "entry", None)
+    if entry is None:
+        return {"ok": False, "error": "no_entry", "rtt_ms": None, "host": ""}
+    return {
+        "ok": bool(getattr(entry, "ok", False)),
+        "rtt_ms": getattr(entry, "rtt_ms", None),
+        "host": str(getattr(entry, "host", "") or ""),
+        "method": str(getattr(entry, "method", "") or ""),
+        "error": str(getattr(entry, "error", "") or ""),
+    }
+
+
 def record_connected_audit_visit(
     *,
     path: Any = None,
@@ -605,9 +626,8 @@ class AuditSplitSession:
         return list(read_events(path=self.connection_log_path))
 
     def _probe_ping(self) -> dict[str, Any]:
-        if self._ping_probe is None:
-            return {}
-        out = self._ping_probe()
+        probe = self._ping_probe if self._ping_probe is not None else default_dedicated_ping_probe
+        out = probe()
         return dict(out or {}) if isinstance(out, Mapping) else {}
 
     def open_visit(self) -> AuditSplitState:
@@ -670,6 +690,8 @@ def show_audit_split_window(
     probe = ping_probe
     if probe is None and ping is not None:
         probe = lambda p=dict(ping): p  # noqa: E731
+    elif probe is None:
+        probe = default_dedicated_ping_probe
     loader = project_loader
     if loader is None and audit_text:
         loader = lambda t=audit_text, plat=platform: load_project_files_snapshot(
