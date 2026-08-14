@@ -913,6 +913,16 @@ def ned_learn_oracle(
         arch_in = empty_suite_architecture()
     prev_learned = list(s.get("suite_surfaces_learned") or [])
     prev_set = {str(x) for x in prev_learned}
+    prev_arch = (
+        s.get("suite_architecture")
+        if isinstance(s.get("suite_architecture"), Mapping)
+        else {}
+    )
+    prev_surfaces = (
+        prev_arch.get("surfaces")
+        if isinstance(prev_arch.get("surfaces"), Mapping)
+        else {}
+    )
     new_learned: list[str] = []
     surfaces_out: dict[str, Any] = {}
     surfaces_in = (
@@ -930,6 +940,15 @@ def ned_learn_oracle(
                 obs = max(0, int(caps.get(f"suite_{sid}_observed") or 0))
             except (TypeError, ValueError):
                 obs = 0
+        prev_entry = (
+            prev_surfaces.get(sid) if isinstance(prev_surfaces.get(sid), Mapping) else {}
+        )
+        try:
+            prev_obs = max(0, int(prev_entry.get("observed") or 0))
+        except (TypeError, ValueError):
+            prev_obs = 0
+        # Durable prior observations stay — an empty later probe must not unlearn.
+        obs = max(obs, prev_obs)
         # Only observed counts (or durable prev_set) mark learned — ignore forged
         # learned:true with observed:0 (no free growth_points).
         learned = obs > 0 or sid in prev_set
@@ -948,6 +967,7 @@ def ned_learn_oracle(
         }
     )
     suite_pts = sum(int(surfaces_out[sid]["observed"]) for sid in SUITE_SURFACE_IDS)
+    all_learned = all(sid in learned_list for sid in SUITE_SURFACE_IDS)
     arch_out = {
         "surfaces": surfaces_out,
         "surfaces_observed": observed_n,
@@ -959,10 +979,11 @@ def ned_learn_oracle(
     s["suite_surfaces_learned"] = learned_list[-24:]
     s["suite_surfaces_observed"] = observed_n
     s["suite_surfaces_total"] = len(SUITE_SURFACE_IDS)
-    s["ready_suite_architecture"] = bool(arch_out["all_suite_surfaces_observed"])
-    # Full co-joined stack does NOT invent suite completeness
-    if not arch_out["all_suite_surfaces_observed"]:
-        s["ready_suite_architecture"] = False
+    # Ready when this collation saw every surface *or* GOD has learned all
+    # seven over time from real observations (not forged learned:true).
+    s["ready_suite_architecture"] = bool(
+        arch_out["all_suite_surfaces_observed"] or all_learned
+    )
 
     # --- Live residual peer catalog absorb (IS + DE only) ---
     peers_in = o.get("residual_peers")

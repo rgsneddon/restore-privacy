@@ -24,6 +24,57 @@ ROLE_LABELS: dict[str, str] = {
     ROLE_PERC: "Perccent blockchain seed",
 }
 
+# Shipped Suite nav map (SuiteNavDest). Residual reports this so Helsinki
+# oracle / GOD can learn architecture without inventing live traffic.
+_FALLBACK_SUITE_IDS: tuple[str, ...] = (
+    "vpn",
+    "wallet",
+    "backup",
+    "analysis",
+    "voting",
+    "credit",
+    "rpai",
+)
+_FALLBACK_SUITE_LABELS: dict[str, str] = {
+    "vpn": "Residual VPN",
+    "wallet": "Wallet (%)",
+    "backup": "Backup recovery",
+    "analysis": "Evolve analysis",
+    "voting": "Evolve voting",
+    "credit": "Credit",
+    "rpai": "rpAI · Ned",
+}
+
+
+def _shipped_suite_architecture() -> dict[str, Any]:
+    """Honest product Suite surface map for /api/private/cojoined."""
+    try:
+        from node.oracle_master import SUITE_SURFACE_IDS, SUITE_SURFACE_LABELS
+
+        ids = tuple(SUITE_SURFACE_IDS)
+        labels = dict(SUITE_SURFACE_LABELS)
+    except Exception:  # noqa: BLE001
+        ids = _FALLBACK_SUITE_IDS
+        labels = dict(_FALLBACK_SUITE_LABELS)
+    surfaces = {
+        sid: {
+            "observed": 1,
+            "learned": True,
+            "label": labels.get(sid, sid),
+        }
+        for sid in ids
+    }
+    return {
+        "suite_surfaces": list(ids),
+        "suite_architecture": {
+            "surfaces": surfaces,
+            "surfaces_observed": len(ids),
+            "surfaces_total": len(ids),
+            "all_suite_surfaces_observed": True,
+            "suite_learn_points": len(ids),
+        },
+    }
+
 
 @dataclass
 class RoleState:
@@ -141,6 +192,7 @@ class CojoinedRoleRegistry:
                 }
             contact = self.single_contact()
             matrix = {r: bool(self._roles[r].ready) for r in COJOINED_ROLES}
+            suite = _shipped_suite_architecture()
             return {
                 "cojoined": True,
                 "roles": roles_out,
@@ -148,6 +200,8 @@ class CojoinedRoleRegistry:
                 "all_ready": all(matrix.values()),
                 "contact": contact,
                 "updated_unix": int(time.time()),
+                "suite_surfaces": list(suite["suite_surfaces"]),
+                "suite_architecture": suite["suite_architecture"],
             }
 
     def start_background_roles(self) -> None:

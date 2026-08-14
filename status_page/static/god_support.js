@@ -21,7 +21,7 @@
       return;
     }
     btn.disabled = true;
-    show("GOD is thinking…");
+    show("GOD is finding the answer…");
     try {
       var res = await fetch(box.getAttribute("data-ask-path") || "/support/god-ask", {
         method: "POST",
@@ -35,7 +35,7 @@
         data = {};
       }
       if (!res.ok || !data.ok) {
-        show(data.error || "GOD could not answer just now.");
+        show(data.error || "GOD is still researching that.");
         return;
       }
       if (learned) learned.textContent = String(data.learned || 0);

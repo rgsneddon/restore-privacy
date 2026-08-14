@@ -68,6 +68,7 @@ SECURITY_TEST_MODULES = [
     # CERBERUS / Helsinki oracle — privacy strip + Suite learning evolution
     "tests.test_oracle_no_user_data",
     "tests.test_oracle_suite_architecture",
+    "tests.test_god_support",
 ]
 
 

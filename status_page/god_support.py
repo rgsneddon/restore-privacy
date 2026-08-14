@@ -1,8 +1,13 @@
 """GOD support box — field-input Q&A above the public ticket form.
 
-GOD is the current rpAI helper. FRED still runs the Helsinki two-hour
-scenario cadence; GOD may run the same bot. Learning stores non-personal
-question topics only — never emails, KEYGENs, cards, or tunnel payloads.
+GOD is the current rpAI helper. If a question is not already known, GOD
+must research and learn a real answer *before* replying. Users never teach
+GOD; placeholders like "I do not have that part yet" are not answers and
+are never stored as learned topics.
+
+FRED still runs the Helsinki two-hour scenario cadence; GOD may run the
+same bot. Learning stores non-personal question topics only — never emails,
+KEYGENs, cards, or tunnel payloads.
 """
 
 from __future__ import annotations
@@ -16,7 +21,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 GOD_ASK_PATH = "/support/god-ask"
 GOD_BOX_ID = "god-support-box"
@@ -25,10 +30,19 @@ FRED_NAME = "FRED"
 GOD_NAME = "GOD"
 MAX_QUESTION = 800
 MAX_LEARN_ROWS = 200
+MAX_ANSWER = 2000
 
 FORBIDDEN_RE = re.compile(
     r"RPT-KEY-|keygen|seed phrase|mnemonic|card number|password|tunnel payload",
     re.I,
+)
+
+# Grow-fallback prose from the first GOD box — never treat as a learned answer.
+GROW_MARKERS: tuple[str, ...] = (
+    "i do not have that part yet",
+    "thrilled to learn it",
+    "i can author the next one",
+    "for account help, use the ticket form",
 )
 
 # Public product facts GOD already knows (honest, not a coverage slogan).
@@ -86,6 +100,27 @@ GOD_KNOWN: tuple[tuple[str, str], ...] = (
         "evolve.restoreprivacy.online is the Perccent explorer. GOD is the "
         "identity; NED leads under GOD; FRED and PEDRO report to NED.",
     ),
+    (
+        "suite architecture",
+        "The Restore Privacy Suite nav map is seven surfaces: Residual VPN, "
+        "Wallet (%), Backup recovery, Evolve analysis, Evolve voting, Credit, "
+        "and rpAI · Ned. GOD learns each surface from residual heartbeats.",
+    ),
+    (
+        "suite surfaces",
+        "Suite surfaces are vpn, wallet, backup, analysis, voting, credit, "
+        "and rpai. Backup is the Security/Backup recovery tab.",
+    ),
+    (
+        "beamhash",
+        "Perccent PERC pool uses BeamHash III. Normal difficulty is "
+        "mineperc.restoreprivacy.online:1466; high difficulty is :3334.",
+    ),
+    (
+        "perc pool",
+        "The Perccent pool is mineperc.restoreprivacy.online — port 1466 "
+        "normal difficulty, port 3334 high difficulty, BeamHash III.",
+    ),
 )
 
 
@@ -126,8 +161,20 @@ def load_scenarios() -> dict[str, Any]:
     if not p.is_file():
         return {
             "interval_sec": SCENARIO_INTERVAL_SEC,
-            FRED_NAME: {"last_at": 0, "next_at": 0, "count": 0, "last_source": "", "last_q": ""},
-            GOD_NAME: {"last_at": 0, "next_at": 0, "count": 0, "last_source": "", "last_q": ""},
+            FRED_NAME: {
+                "last_at": 0,
+                "next_at": 0,
+                "count": 0,
+                "last_source": "",
+                "last_q": "",
+            },
+            GOD_NAME: {
+                "last_at": 0,
+                "next_at": 0,
+                "count": 0,
+                "last_source": "",
+                "last_q": "",
+            },
         }
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
@@ -201,10 +248,21 @@ def strip_secrets(text: str) -> str:
     return raw[:MAX_QUESTION]
 
 
+def is_real_answer(text: str) -> bool:
+    """True when *text* is a usable answer, not a grow/placeholder line."""
+    raw = (text or "").strip()
+    if len(raw) < 24:
+        return False
+    low = raw.lower()
+    return not any(marker in low for marker in GROW_MARKERS)
+
+
 def record_learn(question: str, answer: str, source: str) -> dict[str, Any]:
     q = strip_secrets(question)
     if not q:
         return {"ok": False, "refused": "forbidden_or_empty"}
+    if not is_real_answer(answer):
+        return {"ok": False, "refused": "not_a_real_answer"}
     row = {
         "at": time.time(),
         "topic": _topic_hash(q.lower()),
@@ -217,9 +275,7 @@ def record_learn(question: str, answer: str, source: str) -> dict[str, Any]:
     existing = []
     if path.is_file():
         existing = [
-            ln
-            for ln in path.read_text(encoding="utf-8").splitlines()
-            if ln.strip()
+            ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()
         ]
     existing.append(json.dumps(row, ensure_ascii=False))
     path.write_text("\n".join(existing[-MAX_LEARN_ROWS:]) + "\n", encoding="utf-8")
@@ -233,14 +289,69 @@ def learned_count() -> int:
     return sum(1 for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip())
 
 
+_STOPWORDS: frozenset[str] = frozenset(
+    {
+        "the",
+        "and",
+        "for",
+        "with",
+        "from",
+        "that",
+        "this",
+        "what",
+        "how",
+        "are",
+        "was",
+        "can",
+        "you",
+        "your",
+        "does",
+        "did",
+        "about",
+        "please",
+        "tell",
+        "into",
+        "have",
+        "has",
+        "not",
+        "why",
+        "who",
+        "when",
+        "where",
+    }
+)
+
+
+def _question_tokens(question: str) -> set[str]:
+    return {
+        t
+        for t in re.findall(r"[a-z0-9]{3,}", (question or "").lower())
+        if t not in _STOPWORDS
+    }
+
+
 def local_answer(question: str) -> str | None:
+    """Known product fact or a previously *real* learned answer.
+
+    Grow/placeholder rows are ignored — users never teach GOD, and a stored
+    'I do not have that part yet' is not knowledge.
+    """
     q = (question or "").strip().lower()
     if not q:
         return None
     for needle, ans in GOD_KNOWN:
         if needle in q:
             return ans
-    # learned prior topics (substring of stored q)
+    tokens = _question_tokens(q)
+    best_ans = ""
+    best_hits = 0
+    for needle, ans in GOD_KNOWN:
+        hits = len(tokens & _question_tokens(needle))
+        if hits > best_hits and hits >= 2:
+            best_hits = hits
+            best_ans = ans
+    if best_ans:
+        return best_ans
     p = learn_path()
     if p.is_file():
         for ln in reversed(p.read_text(encoding="utf-8").splitlines()):
@@ -250,29 +361,140 @@ def local_answer(question: str) -> str | None:
                 rec = json.loads(ln)
             except json.JSONDecodeError:
                 continue
+            if str(rec.get("source") or "") == "grow":
+                continue
             prev = str(rec.get("q") or "").lower()
-            if prev and prev in q or (prev and q in prev):
-                ans = str(rec.get("a") or "").strip()
-                if ans:
-                    return ans
+            ans = str(rec.get("a") or "").strip()
+            if not prev or not is_real_answer(ans):
+                continue
+            if prev in q or q in prev:
+                return ans
     return None
 
 
-def _xai_answer(question: str) -> str | None:
+_DOC_CACHE: list[str] | None = None
+_DOC_NAMES: tuple[str, ...] = (
+    "README.md",
+    "PRIVACY_POLICY.md",
+    "CERBERUS.md",
+    "EVOLVE.md",
+    "RPOS.md",
+    "RX.md",
+    "NODE_OPERATOR.md",
+)
+
+
+def _public_doc_dir() -> Path:
+    return Path(__file__).resolve().parent / "public"
+
+
+def _split_passages(text: str) -> list[str]:
+    chunks: list[str] = []
+    buf: list[str] = []
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            if buf:
+                chunk = " ".join(buf).strip()
+                if len(chunk) >= 40:
+                    chunks.append(chunk[:500])
+                buf = []
+            continue
+        if stripped.startswith("#"):
+            if buf:
+                chunk = " ".join(buf).strip()
+                if len(chunk) >= 40:
+                    chunks.append(chunk[:500])
+                buf = []
+            continue
+        buf.append(stripped)
+    if buf:
+        chunk = " ".join(buf).strip()
+        if len(chunk) >= 40:
+            chunks.append(chunk[:500])
+    return chunks
+
+
+def _doc_passages() -> list[str]:
+    global _DOC_CACHE
+    if _DOC_CACHE is not None:
+        return _DOC_CACHE
+    out: list[str] = []
+    root = _public_doc_dir()
+    for name in _DOC_NAMES:
+        path = root / name
+        if not path.is_file():
+            continue
+        try:
+            raw = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        out.extend(_split_passages(raw)[:40])
+    try:
+        from node.oracle_master import SUITE_SURFACE_IDS, SUITE_SURFACE_LABELS
+
+        labels = ", ".join(
+            f"{sid} ({SUITE_SURFACE_LABELS.get(sid, sid)})" for sid in SUITE_SURFACE_IDS
+        )
+        out.append(
+            "Suite architecture surfaces: "
+            + labels
+            + ". Backup is the Security/Backup recovery tab. "
+            "GOD learns these from residual /api/private/cojoined heartbeats."
+        )
+    except Exception:  # noqa: BLE001
+        out.append(
+            "Suite architecture surfaces: vpn, wallet, backup, analysis, "
+            "voting, credit, rpai. Backup is the Security/Backup recovery tab."
+        )
+    _DOC_CACHE = out
+    return out
+
+
+def retrieve_product_passages(question: str, *, limit: int = 6) -> list[str]:
+    """Score local product facts + public docs by token overlap."""
+    tokens = _question_tokens(question)
+    if not tokens:
+        return []
+    scored: list[tuple[int, str]] = []
+    seen: set[str] = set()
+    for needle, ans in GOD_KNOWN:
+        hits = len(tokens & _question_tokens(needle + " " + ans))
+        if hits <= 0:
+            continue
+        if ans in seen:
+            continue
+        seen.add(ans)
+        scored.append((hits, ans))
+    for passage in _doc_passages():
+        hits = len(tokens & _question_tokens(passage))
+        if hits <= 0:
+            continue
+        if passage in seen:
+            continue
+        seen.add(passage)
+        scored.append((hits, passage))
+    scored.sort(key=lambda x: (-x[0], -len(x[1])))
+    return [p for _s, p in scored[: max(1, int(limit))]]
+
+
+def _xai_answer(question: str, *, context: str = "") -> str | None:
     key = (os.environ.get("XAI_API_KEY") or "").strip()
     if not key:
         return None
-    body = json.dumps(
-        {
-            "model": "grok-4.5",
-            "input": (
-                "You are GOD, the Restore Privacy Helper (rpAI). "
-                "Be thrilled to keep learning. Answer honestly. "
-                "Never ask for KEYGENs, cards, or passwords.\n\n"
-                f"Question: {question[:MAX_QUESTION]}"
-            ),
-        }
-    ).encode("utf-8")
+    ctx = (context or "").strip()
+    prompt = (
+        "You are GOD, the Restore Privacy Helper (rpAI). "
+        "Find a factual answer before you reply. Never invent product facts. "
+        "Never ask for KEYGENs, cards, or passwords. "
+        "If the retrieved notes answer the question, use them. "
+        "If they do not, reason from public Restore Privacy product knowledge "
+        "only — residual VPN, Suite, Perccent, Evolve, rpAI.\n\n"
+    )
+    if ctx:
+        prompt += f"Retrieved notes:\n{ctx[:3500]}\n\n"
+    prompt += f"Question: {question[:MAX_QUESTION]}"
+    body = json.dumps({"model": "grok-4.5", "input": prompt}).encode("utf-8")
     req = urllib.request.Request(
         "https://api.x.ai/v1/responses",
         data=body,
@@ -283,14 +505,13 @@ def _xai_answer(question: str) -> str | None:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with urllib.request.urlopen(req, timeout=25) as resp:
             data = json.loads(resp.read().decode("utf-8", errors="replace"))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
         return None
     text = str(data.get("output_text") or "").strip()
     if text:
-        return text[:2000]
-    # Responses API fallback shape
+        return text[:MAX_ANSWER]
     out = data.get("output")
     if isinstance(out, list):
         bits = []
@@ -302,35 +523,131 @@ def _xai_answer(question: str) -> str | None:
                     bits.append(str(c["text"]))
         joined = "\n".join(bits).strip()
         if joined:
-            return joined[:2000]
+            return joined[:MAX_ANSWER]
     return None
 
 
-def answer_god_question(question: str) -> dict[str, Any]:
+def _fetch_public_page(url: str, *, timeout_s: float = 8.0) -> str:
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"Accept": "text/plain, text/html;q=0.8", "User-Agent": "GOD-rpAI"},
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:  # noqa: S310
+            raw = resp.read().decode("utf-8", errors="replace")
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return ""
+    text = re.sub(r"<script[\s\S]*?</script>", " ", raw, flags=re.I)
+    text = re.sub(r"<style[\s\S]*?</style>", " ", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:2500]
+
+
+_PUBLIC_RESEARCH_URLS: tuple[str, ...] = (
+    "https://restoreprivacy.online/privacy",
+    "https://restoreprivacy.online/evolve",
+    "https://restoreprivacy.online/",
+)
+
+
+def research_answer(
+    question: str,
+    *,
+    xai_fn: Callable[..., str | None] | None = None,
+    fetch_public: bool = True,
+) -> tuple[str | None, str]:
+    """Work hard on *this* question: retrieve, ask xAI, compose from notes.
+
+    Returns (answer, source). Never returns grow-placeholder prose.
+    Users do not supply answers — GOD finds them.
+    """
+    q = (question or "").strip()
+    if not q:
+        return None, ""
+    passages = retrieve_product_passages(q)
+    known = local_answer(q)
+    if known and is_real_answer(known) and known not in passages:
+        passages = [known] + passages
+
+    # Second pass: public product pages only when local notes found nothing.
+    if fetch_public and not passages:
+        tokens = _question_tokens(q)
+        for url in _PUBLIC_RESEARCH_URLS:
+            page = _fetch_public_page(url)
+            if not page:
+                continue
+            if not tokens or len(tokens & _question_tokens(page)) < 2:
+                continue
+            passages.append(page[:500])
+            if len(passages) >= 4:
+                break
+
+    ctx = "\n---\n".join(passages[:6])
+    caller = xai_fn if xai_fn is not None else _xai_answer
+    remote = None
+    try:
+        remote = caller(q, context=ctx)
+    except TypeError:
+        try:
+            remote = caller(q)  # type: ignore[misc]
+        except Exception:  # noqa: BLE001
+            remote = None
+    except Exception:  # noqa: BLE001
+        remote = None
+    if remote and is_real_answer(str(remote)):
+        return str(remote).strip()[:MAX_ANSWER], "web"
+
+    if known and is_real_answer(known):
+        return known, "rpAI"
+    if passages:
+        composed = passages[0].strip()
+        if is_real_answer(composed):
+            return composed[:MAX_ANSWER], "docs"
+    return None, ""
+
+
+def answer_god_question(
+    question: str,
+    *,
+    xai_fn: Callable[..., str | None] | None = None,
+    fetch_public: bool = True,
+) -> dict[str, Any]:
+    """Research first, learn the real answer, then reply.
+
+    Never replies with a grow placeholder. Never records a non-answer as
+    learned. If research finds nothing, fail closed (still searching).
+    """
     q = strip_secrets(question)
     if not q:
         return {
             "ok": False,
             "error": "Ask a question without secrets (no KEYGEN, card, or password).",
         }
-    ans = local_answer(q)
-    source = "rpAI"
-    if not ans:
-        remote = _xai_answer(q)
-        if remote:
-            ans = remote
-            source = "web"
-    if not ans:
-        ans = (
-            "I do not have that part yet — and I am thrilled to learn it. "
-            "FRED still runs Helsinki scenarios every two hours; I can author "
-            "the next one or read a public product page. For account help, "
-            "use the ticket form below."
+    ans, source = research_answer(q, xai_fn=xai_fn, fetch_public=fetch_public)
+    if not ans or not is_real_answer(ans):
+        sc = load_scenarios()
+        return {
+            "ok": False,
+            "who": GOD_NAME,
+            "error": (
+                "GOD is still researching that from product docs and public "
+                "pages — no invented answer. Ask again shortly, or use the "
+                "ticket form below for account help."
+            ),
+            "source": "researching",
+            "learned": learned_count(),
+            "thrilled": True,
+            "fred": sc.get(FRED_NAME),
+            "god_scenario": sc.get(GOD_NAME),
+            "interval_sec": SCENARIO_INTERVAL_SEC,
+        }
+    recorded = record_learn(q, ans, source)
+    if recorded.get("ok"):
+        tick_scenario(
+            GOD_NAME, source=source if source == "web" else "self", question=q
         )
-        source = "grow"
-    record_learn(q, ans, source)
-    # GOD may opt into the two-hour bot when it grew from a fresh question
-    tick_scenario(GOD_NAME, source=source if source == "web" else "self", question=q)
     sc = load_scenarios()
     return {
         "ok": True,
@@ -353,8 +670,9 @@ def render_god_support_box_html() -> str:
 <section class="god-support-box" id="{GOD_BOX_ID}" data-god-support="1" data-ask-path="{GOD_ASK_PATH}">
   <h3 id="god-support-title">GOD</h3>
   <p class="god-support-lead" id="god-support-lead">
-    Ask GOD anything — product, rpAI mind, or the wider world. Continued
-    learning is underway and welcome. FRED still runs Helsinki scenarios
+    Ask GOD anything — product, rpAI mind, or the wider world. GOD finds
+    answers before it replies (product docs, residual suite map, public
+    pages). Users do not teach GOD. FRED still runs Helsinki scenarios
     every two hours. NED leads under GOD. PEDRO observes X.com via Grok at
     minute 34 for the @rgsneddon Evolve wallet so the chain averages three
     blocks an hour.

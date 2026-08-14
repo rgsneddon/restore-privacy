@@ -36,6 +36,9 @@ class TestCojoinedRoles(unittest.TestCase):
         self.assertTrue(snap["all_ready"])
         self.assertEqual(snap["contact"]["contact"], "10.0.0.1:44044")
         self.assertEqual(snap["contact"]["roles"], list(COJOINED_ROLES))
+        self.assertEqual(len(snap.get("suite_surfaces") or []), 7)
+        self.assertIn("vpn", snap["suite_surfaces"])
+        self.assertIn("backup", snap["suite_surfaces"])
         reg.stop_background_roles()
 
     def test_deploy_script_lists_cojoined_modules(self) -> None:

@@ -443,6 +443,45 @@ class TestOracleSuiteArchitecture(unittest.TestCase):
         again = load_rps_stats(stats_path=path)
         self.assertGreaterEqual(again["suite_surfaces_observed"], 1)
 
+    def test_learned_surfaces_survive_empty_later_collation(self) -> None:
+        from node.oracle_master import (
+            SUITE_SURFACE_IDS,
+            collate_satellite_heartbeats,
+            ned_learn_oracle,
+        )
+
+        full = collate_satellite_heartbeats(
+            [
+                {
+                    "host": "full",
+                    "cojoined": {
+                        "all_ready": True,
+                        "readiness": {"vpn": True, "rpai": True, "perccent": True},
+                    },
+                    "capacity": {"live": 0, "capacity": 1},
+                    "suite_surfaces": list(SUITE_SURFACE_IDS),
+                }
+            ]
+        )
+        first = ned_learn_oracle({}, full)
+        self.assertTrue(first["ready_suite_architecture"])
+        empty = collate_satellite_heartbeats([])
+        again = ned_learn_oracle(first, empty)
+        self.assertTrue(again["ready_suite_architecture"])
+        self.assertEqual(again["suite_surfaces_observed"], len(SUITE_SURFACE_IDS))
+
+    def test_residual_snapshot_reports_all_suite_surfaces(self) -> None:
+        from node.cojoined_roles import CojoinedRoleRegistry
+        from node.oracle_master import (
+            SUITE_SURFACE_IDS,
+            extract_suite_surface_hits,
+        )
+
+        snap = CojoinedRoleRegistry().snapshot()
+        self.assertEqual(set(snap["suite_surfaces"]), set(SUITE_SURFACE_IDS))
+        hits = extract_suite_surface_hits({"host": "residual", "cojoined": snap})
+        self.assertTrue(all(hits[sid] > 0 for sid in SUITE_SURFACE_IDS))
+
 
 if __name__ == "__main__":
     unittest.main()
