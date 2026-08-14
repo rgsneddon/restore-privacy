@@ -7,16 +7,16 @@
       "filename": "restore-privacy-client-1.2.5-windows-x64-setup.exe"
     },
     "android": {
-      "version": "1.2.5",
-      "filename": "restore-privacy-client-1.2.5-android.apk"
+      "version": "1.2.6",
+      "filename": "restore-privacy-client-1.2.6-android.apk"
     },
     "macos": {
-      "version": "1.2.5",
-      "filename": "restore-privacy-client-1.2.5-macos.zip"
+      "version": "1.2.6",
+      "filename": "restore-privacy-client-1.2.6-macos.zip"
     },
     "ios": {
-      "version": "1.2.5",
-      "filename": "restore-privacy-client-1.2.5-ios.zip"
+      "version": "1.2.6",
+      "filename": "restore-privacy-client-1.2.6-ios.zip"
     },
     "linux": {
       "version": "1.2.5",

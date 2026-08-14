@@ -63,9 +63,9 @@ class TestNodePingHelper(unittest.TestCase):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         self.assertIn("measure_settings_pings", src)
         self.assertIn("Ping statistics", src)
-        # Live residual catalog only: IS / DE / US (RO retired)
-        self.assertIn("Iceland or Germany", src)
+        # Live residual catalog only: DE / SG (IS/US/RO retired)
         self.assertIn("DE = Germany (default)", src)
+        self.assertNotIn("Iceland or Germany", src)
         self.assertNotIn("Exit (Romania)", src)
         self.assertNotIn("RO = Romania", src)
         self.assertIn("Measure ping now", src)
@@ -88,10 +88,12 @@ class TestAuditUkPingSection(unittest.TestCase):
         self.assertIn("UK ping + RAG", text)
         self.assertIn("Method (honesty)", text)
         self.assertIn("Approximate", text)
-        self.assertIn("82.221.101.241", text)
         self.assertIn("178.105.187.178", text)
+        self.assertIn("5.223.48.8", text)
         self.assertIn("Germany", text)
+        self.assertIn("Singapore", text)
         self.assertNotIn("Romania", text)
+        self.assertNotIn("Iceland", text)
         self.assertIn("multi-hop", text.lower())
         rows = uk_ping_matrix_rows(live=LiveRttBase(entry_ms=None, exit_ms=None))
         self.assertEqual(len(rows), 8)
@@ -382,7 +384,7 @@ class TestAuditUkPingSection(unittest.TestCase):
 class TestVersionMonopin(unittest.TestCase):
     def test_version_pin_matches_catalog(self) -> None:
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "1.0.0")
+        self.assertEqual(ver, "1.2.6")
         from status_page import downloads as dl
 
         self.assertEqual(dl.RELEASE_VERSION, ver)

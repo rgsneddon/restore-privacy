@@ -380,11 +380,12 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
         self.assertTrue(audit.is_file())
         text = audit.read_text(encoding="utf-8")
         self.assertGreater(len(text), 3000)
-        # Public audit uses monopin country labels (Iceland (IS)), not raw IPv4
+        # Public audit uses live monopin country labels (DE/SG), not raw IPv4
         self.assertTrue(
-            "82.221.101.241" in text or "Iceland" in text,
-            "audit must name residual peer host or public label",
+            "Germany" in text or "Singapore" in text,
+            "audit must name live residual peers",
         )
+        self.assertNotIn("82.221.101.241", text)
         self.assertIn("residual_ip_capture", text)
         self.assertIn("Findings", text)
         # VPN APP Shop copy used for /AUDIT.md and /audit.md
@@ -403,11 +404,11 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
         data = status_app.audit_document_bytes()
         self.assertIsNotNone(data)
         self.assertIn(b"Restore Privacy", data)
-        # Public AUDIT may redact monopin IPv4 (Iceland (IS) label) — either form OK
         self.assertTrue(
-            b"82.221.101.241" in data or b"Iceland" in data,
-            "audit body must name product residual peer (host or public label)",
+            b"Germany" in data or b"Singapore" in data,
+            "audit body must name live residual peers",
         )
+        self.assertNotIn(b"82.221.101.241", data)
         self.assertIn(b"Audit generated", data)
         # Must not serve the stuck July 22 run as current
         self.assertNotIn(b"2026-07-22T13:00:14Z", data)

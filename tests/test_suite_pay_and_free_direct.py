@@ -102,8 +102,8 @@ class TestHomeAndMapRender(unittest.TestCase):
 
             map_html = render_downloads_map_page_html().decode("utf-8")
             self.assertIn("Restore Privacy", map_html)
+            self.assertIn("v1.2.6", map_html)
             self.assertIn("v1.2.5", map_html)
-            self.assertIn("v1.2.4", map_html)
             # Map package rows free_direct; KEYGEN /pay may still be mentioned in blurb only
             for plat in ("windows", "android", "macos", "ios", "linux"):
                 self.assertIn(f"platform={plat}", map_html)

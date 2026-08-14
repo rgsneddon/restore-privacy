@@ -161,10 +161,10 @@ def active_residual_probe_schedule() -> list[dict[str, Any]]:
     except Exception:  # noqa: BLE001
         peers = []
     if not peers:
-        # Fail-safe: shipped IS + DE monopin (must stay aligned with multihop catalog).
+        # Fail-safe: shipped DE + SG monopin (must stay aligned with live catalog).
         for host, code, label in (
-            ("82.221.101.241", "IS", "Iceland (IS)"),
             ("178.105.187.178", "DE", "Germany (DE)"),
+            ("5.223.48.8", "SG", "Singapore (SG)"),
         ):
             if host not in seen:
                 peers.append(
@@ -287,10 +287,11 @@ def redact_audit_text(text: str) -> str:
         s = redact_residual_hosts_in_text(s)
     except Exception:  # noqa: BLE001
         for host, label in (
-            ("82.221.101.241", "Iceland (IS)"),
             ("178.105.187.178", "Germany (DE)"),
+            ("5.223.48.8", "Singapore (SG)"),
+            ("82.221.101.241", "VPN node"),
             ("185.146.232.107", "Romania (RO, retired)"),
-            ("5.161.242.85", "United States (US)"),
+            ("5.161.242.85", "United States (US, retired)"),
             ("167.233.224.5", "VPN node"),
         ):
             s = s.replace(host, label)
@@ -1735,7 +1736,7 @@ def build_markdown(results: dict) -> str:
     package_section = render_package_rag_section(pkg)
     live_probe_table = render_live_node_probe_table(results)
     # Prefer label from live_node_probes (survives redact_audit_value which turns
-    # monopin IPv4s into "Germany (DE)" / "Iceland (IS)"). public_label_for_host
+    # monopin IPv4s into "Germany (DE)" / "Singapore (SG)"). public_label_for_host
     # only maps raw IPs — already-redacted labels become dishonest "VPN node".
     primary_label = primary_peer_public_label(results)
     # Live KEYGEN GBP anchors from downloads (not a hard-coded retired monthly price)
@@ -1869,7 +1870,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 
 **Primary residual risks (open by design / environment):**
 
-1. **Operational** — Product node is on **FlokiNET** in **Iceland** (strict **Icelandic** privacy / free-expression hosting norms). **As far as we can be assured** from FlokiNET’s public statements (**“No invasive logs”**; resource-usage monitoring only; no third-party tenant traffic/pattern sharing — https://flokinet.is/privacy/, https://flokinet.is/vps/), the host does **not** retain invasive logs of users connecting to the node. That is host-published posture, not a product forensic audit. Separate CDN/status hosts and home-ISP paths may still log. Node **OS compromise** (live RAM) remains residual.  
+1. **Operational** — Live residual nodes are **Germany (DE)** (default entry) and **Singapore (SG)**. Each hop is a dedicated residual VPS with the same no-log stack. Separate CDN/status hosts and home-ISP paths may still log. Node **OS compromise** (live RAM) remains residual.  
 2. **Apple** — residual IP requires signed Packet Tunnel / NE.  
 3. **Linux privilege floor** — residual needs root + TUN/`ip`.  
 4. **Traffic analysis** — padding/jitter/cover/outer obfs are mitigations only.  
@@ -1884,7 +1885,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 | Area | Paths |
 |------|--------|
 | Shared client | `client/connect.py`, `client/endpoint.py`, `client/full_tunnel.py`, `client/multihop.py`, `client/secrets_loader.py`, `client/legal_links.py`, residual honesty / `residual_ip_capture` |
-| Multi-hop residual | Opt-in residual-via-exit (`RPT_MULTIHOP_ENABLED=1`); catalog pubs IS/DE under `product/` (default entry **DE**; US and RO residual peers retired) |
+| Multi-hop residual | Opt-in residual-via-exit (`RPT_MULTIHOP_ENABLED=1`); catalog pubs DE/SG under `product/` (default entry **DE**; IS, US and RO residual peers retired) |
 | Windows / Linux | `client/windows/*` (multihop PE via `scripts/build_windows_multihop.py`), `client/linux/*` |
 | Mobile / Apple | `client_app/` Flutter + NativePrep residual engines (exit pub inject) |
 | Node | `node/*` (handshake, pfs, traffic_shape, crypto_session, nolog); node-only zram+LUKS2 |
@@ -1895,7 +1896,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 ### 2.2 Method notes
 
 - Public audit is served on the **status host** as **`/AUDIT.md`** and **`/audit.md`** (source repo is private).  
-- Product default residual entry **Germany (DE)** (catalog monopin; live probe host may be another peer). Romania monopin retired.  
+- Product default residual entry **Germany (DE)** (catalog monopin; live peers **Germany** and **Singapore**). Iceland / Romania / United States monopins retired.  
 - Live probe host **{host}**.  
 - Product node ElGamal pub pin: `product/NODE_ELGAMAL_PUB.sha256` (SHA-256 `1b126abf…`).  
 - **Did not** paste secret material into this document.
@@ -1928,7 +1929,7 @@ Schedule: **all active residual monopin peers** from the product catalog
 
 #### Scenario A — VPS compromise
 
-Production node placement: **Iceland**, hypervisor host **FlokiNET**. **As far as we can be assured** from FlokiNET’s public statements, the host does **not** retain invasive connection logs of users connecting to the node (**“No invasive logs”**; no third-party traffic/pattern sharing; overall resource usage only). If the **VPS guest OS / root** (production node) is fully compromised while sessions are active, **in-memory** session material may still be exposed. Product **no-log** / nolog composition reduces durable user-info logs on disk but does **not** erase live RAM. **Residual risk:** compromise of the node OS (distinct from FlokiNET’s published no-invasive-logs posture for tenant connection logging).
+Production residual placement: **Germany (DE)** (default) and **Singapore (SG)**. If a **VPS guest OS / root** is fully compromised while sessions are active, **in-memory** session material may still be exposed. Product **no-log** / nolog composition reduces durable user-info logs on disk but does **not** erase live RAM. **Residual risk:** compromise of the node OS.
 
 #### Scenario B — Traffic analysis by ISP
 

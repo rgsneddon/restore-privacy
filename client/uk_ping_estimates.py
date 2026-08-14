@@ -19,8 +19,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
-from client.endpoint import PRODUCT_NODE_HOST, PRODUCT_NODE_PORT
-from client.multihop import PRODUCT_EXIT_HOST, PRODUCT_EXIT_PORT
+from client.multihop import (
+    PRODUCT_DE_HOST,
+    PRODUCT_DE_PORT,
+    PRODUCT_EXIT_HOST,
+    PRODUCT_EXIT_PORT,
+    PRODUCT_SG_HOST,
+    PRODUCT_SG_PORT,
+)
 from client.product_policy import PrivacyScalePrefs
 
 # Approximate base RTT (ms) typical UK → monopin hosts (operator estimate band).
@@ -390,7 +396,7 @@ def render_audit_uk_ping_section(
         lines.extend(
             [
                 "- **Live** RTT where probes succeeded from **this audit host** to product",
-                f"  **entry** `{PRODUCT_NODE_HOST}:{PRODUCT_NODE_PORT}` (Iceland)",
+                f"  **entry** `{PRODUCT_DE_HOST}:{PRODUCT_DE_PORT}` (Germany)",
             ]
         )
         if any_exit_live:
@@ -431,8 +437,9 @@ def render_audit_uk_ping_section(
         lines.extend(
             [
                 "- **Approximate** RTT bands for a **typical UK** (London metro) user to",
-                f"  product **entry** `{PRODUCT_NODE_HOST}:{PRODUCT_NODE_PORT}` (Iceland) and",
+                f"  product **entry** `{PRODUCT_DE_HOST}:{PRODUCT_DE_PORT}` (Germany) and",
                 f"  **exit** `{PRODUCT_EXIT_HOST}:{PRODUCT_EXIT_PORT}` (Germany).",
+                f"  Live catalog also offers Singapore `{PRODUCT_SG_HOST}:{PRODUCT_SG_PORT}`.",
                 "- Live probe from this host **failed or unavailable** — using estimate bands only.",
             ]
         )

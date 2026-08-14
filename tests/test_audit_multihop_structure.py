@@ -116,7 +116,7 @@ class TestMultihopStructureProbes(unittest.TestCase):
         self.assertIn("Multihop node structure", md)
         self.assertIn("Multihop structure overall", md)
         # Public audit table uses country labels (no active US catalog peer)
-        self.assertIn("Iceland (IS)", md)
+        self.assertIn("Singapore (SG)", md)
         self.assertIn("Germany (DE)", md)
         self.assertNotIn("Catalog peer** (United States)", md)
         self.assertIn("retired", md.lower())
@@ -183,7 +183,7 @@ class TestMultihopStructureProbes(unittest.TestCase):
         agg = run_all_multihop_structure_probes(repo_root=ROOT, install_root=ROOT)
         md = render_multihop_structure_markdown(agg)
         self.assertNotIn("| **Catalog peer** (United States)", md)
-        self.assertIn("| **Catalog peer** (Iceland)", md)
+        self.assertIn("| **Catalog peer** (Singapore)", md)
         self.assertIn("Germany (DE)", md)
         flags = (agg.get("probes") or {}).get("multihop_module_flags") or {}
         joined = " ".join(flags.get("reasons") or [])

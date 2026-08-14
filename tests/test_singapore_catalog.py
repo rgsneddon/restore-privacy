@@ -11,6 +11,15 @@ sys.path.insert(0, str(ROOT))
 
 
 class TestSingaporeCatalog(unittest.TestCase):
+    def test_catalog_pin_is_1_2_6(self) -> None:
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(pin, "1.2.6")
+        from client.connection_log import product_client_version
+
+        self.assertEqual(product_client_version(), "1.2.6")
+        downloads = (ROOT / "status_page" / "downloads.py").read_text(encoding="utf-8")
+        self.assertIn('RELEASE_VERSION = "1.2.6"', downloads)
+
     def test_offered_menu_includes_singapore_and_germany(self) -> None:
         from client.country_select import catalog_country_options, parse_catalog_country_code
         from client.multihop import (

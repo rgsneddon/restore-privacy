@@ -58,7 +58,11 @@ class TestAuditMd(unittest.TestCase):
             catalog = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
         self.assertTrue(catalog, "catalog version must be resolvable")
         self.assertIn(catalog, text)
-        self.assertIn("82.221.101.241", text)
+        self.assertTrue(
+            "Singapore" in text or "Germany" in text,
+            "AUDIT.md must name live residual peers",
+        )
+        self.assertNotIn("82.221.101.241", text)
         self.assertIn("private", text.lower())
         self.assertIn("restoreprivacy.online", text)
         self.assertNotIn("public packages + operator tree", text)

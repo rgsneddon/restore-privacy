@@ -1,6 +1,6 @@
 # Restore Privacy
 
-**Version v1.2.5** — monorepo for the free residual VPN client and operator tooling.
+**Version v1.2.6** — monorepo for the free residual VPN client and operator tooling.
 
 Public storefront: [restoreprivacy.online](https://restoreprivacy.online).  
 Open Pages export: [rgsneddon.github.io/restore-privacy-suite](https://rgsneddon.github.io/restore-privacy-suite/).
@@ -9,7 +9,7 @@ Open Pages export: [rgsneddon.github.io/restore-privacy-suite](https://rgsneddon
 
 Install free. Connect is unlocked by a **3-day device trial** or a paid **KEYGEN** (£3.00/month or yearly on `/pay`). There is no account username/password on the product path.
 
-Once connected, residual captures device traffic on a full-tunnel path where the OS allows it. Minimize keeps the tunnel up; **Quit** (main screen lower-left) disconnects then fully exits. Tray chrome: **Privacy, Restored**.
+Once connected, residual captures device traffic on a full-tunnel path where the OS allows it. Choose **Germany** (default) or **Singapore** as the residual location. Minimize keeps the tunnel up; **Quit** (main screen lower-left) disconnects then fully exits. Tray chrome: **Privacy, Restored**.
 
 ### Settings (defaults lean)
 
@@ -31,17 +31,17 @@ Traffic shaping, outer obfuscation, multi-hop extras, and kill switch are **off 
 
 | Platform | File |
 |----------|------|
-| Windows | `restore-privacy-client-1.2.5-windows-x64-setup.exe` (already on Helsinki; this Mac does not rebuild or overwrite it) |
-| Android | `restore-privacy-client-1.2.5-android.apk` |
-| macOS | `restore-privacy-client-1.2.5-macos.zip` — Notarized Developer ID + residual Packet Tunnel **systemextension** host NE |
-| iOS | `restore-privacy-client-1.2.5-ios.zip` — IPA `Payload/Runner.app` + embedded provisions (Team-signed sideload; rename to `.ipa`) |
-| Linux | `restore-privacy-client-1.2.5-linux-x64.tar.gz` (carry-forward 1.2.4 until a Linux agent rebuilds) |
+| Windows | `restore-privacy-client-1.2.5-windows-x64-setup.exe` (Helsinki 1.2.5 stays; this Mac does not rebuild or overwrite it — Windows machine ships 1.2.6) |
+| Android | `restore-privacy-client-1.2.6-android.apk` |
+| macOS | `restore-privacy-client-1.2.6-macos.zip` — Notarized Developer ID + residual Packet Tunnel **systemextension** host NE |
+| iOS | `restore-privacy-client-1.2.6-ios.zip` — IPA `Payload/Runner.app` + embedded provisions (Team-signed sideload; rename to `.ipa`) |
+| Linux | `restore-privacy-client-1.2.5-linux-x64.tar.gz` (Helsinki 1.2.5 stays until a Linux agent rebuilds 1.2.6) |
 
 ## Operator build
 
-- Pin: `client/VERSION` → `1.2.5`
+- Pin: `client/VERSION` → `1.2.6`
 - Flutter client: `client_app/`
-- Stage script: `scripts/build_suite_1.2.5.py` (this Mac host skips Windows PE)
+- Stage script: `scripts/build_suite_1.2.6.py` (this Mac host skips Windows PE and does not restamp Linux)
 - Full ship skill: type `kyrusfables` / `/kyrusfables`
 - Public static export: `python3 scripts/build_public_pages.py` → `public_site/`
 

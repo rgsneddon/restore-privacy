@@ -1801,7 +1801,7 @@ class TunnelClientApp:
         if not ok_entry or not entry_country_allows_connect(entry_code):
             msg = (
                 "Choose a valid entry country above Connect "
-                "(Iceland is the product default)."
+                "(Germany is the product default)."
             )
             self._log(msg)
             self._set_status("error", detail=msg)
@@ -3462,8 +3462,7 @@ class TunnelClientApp:
             tk.Label(
                 entry_col,
                 text=(
-                    "Residual entry: Germany (DE). "
-                    "Iceland is not available until sales."
+                    "Residual entry: Germany (DE) default or Singapore (SG)."
                 ),
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
@@ -3495,7 +3494,7 @@ class TunnelClientApp:
             # Friendly labels under the code menu
             tk.Label(
                 entry_col,
-                text="DE = Germany (sole residual entry)",
+                text="DE = Germany (default) · SG = Singapore",
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
                 font=("Segoe UI", 7),

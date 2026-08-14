@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Install systemd timer: run security audit ~every 1 day on the residual node.
 #
-# Default fleet home for this timer: **Romania** residual monopin
-# (185.146.232.107) — lowest-spec peer; install by running this script as root
-# *on that host*. Oneshot always probes localhost only (never hardcodes a
-# remote residual IP in the unit environment).
+# Default fleet home for this timer: **Germany** residual monopin
+# (178.105.187.178) — product default entry. Live catalog peers are
+# Germany + Singapore. Install by running this script as root *on that host*.
+# Oneshot always probes localhost only (never hardcodes a remote residual IP
+# in the unit environment).
 #
 # Privacy section A (audit run must not become a leak):
 #   - Probes localhost only (RPT_NODE_HOST=127.0.0.1 + RPT_AUDIT_REQUIRE_LOCALHOST)
@@ -18,9 +19,9 @@
 #
 # Writes ${INSTALL_ROOT}/AUDIT.md and status_page copies when present.
 # VPN APP Shop can serve local AUDIT.md at /AUDIT.md and /audit.md.
-# Operator pull defaults (sync_audit_artifacts_from_node.py) → Romania monopin.
+# Operator pull defaults (sync_audit_artifacts_from_node.py) → Germany monopin.
 #
-# Usage (root on Romania residual node — audit-timer home):
+# Usage (root on Germany residual node — audit-timer home):
 #   bash scripts/install_security_audit_timer.sh
 #   PERIOD=1d bash scripts/install_security_audit_timer.sh
 set -euo pipefail

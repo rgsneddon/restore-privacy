@@ -26,9 +26,11 @@ class TestDownloadsMapLatest(unittest.TestCase):
         self.assertEqual(map_platform_version("windows"), "1.2.5")
         self.assertIn("1.2.5", map_platform_filename("windows"))
         self.assertEqual(pub["platforms"]["windows"]["version"], "1.2.5")
-        for plat in ("android", "macos", "ios", "linux"):
-            self.assertTrue(map_platform_version(plat))
-            self.assertIn(map_platform_version(plat), map_platform_filename(plat))
+        for plat in ("android", "macos", "ios"):
+            self.assertEqual(map_platform_version(plat), "1.2.6")
+            self.assertIn("1.2.6", map_platform_filename(plat))
+        self.assertEqual(map_platform_version("linux"), "1.2.5")
+        self.assertIn("1.2.5", map_platform_filename("linux"))
 
     def test_fulfilment_and_host_delivery_watch_map(self) -> None:
         from downloads import map_platform_filename, map_platform_version
@@ -45,9 +47,10 @@ class TestDownloadsMapLatest(unittest.TestCase):
         url = vps_asset_url(win)
         self.assertIn("/1.2.5/", url)
         self.assertTrue(url.endswith(win))
-        self.assertEqual(map_platform_version("linux"), "1.2.4")
+        self.assertEqual(map_platform_version("linux"), "1.2.5")
         linux = map_platform_filename("linux")
-        self.assertIn("/1.2.4/", vps_asset_url(linux))
+        self.assertIn("/1.2.5/", vps_asset_url(linux))
+        self.assertEqual(map_platform_version("android"), "1.2.6")
 
     def test_ned_snapshot_includes_downloads_map(self) -> None:
         from admin_rps import ned_growth_public_snapshot

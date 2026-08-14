@@ -61,8 +61,9 @@ class TestTimerWritePathStructural(unittest.TestCase):
         self.assertIn("--publish", text)
         self.assertIn("publish_pulled_artifacts", text)
         self.assertIn("DEFAULT_HOST", text)
-        # Default residual timer home (IS monopin with active timer)
-        self.assertIn("82.221.101.241", text)
+        # Default residual timer home (Germany default entry)
+        self.assertIn("178.105.187.178", text)
+        self.assertNotIn("82.221.101.241", text)
 
 
 class TestPublishTimerHelpers(unittest.TestCase):

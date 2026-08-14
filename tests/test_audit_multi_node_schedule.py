@@ -37,9 +37,10 @@ class TestMultiNodeProbeSchedule(unittest.TestCase):
         self.assertGreaterEqual(len(sched), 2, f"expected multi-node schedule, got {sched}")
         hosts = {str(p.get("host") or "") for p in sched}
         codes = {str(p.get("code") or "").upper() for p in sched}
-        # Product residual catalog monopin peers (IS + DE)
-        self.assertIn("IS", codes)
+        # Product residual catalog monopin peers (DE + SG)
         self.assertIn("DE", codes)
+        self.assertIn("SG", codes)
+        self.assertNotIn("IS", codes)
         self.assertTrue(any(h.count(".") == 3 for h in hosts), hosts)
         # Not only a single DEFAULT_HOST
         self.assertGreater(len(hosts), 1)
@@ -58,8 +59,8 @@ class TestMultiNodeProbeSchedule(unittest.TestCase):
             "node_host": "178.105.187.178",
             "live_node_probes": [
                 {
-                    "code": "IS",
-                    "label": "Iceland (IS)",
+                    "code": "SG",
+                    "label": "Singapore (SG)",
                     "tcp_status": {"ok": True, "error": None},
                     "http_status": {
                         "ok": True,
@@ -78,7 +79,7 @@ class TestMultiNodeProbeSchedule(unittest.TestCase):
             ],
         }
         table = mod.render_live_node_probe_table(results)
-        self.assertIn("Iceland (IS)", table)
+        self.assertIn("Singapore (SG)", table)
         self.assertIn("Germany (DE)", table)
         self.assertIn("ok=True", table)
         self.assertIn("ok=False", table)
@@ -110,8 +111,8 @@ class TestMultiNodeProbeSchedule(unittest.TestCase):
             "multihop_structure": {"ok": True},
             "live_node_probes": [
                 {
-                    "code": "IS",
-                    "label": "Iceland (IS)",
+                    "code": "SG",
+                    "label": "Singapore (SG)",
                     "tcp_status": {"ok": True, "error": None},
                     "http_status": {"ok": True, "status_code": 200, "body": {}},
                     "udp": {"sent": True, "error": None},
@@ -127,7 +128,7 @@ class TestMultiNodeProbeSchedule(unittest.TestCase):
         }
         md = mod.build_markdown(results)
         self.assertIn("Live residual node probe results", md)
-        self.assertIn("Iceland (IS)", md)
+        self.assertIn("Singapore (SG)", md)
         self.assertIn("Germany (DE)", md)
         self.assertIn("all active residual monopin peers", md.lower())
 
@@ -202,9 +203,9 @@ class TestPrimaryLabelSurvivesRedact(unittest.TestCase):
                 "multihop_structure": {"ok": True},
                 "live_node_probes": [
                     {
-                        "code": "IS",
-                        "label": "Iceland (IS)",
-                        "host": "82.221.101.241",
+                        "code": "SG",
+                        "label": "Singapore (SG)",
+                        "host": "5.223.48.8",
                         "tcp_status": {"ok": True, "error": None},
                         "http_status": {
                             "ok": True,
@@ -236,10 +237,11 @@ class TestPrimaryLabelSurvivesRedact(unittest.TestCase):
             self.assertIn("| Peer | Germany (DE) |", md)
             self.assertNotIn("| Peer | VPN node |", md)
             # Multi-node table rows still present
-            self.assertIn("Iceland (IS)", md)
+            self.assertIn("Singapore (SG)", md)
             self.assertIn("Germany (DE)", md)
             # No raw monopin IPs on public AUDIT surface
             self.assertNotIn("178.105.187.178", md)
+            self.assertNotIn("5.223.48.8", md)
             self.assertNotIn("82.221.101.241", md)
             # Helper alone must not map already-redacted label to VPN node
             self.assertEqual(
@@ -277,9 +279,9 @@ class TestPrimaryLabelSurvivesRedact(unittest.TestCase):
         # Already redacted host string without re-map to VPN node
         self.assertEqual(
             mod.primary_peer_public_label(
-                {"node_host": "Iceland (IS)", "live_node_probes": []}
+                {"node_host": "Singapore (SG)", "live_node_probes": []}
             ),
-            "Iceland (IS)",
+            "Singapore (SG)",
         )
 
 

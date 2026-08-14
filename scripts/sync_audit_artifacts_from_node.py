@@ -7,8 +7,8 @@ on the residual timer host (section A: no general outbound). Public homepage
 successful timer run must be followed by this pull **and** a publish, or the
 page stays on the last operator-commanded stamp.
 
-Default residual timer host is the Iceland monopin (``82.221.101.241``) where
-``rpt-security-audit.timer`` is active; override with ``RPT_SSH_HOST``.
+Default residual timer host is the Germany monopin (``178.105.187.178``);
+live catalog peers are Germany and Singapore. Override with ``RPT_SSH_HOST``.
 
 Usage (from a machine with SSH access)::
 
@@ -34,8 +34,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-# Default: Iceland residual monopin (active rpt-security-audit.timer as of 1.1.7).
-DEFAULT_HOST = "82.221.101.241"
+# Default: Germany residual monopin (product default entry; live catalog DE+SG).
+DEFAULT_HOST = "178.105.187.178"
 DEFAULT_USER = "raskul"
 REMOTE_JSON = "/opt/restore-privacy/status_page/static/security_audit_latest.json"
 REMOTE_AUDIT = "/opt/restore-privacy/AUDIT.md"

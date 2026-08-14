@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import unittest
 
-from client.endpoint import PRODUCT_NODE_HOST, PRODUCT_NODE_PORT
+from client.endpoint import PRODUCT_NODE_PORT
 from client.multihop import (
     MULTI_HOP_ROUTING_IMPLEMENTED,
+    PRODUCT_DE_HOST,
     PRODUCT_EXIT_HOST,
+    PRODUCT_SG_HOST,
     Hop,
     MultiHopConfig,
     build_entry_exit_path,
@@ -34,14 +36,14 @@ class TestMultiHopPath(unittest.TestCase):
         self.assertFalse(is_multihop_active(cfg))
         self.assertIn("inactive", multihop_status_text(cfg))
         ep = first_hop_endpoint(cfg)
-        self.assertEqual(ep.host, PRODUCT_NODE_HOST)
+        self.assertEqual(ep.host, PRODUCT_DE_HOST)
         self.assertEqual(ep.port, PRODUCT_NODE_PORT)
-        self.assertEqual(residual_endpoint(cfg).host, PRODUCT_NODE_HOST)
+        self.assertEqual(residual_endpoint(cfg).host, PRODUCT_DE_HOST)
 
     def test_build_hop_path_empty_defaults_product(self):
         hops = build_hop_path([])
         self.assertEqual(len(hops), 1)
-        self.assertEqual(hops[0].host, PRODUCT_NODE_HOST)
+        self.assertEqual(hops[0].host, PRODUCT_DE_HOST)
 
     def test_two_or_more_hops_active_routes_to_exit(self):
         """≥2 hops + enabled + routing implemented → residual dials exit."""
@@ -90,11 +92,11 @@ class TestMultiHopPath(unittest.TestCase):
         self.assertEqual(residual_endpoint(cfg).host, "9.9.9.9")
 
     def test_product_entry_exit_germany(self):
-        """Iceland entry → Germany exit (RO replacement monopin)."""
-        path = build_entry_exit_path(PRODUCT_EXIT_HOST)
+        """Singapore entry → Germany exit (live catalog peers)."""
+        path = build_entry_exit_path(PRODUCT_EXIT_HOST, entry_host=PRODUCT_SG_HOST)
         cfg = MultiHopConfig(hops=path, enabled=True)
         self.assertTrue(is_multihop_active(cfg))
-        self.assertEqual(first_hop_endpoint(cfg).host, PRODUCT_NODE_HOST)
+        self.assertEqual(first_hop_endpoint(cfg).host, PRODUCT_SG_HOST)
         self.assertEqual(residual_endpoint(cfg).host, PRODUCT_EXIT_HOST)
         # User-facing label is country name (never raw monopin IP)
         self.assertEqual(exit_hop_label(cfg), "Germany (DE)")
@@ -103,7 +105,7 @@ class TestMultiHopPath(unittest.TestCase):
         self.assertIn(pub, ("de_node_elgamal.pub", "exit_node_elgamal.pub"))
         self.assertEqual(
             node_pub_name_for_endpoint(first_hop_endpoint(cfg)),
-            "node_elgamal.pub",
+            "sg_node_elgamal.pub",
         )
 
     def test_multihop_config_from_env_exit_host(self):
@@ -118,7 +120,7 @@ class TestMultiHopPath(unittest.TestCase):
         self.assertEqual(residual_endpoint(cfg).host, "185.146.232.107")
         bare = multihop_config_from_env({})
         self.assertFalse(bare.enabled)
-        self.assertEqual(entry_hop().host, PRODUCT_NODE_HOST)
+        self.assertEqual(entry_hop().host, PRODUCT_DE_HOST)
 
     def test_entry_exit_requires_exit_host(self):
         with self.assertRaises(ValueError):
@@ -140,7 +142,7 @@ class TestMultiHopPath(unittest.TestCase):
             exit_healthy=True,
             entry_draining=False,
         )
-        self.assertEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
+        self.assertEqual(sel.endpoint.host, PRODUCT_DE_HOST)
         self.assertEqual(sel.reason, "entry_primary")
         # Entry draining → automatic hop to any non-preferred catalog peer
         fo = select_residual_endpoint(
@@ -149,7 +151,7 @@ class TestMultiHopPath(unittest.TestCase):
             exit_healthy=True,
             entry_draining=True,
         )
-        self.assertNotEqual(fo.endpoint.host, PRODUCT_NODE_HOST)
+        self.assertNotEqual(fo.endpoint.host, PRODUCT_DE_HOST)
         self.assertTrue(fo.failover_active)
         # Fleet wipe / entry drain is labeled wipe_drain_failover (plain down = exit_failover)
         self.assertEqual(fo.reason, "wipe_drain_failover")
