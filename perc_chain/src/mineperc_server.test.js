@@ -307,8 +307,12 @@ describe('createServer launch', () => {
     for (const { text, health, jsStatus, jsText, confPage, confHtml, confApi } of bodies) {
       assert.match(text, /Perccent PERC pool/);
       assert.match(text, /72 seconds/);
-      assert.match(text, /perc-mine v1\.0\.1/);
-      assert.match(text, /perc-mine-1\.0\.1-windows\.zip/);
+      assert.match(text, /perc-mine v1\.0\.2/);
+      assert.match(text, /perc-mine-1\.0\.2-windows\.zip/);
+      assert.match(text, /Live miners/);
+      assert.match(text, /72 seconds/);
+      assert.match(text, /miner-body/);
+      assert.match(text, /\/api\/stats/);
       assert.doesNotMatch(text, /perc-mine v1\.0\.0/);
       assert.doesNotMatch(text, /perc-mine-1\.0\.0/);
       assert.match(text, /\/confirmations/);
