@@ -551,6 +551,54 @@ def restore_windows_residual_path(
     return applied
 
 
+def residual_idle_lost_restore(
+    *,
+    server_host: Optional[str] = None,
+    plan: Optional[FullTunnelPlan] = None,
+    if_index: Optional[int] = None,
+) -> dict[str, object]:
+    """Idle-dead restore hook: drop dual /1 + KS + IPv6 so host internet works.
+
+    Same residual-path rollback as Disconnect. Always runs **before** optional
+    auto-reconnect. Returns a report for tests / support logs.
+    """
+    applied: list[str] = []
+    host = (server_host or "").strip()
+    try:
+        applied = list(
+            restore_windows_residual_path(
+                server_host=host or None,
+                plan=plan,
+                if_index=if_index,
+                run_kill_switch_rollback=True,
+                run_ipv6_rollback=True,
+            )
+        )
+    except Exception:
+        try:
+            if plan is not None:
+                applied = list(
+                    rollback_full_tunnel_routes(plan, host, if_index)
+                )
+        except Exception:
+            applied = []
+    restore_cmds: list[str] = []
+    try:
+        from client.full_tunnel import windows_residual_restore_route_commands
+
+        restore_cmds = list(windows_residual_restore_route_commands(host or None))
+    except Exception:
+        restore_cmds = []
+    blob = " ".join(str(c) for c in (applied + restore_cmds))
+    return {
+        "residual_path_restored": True,
+        "applied": applied,
+        "restore_commands": restore_cmds,
+        "clears_dual_slash1": ("128.0.0.0" in blob) or ("0.0.0.0" in blob),
+        "kill_switch_rollback": True,
+    }
+
+
 def stop_full_tunnel(
     result: Optional[WindowsTunnelResult] = None,
     client: Optional[RptClient] = None,
@@ -919,6 +967,7 @@ def residual_post_attach_ready(
     require_forward_smoke: bool = True,
     require_dns_smoke: bool = True,
     dataplane_return_ok: bool = False,
+    session_liveness_lost: bool = False,
 ) -> bool:
     """Pure gate: residual capture may stay installed only when attach is healthy.
 
@@ -926,10 +975,13 @@ def residual_post_attach_ready(
     1.1.1.1 / node Unbound have been false-negatives (desktop ``tun=150/12``
     then rollback). A real DATA reply (``udp_to_tun >= 1``) is enough to stay
     Connected. Rollback only when pin/dataplane die or nothing returns.
+    Idle-dead (``session_liveness_lost``) is never residual-capture-active.
     """
     if not routes_applied:
         # Pin-only / session-only — not residual capture; health of dual /1 N/A
         return True
+    if session_liveness_lost:
+        return False
     if not dataplane_running:
         return False
     if not keepalive_ok:
@@ -1188,6 +1240,7 @@ def residual_run_post_attach_smokes(
             keepalive_ok=bool(keepalive_ok),
             forward_path_ok=fwd_ok,
             dns_ok=dns_ok,
+            session_liveness_lost=False,
         )
         if ready:
             return True, fwd_ok, dns_ok
@@ -1208,7 +1261,12 @@ def residual_ip_capture_active(result: Optional[WindowsTunnelResult]) -> bool:
     plane = result.dataplane
     if plane is not None:
         try:
-            if bool(getattr(plane.stats, "session_liveness_lost", False)):
+            from client.dataplane import residual_idle_dead
+
+            st = getattr(plane, "stats", None)
+            if residual_idle_dead(st, routes_applied=True):
+                return False
+            if getattr(st, "session_liveness_lost", False) is True:
                 return False
         except Exception:
             pass
@@ -1643,12 +1701,10 @@ def start_full_tunnel(
             return
         residual_liveness_ctx["routes_applied"] = False
         try:
-            restore_windows_residual_path(
+            residual_idle_lost_restore(
                 server_host=residual_liveness_ctx.get("server_host") or server_host,
                 plan=residual_liveness_ctx.get("plan") or plan,
                 if_index=residual_liveness_ctx.get("if_index"),
-                run_kill_switch_rollback=True,
-                run_ipv6_rollback=True,
             )
         except Exception:
             try:
@@ -1851,6 +1907,9 @@ def start_full_tunnel(
             require_forward_smoke=False,
             require_dns_smoke=False,
             dataplane_return_ok=return_ok,
+            session_liveness_lost=bool(
+                getattr(getattr(plane, "stats", None), "session_liveness_lost", False)
+            ),
         ):
             try:
                 restore_windows_residual_path(

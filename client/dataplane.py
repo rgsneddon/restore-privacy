@@ -33,6 +33,9 @@ from .connect import RptClient
 
 # Consecutive failed keepalives before residual session is treated as dead.
 KEEPALIVE_FAIL_THRESHOLD = 3
+# Successful UDP sends with no peer reply (NODE_STATUS / DATA). Send-only
+# keepalives stay True after NAT expiry / node prune — that is the idle black hole.
+KEEPALIVE_UNACKED_THRESHOLD = 2
 # Idle select/sleep backoff caps (seconds) — no busy spin.
 IDLE_SELECT_MIN_S = 0.05
 IDLE_SELECT_MAX_S = 0.40
@@ -80,6 +83,90 @@ def residual_keepalive_under_node_idle(
     return keepalive_s > 0 and keepalive_s < idle
 
 
+def residual_idle_dead(
+    stats: DataPlaneStats | None,
+    *,
+    routes_applied: bool = True,
+    session_liveness_lost: bool | None = None,
+) -> bool:
+    """True when dual /1 would black-hole: liveness lost or silent keepalive death.
+
+    Covers send errors *and* send-ok / no NODE_STATUS-or-DATA (NAT/session prune).
+    """
+    if not routes_applied:
+        return False
+    lost = session_liveness_lost
+    if lost is None:
+        raw = getattr(stats, "session_liveness_lost", False) if stats else False
+        lost = raw is True
+    if lost is True:
+        return True
+    if stats is None:
+        return False
+    try:
+        fails = int(getattr(stats, "consecutive_keepalive_failures", 0) or 0)
+    except (TypeError, ValueError):
+        fails = 0
+    try:
+        unacked = int(getattr(stats, "consecutive_keepalive_unacked", 0) or 0)
+    except (TypeError, ValueError):
+        unacked = 0
+    if fails >= int(KEEPALIVE_FAIL_THRESHOLD):
+        return True
+    if unacked >= int(KEEPALIVE_UNACKED_THRESHOLD):
+        return True
+    return False
+
+
+def note_residual_peer_udp(
+    stats: DataPlaneStats,
+    *,
+    node_status: bool = False,
+) -> None:
+    """Peer UDP (DATA or NODE_STATUS) proves the residual session is not silent-dead."""
+    stats.consecutive_keepalive_unacked = 0
+    if node_status:
+        stats.keepalives_acked += 1
+
+
+def apply_keepalive_liveness_tick(
+    stats: DataPlaneStats,
+    *,
+    send_ok: bool,
+    peer_seen_since_last: bool,
+    fail_threshold: int = KEEPALIVE_FAIL_THRESHOLD,
+    unacked_threshold: int = KEEPALIVE_UNACKED_THRESHOLD,
+) -> bool:
+    """Apply one keepalive attempt to *stats*. True if liveness was just lost.
+
+    *peer_seen_since_last*: NODE_STATUS or DATA arrived since the previous send.
+    A send that succeeds with no peer reply increments the unacked streak
+    (idle black-hole: OS accepted UDP but the session/NAT is dead).
+    """
+    if send_ok:
+        stats.keepalives_sent += 1
+        stats.consecutive_keepalive_failures = 0
+        if peer_seen_since_last:
+            stats.consecutive_keepalive_unacked = 0
+        else:
+            stats.consecutive_keepalive_unacked += 1
+    else:
+        stats.keepalives_failed += 1
+        stats.consecutive_keepalive_failures += 1
+        stats.errors += 1
+
+    if stats.session_liveness_lost:
+        return False
+    dead = (
+        int(stats.consecutive_keepalive_failures) >= int(fail_threshold)
+        or int(stats.consecutive_keepalive_unacked) >= int(unacked_threshold)
+    )
+    if dead:
+        stats.session_liveness_lost = True
+        return True
+    return False
+
+
 class TunIO(Protocol):
     def read_packet(self, max_size: int = 65535, wait_ms: int = 0) -> Optional[bytes]:
         """Return one IP packet or None if none available.
@@ -108,6 +195,8 @@ class DataPlaneStats:
     keepalives_sent: int = 0
     keepalives_failed: int = 0
     consecutive_keepalive_failures: int = 0
+    consecutive_keepalive_unacked: int = 0
+    keepalives_acked: int = 0
     session_liveness_lost: bool = False
     started: bool = False
     stopped: bool = False
@@ -354,6 +443,7 @@ class RptDataPlane:
         except Exception:  # noqa: BLE001
             inner = data
         if peek_type(inner) == MsgType.NODE_STATUS:
+            note_residual_peer_udp(self.stats, node_status=True)
             try:
                 threading.Thread(
                     target=lambda frame=data: self.client.process_node_status_frame(
@@ -368,9 +458,11 @@ class RptDataPlane:
         plain, is_cover = self.client.open_packet_allow_cover(data)
         if is_cover:
             self.stats.cover_recv += 1
+            note_residual_peer_udp(self.stats, node_status=False)
         elif plain:
             tun.write_packet(plain)
             self.stats.udp_to_tun += 1
+            note_residual_peer_udp(self.stats, node_status=False)
 
     def seal_unicast_probe(self, dst: str = "1.1.1.1") -> bool:
         """Seal one public IPv4 UDP probe via the live residual session.
@@ -422,6 +514,7 @@ class RptDataPlane:
         last_keepalive = 0.0
         last_cover = 0.0
         last_activity = time.time()
+        last_peer_udp = time.time()
         # Lean protocol keepalive — independent of TUN browsing traffic / cover.
         keepalive_every = float(self._keepalive_interval_s)
         idle_select_s = IDLE_SELECT_MIN_S
@@ -461,6 +554,7 @@ class RptDataPlane:
                     break
                 udp_n += 1
                 last_activity = time.time()
+                last_peer_udp = last_activity
                 idle_select_s = IDLE_SELECT_MIN_S
                 try:
                     self._handle_udp_datagram(tun, data, outer_on=outer_on)
@@ -497,7 +591,8 @@ class RptDataPlane:
                 last_activity = now
 
             # Periodic KEEPALIVE so idle tunnels are not pruned (node + NAT/UDP).
-            # Independent of TUN browsing traffic. Only advance timer on success.
+            # Independent of TUN browsing traffic. Send-ok is not liveness —
+            # NODE_STATUS/DATA must come back or we treat the path as idle-dead.
             if (now - last_keepalive) >= keepalive_every:
                 ok = False
                 try:
@@ -505,28 +600,23 @@ class RptDataPlane:
                 except Exception:
                     ok = False
                     self.stats.errors += 1
+                first_tick = last_keepalive == 0.0
+                peer_seen = first_tick or last_peer_udp >= last_keepalive
+                just_lost = apply_keepalive_liveness_tick(
+                    self.stats,
+                    send_ok=ok,
+                    peer_seen_since_last=peer_seen,
+                )
                 if ok:
                     last_keepalive = now
-                    self.stats.keepalives_sent += 1
-                    self.stats.consecutive_keepalive_failures = 0
-                    # Keepalive is residual activity (NAT refresh) — reset idle select.
                     last_activity = now
                     idle_select_s = IDLE_SELECT_MIN_S
                 else:
-                    self.stats.keepalives_failed += 1
-                    self.stats.consecutive_keepalive_failures += 1
-                    self.stats.errors += 1
                     # Retry sooner after failure (half interval) without busy loop.
                     last_keepalive = now - (keepalive_every * 0.5)
-                    if (
-                        self.stats.consecutive_keepalive_failures
-                        >= KEEPALIVE_FAIL_THRESHOLD
-                        and not self.stats.session_liveness_lost
-                    ):
-                        self.stats.session_liveness_lost = True
-                        if not liveness_notified:
-                            liveness_notified = True
-                            self._notify_liveness_lost()
+                if just_lost and not liveness_notified:
+                    liveness_notified = True
+                    self._notify_liveness_lost()
 
             # Idle backoff: when no TUN/UDP activity, lengthen select wait (battery).
             quiet_s = now - last_activity

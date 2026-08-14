@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 from client.dataplane import (  # noqa: E402
     IDLE_SELECT_MAX_S,
     KEEPALIVE_FAIL_THRESHOLD,
+    KEEPALIVE_UNACKED_THRESHOLD,
     DataPlaneStats,
     RptDataPlane,
     residual_idle_select_max_s,
@@ -44,7 +45,7 @@ class TestResidualKeepalivePolicy(unittest.TestCase):
         src = (ROOT / "client" / "dataplane.py").read_text(encoding="utf-8")
         # Must sleep/select with idle backoff — not a tight empty loop
         self.assertIn("select.select", src)
-        self.assertIn("time.sleep", src)
+        self.assertIn("idle_select_s", src)
         self.assertIn("IDLE_SELECT_MAX_S", src)
         # Keepalive independent of cover traffic
         self.assertIn("send_keepalive", src)
@@ -153,12 +154,69 @@ class TestDataPlaneKeepaliveScheduling(unittest.TestCase):
         self.assertGreaterEqual(plane.stats.keepalives_failed, KEEPALIVE_FAIL_THRESHOLD)
         self.assertTrue(lost, "on_liveness_lost must fire")
 
-    def test_successful_keepalive_resets_failure_streak(self):
+    def test_send_ok_without_peer_reply_marks_liveness_lost(self):
+        """OS accepted keepalive UDP but no NODE_STATUS/DATA → idle-dead."""
         client = RptClient.__new__(RptClient)
         client.session = mock.Mock(session_id=b"\x01" * 8, crypto=mock.Mock())
         client.session.crypto.traffic_shape = None
         sock = mock.Mock()
         sock.recvfrom.side_effect = BlockingIOError
+        client._sock = sock
+        client.endpoint = mock.Mock(address=("127.0.0.1", 44044))
+        client.send_keepalive = mock.Mock(return_value=True)
+        client.open_packet_allow_cover = mock.Mock(return_value=(None, False))
+        client.seal_packet = mock.Mock()
+        client.process_node_status_frame = mock.Mock()
+
+        lost = []
+
+        class FakeTun:
+            def read_packet(self, max_size=65535, wait_ms=0):
+                return None
+
+            def write_packet(self, packet):
+                pass
+
+            def fileno(self):
+                return -1
+
+            def close(self):
+                pass
+
+        with mock.patch("client.dataplane.select.select", return_value=([], [], [])):
+            plane = RptDataPlane(
+                client,
+                keepalive_interval_s=0.05,
+                on_liveness_lost=lambda: lost.append(1),
+            )
+            plane.start(FakeTun())
+            deadline = time.time() + 3.0
+            while time.time() < deadline and not plane.stats.session_liveness_lost:
+                time.sleep(0.05)
+            plane.stop()
+        self.assertTrue(plane.stats.session_liveness_lost)
+        self.assertGreaterEqual(
+            plane.stats.consecutive_keepalive_unacked, KEEPALIVE_UNACKED_THRESHOLD
+        )
+        self.assertTrue(lost, "idle-dead restore hook must fire")
+
+    def test_successful_keepalive_resets_failure_streak(self):
+        client = RptClient.__new__(RptClient)
+        client.session = mock.Mock(session_id=b"\x01" * 8, crypto=mock.Mock())
+        client.session.crypto.traffic_shape = None
+        from node.protocol import MAGIC, MsgType
+
+        sock = mock.Mock()
+        ns = MAGIC + bytes([int(MsgType.NODE_STATUS)]) + b"\x00" * 16
+
+        def _recv(*_a, **_k):
+            n = getattr(_recv, "n", 0)
+            _recv.n = n + 1
+            if n % 2 == 0:
+                return ns, ("127.0.0.1", 44044)
+            raise BlockingIOError
+
+        sock.recvfrom.side_effect = _recv
         client._sock = sock
         client.endpoint = mock.Mock(address=("127.0.0.1", 44044))
         # Fail twice then succeed forever

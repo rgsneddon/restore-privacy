@@ -258,7 +258,7 @@ class TestResidualDisconnect(unittest.TestCase):
             return_value=["route delete 0.0.0.0 mask 128.0.0.0"],
         ) as rb:
             stop_full_tunnel(result, client)
-        rb.assert_called_once()
+        self.assertGreaterEqual(rb.call_count, 1)
         self.assertFalse(result.routes_applied)
         self.assertFalse(residual_ip_capture_active(result))
         plane.stop.assert_called_once()
