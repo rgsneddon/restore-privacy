@@ -54,7 +54,17 @@ describe('alignment without client rebuild', () => {
     assert.ok(names.includes('bob'));
     assert.ok(names.includes('carol'));
     assert.ok(!names.includes('evolve_treasury'));
-    assert.ok(ledger.mineCredits.alice.microUnits > 0);
+    assert.ok(ledger.accounts.alice.balance.microUnits > 0);
+    assert.ok(ledger.accounts.bob.balance.microUnits > 0);
+    assert.ok(ledger.accounts.carol.balance.microUnits > 0);
+    const tip = ledger.blocks[0];
+    const kinds = (tip.transactions || []).map((t) => t.kind);
+    assert.ok(kinds.includes('block_gen_reward'));
+    const aliceTx = (ledger.accounts.alice.transactions || []).find(
+      (t) => t.kind === 'block_gen_reward',
+    );
+    assert.ok(aliceTx);
+    assert.equal(aliceTx.toUsername, 'alice');
     const again = rewardAllOnBlockGen(ledger, { finder: 'alice', height: 1 });
     assert.ok(again.count >= 3);
   });
@@ -77,6 +87,12 @@ describe('alignment without client rebuild', () => {
     assert.equal(ledger.blocks[0].minerUnlock, true);
     assert.match(ledger.blocks[0].memo, /Unlocking hash/);
     assert.ok(accepted.rewards.count >= 1);
+    assert.ok(ledger.accounts.perc_user.balance.microUnits > 0);
+    assert.ok(
+      (ledger.accounts.perc_user.transactions || []).some(
+        (t) => t.kind === 'block_gen_reward',
+      ),
+    );
   });
 
   it('fully confirmed at 72 seconds not 72 minutes', () => {

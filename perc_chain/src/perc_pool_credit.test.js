@@ -4,6 +4,7 @@ import {
   applyCredit,
   creditAcceptedShare,
   PAYOUT_ASSET,
+  rewardAllOnBlockGen,
 } from './perc_pool_credit.js';
 import { checkShare } from './beamhash_iii.js';
 
@@ -52,5 +53,39 @@ describe('accepted share → PERC credit (shipped path)', () => {
     assert.equal(book.perc_miner.asset, 'PERC');
     assert.equal(book.perc_miner.microUnits, 1);
     assert.notEqual(book.perc_miner.asset, 'BEAM');
+  });
+});
+
+describe('rewardAllOnBlockGen wallet path', () => {
+  it('credits accounts[u].balance and posts block_gen_reward txs wallets sync', () => {
+    const ledger = {
+      accounts: {
+        evolve_treasury: {
+          username: 'evolve_treasury',
+          balance: { microUnits: 1_000 },
+          transactions: [],
+        },
+        alice: { username: 'alice', balance: { microUnits: 10 }, transactions: [] },
+        bob: { username: 'bob', balance: { microUnits: 0 }, transactions: [] },
+      },
+      blocks: [
+        { index: 0, scenarioLabel: 'seal', transactions: [] },
+      ],
+      mineCredits: {},
+    };
+    const aliceBefore = ledger.accounts.alice.balance.microUnits;
+    const got = rewardAllOnBlockGen(ledger, { finder: 'carol.rig', height: 0 });
+    assert.ok(got.count >= 3);
+    assert.ok(got.rewarded.includes('alice'));
+    assert.ok(got.rewarded.includes('bob'));
+    assert.ok(got.rewarded.includes('carol'));
+    assert.ok(ledger.accounts.alice.balance.microUnits > aliceBefore);
+    assert.ok(ledger.accounts.bob.balance.microUnits > 0);
+    assert.ok(ledger.accounts.carol.balance.microUnits > 0);
+    const tx = ledger.accounts.alice.transactions.find((t) => t.kind === 'block_gen_reward');
+    assert.ok(tx);
+    assert.equal(tx.toUsername, 'alice');
+    assert.equal(tx.fromUsername, 'evolve_treasury');
+    assert.ok(ledger.blocks[0].transactions.some((t) => t.kind === 'block_gen_reward'));
   });
 });

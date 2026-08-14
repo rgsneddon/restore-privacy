@@ -3,6 +3,7 @@
  * Beam SBBS / BEAM-coin addresses are not a destination of record.
  */
 
+import crypto from 'crypto';
 import { BLOCK_GEN_REWARD_MICRO } from './chain_timing.js';
 
 export const PAYOUT_ASSET = 'PERC';
@@ -52,19 +53,46 @@ export function creditAcceptedShare({
   };
 }
 
+const TREASURY_USERNAME = 'evolve_treasury';
+const SEED_USERNAME = 'evolve_seed_node';
+
+function ensureWalletAccount(state, username) {
+  state.accounts = state.accounts || {};
+  if (!state.accounts[username]) {
+    state.accounts[username] = {
+      username,
+      address: '',
+      balance: { microUnits: 0 },
+      cumulativeStakingEarned: { microUnits: 0 },
+      transactions: [],
+    };
+  }
+  const acc = state.accounts[username];
+  if (!acc.balance || typeof acc.balance !== 'object') acc.balance = { microUnits: 0 };
+  if (!Array.isArray(acc.transactions)) acc.transactions = [];
+  return acc;
+}
+
 /**
- * Credit every user and miner on the ledger when a block is generated.
- * Server-side book — wallets do not need a rebuild.
+ * Credit every user and miner on block generation the same way the NED
+ * faucet does: debit evolve_treasury, credit accounts[u].balance, and
+ * post a block_gen_reward / scenarioReward tx wallets already sync.
+ * mineCredits is a secondary pool book only.
  */
-export function rewardAllOnBlockGen(ledger, { finder, height } = {}) {
+export function rewardAllOnBlockGen(ledger, { finder, height, unit } = {}) {
   const state = ledger && typeof ledger === 'object' ? ledger : {};
   if (!state.mineCredits || typeof state.mineCredits !== 'object') state.mineCredits = {};
+  if (!Array.isArray(state.blocks)) state.blocks = [];
   const names = new Set();
   for (const name of Object.keys(state.accounts || {})) {
-    if (name && name !== 'evolve_treasury') names.add(name);
+    if (name && name !== TREASURY_USERNAME && name !== SEED_USERNAME) names.add(name);
   }
   for (const name of Object.keys(state.mineCredits || {})) {
-    if (name) names.add(name);
+    try {
+      names.add(normalizePercUser(name));
+    } catch {
+      /* skip */
+    }
   }
   if (finder) {
     try {
@@ -73,23 +101,68 @@ export function rewardAllOnBlockGen(ledger, { finder, height } = {}) {
       /* skip invalid finder */
     }
   }
+  const payout = Number.isFinite(Number(unit)) && Number(unit) > 0
+    ? Math.floor(Number(unit))
+    : BLOCK_GEN_REWARD_MICRO;
   const rewarded = [];
+  const txs = [];
+  const ts = new Date().toISOString();
+  const idx =
+    height != null && Number.isFinite(Number(height))
+      ? Number(height)
+      : Math.max(0, state.blocks.length - 1);
+  const block =
+    state.blocks.find((b) => Number(b?.index) === idx) ||
+    state.blocks[state.blocks.length - 1] ||
+    null;
+
+  const treasury = ensureWalletAccount(state, TREASURY_USERNAME);
+  const total = payout * names.size;
+  if ((treasury.balance.microUnits || 0) < total) {
+    treasury.balance = {
+      microUnits: (treasury.balance.microUnits || 0) + total,
+    };
+  }
+  treasury.balance = {
+    microUnits: (treasury.balance.microUnits || 0) - total,
+  };
+
   for (const username of names) {
     let rec;
     try {
       rec = creditAcceptedShare({
         username,
-        microUnits: BLOCK_GEN_REWARD_MICRO,
-        jobId: height != null ? String(height) : 'block_gen',
+        microUnits: payout,
+        jobId: String(idx),
       });
     } catch {
       continue;
     }
     rec.kind = 'block_gen_reward';
     state.mineCredits = applyCredit(state.mineCredits, rec);
+    const acc = ensureWalletAccount(state, rec.username);
+    acc.balance = { microUnits: (acc.balance.microUnits || 0) + payout };
+    const tx = {
+      id: `block-gen-${idx}-${rec.username}-${crypto.randomBytes(3).toString('hex')}`,
+      kind: 'block_gen_reward',
+      amount: { microUnits: payout },
+      timestamp: ts,
+      fromUsername: TREASURY_USERNAME,
+      toUsername: rec.username,
+      scenarioLabel: 'Block generation reward',
+      memo: 'Reward on block generation',
+      blockIndex: idx,
+    };
+    acc.transactions.unshift(tx);
+    treasury.transactions.unshift(tx);
+    if (block) {
+      if (!Array.isArray(block.transactions)) block.transactions = [];
+      block.transactions.push(tx);
+    }
+    txs.push(tx);
     rewarded.push(rec.username);
   }
-  return { rewarded, count: rewarded.length, height: height ?? null };
+  return { rewarded, count: rewarded.length, height: idx, txs, unit: payout };
 }
 
 export function applyCredit(book, credit) {

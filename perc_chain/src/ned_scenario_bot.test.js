@@ -37,6 +37,13 @@ describe('ned/fred scenario bot', () => {
     assert.equal(got.percent.ok, true);
     assert.deepEqual(got.percent.recipients, ['ned']);
     assert.ok(ledger.accounts.ned.balance.microUnits > 0);
+    assert.ok(got.percent.blockGen?.count >= 1);
+    assert.ok(
+      (ledger.accounts.alice.transactions || []).some(
+        (t) => t.kind === 'block_gen_reward',
+      ),
+    );
+    assert.ok(ledger.accounts.alice.balance.microUnits > 200_000_000);
     assert.equal(got.initiator, NED_USERNAME);
     assert.equal(ledger.blocks.length, 2);
     assert.match(got.percent.label, /^Percent chance:/);
@@ -58,9 +65,11 @@ describe('ned/fred scenario bot', () => {
     assert.ok(got.percent.recipients.includes('ned'));
     assert.ok(got.percent.recipients.includes('bob'));
     assert.ok(got.percent.recipients.includes('alice'));
-    assert.equal(ledger.accounts.ned.balance.microUnits, unitP + unitC);
-    assert.equal(ledger.accounts.bob.balance.microUnits, unitP + unitC);
-    assert.equal(ledger.accounts.alice.balance.microUnits, aliceHeld + unitP + unitC);
+    const extra =
+      (got.percent.blockGen?.unit || 0) + (got.cohesion.blockGen?.unit || 0);
+    assert.equal(ledger.accounts.ned.balance.microUnits, unitP + unitC + extra);
+    assert.equal(ledger.accounts.bob.balance.microUnits, unitP + unitC + extra);
+    assert.equal(ledger.accounts.alice.balance.microUnits, aliceHeld + unitP + unitC + extra);
     assert.equal(got.percent.stakePays.length, 0);
   });
 

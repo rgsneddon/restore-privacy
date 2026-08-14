@@ -6,6 +6,7 @@
  */
 import crypto from 'crypto';
 import { UNITS_PER_PERC } from './chain_constants.js';
+import { rewardAllOnBlockGen } from './perc_pool_credit.js';
 
 export const NED_USERNAME = 'ned';
 export const FRED_USERNAME = 'fred';
@@ -245,6 +246,10 @@ export function applyNedScenario(
     transactions: txs,
   });
   ledger.lastScenarioAt = ts;
+  const blockGen = rewardAllOnBlockGen(ledger, {
+    finder: agent,
+    height: index,
+  });
   return {
     ok: true,
     unit,
@@ -255,6 +260,7 @@ export function applyNedScenario(
     kind: run.kind,
     height: index,
     initiator: agent,
+    blockGen,
   };
 }
 
