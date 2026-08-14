@@ -1,21 +1,26 @@
-"""UK-user ping matrix for AUDIT + operator honesty.
+"""Privacy-scale ping matrix for AUDIT — DE–SG world-midpoint origin.
 
-When live probes succeed (device/host → product entry/exit via
-:mod:`client.node_ping`), table cells use **measured** RTT. On probe failure
-the section fails soft to documented approximate bands — never invents a live
-ms figure.
+The published AUDIT ping **base/origin** is the exact great-circle midpoint
+on Earth between the Germany residual node (``PRODUCT_DE_HOST``) and the
+Singapore residual node (``PRODUCT_SG_HOST``). Midpoint→DE and midpoint→SG
+distances (and therefore modeled base RTT) are equal. Singapore is not
+scored as a UK→Singapore path.
+
+Optional ``live=`` injection remains for unit tests of AVG→RAG only. The
+audit write path never uses this laptop/UK (or Helsinki) ICMP as the
+displayed base — there is no probe host at the geographic midpoint.
 
 **RAG** is driven by each row's numeric **AVG** ms (not live-vs-approx):
   - 🟩 green when AVG &lt; 40
   - 🟧 amber when 40 ≤ AVG ≤ 70
   - 🟥 red when AVG &gt; 70
 
-Method honesty always states whether figures are live (this probe host) or
-approximate UK estimates. Not a contractual SLA.
+Not a contractual SLA.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
@@ -29,12 +34,19 @@ from client.multihop import (
 )
 from client.product_policy import PrivacyScalePrefs
 
-# Approximate base RTT (ms) typical UK → monopin hosts (operator estimate band).
-# Used only when live probe is unavailable.
-UK_TO_ENTRY_MS_LOW = 38
-UK_TO_ENTRY_MS_HIGH = 58
-UK_TO_EXIT_MS_LOW = 32
-UK_TO_EXIT_MS_HIGH = 52
+# Catalog residual node positions (decimal degrees). Hetzner Falkenstein
+# campus for 178.105.187.178; Hetzner Cloud Singapore campus for 5.223.48.8.
+DE_NODE_LATLON: tuple[float, float] = (50.47785, 12.37139)
+SG_NODE_LATLON: tuple[float, float] = (1.32199, 103.69500)
+
+# WGS84 mean Earth radius (km).
+EARTH_RADIUS_KM = 6371.0088
+# Group velocity in fiber ≈ 2/3 c ≈ 200 km per millisecond.
+FIBER_KM_PER_MS = 200.0
+# Typical Internet path stretch vs great-circle.
+PATH_STRETCH = 1.5
+# Symmetric modeled band around the midpoint base RTT (ms).
+MIDPOINT_BAND_HALF_MS = 8
 
 # Extra latency *feel* when traffic shaping is on (jitter/cover — not pure RTT).
 SHAPE_OVERHEAD_MS = 5
@@ -47,6 +59,111 @@ RAG_AMBER_MAX_MS = 70.0  # amber when RAG_GREEN_MAX_MS <= avg <= this; else red
 
 # Injectable probe callables: () -> PingResult-like with .ok and .rtt_ms
 ProbeFn = Callable[[], object]
+
+
+def haversine_km(
+    lat1: float, lon1: float, lat2: float, lon2: float
+) -> float:
+    """Great-circle distance (km) on a sphere of radius :data:`EARTH_RADIUS_KM`."""
+    φ1, λ1, φ2, λ2 = (math.radians(lat1), math.radians(lon1), math.radians(lat2), math.radians(lon2))
+    dφ = φ2 - φ1
+    dλ = λ2 - λ1
+    a = math.sin(dφ / 2.0) ** 2 + math.cos(φ1) * math.cos(φ2) * math.sin(dλ / 2.0) ** 2
+    return 2.0 * EARTH_RADIUS_KM * math.asin(min(1.0, math.sqrt(a)))
+
+
+def great_circle_midpoint(
+    lat1: float, lon1: float, lat2: float, lon2: float
+) -> tuple[float, float]:
+    """Exact great-circle midpoint (lat, lon degrees) between two positions."""
+    φ1, λ1, φ2, λ2 = (math.radians(lat1), math.radians(lon1), math.radians(lat2), math.radians(lon2))
+    x1 = math.cos(φ1) * math.cos(λ1)
+    y1 = math.cos(φ1) * math.sin(λ1)
+    z1 = math.sin(φ1)
+    x2 = math.cos(φ2) * math.cos(λ2)
+    y2 = math.cos(φ2) * math.sin(λ2)
+    z2 = math.sin(φ2)
+    x, y, z = x1 + x2, y1 + y2, z1 + z2
+    hyp = math.hypot(x, y)
+    φm = math.atan2(z, hyp)
+    λm = math.atan2(y, x)
+    return (math.degrees(φm), math.degrees(λm))
+
+
+def modeled_base_rtt_ms(distance_km: float) -> float:
+    """Modeled RTT (ms) for a great-circle path of *distance_km*.
+
+    Round-trip at fiber group velocity (``FIBER_KM_PER_MS``) times
+    ``PATH_STRETCH`` (typical Internet path vs great-circle).
+    """
+    km = max(0.0, float(distance_km))
+    return (2.0 * km / FIBER_KM_PER_MS) * PATH_STRETCH
+
+
+def format_latlon(lat: float, lon: float) -> str:
+    """Human lat/lon for honesty text, e.g. ``32.1234°N, 58.0456°E``."""
+    ns = "N" if lat >= 0 else "S"
+    ew = "E" if lon >= 0 else "W"
+    return f"{abs(lat):.4f}°{ns}, {abs(lon):.4f}°{ew}"
+
+
+@dataclass(frozen=True)
+class MidpointOrigin:
+    """DE–SG great-circle midpoint used as the AUDIT ping base."""
+
+    lat: float
+    lon: float
+    km_to_de: float
+    km_to_sg: float
+    base_rtt_ms: float
+    de_host: str
+    sg_host: str
+    de_latlon: tuple[float, float]
+    sg_latlon: tuple[float, float]
+
+    def format_coords(self) -> str:
+        return format_latlon(self.lat, self.lon)
+
+
+def catalog_peer_positions() -> dict[str, tuple[float, float]]:
+    """Shipped residual node positions keyed by catalog host."""
+    return {
+        PRODUCT_DE_HOST: DE_NODE_LATLON,
+        PRODUCT_SG_HOST: SG_NODE_LATLON,
+    }
+
+
+def ping_origin_midpoint() -> MidpointOrigin:
+    """Great-circle midpoint between the Germany and Singapore residual nodes.
+
+    Midpoint→DE and midpoint→SG haversine distances are equal (half the
+    DE↔SG arc). Modeled base RTT to each peer is therefore equal.
+    """
+    de = DE_NODE_LATLON
+    sg = SG_NODE_LATLON
+    mid = great_circle_midpoint(de[0], de[1], sg[0], sg[1])
+    km_de = haversine_km(mid[0], mid[1], de[0], de[1])
+    km_sg = haversine_km(mid[0], mid[1], sg[0], sg[1])
+    # Equal distances → equal modeled RTT; use DE leg (same as SG).
+    rtt = modeled_base_rtt_ms(km_de)
+    return MidpointOrigin(
+        lat=mid[0],
+        lon=mid[1],
+        km_to_de=km_de,
+        km_to_sg=km_sg,
+        base_rtt_ms=rtt,
+        de_host=PRODUCT_DE_HOST,
+        sg_host=PRODUCT_SG_HOST,
+        de_latlon=de,
+        sg_latlon=sg,
+    )
+
+
+def midpoint_peer_band_ms() -> tuple[int, int]:
+    """Inclusive lo–hi modeled RTT (ms) from the DE–SG midpoint to either peer."""
+    origin = ping_origin_midpoint()
+    mid = int(round(origin.base_rtt_ms))
+    return max(1, mid - MIDPOINT_BAND_HALF_MS), mid + MIDPOINT_BAND_HALF_MS
 
 
 def rag_from_avg_ms(avg_ms: float) -> str:
@@ -248,8 +365,7 @@ def _estimate_row(
         else:
             entry_lo = entry_hi = base
     else:
-        entry_lo = UK_TO_ENTRY_MS_LOW
-        entry_hi = UK_TO_ENTRY_MS_HIGH
+        entry_lo, entry_hi = midpoint_peer_band_ms()
         if prefs.traffic_shape:
             entry_lo += SHAPE_OVERHEAD_MS
             entry_hi += SHAPE_OVERHEAD_MS
@@ -265,8 +381,7 @@ def _estimate_row(
             else:
                 exit_lo = exit_hi = xbase
         else:
-            exit_lo = UK_TO_EXIT_MS_LOW
-            exit_hi = UK_TO_EXIT_MS_HIGH
+            exit_lo, exit_hi = midpoint_peer_band_ms()
             if prefs.traffic_shape:
                 exit_lo += SHAPE_OVERHEAD_MS
                 exit_hi += SHAPE_OVERHEAD_MS
@@ -287,14 +402,14 @@ def _estimate_row(
         notes += "; outer obfs off (bare RPT, ~0 ms RTT)"
 
     if entry_live:
-        notes += "; entry RTT live probe this host"
+        notes += "; DE RTT injected (not UK/laptop origin)"
     else:
-        notes += "; entry RTT approximate UK band"
+        notes += "; DE RTT modeled from DE–SG midpoint"
     if prefs.multihop:
         if exit_live:
-            notes += "; exit RTT live probe this host"
+            notes += "; SG RTT injected (not UK/laptop origin)"
         else:
-            notes += "; exit RTT approximate UK band"
+            notes += "; SG RTT modeled from DE–SG midpoint"
 
     avg = row_avg_ms(
         entry_ms_low=entry_lo,
@@ -357,30 +472,38 @@ def uk_ping_matrix_rows(
 def render_audit_uk_ping_section(
     *,
     live: LiveRttBase | None = None,
-    measure: bool = True,
+    measure: bool = False,
     probe_entry: ProbeFn | None = None,
     probe_exit: ProbeFn | None = None,
     timeout_s: float = 1.5,
 ) -> str:
-    """Markdown section for AUDIT.md — UK ping + RAG by settings.
+    """Markdown section for AUDIT.md — DE–SG midpoint ping + RAG by settings.
 
-    When *measure* is True and *live* is None, probes entry/exit once via
-    :func:`measure_live_rtt_base` (injectable *probe_entry* / *probe_exit*).
+    The displayed origin is always the DE–SG great-circle midpoint unless
+    *live* is explicitly passed (unit tests of AVG→RAG). *measure* / host
+    probes are **not** the matrix origin — a UK or Helsinki laptop path
+    would recreate UK→Singapore scoring.
+
+    *probe_entry* / *probe_exit* / *timeout_s* are retained for API compat
+    and only used when *live* is None **and** *measure* is True **and**
+    callers pass an explicit *live* overlay; they do not become the base.
     """
-    if live is None and measure:
-        live = measure_live_rtt_base(
-            probe_entry=probe_entry,
-            probe_exit=probe_exit,
-            timeout_s=timeout_s,
-        )
-    elif live is None:
+    # Host ICMP from a non-midpoint machine is never the displayed origin.
+    # Explicit live= still overlays RTTs so RAG unit tests drive the same
+    # row builder the audit uses.
+    if live is None:
         live = LiveRttBase(entry_ms=None, exit_ms=None)
+    _ = (measure, probe_entry, probe_exit, timeout_s)  # API compat; not origin
 
+    origin = ping_origin_midpoint()
+    band_lo, band_hi = midpoint_peer_band_ms()
     rows = uk_ping_matrix_rows(live=live)
     any_entry_live = any(r.entry_live for r in rows)
     any_exit_live = any(r.exit_live for r in rows)
 
-    title = "## Privacy-scale settings — UK ping + RAG"
+    title = "## Privacy-scale settings — DE–SG midpoint ping + RAG"
+    de_cell = f"`{PRODUCT_DE_HOST}:{PRODUCT_DE_PORT}`"
+    sg_cell = f"`{PRODUCT_SG_HOST}:{PRODUCT_SG_PORT}`"
     lines = [
         title,
         "",
@@ -390,88 +513,63 @@ def render_audit_uk_ping_section(
         "",
         "### Method (honesty)",
         "",
+        "- **Ping base/origin:** exact great-circle midpoint on Earth between the",
+        f"  Germany residual {de_cell} and the Singapore residual {sg_cell}",
+        "  — halfway between Germany and Singapore.",
+        f"- Midpoint coordinates: **{origin.format_coords()}**.",
+        f"- Midpoint→DE = **{origin.km_to_de:.1f} km**; Midpoint→SG = **{origin.km_to_sg:.1f} km**",
+        "  (equal under the same midpoint function). Modeled base RTT is therefore",
+        f"  equal: **{origin.base_rtt_ms:.1f} ms** each (fiber ≈ 2/3 *c* × path stretch",
+        f"  {PATH_STRETCH:g}; band {band_lo}–{band_hi} ms).",
+        "- Singapore is **not** scored from a United Kingdom origin. This audit",
+        "  host's live ICMP (laptop / Helsinki) is **not** the displayed base.",
+        f"- Catalog peers: Germany {de_cell}; Singapore {sg_cell}.",
+        "  Multi-hop residual still dials the product **exit** "
+        f"`{PRODUCT_EXIT_HOST}:{PRODUCT_EXIT_PORT}` (Germany); the SG column is the",
+        "  midpoint→Singapore catalog-peer figure (equal modeled RTT).",
     ]
 
     if any_entry_live or any_exit_live:
         lines.extend(
             [
-                "- **Live** RTT where probes succeeded from **this audit host** to product",
-                f"  **entry** `{PRODUCT_DE_HOST}:{PRODUCT_DE_PORT}` (Germany)",
+                "- Optional **injected** RTT overlay is present (tests / explicit",
+                "  `live=`); it is **not** a UK/laptop origin and does not rename",
+                "  the midpoint columns.",
             ]
         )
-        if any_exit_live:
-            lines.append(
-                f"  and **exit** `{PRODUCT_EXIT_HOST}:{PRODUCT_EXIT_PORT}` (Germany)."
-            )
-        else:
-            lines.append(
-                f"  (exit `{PRODUCT_EXIT_HOST}:{PRODUCT_EXIT_PORT}` used approximate UK band "
-                "when multi-hop rows need it and exit probe failed)."
-            )
         if live.entry_live:
-            em = live.entry_method or "probe"
+            em = live.entry_method or "injected"
             lines.append(
-                f"- Entry probe: **{int(round(live.entry_ms or 0))} ms** "
-                f"via `{em}` (shared base across rows)."
+                f"- DE overlay: **{int(round(live.entry_ms or 0))} ms** via `{em}`."
             )
         if live.exit_live:
-            xm = live.exit_method or "probe"
+            xm = live.exit_method or "injected"
             lines.append(
-                f"- Exit probe: **{int(round(live.exit_ms or 0))} ms** "
-                f"via `{xm}` (shared base for multi-hop rows)."
+                f"- SG overlay: **{int(round(live.exit_ms or 0))} ms** via `{xm}`."
             )
-        lines.extend(
-            [
-                "- Live ms are from **this host's path**, not guaranteed London UK RTT.",
-                "- Traffic shaping **feel** may add a small band on top of live base",
-                f"  (+0–{SHAPE_OVERHEAD_MS} ms labeled); outer obfs ~0 ms RTT.",
-                "- **Not** a contractual SLA. Failed probes fall back to approximate UK bands",
-                "  (never invent live ms).",
-                "- **AVG** is the numeric mean used for RAG: single-hop = entry band midpoint;",
-                "  multi-hop = mean of entry and exit midpoints.",
-                "- **RAG (from AVG only):** 🟩 Green = AVG **&lt; 40 ms**; "
-                "🟧 Amber = **40–70 ms**; 🟥 Red = AVG **&gt; 70 ms**.",
-            ]
-        )
-    else:
-        lines.extend(
-            [
-                "- **Approximate** RTT bands for a **typical UK** (London metro) user to",
-                f"  product **entry** `{PRODUCT_DE_HOST}:{PRODUCT_DE_PORT}` (Germany) and",
-                f"  **exit** `{PRODUCT_EXIT_HOST}:{PRODUCT_EXIT_PORT}` (Germany).",
-                f"  Live catalog also offers Singapore `{PRODUCT_SG_HOST}:{PRODUCT_SG_PORT}`.",
-                "- Live probe from this host **failed or unavailable** — using estimate bands only.",
-            ]
-        )
-        if live.entry_error:
-            lines.append(f"- Entry probe error: `{live.entry_error[:60]}`.")
-        if live.exit_error:
-            lines.append(f"- Exit probe error: `{live.exit_error[:60]}`.")
-        lines.extend(
-            [
-                "- **Not** a contractual SLA.",
-                "- Traffic shaping adds a small **feel** overhead (bounded jitter/cover);",
-                "  outer obfuscation is ~0 ms RTT; multi-hop residual dials **exit**.",
-                "- **AVG** is still computed from band midpoints so RAG is latency-threshold",
-                "  driven (not permanently amber just because estimates were used).",
-                "- **RAG (from AVG only):** 🟩 Green = AVG **&lt; 40 ms**; "
-                "🟧 Amber = **40–70 ms**; 🟥 Red = AVG **&gt; 70 ms**.",
-                "- Client Settings shows **live probe** ms (device→entry / exit) when measured.",
-            ]
-        )
 
-    entry_hdr = "UK→entry (live)" if any_entry_live else "UK→entry (approx)"
-    exit_hdr = "UK→exit (live)" if any_exit_live else "UK→exit (approx)"
-    # Mixed: say live/approx
-    if any_entry_live and not any_exit_live:
-        exit_hdr = "UK→exit (approx)"
-    if any_exit_live and not any_entry_live:
-        entry_hdr = "UK→entry (approx)"
+    lines.extend(
+        [
+            "- Traffic shaping adds a small **feel** overhead (bounded jitter/cover);",
+            "  outer obfuscation is ~0 ms RTT.",
+            "- **Not** a contractual SLA. Midpoint-modeled RTT can still exceed 70 ms",
+            "  (RAG may stay red); the objective is a fair halfway origin, not a green SLA.",
+            "- **AVG** is the numeric mean used for RAG: single-hop = DE (entry) band",
+            "  midpoint; multi-hop = mean of DE and SG band midpoints.",
+            "- **RAG (from AVG only):** 🟩 Green = AVG **&lt; 40 ms**; "
+            "🟧 Amber = **40–70 ms**; 🟥 Red = AVG **&gt; 70 ms**.",
+            "- Client Settings still shows **live device→node** probe ms when measured;",
+            "  that Settings surface is not this AUDIT matrix origin.",
+        ]
+    )
+
+    de_hdr = "Midpoint→DE"
+    sg_hdr = "Midpoint→SG"
 
     lines.extend(
         [
             "",
-            f"| Shape | Outer obfs | Multi-hop | {entry_hdr} | {exit_hdr} | AVG | RAG | Notes |",
+            f"| Shape | Outer obfs | Multi-hop | {de_hdr} | {sg_hdr} | AVG | RAG | Notes |",
             "|-------|------------|-----------|-------------------|------------------|-----|-----|-------|",
         ]
     )
@@ -484,6 +582,10 @@ def render_audit_uk_ping_section(
     lines.extend(
         [
             "",
+            f"**Equal modeled base:** midpoint→`{PRODUCT_DE_HOST}` = "
+            f"midpoint→`{PRODUCT_SG_HOST}` = **{origin.base_rtt_ms:.1f} ms** "
+            f"({origin.km_to_de:.1f} km each).",
+            "",
             "**Product defaults:** shape **off**, outer obfs **off**, multi-hop **off**",
             "(lean single-hop entry). Turn shape/obfs **on** for stronger residual defenses;",
             "hot-apply while connected (multi-hop re-establishes residual).",
@@ -494,13 +596,13 @@ def render_audit_uk_ping_section(
 
 
 def replace_audit_uk_ping_section(audit_text: str, section_md: str | None = None) -> str:
-    """Replace the UK ping section in an AUDIT.md body (or append if missing)."""
+    """Replace the privacy-scale ping section in an AUDIT.md body (or append)."""
     import re
 
     section = section_md if section_md is not None else render_audit_uk_ping_section()
-    # Match heading variants (approx / live title)
+    # Old UK heading and new DE–SG midpoint heading.
     pattern = re.compile(
-        r"## Privacy-scale settings — UK[^\n]*\n"
+        r"## Privacy-scale settings — (?:UK|DE–SG midpoint)[^\n]*\n"
         r".*?"
         r"(?=\n## |\n# |\Z)",
         re.DOTALL,

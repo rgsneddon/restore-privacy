@@ -5,7 +5,7 @@ in the monorepo that can lower measured or perceived latency. Apply only after
 explicit operator decision; trade-offs favour privacy vs snappiness.
 
 Live RTT is dominated by **geography and path** (device → catalog peer). Table
-order on the AUDIT UK ping matrix does not change latency.
+order on the AUDIT DE–SG midpoint ping matrix does not change latency.
 
 ## User / Settings levers (already shipped)
 
@@ -23,7 +23,7 @@ order on the AUDIT UK ping matrix does not change latency.
 |-------|----------------|--------|
 | Probe path | `client/node_ping.py` | UDP **44044** first, then TCP **8080** status port fallback. TCP status RTT ≠ residual UDP data path RTT. |
 | Timeouts | `DEFAULT_PROBE_TIMEOUT_S` (~1.5 s) | Raising timeout only waits longer on failure; it does not lower successful RTT. |
-| AUDIT UK table | `client/uk_ping_estimates.py` | Live ms + optional **shape feel** band (+~5 ms estimate). Lean rows (shape off) show pure live base when probes succeed. |
+| AUDIT midpoint table | `client/uk_ping_estimates.py` | Modeled RTT from the **DE–SG great-circle midpoint** to both catalog peers (equal legs). Optional shape-feel band (+~5 ms). Not this host’s UK/laptop ICMP. |
 
 ## Infrastructure / path (operator, not client defaults)
 
@@ -38,7 +38,7 @@ order on the AUDIT UK ping matrix does not change latency.
 
 - Do **not** silently turn shape/obfs/multihop off in code “to improve ping” (defaults are already lean-off).
 - Do **not** shorten HELLO/connect timeouts solely to report lower ms (causes false failures).
-- Do **not** treat AUDIT live RTT from a non-UK host as London SLA.
+- Do **not** treat AUDIT live RTT from this laptop (UK / Helsinki) as the matrix origin — the origin is the DE–SG world midpoint.
 
 ## Related code
 

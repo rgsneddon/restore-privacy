@@ -71,6 +71,91 @@ class TestNodePingHelper(unittest.TestCase):
         self.assertIn("Measure ping now", src)
 
 
+class TestDeSgMidpointOrigin(unittest.TestCase):
+    """Drive the shipped midpoint + matrix/render functions (not a re-impl)."""
+
+    def test_origin_is_great_circle_midpoint_equal_legs(self) -> None:
+        from client.multihop import PRODUCT_DE_HOST, PRODUCT_SG_HOST
+        from client.uk_ping_estimates import (
+            DE_NODE_LATLON,
+            SG_NODE_LATLON,
+            catalog_peer_positions,
+            great_circle_midpoint,
+            haversine_km,
+            modeled_base_rtt_ms,
+            ping_origin_midpoint,
+        )
+
+        origin = ping_origin_midpoint()
+        positions = catalog_peer_positions()
+        self.assertEqual(origin.de_host, PRODUCT_DE_HOST)
+        self.assertEqual(origin.sg_host, PRODUCT_SG_HOST)
+        self.assertEqual(positions[PRODUCT_DE_HOST], DE_NODE_LATLON)
+        self.assertEqual(positions[PRODUCT_SG_HOST], SG_NODE_LATLON)
+        mid = great_circle_midpoint(
+            DE_NODE_LATLON[0],
+            DE_NODE_LATLON[1],
+            SG_NODE_LATLON[0],
+            SG_NODE_LATLON[1],
+        )
+        self.assertAlmostEqual(origin.lat, mid[0], places=9)
+        self.assertAlmostEqual(origin.lon, mid[1], places=9)
+        d_de = haversine_km(origin.lat, origin.lon, *DE_NODE_LATLON)
+        d_sg = haversine_km(origin.lat, origin.lon, *SG_NODE_LATLON)
+        self.assertAlmostEqual(origin.km_to_de, d_de, places=9)
+        self.assertAlmostEqual(origin.km_to_sg, d_sg, places=9)
+        self.assertAlmostEqual(origin.km_to_de, origin.km_to_sg, places=6)
+        # Half the DE↔SG arc
+        de_sg = haversine_km(*DE_NODE_LATLON, *SG_NODE_LATLON)
+        self.assertAlmostEqual(origin.km_to_de + origin.km_to_sg, de_sg, places=4)
+        self.assertAlmostEqual(
+            origin.base_rtt_ms, modeled_base_rtt_ms(origin.km_to_de), places=9
+        )
+        self.assertAlmostEqual(
+            modeled_base_rtt_ms(origin.km_to_de),
+            modeled_base_rtt_ms(origin.km_to_sg),
+            places=9,
+        )
+
+    def test_matrix_default_bands_equal_and_include_both_peers(self) -> None:
+        from client.uk_ping_estimates import (
+            LiveRttBase,
+            midpoint_peer_band_ms,
+            ping_origin_midpoint,
+            rag_from_avg_ms,
+            render_audit_uk_ping_section,
+            uk_ping_matrix_rows,
+        )
+
+        origin = ping_origin_midpoint()
+        lo, hi = midpoint_peer_band_ms()
+        rows = uk_ping_matrix_rows(live=LiveRttBase(entry_ms=None, exit_ms=None))
+        self.assertEqual(len(rows), 8)
+        for r in rows:
+            if not r.traffic_shape:
+                self.assertEqual(r.entry_ms_low, lo)
+                self.assertEqual(r.entry_ms_high, hi)
+                if r.multihop:
+                    self.assertEqual(r.exit_ms_low, lo)
+                    self.assertEqual(r.exit_ms_high, hi)
+                    # Equal legs → multi-hop AVG equals single-hop AVG
+                    self.assertAlmostEqual(r.avg_ms, (lo + hi) / 2.0, places=6)
+            self.assertEqual(r.rag, rag_from_avg_ms(r.avg_ms))
+            self.assertFalse(r.entry_live)
+        text = render_audit_uk_ping_section(measure=False)
+        self.assertIn("178.105.187.178", text)
+        self.assertIn("5.223.48.8", text)
+        self.assertIn("halfway between Germany and Singapore", text)
+        self.assertIn(origin.format_coords(), text)
+        self.assertIn("Midpoint→DE", text)
+        self.assertIn("Midpoint→SG", text)
+        self.assertNotIn("UK→entry", text)
+        self.assertNotIn("UK→exit", text)
+        self.assertNotIn("typical UK", text)
+        self.assertNotIn("London", text)
+        self.assertIn("from AVG only", text)
+
+
 class TestAuditUkPingSection(unittest.TestCase):
     def test_render_section_has_matrix_and_method(self) -> None:
         from client.uk_ping_estimates import (
@@ -80,20 +165,26 @@ class TestAuditUkPingSection(unittest.TestCase):
             uk_ping_matrix_rows,
         )
 
-        # Pure approx path (no measure) — deterministic for CI
+        # Pure midpoint-band path (no measure) — deterministic for CI
         text = render_audit_uk_ping_section(
             live=LiveRttBase(entry_ms=None, exit_ms=None),
             measure=False,
         )
-        self.assertIn("UK ping + RAG", text)
+        self.assertIn("DE–SG midpoint ping + RAG", text)
         self.assertIn("Method (honesty)", text)
-        self.assertIn("Approximate", text)
+        self.assertIn("halfway between Germany and Singapore", text)
         self.assertIn("178.105.187.178", text)
         self.assertIn("5.223.48.8", text)
         self.assertIn("Germany", text)
         self.assertIn("Singapore", text)
         self.assertNotIn("Romania", text)
         self.assertNotIn("Iceland", text)
+        self.assertNotIn("UK→entry", text)
+        self.assertNotIn("UK→exit", text)
+        self.assertNotIn("UK ping + RAG", text)
+        self.assertNotIn("typical UK", text)
+        self.assertIn("Midpoint→DE", text)
+        self.assertIn("Midpoint→SG", text)
         self.assertIn("multi-hop", text.lower())
         rows = uk_ping_matrix_rows(live=LiveRttBase(entry_ms=None, exit_ms=None))
         self.assertEqual(len(rows), 8)
@@ -209,13 +300,16 @@ class TestAuditUkPingSection(unittest.TestCase):
         text = render_audit_uk_ping_section(live=live, measure=False)
         self.assertIn("42 ms", text)
         self.assertIn("50 ms", text)
-        self.assertIn("Live", text)
+        self.assertIn("injected", text.lower())
         self.assertIn("(live)", text)
         self.assertIn("| AVG |", text)
         self.assertIn("AVG", text)
         self.assertIn("40", text)  # threshold prose
         self.assertIn("70", text)
-        self.assertNotIn("Approximate** RTT bands", text)
+        self.assertNotIn("typical UK", text)
+        self.assertIn("Midpoint→DE", text)
+        self.assertNotIn("UK→entry", text)
+        self.assertNotIn("UK→exit", text)
         # injectable probe_entry path also works
         fake_entry = PingResult(
             host="82.221.101.241", port=44044, ok=True, rtt_ms=33.0, method="tcp"
@@ -224,16 +318,27 @@ class TestAuditUkPingSection(unittest.TestCase):
             host="178.105.187.178", port=44044, ok=True, rtt_ms=44.0, method="udp"
         )
         text2 = render_audit_uk_ping_section(
-            measure=True,
-            probe_entry=lambda: fake_entry,
-            probe_exit=lambda: fake_exit,
+            live=LiveRttBase(
+                entry_ms=33.0,
+                exit_ms=44.0,
+                entry_method="tcp",
+                exit_method="udp",
+            ),
+            measure=False,
         )
         self.assertIn("33 ms", text2)
         self.assertIn("44 ms", text2)
+        # Host probes are not the displayed origin even when measure=True
+        self.assertIn("Midpoint→DE", text2)
+        self.assertNotIn("UK→entry", text2)
+        self.assertNotIn("UK→exit", text2)
 
     def test_probe_failure_falls_back_to_approx_no_fake_live(self) -> None:
         from client.node_ping import PingResult
-        from client.uk_ping_estimates import render_audit_uk_ping_section
+        from client.uk_ping_estimates import (
+            midpoint_peer_band_ms,
+            render_audit_uk_ping_section,
+        )
 
         fail_e = PingResult(
             host="82.221.101.241",
@@ -256,24 +361,28 @@ class TestAuditUkPingSection(unittest.TestCase):
             probe_entry=lambda: fail_e,
             probe_exit=lambda: fail_x,
         )
-        self.assertIn("Approximate", text)
-        self.assertIn("38–58 ms", text)  # approx band present
+        lo, hi = midpoint_peer_band_ms()
+        self.assertIn("halfway between Germany and Singapore", text)
+        self.assertIn(f"{lo}–{hi} ms", text)
         self.assertNotIn("ms (live)", text)
-        self.assertIn("failed or unavailable", text.lower())
+        self.assertNotIn("38–58 ms", text)  # retired UK London band
+        self.assertNotIn("UK→entry", text)
+        self.assertNotIn("UK→exit", text)
         # must not invent the failed rtt as a number cell like "None ms"
         self.assertNotIn("None ms", text)
 
     def test_audit_md_contains_shipped_section(self) -> None:
         pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
         audit = (ROOT / "AUDIT.md").read_text(encoding="utf-8")
-        self.assertIn("Privacy-scale settings — UK", audit)
+        self.assertIn("Privacy-scale settings — DE–SG midpoint ping + RAG", audit)
         self.assertIn("ping + RAG", audit)
-        self.assertTrue(
-            "UK→entry (approx)" in audit
-            or "UK→entry (live)" in audit
-            or "UK→entry" in audit,
-            "entry column header missing",
-        )
+        self.assertIn("Midpoint→DE", audit)
+        self.assertIn("Midpoint→SG", audit)
+        self.assertNotIn("UK→entry", audit)
+        self.assertNotIn("UK→exit", audit)
+        # Write path redacts raw IPs to country labels; both catalog peers remain.
+        self.assertIn("Germany (DE)", audit)
+        self.assertIn("Singapore (SG)", audit)
         self.assertIn(pin, audit)
         self.assertIn("n/a (multi-hop off)", audit)
         # AVG column + threshold RAG (not live-vs-approx colouring)
@@ -284,10 +393,7 @@ class TestAuditUkPingSection(unittest.TestCase):
             "green threshold prose missing",
         )
         self.assertIn("70 ms", audit)
-        # method honesty (live and/or approximate)
-        self.assertTrue(
-            "Approximate" in audit or "Live" in audit or "live probe" in audit.lower()
-        )
+        self.assertIn("halfway between Germany and Singapore", audit)
 
     def test_rag_from_avg_ms_thresholds(self) -> None:
         """Shipped classifier: green &lt;40, amber 40–70, red &gt;70."""
@@ -346,6 +452,28 @@ class TestAuditUkPingSection(unittest.TestCase):
         text_mid = render_audit_uk_ping_section(live=live_mid, measure=False)
         self.assertIn("🟧", text_mid)
         self.assertIn("| AVG | RAG |", text_mid)
+        self.assertIn("Midpoint→DE", text_mid)
+        self.assertNotIn("UK→entry", text_mid)
+        self.assertNotIn("UK→exit", text_mid)
+
+    def test_replace_section_swaps_legacy_uk_heading(self) -> None:
+        from client.uk_ping_estimates import replace_audit_uk_ping_section
+
+        old = (
+            "# Audit\n\n"
+            "## Privacy-scale settings — UK ping + RAG\n\n"
+            "old UK→entry body\n\n"
+            "## 1. Executive summary\n\n"
+            "rest\n"
+        )
+        out = replace_audit_uk_ping_section(old)
+        self.assertIn("DE–SG midpoint ping + RAG", out)
+        self.assertIn("Midpoint→DE", out)
+        self.assertIn("178.105.187.178", out)
+        self.assertIn("5.223.48.8", out)
+        self.assertNotIn("UK→entry", out)
+        self.assertNotIn("old UK→entry body", out)
+        self.assertIn("## 1. Executive summary", out)
 
     def test_audit_package_table_and_monopin_match_catalog(self) -> None:
         """Shipped AUDIT must name live monopin; package RAG uses catalog basenames."""

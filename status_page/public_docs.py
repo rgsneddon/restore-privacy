@@ -573,7 +573,7 @@ def markdownish_to_html(text: str) -> str:
             if not in_table:
                 # Installer package table: Platform | Package | STATE | Notes
                 # Section B privacy probes: Probe | State | Notes
-                # UK ping + RAG: Shape | … | AVG | RAG | Notes
+                # Midpoint ping + RAG: Shape | … | AVG | RAG | Notes
                 header_join = " ".join(cells).lower()
                 table_is_pkg_rag = (
                     "package" in header_join
@@ -630,7 +630,7 @@ def markdownish_to_html(text: str) -> str:
                 tag = "td"
             # Package AUDIT STATE: scroll lengthy Package (col 2) / Notes (col 4) in-cell
             # Section B: scroll lengthy Notes (col 3) only - Probe col stays identity
-            # UK ping / notes matrix: last Notes column scrolls (vertical + horizontal)
+            # Midpoint ping / notes matrix: last Notes column scrolls (vertical + horizontal)
             scroll_cols: set[int] = set()
             notes_scroll_cols: set[int] = set()
             if table_is_pkg_rag:
@@ -910,9 +910,9 @@ table.doc-table.section-b-probes .cell-scroll code {
   font-size: 0.82rem;
 }
 /*
- * Privacy-scale UK ping + RAG:
- * compact control columns; entry/exit readable; Notes scrolls in-cell.
- * Shape | Outer obfs | Multi-hop | Entry | Exit | AVG | RAG | Notes
+ * Privacy-scale DE–SG midpoint ping + RAG:
+ * compact control columns; Midpoint→DE / Midpoint→SG readable; Notes scrolls in-cell.
+ * Shape | Outer obfs | Multi-hop | Midpoint→DE | Midpoint→SG | AVG | RAG | Notes
  */
 table.doc-table.uk-ping-rag {
   display: table;

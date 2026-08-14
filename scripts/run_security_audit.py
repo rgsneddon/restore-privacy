@@ -1814,7 +1814,9 @@ def build_markdown(results: dict) -> str:
     multihop_md = render_multihop_structure_markdown(
         results.get("multihop_structure")
     )
-    # Privacy-scale UK ping + AVG-threshold RAG (live probes when reachable).
+    # Privacy-scale DE–SG midpoint ping + AVG-threshold RAG.
+    # Origin is the great-circle midpoint between Germany and Singapore
+    # residual nodes — never this host's UK/laptop ICMP.
     # Soft-fail: residual timer hosts may ship a lean client/ tree without this
     # module — never abort write_outputs / AUDIT.md stamp on ImportError.
     uk_ping_md = ""
@@ -1826,10 +1828,10 @@ def build_markdown(results: dict) -> str:
             from client.uk_ping_estimates import (  # type: ignore
                 render_audit_uk_ping_section,
             )
-        uk_ping_md = render_audit_uk_ping_section(measure=True) + "\n"
+        uk_ping_md = render_audit_uk_ping_section(measure=False) + "\n"
     except Exception as exc:  # noqa: BLE001
         uk_ping_md = (
-            "## Privacy-scale settings — UK ping + RAG\n\n"
+            "## Privacy-scale settings — DE–SG midpoint ping + RAG\n\n"
             f"_UK ping section unavailable this pass: {type(exc).__name__}_\n\n"
         )
     suite_line = format_executive_suite_line(suite, package_rag=pkg)
