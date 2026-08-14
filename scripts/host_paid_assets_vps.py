@@ -284,7 +284,7 @@ def upload_brand_packages(
         return 1
     assert key_path is not None
     code, _ = _ssh_run_openssh(
-        f"mkdir -p {remote_ver} && chown -R {user}:{user} {remote_root}",
+        f"mkdir -p {remote_ver} && chown {user}:{user} {remote_ver}",
         host=host,
         user=user,
         key_path=key_path,
@@ -1358,7 +1358,7 @@ def upload_packages(
         assert key_path is not None
         print(f"transport=openssh key={key_path}")
         code, _ = _ssh_run_openssh(
-            f"mkdir -p {remote_ver} && chown -R {user}:{user} {remote_root}",
+            f"mkdir -p {remote_ver} && chown {user}:{user} {remote_ver}",
             host=host,
             user=user,
             key_path=key_path,
