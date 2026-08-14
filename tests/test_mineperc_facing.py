@@ -15,7 +15,8 @@ class TestMinepercFacing(unittest.TestCase):
         html = PAGE.read_text(encoding="utf-8")
         self.assertIn("Perccent PERC pool", html)
         self.assertIn("BeamHash III", html)
-        self.assertIn("mineperc.restoreprivacy.online:3334", html)
+        self.assertIn("mineperc.restoreprivacy.online:1466", html)
+        self.assertIn("Ports <code>1690</code> and <code>1974</code> stay on Beam", html)
         self.assertIn("PERC_USERNAME.WORKER", html)
         self.assertNotIn("Beam mining pool", html)
         self.assertNotIn("beam.2miners.com", html)
@@ -26,9 +27,11 @@ class TestMinepercFacing(unittest.TestCase):
         src = SERVER.read_text(encoding="utf-8")
         self.assertIn("Perccent PERC pool", src)
         self.assertIn("beamhashIII", src)
-        self.assertIn("3334", src)
+        self.assertIn("1466", src)
+        self.assertIn("BEAM_RESERVED_PORTS", src)
         self.assertIn("Do not use --coin BEAM", src)
         self.assertIn("creditAcceptedShare", src)
+        self.assertNotRegex(src, r"STRATUM_PORTS\s*=\s*\[[^\]]*(1690|1974)")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 /**
  * Perccent PERC pool front (BeamHash III). HTTP landing + /health + /api.
- * Stratum TCP is published on POOL_STRATUM_PORT (default 3334).
+ * Stratum TCP is published on port 1466 (Perc mine). Not Beam 1690/1974/3333.
  */
 import http from 'http';
 import net from 'net';
@@ -12,8 +12,23 @@ import { applyCredit, creditAcceptedShare } from './perc_pool_credit.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_HTTP_PORT = 8011;
-export const DEFAULT_STRATUM_PORT = 3334;
+export const DEFAULT_STRATUM_PORT = 1466;
+export const STRATUM_PORTS = [1466];
+export const BEAM_RESERVED_PORTS = [1690, 1974];
 export const DEFAULT_HOST = 'mineperc.restoreprivacy.online';
+
+export function percStratumPorts(raw = process.env.MINEPERC_STRATUM_PORTS) {
+  if (raw === '' || raw === 'none' || raw === '0') return [];
+  const requested = String(raw ?? STRATUM_PORTS.join(','))
+    .split(',')
+    .map((p) => Number(p.trim()))
+    .filter((p) => p > 0);
+  const blocked = requested.filter((p) => BEAM_RESERVED_PORTS.includes(p));
+  if (blocked.length) {
+    throw new Error(`ports ${blocked.join(',')} reserved for Beam; Perc mine uses 1466 only`);
+  }
+  return requested.length ? requested : [...STRATUM_PORTS];
+}
 
 let jobSeq = 1;
 let credits = {};
@@ -194,13 +209,15 @@ export function createServer({ port = DEFAULT_HTTP_PORT } = {}) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.MINEPERC_HTTP_PORT || DEFAULT_HTTP_PORT);
-  const sPort = Number(process.env.MINEPERC_STRATUM_PORT || DEFAULT_STRATUM_PORT);
+  const extra = percStratumPorts();
   const srv = createServer({ port });
-  const stratum = createStratumServer({ port: sPort });
   srv.listen(() => {
     console.log(`mineperc perc pool http://127.0.0.1:${port}/  coin=PERC algo=BeamHash III`);
   });
-  stratum.listen(() => {
-    console.log(`mineperc stratum 0.0.0.0:${sPort} BeamHash III PERC`);
-  });
+  for (const sPort of extra) {
+    const stratum = createStratumServer({ port: sPort });
+    stratum.listen(() => {
+      console.log(`mineperc stratum 0.0.0.0:${sPort} BeamHash III PERC`);
+    });
+  }
 }

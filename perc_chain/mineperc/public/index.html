@@ -28,14 +28,14 @@
     <div class="grid">
       <div class="card"><div class="label">Coin</div><div class="value">PERC</div></div>
       <div class="card"><div class="label">Algorithm</div><div class="value">BeamHash III</div></div>
-      <div class="card"><div class="label">Stratum</div><div class="value" style="font-size:.95rem">mineperc.restoreprivacy.online:3334</div></div>
+      <div class="card"><div class="label">Stratum</div><div class="value" style="font-size:.95rem">mineperc.restoreprivacy.online:1466</div></div>
       <div class="card"><div class="label">Worker</div><div class="value" style="font-size:.95rem">PERC_USERNAME.WORKER</div></div>
     </div>
     <h2>Connect a miner</h2>
-    <p class="hint">Point any BeamHash III miner at this Perccent pool. Username is your Perccent identity (wallet / evolve username). Payouts are PERC. Do not pass <code>--coin BEAM</code>.</p>
-    <pre>lolMiner --algo BEAM-III --pool mineperc.restoreprivacy.online:3334 --user PERC_USERNAME.WORKER
-miniZ --url mineperc.restoreprivacy.online:3334 --user PERC_USERNAME.WORKER --algo beamhashiii
-gminer --algo beamhashIII --server mineperc.restoreprivacy.online:3334 --user PERC_USERNAME.WORKER</pre>
+    <p class="hint">Point any BeamHash III miner at this Perccent pool on port <code>1466</code>. Ports <code>1690</code> and <code>1974</code> stay on Beam. Username is your Perccent identity (wallet / evolve username). Payouts are PERC. Do not pass <code>--coin BEAM</code>.</p>
+    <pre>lolMiner --algo BEAM-III --pool mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER
+miniZ --url mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER --algo beamhashiii
+gminer --algo beamhashIII --server mineperc.restoreprivacy.online:1466 --user PERC_USERNAME.WORKER</pre>
     <p class="hint">JSON: <a href="/api/connect">/api/connect</a> · health <a href="/health">/health</a> · explorer <a href="https://evolve.restoreprivacy.online/">evolve.restoreprivacy.online</a></p>
   </div>
 </body>

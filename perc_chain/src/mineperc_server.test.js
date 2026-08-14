@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer, handleApi, poolFacing } from './mineperc_server.js';
+import { createServer, handleApi, percStratumPorts, poolFacing } from './mineperc_server.js';
 import { checkShare } from './beamhash_iii.js';
 import { creditAcceptedShare } from './perc_pool_credit.js';
 
@@ -17,11 +17,23 @@ describe('poolFacing', () => {
     assert.match(f.product, /Perccent PERC pool/);
     assert.equal(f.coin, 'PERC');
     assert.equal(f.algorithm, 'BeamHash III');
-    assert.match(f.stratum, /mineperc\.restoreprivacy\.online:3334/);
+    assert.match(f.stratum, /mineperc\.restoreprivacy\.online:1466/);
     assert.match(f.note, /Do not use --coin BEAM/);
     const blob = JSON.stringify(f);
     assert.doesNotMatch(blob, /Beam mining pool/);
     assert.doesNotMatch(blob, /--coin BEAM --/);
+  });
+});
+
+describe('percStratumPorts', () => {
+  it('defaults to 1466 and refuses Beam 1690/1974', () => {
+    assert.deepEqual(percStratumPorts(), [1466]);
+    assert.deepEqual(percStratumPorts(undefined), [1466]);
+    assert.deepEqual(percStratumPorts(''), []);
+    assert.deepEqual(percStratumPorts('none'), []);
+    assert.deepEqual(percStratumPorts('1466'), [1466]);
+    assert.throws(() => percStratumPorts('1690'), /reserved for Beam/);
+    assert.throws(() => percStratumPorts('1466,1974'), /1974/);
   });
 });
 
@@ -33,7 +45,7 @@ describe('handleApi', () => {
     assert.equal(h.json.coin, 'PERC');
     assert.equal(h.json.algorithm, 'BeamHash III');
     const c = handleApi('/api/connect', 'GET');
-    assert.match(c.json.stratum, /3334/);
+    assert.match(c.json.stratum, /1466/);
   });
 });
 
@@ -63,7 +75,7 @@ describe('createServer launch', () => {
     for (const { text, health } of bodies) {
       assert.match(text, /Perccent PERC pool/);
       assert.match(text, /BeamHash III/);
-      assert.match(text, /mineperc\.restoreprivacy\.online:3334/);
+      assert.match(text, /mineperc\.restoreprivacy\.online:1466/);
       assert.doesNotMatch(text, /Beam mining pool/);
       assert.equal(health.coin, 'PERC');
       assert.equal(health.algorithm, 'BeamHash III');
