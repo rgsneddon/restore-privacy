@@ -127,7 +127,9 @@
     .fcg-link { opacity: 1; }
     .page-downloads {
       display: flex;
-      align-items: center;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 4px;
       width: 100%;
       box-sizing: border-box;
       padding: 6px 20px 10px;
@@ -135,8 +137,26 @@
       border-bottom: 1px solid var(--border);
       background: #0d1018;
     }
+    .download-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      min-width: 0;
+    }
+    .download-label {
+      flex: 0 0 auto;
+      min-width: 7.4rem;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--neon-yellow);
+      white-space: nowrap;
+    }
     .page-download-links {
       width: 100%;
+      min-width: 0;
     }
     .page-download-links a {
       color: var(--neon-yellow);
@@ -229,6 +249,8 @@
         padding: 6px 2px;
       }
       .page-downloads { padding: 4px 12px 8px; }
+      .download-row { flex-wrap: wrap; gap: 2px 8px; }
+      .download-label { min-width: 100%; padding: 2px 0 0; }
     }
     #wallet-pentagon-chart {
       width: 100%;
@@ -296,14 +318,26 @@
       <a class="fcg-link" href="https://rgsneddon.github.io/evolve/fcg_white_paper.html" target="_blank" rel="noopener noreferrer">FCG white paper</a>
     </div>
   </nav>
-  <nav class="page-downloads" aria-label="Evolve installers">
-    <div class="page-top-links page-download-links">
-      <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-macos-notarized/evolve-v4.1.10-macos-x64.zip">macOS</a>
-      <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-ios-setup.ipa">iOS</a>
-      <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-linux-x64.tar.gz">Linux</a>
-      <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-archlinux-x86_64.pkg.tar.zst">Arch</a>
-      <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-windows-x64.zip">Windows</a>
-      <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-android-setup.apk">Android</a>
+  <nav class="page-downloads" aria-label="App installers">
+    <div class="download-row">
+      <span class="download-label">Evolve 4.1.10</span>
+      <div class="page-top-links page-download-links">
+        <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-macos-notarized/evolve-v4.1.10-macos-x64.zip">macOS</a>
+        <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-ios-android/evolve-v4.1.10-ios-setup.ipa">iOS</a>
+        <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-linux-x64.tar.gz">Linux</a>
+        <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-archlinux-x86_64.pkg.tar.zst">Arch</a>
+        <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-windows-x64.zip">Windows</a>
+        <a href="https://github.com/rgsneddon/evolve/releases/download/v4.1.10-ios-android/evolve-v4.1.10-android-setup.apk">Android</a>
+      </div>
+    </div>
+    <div class="download-row">
+      <span class="download-label">MY PERC</span>
+      <div class="page-top-links page-download-links">
+        <a href="https://github.com/rgsneddon/perccent-wallet/releases/download/v1.1.7/perccent-wallet-v1.1.7-macos-setup.zip">macOS</a>
+        <a href="https://github.com/rgsneddon/perccent-wallet/releases/download/v1.1.7/perccent-wallet-v1.1.7-ios-setup.ipa">iOS</a>
+        <a href="https://github.com/rgsneddon/perccent-wallet/releases/download/v1.1.6/perccent-wallet-v1.1.6-windows-x64-setup.exe">Windows</a>
+        <a href="https://github.com/rgsneddon/perccent-wallet/releases/download/v1.1.6/perccent-wallet-v1.1.6-android-setup.apk">Android</a>
+      </div>
     </div>
   </nav>
   <div class="wrap">

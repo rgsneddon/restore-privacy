@@ -34,8 +34,14 @@ class TestPercExplorerBranding(unittest.TestCase):
         self.assertIn("FCG white paper", html)
         self.assertIn("page-downloads", html)
         self.assertIn("--neon-yellow", html)
+        self.assertIn("Evolve 4.1.10", html)
+        self.assertIn("MY PERC", html)
         self.assertIn(
             "https://github.com/rgsneddon/evolve/releases/download/v4.1.10-macos-notarized/evolve-v4.1.10-macos-x64.zip",
+            html,
+        )
+        self.assertIn(
+            "https://github.com/rgsneddon/evolve/releases/download/v4.1.10-ios-android/evolve-v4.1.10-ios-setup.ipa",
             html,
         )
         self.assertIn(
@@ -43,7 +49,19 @@ class TestPercExplorerBranding(unittest.TestCase):
             html,
         )
         self.assertIn(
-            "https://github.com/rgsneddon/evolve/releases/download/v4.1.10-platforms/evolve-v4.1.10-android-setup.apk",
+            "https://github.com/rgsneddon/evolve/releases/download/v4.1.10-ios-android/evolve-v4.1.10-android-setup.apk",
+            html,
+        )
+        self.assertIn(
+            "https://github.com/rgsneddon/perccent-wallet/releases/download/v1.1.7/perccent-wallet-v1.1.7-macos-setup.zip",
+            html,
+        )
+        self.assertIn(
+            "https://github.com/rgsneddon/perccent-wallet/releases/download/v1.1.7/perccent-wallet-v1.1.7-ios-setup.ipa",
+            html,
+        )
+        self.assertIn(
+            "https://github.com/rgsneddon/perccent-wallet/releases/download/v1.1.6/perccent-wallet-v1.1.6-android-setup.apk",
             html,
         )
 
