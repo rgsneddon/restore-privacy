@@ -25,14 +25,16 @@ from node.handshake import (
 CLIENT_PRIV_NAME = "client_ed25519.priv"
 CLIENT_PUB_NAME = "client_ed25519.pub"
 NODE_PUB_NAME = "node_elgamal.pub"
-# Live catalog residual public pins (IS + DE; exit pin mirrors DE). Never priv.
+# Live catalog residual public pins (DE + SG; exit pin mirrors DE). Never priv.
 # us_node_elgamal.pub is retired (heal path only — not a live catalog seed).
 EXIT_NODE_PUB_NAME = "exit_node_elgamal.pub"
 DE_NODE_PUB_NAME = "de_node_elgamal.pub"
+SG_NODE_PUB_NAME = "sg_node_elgamal.pub"
 US_NODE_PUB_NAME = "us_node_elgamal.pub"  # retired monopin file (optional heal only)
 CATALOG_NODE_PUB_NAMES: tuple[str, ...] = (
     NODE_PUB_NAME,
     DE_NODE_PUB_NAME,
+    SG_NODE_PUB_NAME,
     EXIT_NODE_PUB_NAME,
 )
 # Never load or expect node private key on the client
@@ -252,6 +254,10 @@ def _product_pub_path_for_name(name: str) -> Path | None:
             from .endpoint import product_de_node_elgamal_pub_path
         except Exception:
             product_de_node_elgamal_pub_path = None  # type: ignore
+        try:
+            from .endpoint import product_sg_node_elgamal_pub_path
+        except Exception:
+            product_sg_node_elgamal_pub_path = None  # type: ignore
     except Exception:
         return None
     mapping = {
@@ -266,6 +272,13 @@ def _product_pub_path_for_name(name: str) -> Path | None:
             from pathlib import Path as _P
             return _P(__file__).resolve().parents[1] / "product" / "de_node_elgamal.pub"
         mapping[DE_NODE_PUB_NAME] = _de_path
+    if product_sg_node_elgamal_pub_path is not None:
+        mapping[SG_NODE_PUB_NAME] = product_sg_node_elgamal_pub_path
+    else:
+        def _sg_path():
+            from pathlib import Path as _P
+            return _P(__file__).resolve().parents[1] / "product" / "sg_node_elgamal.pub"
+        mapping[SG_NODE_PUB_NAME] = _sg_path
     fn = mapping.get(name)
     if fn is None:
         return None
@@ -284,11 +297,12 @@ def sync_product_node_pub_into(dest_dir: Path) -> bool:
 
 
 def sync_catalog_public_pubs_into(dest_dir: Path) -> list[str]:
-    """Refresh all live catalog residual public pins (IS/DE) into *dest_dir*.
+    """Refresh all live catalog residual public pins (DE/SG) into *dest_dir*.
 
     Default Windows entry is Germany (DE) — without ``de_node_elgamal.pub``
-    HELLO to the primary residual fails closed and Connect falls over to
-    Iceland. Heal install trees that only shipped the Iceland entry pub.
+    HELLO to the primary residual fails closed. Singapore needs
+    ``sg_node_elgamal.pub`` (never the DE or Iceland pin). Heal install trees
+    that only shipped the Iceland entry pub.
     Returns basenames successfully written/refreshed.
     """
     dest = Path(dest_dir)
@@ -516,23 +530,12 @@ def load_node_elgamal_public(
     :func:`load_node_elgamal_public_for_endpoint`).
     """
     name = (pub_name or NODE_PUB_NAME).strip() or NODE_PUB_NAME
-    # Prefer tracked product/ keys for known names
-    if name == NODE_PUB_NAME:
+    # Prefer tracked product/ keys for known catalog names (DE / SG / exit / IS).
+    src = _product_pub_path_for_name(name)
+    if src is not None:
         try:
-            from .endpoint import product_node_elgamal_pub_path
-
-            pp = product_node_elgamal_pub_path()
-            if pp.is_file() and pp.stat().st_size >= 32:
-                return ElGamalPublicKey.import_bytes(pp.read_bytes())
-        except Exception:
-            pass
-    if name == "exit_node_elgamal.pub":
-        try:
-            from .endpoint import product_exit_node_elgamal_pub_path
-
-            ep = product_exit_node_elgamal_pub_path()
-            if ep.is_file() and ep.stat().st_size >= 32:
-                return ElGamalPublicKey.import_bytes(ep.read_bytes())
+            if src.is_file() and src.stat().st_size >= 32:
+                return ElGamalPublicKey.import_bytes(src.read_bytes())
         except Exception:
             pass
     if name == "us_node_elgamal.pub":
@@ -547,9 +550,14 @@ def load_node_elgamal_public(
     d = resolve_secrets_dir(secrets_dir)
     path = d / name
     if not path.is_file() and name != NODE_PUB_NAME:
-        # Non-IS pins must not silently use Iceland entry pub (HELLO would fail closed
-        # on the node, but fail early here for RO/US dedicated pins).
-        if name in ("exit_node_elgamal.pub", "us_node_elgamal.pub"):
+        # Non-IS pins must not silently use Iceland entry pub (HELLO would
+        # silent-drop on DE/SG). Fail closed for every dedicated catalog pin.
+        if name in (
+            EXIT_NODE_PUB_NAME,
+            US_NODE_PUB_NAME,
+            DE_NODE_PUB_NAME,
+            SG_NODE_PUB_NAME,
+        ):
             raise SecretsError(
                 f"Missing {name} — refuse Iceland entry pub fallback"
             )

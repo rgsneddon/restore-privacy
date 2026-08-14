@@ -85,3 +85,94 @@ class TestSingaporePin(unittest.TestCase):
         self.assertNotEqual(sg.read_bytes(), de.read_bytes())
         ElGamalPublicKey.import_bytes(sg.read_bytes())
         ElGamalPublicKey.import_bytes(de.read_bytes())
+
+    def test_seed_catalog_public_keys_copies_sg_pin(self) -> None:
+        import tempfile
+
+        from client.residual_pub_ensure import (
+            CATALOG_PUBLIC_PUBS,
+            seed_catalog_public_keys,
+        )
+
+        self.assertIn("sg_node_elgamal.pub", CATALOG_PUBLIC_PUBS)
+        with tempfile.TemporaryDirectory() as td:
+            dest = Path(td)
+            installed = seed_catalog_public_keys(dest, [ROOT / "product"])
+            self.assertIn("sg_node_elgamal.pub", installed)
+            copied = dest / "sg_node_elgamal.pub"
+            self.assertTrue(copied.is_file())
+            self.assertEqual(
+                copied.read_bytes(),
+                (ROOT / "product" / "sg_node_elgamal.pub").read_bytes(),
+            )
+
+    def test_ios_and_android_hello_pin_maps_singapore(self) -> None:
+        ios = (
+            ROOT
+            / "client_app"
+            / "ios"
+            / "NativePrep"
+            / "RptSecrets.swift"
+        ).read_text(encoding="utf-8")
+        fn = ios.index("func residualNodePubName(forHost")
+        body = ios[fn : fn + 1200]
+        self.assertIn("productSgHost", body)
+        self.assertIn("sgNodePubName", body)
+        self.assertIn("sg_node_elgamal.pub", ios)
+        self.assertIn("sgNodePubName", ios.split("catalogPublicPubNames")[1][:400])
+
+        from tests.test_android_de_residual_pin import (
+            residual_node_pub_name_for_host_from_source,
+        )
+
+        vpn = (
+            ROOT
+            / "client_app"
+            / "android"
+            / "app"
+            / "src"
+            / "main"
+            / "kotlin"
+            / "com"
+            / "restoreprivacy"
+            / "restore_privacy_client"
+            / "RptVpnService.kt"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(
+            residual_node_pub_name_for_host_from_source(vpn, "5.223.48.8"),
+            "sg_node_elgamal.pub",
+        )
+        gradle = (
+            ROOT / "client_app" / "android" / "app" / "build.gradle.kts"
+        ).read_text(encoding="utf-8")
+        names = gradle.split("val names = listOf(")[1].split(")")[0]
+        self.assertIn("sg_node_elgamal.pub", names)
+
+    def test_python_secrets_loader_loads_sg_pin_not_iceland(self) -> None:
+        import tempfile
+
+        from client.endpoint import Endpoint, product_sg_node_elgamal_pub_path
+        from client.secrets_loader import (
+            CATALOG_NODE_PUB_NAMES,
+            load_node_elgamal_public,
+            load_node_elgamal_public_for_endpoint,
+            sync_catalog_public_pubs_into,
+        )
+
+        self.assertIn("sg_node_elgamal.pub", CATALOG_NODE_PUB_NAMES)
+        sg_path = product_sg_node_elgamal_pub_path()
+        self.assertTrue(sg_path.is_file())
+        loaded = load_node_elgamal_public(pub_name="sg_node_elgamal.pub")
+        self.assertEqual(loaded.export(), sg_path.read_bytes())
+        via_ep = load_node_elgamal_public_for_endpoint(
+            Endpoint(host="5.223.48.8", port=44044)
+        )
+        self.assertEqual(via_ep.export(), sg_path.read_bytes())
+        with tempfile.TemporaryDirectory() as td:
+            dest = Path(td)
+            installed = sync_catalog_public_pubs_into(dest)
+            self.assertIn("sg_node_elgamal.pub", installed)
+            self.assertEqual(
+                (dest / "sg_node_elgamal.pub").read_bytes(),
+                sg_path.read_bytes(),
+            )

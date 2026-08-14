@@ -920,6 +920,7 @@ class RptVpnService : VpnService() {
         const val PRODUCT_ENTRY_HOST = "178.105.187.178"
         const val PRODUCT_ICELAND_HOST = "82.221.101.241"
         const val PRODUCT_DE_HOST = "178.105.187.178"
+        const val PRODUCT_SG_HOST = "5.223.48.8"
         /** Multi-hop exit = Germany (same monopin as DE entry). */
         const val PRODUCT_EXIT_HOST = "178.105.187.178"
         const val PRODUCT_US_HOST = "5.161.242.85"
@@ -928,7 +929,7 @@ class RptVpnService : VpnService() {
 
         /**
          * ElGamal public pin basename for residual HELLO from dial host.
-         * IS → node_elgamal.pub; DE → de_node_elgamal.pub; retired US → de_node_elgamal.pub.
+         * DE → de_node_elgamal.pub; SG → sg_node_elgamal.pub; retired US → de.
          */
         @JvmStatic
         fun residualNodePubNameForHost(host: String): String {
@@ -938,18 +939,21 @@ class RptVpnService : VpnService() {
             ) {
                 return "de_node_elgamal.pub"
             }
+            if (h == PRODUCT_SG_HOST || h.endsWith(PRODUCT_SG_HOST)) {
+                return "sg_node_elgamal.pub"
+            }
             // Retired US monopin — heal to DE pin
             if (h == PRODUCT_US_HOST || h.endsWith(PRODUCT_US_HOST)) {
                 return "de_node_elgamal.pub"
             }
             if (h == PRODUCT_ICELAND_HOST || h.endsWith(PRODUCT_ICELAND_HOST)) {
-                return "node_elgamal.pub"
+                return "de_node_elgamal.pub"
             }
             // Stale RO host: exit pin file holds DE material after 0.5.7 reassign
             if (h == PRODUCT_RO_LEGACY_HOST || h.endsWith(PRODUCT_RO_LEGACY_HOST)) {
                 return "exit_node_elgamal.pub"
             }
-            return "node_elgamal.pub"
+            return "de_node_elgamal.pub"
         }
 
         /**

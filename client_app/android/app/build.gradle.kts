@@ -66,6 +66,7 @@ tasks.register("copyRptSecretsToAssets") {
         val names = listOf(
             "node_elgamal.pub",
             "de_node_elgamal.pub",
+            "sg_node_elgamal.pub",
             "exit_node_elgamal.pub",
         )
         for (name in names) {
@@ -78,7 +79,7 @@ tasks.register("copyRptSecretsToAssets") {
             if (src != null) {
                 src.copyTo(dest, overwrite = true)
                 logger.lifecycle("copyRptSecretsToAssets: injected $name from ${src.absolutePath}")
-            } else if (name == "node_elgamal.pub" || name == "de_node_elgamal.pub") {
+            } else if (name == "node_elgamal.pub" || name == "de_node_elgamal.pub" || name == "sg_node_elgamal.pub") {
                 logger.warn(
                     "copyRptSecretsToAssets: missing product/ and secrets/ $name — APK handshake will fail"
                 )

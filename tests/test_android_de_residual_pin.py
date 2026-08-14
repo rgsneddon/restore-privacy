@@ -49,6 +49,7 @@ def residual_node_pub_name_for_host_from_source(src: str, host: str) -> str:
     exit_h = c["PRODUCT_EXIT_HOST"]
     us = c["PRODUCT_US_HOST"]
     iceland = c["PRODUCT_ICELAND_HOST"]
+    sg = c.get("PRODUCT_SG_HOST", "")
     ro_legacy = c.get("PRODUCT_RO_LEGACY_HOST", "")
 
     # Function must exist and return de_node for DE
@@ -62,22 +63,21 @@ def residual_node_pub_name_for_host_from_source(src: str, host: str) -> str:
     body = body_m.group(1)
     assert 'return "de_node_elgamal.pub"' in body
     assert "PRODUCT_DE_HOST" in body or "PRODUCT_EXIT_HOST" in body
-    # DE must not fall through to bare node_elgamal without a DE branch first
-    assert body.find("PRODUCT_DE_HOST") < body.rfind('return "node_elgamal.pub"') or (
-        body.find("PRODUCT_EXIT_HOST") < body.rfind('return "node_elgamal.pub"')
-        and exit_h == de
-    )
+    assert "PRODUCT_SG_HOST" in body
+    assert 'return "sg_node_elgamal.pub"' in body
 
     h = host.strip()
     if h == de or h.endswith(de) or h == exit_h or h.endswith(exit_h):
         return "de_node_elgamal.pub"
+    if sg and (h == sg or h.endswith(sg)):
+        return "sg_node_elgamal.pub"
     if h == us or h.endswith(us):
         return "de_node_elgamal.pub"  # retired US monopin heals to DE
     if h == iceland or h.endswith(iceland):
-        return "node_elgamal.pub"
+        return "de_node_elgamal.pub"
     if ro_legacy and (h == ro_legacy or h.endswith(ro_legacy)):
         return "exit_node_elgamal.pub"
-    return "node_elgamal.pub"
+    return "de_node_elgamal.pub"
 
 
 def test_android_residual_node_pub_name_maps_de_host():
@@ -96,7 +96,8 @@ def test_android_residual_node_pub_name_maps_de_host():
 
     assert residual_node_pub_name_for_host_from_source(src, DE_HOST) == "de_node_elgamal.pub"
     assert residual_node_pub_name_for_host_from_source(src, "5.161.242.85") == "de_node_elgamal.pub"
-    assert residual_node_pub_name_for_host_from_source(src, "82.221.101.241") == "node_elgamal.pub"
+    assert residual_node_pub_name_for_host_from_source(src, "82.221.101.241") == "de_node_elgamal.pub"
+    assert residual_node_pub_name_for_host_from_source(src, "5.223.48.8") == "sg_node_elgamal.pub"
     assert residual_node_pub_name_for_host_from_source(src, DE_HOST) != "node_elgamal.pub"
 
 
@@ -112,7 +113,7 @@ def test_copy_rpt_secrets_packages_de_node_pin():
     names_block = m.group(1)
     assert "de_node_elgamal.pub" in names_block
     assert "node_elgamal.pub" in names_block
-    assert "de_node_elgamal.pub" in names_block  # live DE pin; US pub not required
+    assert "sg_node_elgamal.pub" in names_block
     assert "exit_node_elgamal.pub" in names_block
 
 

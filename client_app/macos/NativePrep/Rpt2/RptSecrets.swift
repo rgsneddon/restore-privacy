@@ -46,6 +46,9 @@ public enum RptSecrets {
         if h == productUsHost || h.hasSuffix(productUsHost) {
             return deNodePubName
         }
+        if h == "5.223.48.8" || h.hasSuffix("5.223.48.8") {
+            return "sg_node_elgamal.pub"
+        }
         if h == productIcelandHost || h.hasSuffix(productIcelandHost) {
             return deNodePubName
         }

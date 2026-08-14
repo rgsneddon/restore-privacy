@@ -38,10 +38,13 @@ public enum RptSecrets {
         if h == productUsHost || h.hasSuffix(productUsHost) {
             return deNodePubName
         }
-        if h == productIcelandHost || h.hasSuffix(productIcelandHost) {
-            return nodePubName
+        if h == "5.223.48.8" || h.hasSuffix("5.223.48.8") {
+            return "sg_node_elgamal.pub"
         }
-        return nodePubName
+        if h == productIcelandHost || h.hasSuffix(productIcelandHost) {
+            return deNodePubName
+        }
+        return deNodePubName
     }
 
     public static var appGroupId: String { "group.com.restoreprivacy.shared" }

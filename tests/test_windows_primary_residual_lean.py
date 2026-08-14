@@ -22,6 +22,7 @@ from client.multihop import (  # noqa: E402
     PRODUCT_DE_HOST,
     PRODUCT_EXIT_HOST,
     PRODUCT_NODE_HOST,
+    PRODUCT_SG_HOST,
     PRODUCT_US_HOST,
     MultiHopConfig,
     multihop_config_for_entry_country,
@@ -52,7 +53,7 @@ class TestPrimaryResidualTryOrder(unittest.TestCase):
             exit_healthy=True,
             entry_draining=False,
         )
-        # Stale US heals to DE; DE-only catalog has no Iceland failover.
+        # Stale US heals to DE; catalog failover is Singapore, never Iceland.
         self.assertEqual(sel.endpoint.host, PRODUCT_DE_HOST)
         self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
         self.assertEqual(sel.reason, "entry_primary")
@@ -64,7 +65,9 @@ class TestPrimaryResidualTryOrder(unittest.TestCase):
             exit_healthy=True,
             entry_draining=False,
         )
-        self.assertEqual([e.host for e in order], [PRODUCT_DE_HOST])
+        self.assertEqual(
+            [e.host for e in order], [PRODUCT_DE_HOST, PRODUCT_SG_HOST]
+        )
         self.assertNotIn(PRODUCT_NODE_HOST, [e.host for e in order])
 
     def test_forced_primary_fail_try_order_failover_to_alternate(self) -> None:
@@ -146,18 +149,17 @@ class TestPrimaryResidualTryOrder(unittest.TestCase):
                 ):
                     result = client.connect(timeout=2.0)
 
-        # DE-only: one HELLO target; no Iceland failover after primary fail.
+        # DE primary fail → Singapore failover; never Iceland.
         self.assertFalse(result.ok)
-        self.assertEqual(calls, [PRODUCT_DE_HOST])
+        self.assertEqual(calls, [PRODUCT_DE_HOST, PRODUCT_SG_HOST])
         self.assertNotIn(PRODUCT_NODE_HOST, calls)
-        self.assertNotEqual(client.last_selection_reason, "hello_failover")
 
 
-class TestUsPubCatalogHeal(unittest.TestCase):
-    def test_sync_catalog_installs_us_pub_from_product(self) -> None:
-        product_us = ROOT / "product" / US_NODE_PUB_NAME
-        if not product_us.is_file():
-            self.skipTest("product/us_node_elgamal.pub missing")
+class TestCatalogPubHeal(unittest.TestCase):
+    def test_sync_catalog_installs_sg_pub_from_product(self) -> None:
+        product_sg = ROOT / "product" / "sg_node_elgamal.pub"
+        if not product_sg.is_file():
+            self.skipTest("product/sg_node_elgamal.pub missing")
         with tempfile.TemporaryDirectory() as td:
             dest = Path(td)
             # Seed only Iceland pub (historical install layout)
@@ -165,19 +167,15 @@ class TestUsPubCatalogHeal(unittest.TestCase):
                 (ROOT / "product" / "node_elgamal.pub").read_bytes()
             )
             installed = sync_catalog_public_pubs_into(dest)
-            self.assertIn(US_NODE_PUB_NAME, installed)
-            self.assertTrue((dest / US_NODE_PUB_NAME).is_file())
-            # Load path for US endpoint must succeed without Iceland fallback
+            self.assertIn("sg_node_elgamal.pub", installed)
+            self.assertTrue((dest / "sg_node_elgamal.pub").is_file())
             pub = load_node_elgamal_public_for_endpoint(
-                Endpoint(host=PRODUCT_US_HOST, port=44044),
+                Endpoint(host=PRODUCT_SG_HOST, port=44044),
                 dest,
             )
-            self.assertIsNotNone(pub)
+            self.assertEqual(pub.export(), product_sg.read_bytes())
 
-    def test_ensure_admission_heals_us_pub_when_node_pub_present(self) -> None:
-        product_us = ROOT / "product" / US_NODE_PUB_NAME
-        if not product_us.is_file():
-            self.skipTest("product/us_node_elgamal.pub missing")
+    def test_ensure_admission_heals_catalog_pubs_when_node_pub_present(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             dest = Path(td)
             (dest / "node_elgamal.pub").write_bytes(
@@ -185,9 +183,7 @@ class TestUsPubCatalogHeal(unittest.TestCase):
             )
             out = ensure_device_admission_key(dest)
             self.assertEqual(out, dest)
-            self.assertTrue((dest / US_NODE_PUB_NAME).is_file())
             for name in CATALOG_NODE_PUB_NAMES:
-                # US + IS at minimum; RO when product/exit present
                 if name == "exit_node_elgamal.pub" and not (
                     ROOT / "product" / name
                 ).is_file():

@@ -118,11 +118,12 @@ def load_residual_node_pub(
     return data
 
 
-# Catalog public pin basenames (IS / DE) — never private keys.
+# Catalog public pin basenames (DE / SG + exit alias) — never private keys.
 # exit_node_elgamal.pub mirrors DE pin for multi-hop residual-via-exit.
 CATALOG_PUBLIC_PUBS: tuple[str, ...] = (
     "node_elgamal.pub",
     "de_node_elgamal.pub",
+    "sg_node_elgamal.pub",
     "exit_node_elgamal.pub",
 )
 

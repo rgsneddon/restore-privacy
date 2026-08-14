@@ -27,36 +27,42 @@ public enum RptSecrets {
     public static let usNodePubName = "us_node_elgamal.pub"
     /// Germany residual hop public key (HELLO when residual host is DE monopin).
     public static let deNodePubName = "de_node_elgamal.pub"
+    /// Singapore residual hop public key (HELLO when residual host is SG monopin).
+    public static let sgNodePubName = "sg_node_elgamal.pub"
     /// Product default residual entry (Germany monopin).
     public static let productEntryHost = "178.105.187.178"
     public static let productIcelandHost = "82.221.101.241"
     public static let productExitHost = "178.105.187.178"
     public static let productUsHost = "5.161.242.85"
     public static let productDeHost = "178.105.187.178"
+    public static let productSgHost = "5.223.48.8"
     /// Must never be loaded by product clients.
     public static let nodePrivName = "node_elgamal.priv"
 
     /// Public key basename for residual HELLO from dial host monopin.
-    /// IS → node; DE → de; retired US → de (never invent pin from entry code alone).
+    /// DE → de; SG → sg; retired IS/US → de (never invent pin from entry code alone).
     public static func residualNodePubName(forHost host: String) -> String {
         let h = host.trimmingCharacters(in: .whitespacesAndNewlines)
         if h == productDeHost || h.hasSuffix(productDeHost)
             || h == productExitHost || h.hasSuffix(productExitHost) {
             return deNodePubName
         }
+        if h == productSgHost || h.hasSuffix(productSgHost) {
+            return sgNodePubName
+        }
         // Retired US monopin — heal to DE pin
         if h == productUsHost || h.hasSuffix(productUsHost) {
             return deNodePubName
         }
         if h == productIcelandHost || h.hasSuffix(productIcelandHost) {
-            return nodePubName
+            return deNodePubName
         }
-        return nodePubName
+        return deNodePubName
     }
 
     /// All catalog residual public pin basenames (never private keys).
     public static let catalogPublicPubNames: [String] = [
-        nodePubName, deNodePubName, exitNodePubName,
+        nodePubName, deNodePubName, exitNodePubName, sgNodePubName,
     ]
 
     /// Copy every catalog public pin found in *candidates* into *dest*.
