@@ -3,8 +3,8 @@
   "note": "Source of truth for FREE DOWNLOAD, /downloads-map, and Helsinki fulfilment. Update this file whenever a client installer is deployed. rpAI/Ned learns the same map.",
   "platforms": {
     "windows": {
-      "version": "1.2.3",
-      "filename": "restore-privacy-client-1.2.3-windows-x64-setup.exe"
+      "version": "1.2.5",
+      "filename": "restore-privacy-client-1.2.5-windows-x64-setup.exe"
     },
     "android": {
       "version": "1.2.5",

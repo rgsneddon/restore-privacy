@@ -31,7 +31,7 @@ Traffic shaping, outer obfuscation, multi-hop extras, and kill switch are **off 
 
 | Platform | File |
 |----------|------|
-| Windows | not staged on this Mac (`build_suite_1.2.5.py` skips PE; operator Windows-host rebuild) |
+| Windows | `restore-privacy-client-1.2.5-windows-x64-setup.exe` (already on Helsinki; this Mac does not rebuild or overwrite it) |
 | Android | `restore-privacy-client-1.2.5-android.apk` |
 | macOS | `restore-privacy-client-1.2.5-macos.zip` — Notarized Developer ID + residual Packet Tunnel **systemextension** host NE |
 | iOS | `restore-privacy-client-1.2.5-ios.zip` — IPA `Payload/Runner.app` + embedded provisions (Team-signed sideload; rename to `.ipa`) |
