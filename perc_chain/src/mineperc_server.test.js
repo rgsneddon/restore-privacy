@@ -180,7 +180,7 @@ describe('BeamHash III miner wire', () => {
 });
 
 describe('live miner stats', () => {
-  it('login + stats list immediately; reject still lists after drop', async () => {
+  it('login + stats stay off the list until a hash; reject still lists', async () => {
     resetMinerStats();
     resetPoolBlocks();
     seedJob({ preWork: BH3.preWork, jobId: 'share-list' });
@@ -200,9 +200,8 @@ describe('live miner stats', () => {
       version: '1.0.1',
     });
     await s.take(1);
-    assert.equal(poolStatsSnapshot().workers.length, 1);
-    assert.equal(handleApi('/api/stats', 'GET').json.minersOnline, 1);
-    assert.equal(handleApi('/api/stats', 'GET').json.workers[0].worker, 'raskul');
+    assert.equal(poolStatsSnapshot().workers.length, 0);
+    assert.equal(handleApi('/api/stats', 'GET').json.minersOnline, 0);
     s.write({
       id: 2,
       method: 'solution',
@@ -212,7 +211,8 @@ describe('live miner stats', () => {
     await s.take(1);
     const on = handleApi('/api/stats', 'GET').json;
     assert.equal(on.minersOnline, 1);
-    assert.equal(on.workers[0].worker, 'raskul');
+    assert.equal(on.workers[0].wallet, 'percpriv193bfbb92db68043f010592e879396c724d488b30');
+    assert.equal(on.workers[0].remote, undefined);
     s.end();
     await new Promise((r) => setTimeout(r, 30));
     const still = handleApi('/api/stats', 'GET').json;
@@ -239,8 +239,8 @@ describe('live miner stats', () => {
       }),
     );
     assert.equal(got.json.accepted, false);
-    assert.ok(listMiners(t0).some((m) => m.username === 'eve.rig'));
-    assert.equal(listMiners(t0 + HASH_PRESENCE_MS + 1).some((m) => m.username === 'eve.rig'), false);
+    assert.ok(listMiners(t0).some((m) => m.wallet === 'eve'));
+    assert.equal(listMiners(t0 + HASH_PRESENCE_MS + 1).some((m) => m.wallet === 'eve'), false);
     const accepted = handleApi(
       '/api/submit',
       'POST',
@@ -314,6 +314,10 @@ describe('createServer launch', () => {
       assert.match(text, /72 seconds/);
       assert.match(text, /miner-body/);
       assert.match(text, /\/api\/stats/);
+      assert.match(text, /<th>Wallet<\/th>/);
+      assert.match(text, /m\.wallet/);
+      assert.doesNotMatch(text, /<th>Remote<\/th>/);
+      assert.doesNotMatch(text, /m\.remote/);
       assert.doesNotMatch(text, /perc-mine v1\.0\.0/);
       assert.doesNotMatch(text, /perc-mine-1\.0\.0/);
       assert.match(text, /\/confirmations/);

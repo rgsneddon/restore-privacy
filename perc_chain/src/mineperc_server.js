@@ -29,6 +29,7 @@ import {
   recordMinerLogin,
   recordMinerShare,
   recordMinerStats,
+  publicMinerRow,
 } from './miner_stats.js';
 import { confirmationSnapshot, recordPoolBlock } from './perc_block_confirm.js';
 
@@ -167,7 +168,10 @@ export function handleApi(url, method, body) {
     try {
       const payload = typeof body === 'string' ? JSON.parse(body || '{}') : body || {};
       const rec = recordMinerStats(payload);
-      return { status: 200, json: { ok: true, miner: rec, pool: poolStatsSnapshot() } };
+      return {
+        status: 200,
+        json: { ok: true, miner: publicMinerRow(rec), pool: poolStatsSnapshot() },
+      };
     } catch (err) {
       return { status: 400, json: { ok: false, reason: err.message } };
     }

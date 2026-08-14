@@ -1,7 +1,6 @@
 /**
- * Live Perc pool miner book.
- * Connected miners are listed. After disconnect they stay for 72s if they
- * submitted a hash; login-only workers drop as soon as the socket closes.
+ * Live Perc pool miner book. A submitted hash lists the miner for 72s.
+ * Login / stats / TCP connect alone do not list them.
  */
 const miners = new Map();
 const startedAt = Date.now();
@@ -27,6 +26,30 @@ export function splitWorker(username) {
   const i = raw.indexOf('.');
   if (i <= 0) return { user: raw, worker: raw };
   return { user: raw.slice(0, i), worker: raw.slice(i + 1) || raw };
+}
+
+/** Perccent wallet / identity: the login part before `.worker`. */
+export function percWalletAddress(username) {
+  return splitWorker(username).user;
+}
+
+/** Public miner row: wallet only as identity; never IP / remote / worker login. */
+export function publicMinerRow(m, now = Date.now()) {
+  const wallet = percWalletAddress(m?.username || m?.user || m?.id);
+  const at = Number(now) || Date.now();
+  return {
+    wallet,
+    connected: Boolean(m?.connected),
+    threads: m?.threads || 0,
+    hashes: m?.hashes || 0,
+    hashrate: m?.hashrate || 0,
+    accepted: m?.accepted || 0,
+    rejected: m?.rejected || 0,
+    percMicro: m?.percMicro || 0,
+    perc: (m?.percMicro || 0) / 100_000_000,
+    staleSeconds: m?.lastHashAt ? Math.round((at - m.lastHashAt) / 1000) : null,
+    asset: 'PERC',
+  };
 }
 
 function row(username) {
@@ -100,6 +123,7 @@ export function recordMinerShare({ username, accepted, percMicro, now } = {}) {
   const at = Number(now) || Date.now();
   rec.lastSeen = at;
   rec.lastHashAt = at;
+  rec.connected = true;
   rec.sessionShares += 1;
   if (accepted) {
     rec.accepted += 1;
@@ -119,9 +143,8 @@ export function recordMinerDisconnect(username) {
   return rec;
 }
 
-/** Public list: connected now, or last hash within HASH_PRESENCE_MS. */
+/** Public list: last submitted hash within HASH_PRESENCE_MS. Login does not count. */
 export function minerIsListed(m, now = Date.now()) {
-  if (m?.connected) return true;
   const at = Number(m?.lastHashAt);
   if (!Number.isFinite(at)) return false;
   return Number(now) - at <= HASH_PRESENCE_MS;
@@ -131,13 +154,8 @@ export function listMiners(now = Date.now()) {
   const at = Number(now) || Date.now();
   return [...miners.values()]
     .filter((m) => minerIsListed(m, at))
-    .map((m) => ({
-      ...m,
-      connected: Boolean(m.connected),
-      staleSeconds: m.lastHashAt ? Math.round((at - m.lastHashAt) / 1000) : null,
-      perc: (m.percMicro || 0) / 100_000_000,
-    }))
-    .sort((a, b) => (b.hashrate || 0) - (a.hashrate || 0) || (b.sessionShares || 0) - (a.sessionShares || 0));
+    .map((m) => publicMinerRow(m, at))
+    .sort((a, b) => (b.hashrate || 0) - (a.hashrate || 0) || (b.accepted || 0) - (a.accepted || 0));
 }
 
 export function poolStatsSnapshot(now = Date.now()) {

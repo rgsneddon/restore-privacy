@@ -31,6 +31,10 @@ class TestMinepercPage(unittest.TestCase):
         self.assertIn("72 seconds", html)
         self.assertIn("miner-body", html)
         self.assertIn("/api/stats", html)
+        self.assertIn("<th>Wallet</th>", html)
+        self.assertIn("m.wallet", html)
+        self.assertNotIn("<th>Remote</th>", html)
+        self.assertNotIn("m.remote", html)
         css = html[html.index(".info-value") : html.index(".copy-icon")]
         self.assertNotIn("ellipsis", css)
         self.assertNotIn("overflow: hidden", css)

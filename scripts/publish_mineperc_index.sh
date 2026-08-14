@@ -5,12 +5,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="${1:-$ROOT/perc_chain/mineperc/public/index.html}"
 DST="${MINEPERC_WWW_INDEX:-/var/www/mineperc.restoreprivacy.online/index.html}"
-for needle in "Live miners" "72 seconds" "miner-body" "/api/stats"; do
+for needle in "Live miners" "72 seconds" "miner-body" "/api/stats" "Wallet" "m.wallet"; do
   grep -q "$needle" "$SRC" || {
     echo "refuse: $SRC missing $needle — would drop the miner table" >&2
     exit 1
   }
 done
+if grep -q "<th>Remote</th>" "$SRC" || grep -q "m.remote" "$SRC"; then
+  echo "refuse: $SRC still exposes Remote / m.remote" >&2
+  exit 1
+fi
 if [[ -f "$DST" ]]; then
   chattr -i "$DST" 2>/dev/null || true
 fi

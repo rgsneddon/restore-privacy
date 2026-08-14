@@ -27,15 +27,14 @@ describe('miner stats book', () => {
       version: '1.0.1',
     });
     const beforeShare = poolStatsSnapshot();
-    assert.equal(beforeShare.minersOnline, 1);
-    assert.equal(beforeShare.workers.length, 1);
-    assert.equal(beforeShare.workers[0].accepted, 0);
+    assert.equal(beforeShare.minersOnline, 0);
+    assert.equal(beforeShare.workers.length, 0);
     const hashedAt = Date.now();
     recordMinerShare({ username: name, accepted: true, percMicro: 1, now: hashedAt });
     assert.equal(minerIsListed({ lastHashAt: hashedAt }, hashedAt), true);
     assert.equal(minerIsListed({ lastHashAt: hashedAt }, hashedAt + HASH_PRESENCE_MS), true);
     assert.equal(minerIsListed({ lastHashAt: hashedAt }, hashedAt + HASH_PRESENCE_MS + 1), false);
-    assert.equal(minerIsListed({ connected: true, sessionShares: 1 }), true);
+    assert.equal(minerIsListed({ connected: true, sessionShares: 1 }), false);
     const split = splitWorker(name);
     assert.equal(split.user, 'percpriv193bfbb92db68043f010592e879396c724d488b30');
     assert.equal(split.worker, 'raskul');
@@ -43,15 +42,16 @@ describe('miner stats book', () => {
     assert.equal(snap.minersOnline, 1);
     assert.equal(snap.threads, 2);
     assert.equal(snap.accepted, 1);
-    assert.equal(snap.workers[0].username, name);
+    assert.equal(snap.workers[0].wallet, split.user);
     assert.equal(snap.workers[0].threads, 2);
     assert.equal(snap.workers[0].hashes, 262144);
     assert.equal(snap.workers[0].accepted, 1);
     assert.equal(snap.workers[0].asset, 'PERC');
+    assert.equal(snap.workers[0].remote, undefined);
+    assert.equal(snap.workers[0].username, undefined);
     const api = handleApi('/api/stats', 'GET');
     assert.equal(api.status, 200);
-    assert.equal(api.json.minersOnline, 1);
-    assert.equal(api.json.workers[0].worker, 'raskul');
+    assert.equal(api.json.workers[0].wallet, split.user);
     const posted = handleApi(
       '/api/miner-stats',
       'POST',
@@ -64,21 +64,35 @@ describe('miner stats book', () => {
     recordMinerDisconnect(name);
     const still = poolStatsSnapshot(hashedAt + 1_000);
     assert.equal(still.minersOnline, 1);
-    assert.equal(still.workers[0].username, name);
+    assert.equal(still.workers[0].wallet, split.user);
     assert.equal(listMiners(hashedAt + HASH_PRESENCE_MS + 1).length, 0);
   });
 
-  it('login lists while connected; rejected hash stays 72s after drop', () => {
+  it('public snapshot is wallet-only and never includes IP', () => {
+    resetMinerStats();
+    const ip = '203.0.113.77';
+    const login = 'percprivWALLETADDR00000000000000000000001.rig1';
+    recordMinerLogin({ username: login, remote: ip, port: 1466 });
+    recordMinerShare({ username: login, accepted: false, now: 8_000 });
+    const snap = poolStatsSnapshot(8_000);
+    const blob = JSON.stringify(snap.workers);
+    assert.equal(snap.workers[0].wallet, splitWorker(login).user);
+    assert.ok(!Object.prototype.hasOwnProperty.call(snap.workers[0], 'remote'));
+    assert.ok(!Object.prototype.hasOwnProperty.call(snap.workers[0], 'username'));
+    assert.ok(!Object.prototype.hasOwnProperty.call(snap.workers[0], 'worker'));
+    assert.equal(blob.includes(ip), false);
+    assert.equal(blob.includes('203.0.113'), false);
+    assert.equal(blob.includes('rig1'), false);
+  });
+
+  it('login-only never lists; rejected hash lists until 72s', () => {
     resetMinerStats();
     const t0 = 5_000_000;
     recordMinerLogin({ username: 'bob.rig' });
     recordMinerStats({ username: 'bob.rig', threads: 1, hashes: 10, hashrate: 1 });
-    assert.equal(listMiners(t0).map((m) => m.username).includes('bob.rig'), true);
-    recordMinerDisconnect('bob.rig');
     assert.equal(listMiners(t0).length, 0);
     recordMinerShare({ username: 'bob.rig', accepted: false, now: t0 });
-    recordMinerDisconnect('bob.rig');
-    assert.equal(listMiners(t0).map((m) => m.username).includes('bob.rig'), true);
+    assert.equal(listMiners(t0).map((m) => m.wallet).includes('bob'), true);
     assert.equal(listMiners(t0 + HASH_PRESENCE_MS).length, 1);
     assert.equal(listMiners(t0 + HASH_PRESENCE_MS + 1).length, 0);
   });
