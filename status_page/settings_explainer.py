@@ -7,7 +7,7 @@ controls in plain language.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping
 
 # Public path served by the status host
 SETTINGS_EXPLAINER_PATH = "/settings-explainer"
@@ -45,7 +45,52 @@ CORPORATE_CLIENTS_AI = (
     "organisation's workflow and workforce, that is another £27,000 on top "
     "of the £30,000."
 )
+CORPORATE_CLIENTS_CONTRACT = (
+    "If a corporate client aims for 50% AI, that can be worked into the "
+    "contract if they so wish."
+)
+CORPORATE_CLIENTS_LIMITS = (
+    "There are no limits to how each function might be controlled and "
+    "administered."
+)
 CORPORATE_CLIENTS_FOOT = "This is a yearly subscription."
+
+# Five CORPORATE CLIENTS parts → NED / rpAI learned signals (not coverage slogans).
+# Surfaces are suite_architecture ids from node.oracle_master.SUITE_SURFACE_IDS.
+CORPORATE_NED_PARTS: tuple[dict[str, Any], ...] = (
+    {
+        "id": "admin_sdk",
+        "label": "MISHI admin SDK",
+        "surfaces": ("analysis", "voting", "credit"),
+        "ready": "ready_oracle",
+    },
+    {
+        "id": "databases",
+        "label": "Databases",
+        "surfaces": ("backup", "wallet"),
+        "ready": "ready_perccent",
+    },
+    {
+        "id": "branded_vpn",
+        "label": "Branded VPN",
+        "surfaces": ("vpn",),
+        "ready": "ready_vpn",
+    },
+    {
+        "id": "dedicated_server",
+        "label": "Dedicated server",
+        "surfaces": (),
+        "ready": "ready_cojoined",
+        "nodes": True,
+    },
+    {
+        "id": "branded_ai",
+        "label": "Branded AI (rpAI)",
+        "surfaces": ("rpai",),
+        "ready": "ready_rpai",
+        "epochs": True,
+    },
+)
 
 SUITE_GUIDE_INTRO_HEADING = "How to use Restore Privacy"
 SUITE_GUIDE_INTRO_BODY = (
@@ -58,6 +103,87 @@ SUITE_GUIDE_INTRO_FOOT = (
     "This page is a user guide, not an operator console. "
     "Monthly KEYGEN starts at £3."
 )
+
+
+def clamp_learned_percent(value: Any) -> int:
+    """Force a learned progress figure into 0–100 inclusive."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(100, n))
+
+
+def _surface_learned_percent(snapshot: Mapping[str, Any] | None, sid: str) -> int:
+    """Honest 0–100 for one NED suite surface (observed counts + learned flag)."""
+    snap = snapshot if isinstance(snapshot, Mapping) else {}
+    arch = snap.get("suite_architecture")
+    surfaces = (
+        arch.get("surfaces") if isinstance(arch, Mapping) else {}
+    )
+    entry = surfaces.get(sid) if isinstance(surfaces, Mapping) else {}
+    if not isinstance(entry, Mapping):
+        entry = {}
+    try:
+        obs = max(0, int(entry.get("observed") or 0))
+    except (TypeError, ValueError):
+        obs = 0
+    learned_list = snap.get("suite_surfaces_learned") or []
+    learned = bool(entry.get("learned")) or sid in {
+        str(x) for x in learned_list
+    }
+    if obs <= 0 and not learned:
+        return 0
+    if obs <= 0:
+        return 50
+    table = {1: 40, 2: 70, 3: 90}
+    return table.get(obs, 100)
+
+
+def corporate_ned_bar_values(
+    snapshot: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Map public NED / rpAI growth snapshot → five CORPORATE CLIENTS bars.
+
+    Each bar is one named corporate part's learned progress (0–100). Fill can
+    reach 100 when NED has fully learned that part. Does not invent 94–99%
+    coverage slogans.
+    """
+    snap = snapshot if isinstance(snapshot, Mapping) else {}
+    learned_list = [str(x) for x in (snap.get("suite_surfaces_learned") or [])]
+    try:
+        nodes = max(0, int(snap.get("nodes_online") or 0))
+    except (TypeError, ValueError):
+        nodes = 0
+    try:
+        epochs = max(0, int(snap.get("learning_epochs") or 0))
+    except (TypeError, ValueError):
+        epochs = 0
+    out: list[dict[str, Any]] = []
+    for part in CORPORATE_NED_PARTS:
+        scores: list[int] = []
+        for sid in part.get("surfaces") or ():
+            scores.append(_surface_learned_percent(snap, str(sid)))
+        ready_key = str(part.get("ready") or "")
+        if ready_key and snap.get(ready_key):
+            scores.append(35)
+        if part.get("nodes"):
+            scores.append(clamp_learned_percent(20 * nodes))
+        if part.get("epochs"):
+            floor = 40 if snap.get("ready_rpai") else 0
+            scores.append(clamp_learned_percent(floor + 8 * epochs))
+        for sid in part.get("surfaces") or ():
+            if str(sid) in learned_list:
+                scores.append(50)
+        pct = clamp_learned_percent(max(scores) if scores else 0)
+        out.append(
+            {
+                "id": str(part["id"]),
+                "label": str(part["label"]),
+                "percent": pct,
+            }
+        )
+    return out
 
 
 def _esc(s: str) -> str:
@@ -348,6 +474,10 @@ def corporate_clients_css() -> str:
   margin: 1rem 0 0; font-weight: 800; letter-spacing: 0.04em;
   text-transform: uppercase; font-size: 0.82rem; color: var(--rb-cream);
 }
+.corporate-clients .corp-contract,
+.corporate-clients .corp-limits {
+  margin: 0.65rem 0 0; font-size: 0.9rem; line-height: 1.5; color: var(--rb-muted);
+}
 [data-theme="light"] .corporate-clients .corporate-clients-foot,
 [data-theme="light"] .corp-card h3,
 [data-theme="light"] .corp-price-n { color: #0a2348; }
@@ -373,13 +503,19 @@ def corporate_clients_css() -> str:
   text-transform: uppercase; color: var(--rb-accent-sky, var(--rb-link));
   margin: 0 0 0.2rem;
 }
+.corp-meter-pct { color: #39ff14; text-shadow: 0 0 7px rgba(57,255,20,.75); }
+.corp-meter-pct.is-100 {
+  color: #3ec6ff; text-shadow: 0 0 8px rgba(62,198,255,.95);
+}
 .corp-meter-track {
   height: 10px; border-radius: 999px; overflow: hidden;
   background: color-mix(in srgb, var(--rb-card-border) 80%, #000);
 }
 .corp-meter-fill {
-  display: block; height: 100%; border-radius: 999px;
-  background: linear-gradient(90deg, #1ec8a0, #3ec6ff 55%, #7b6cff);
+  display: block; height: 100%; border-radius: 999px; max-width: 100%;
+  background: #39ff14;
+  box-shadow: 0 0 10px #39ff14, 0 0 2px #b8ff8a inset;
+  transition: width 0.45s ease;
 }
 .corp-price-row {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
@@ -584,8 +720,18 @@ def render_install_howto_box_html() -> str:
 """
 
 
-def render_corporate_clients_html() -> str:
+def render_corporate_clients_html(
+    snapshot: Mapping[str, Any] | None = None,
+) -> str:
     """Yearly corporate retainers — branded admin, VPN, optional dedicated AI."""
+    snap: Mapping[str, Any] | dict[str, Any] = snapshot if snapshot is not None else {}
+    if snapshot is None:
+        try:
+            from admin_rps import load_rps_stats, ned_growth_public_snapshot
+
+            snap = ned_growth_public_snapshot(load_rps_stats())
+        except Exception:  # noqa: BLE001
+            snap = {}
     ico_sdk = (
         '<svg class="corp-ico" viewBox="0 0 48 48" aria-hidden="true">'
         '<rect x="6" y="8" width="36" height="32" rx="6" fill="none" stroke="#3ec6ff" stroke-width="2"/>'
@@ -633,20 +779,18 @@ def render_corporate_clients_html() -> str:
             f'        <article class="corp-card">'
             f"{ico}<h3>{_esc(title)}</h3><p>{_esc(body)}</p></article>"
         )
-    meters = (
-        ("Residual full tunnel", "98%"),
-        ("Dual-stack residual capture", "96%"),
-        ("No-log / local-only client", "99%"),
-        ("Dedicated estate isolation", "95%"),
-        ("Governance controls (admin + audit)", "94%"),
-    )
+    bars = corporate_ned_bar_values(snap)
     meter_html = []
-    for lab, pct in meters:
+    for bar in bars:
+        pct = int(bar["percent"])
+        pct_cls = "corp-meter-pct is-100" if pct >= 100 else "corp-meter-pct"
         meter_html.append(
-            f'        <div class="corp-meter-row">'
-            f'<div class="corp-meter-lab"><span>{_esc(lab)}</span><span>{pct}</span></div>'
-            f'<div class="corp-meter-track"><span class="corp-meter-fill" style="width:{pct}"></span></div>'
-            f"</div>"
+            f'        <div class="corp-meter-row" data-corp-part="{_esc(bar["id"])}">'
+            f'<div class="corp-meter-lab"><span>{_esc(bar["label"])}</span>'
+            f'<span class="{pct_cls}" data-corp-pct="1">{pct}%</span></div>'
+            f'<div class="corp-meter-track">'
+            f'<span class="corp-meter-fill" data-corp-fill="1" style="width:{pct}%"></span>'
+            f"</div></div>"
         )
     return f"""    <section class="panel-card corporate-clients" id="{CORPORATE_CLIENTS_BOX_ID}"
              aria-labelledby="corporate-clients-heading">
@@ -655,7 +799,7 @@ def render_corporate_clients_html() -> str:
       <div class="corp-icon-grid" id="corporate-clients-icons">
 {''.join(card_html)}
       </div>
-      <div class="corp-meters" id="corporate-clients-graphs" aria-label="Privacy-preserving coverage">
+      <div class="corp-meters" id="corporate-clients-graphs" aria-label="rpAI learned percent — NED progress">
 {''.join(meter_html)}
       </div>
       <div class="corp-price-row" id="corporate-clients-pricing">
@@ -670,6 +814,8 @@ def render_corporate_clients_html() -> str:
           <p id="corporate-clients-ai">{_esc(CORPORATE_CLIENTS_AI)}</p>
         </div>
       </div>
+      <p class="corp-contract" id="corporate-clients-contract">{_esc(CORPORATE_CLIENTS_CONTRACT)}</p>
+      <p class="corp-limits" id="corporate-clients-limits">{_esc(CORPORATE_CLIENTS_LIMITS)}</p>
       <p class="corporate-clients-foot" id="corporate-clients-foot">{_esc(CORPORATE_CLIENTS_FOOT)}</p>
     </section>
     <script>
@@ -679,6 +825,34 @@ def render_corporate_clients_html() -> str:
       if (location.pathname === "/sdk" || location.hash === "#corporate-clients") {{
         box.scrollIntoView({{behavior: "smooth", block: "start"}});
       }}
+      function paint(parts) {{
+        if (!parts || !parts.length) return;
+        for (var i = 0; i < parts.length; i++) {{
+          var p = parts[i];
+          var row = box.querySelector('[data-corp-part="' + p.id + '"]');
+          if (!row) continue;
+          var n = Math.max(0, Math.min(100, parseInt(p.percent, 10) || 0));
+          var fill = row.querySelector("[data-corp-fill]");
+          var lab = row.querySelector("[data-corp-pct]");
+          if (fill) fill.style.width = n + "%";
+          if (lab) {{
+            lab.textContent = n + "%";
+            if (n >= 100) lab.classList.add("is-100");
+            else lab.classList.remove("is-100");
+          }}
+        }}
+      }}
+      function refresh() {{
+        fetch("/api/ned-growth", {{credentials: "same-origin"}})
+          .then(function (r) {{ return r.json(); }})
+          .then(function (data) {{
+            var ned = (data && data.ned) || {{}};
+            paint(ned.corporate_parts || []);
+          }})
+          .catch(function () {{}});
+      }}
+      refresh();
+      setInterval(refresh, 20000);
     }})();
     </script>
 """

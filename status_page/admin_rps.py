@@ -385,6 +385,19 @@ def ned_growth_public_snapshot(stats: dict[str, Any] | None = None) -> dict[str,
         ],
     }
     try:
+        from settings_explainer import corporate_ned_bar_values
+    except ImportError:
+        try:
+            from status_page.settings_explainer import (  # type: ignore
+                corporate_ned_bar_values,
+            )
+        except ImportError:  # pragma: no cover
+            corporate_ned_bar_values = None  # type: ignore
+    if callable(corporate_ned_bar_values):
+        snap["corporate_parts"] = corporate_ned_bar_values(snap)
+    else:
+        snap["corporate_parts"] = []
+    try:
         from downloads import load_downloads_map_public
     except ImportError:
         try:
