@@ -216,17 +216,24 @@ describe('createServer launch', () => {
       const { port } = srv.address();
       const res = await fetch(`http://127.0.0.1:${port}/`);
       const text = await res.text();
+      const js = await fetch(`http://127.0.0.1:${port}/mineperc_parts.js`);
+      const jsText = await js.text();
       const health = await fetch(`http://127.0.0.1:${port}/health`).then((r) => r.json());
       await srv.close();
-      bodies.push({ text, health });
+      bodies.push({ text, health, jsStatus: js.status, jsText });
     }
-    for (const { text, health } of bodies) {
+    for (const { text, health, jsStatus, jsText } of bodies) {
       assert.match(text, /Perccent PERC pool/);
       assert.match(text, /BeamHash III/);
       assert.match(text, /mineperc\.restoreprivacy\.online:1466/);
+      assert.match(text, /copy-icon/);
+      assert.match(text, /--mineperc-longest-ch/);
       assert.doesNotMatch(text, /Beam mining pool/);
       assert.equal(health.coin, 'PERC');
       assert.equal(health.algorithm, 'BeamHash III');
+      assert.equal(jsStatus, 200);
+      assert.match(jsText, /export function copyPayloadForPart/);
+      assert.match(jsText, /export function minWidthChFromParts/);
     }
   });
 });

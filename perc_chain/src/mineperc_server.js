@@ -248,15 +248,31 @@ export function startPercMinePool({
   return { http: httpSrv, strata };
 }
 
+export { publicDir };
+
+export function writePublicFile(res, url, dir = publicDir()) {
+  const clean = String(url || '/').split('?')[0];
+  const files = {
+    '/': { name: 'index.html', type: 'text/html; charset=utf-8' },
+    '/index.html': { name: 'index.html', type: 'text/html; charset=utf-8' },
+    '/mineperc_parts.js': {
+      name: 'mineperc_parts.js',
+      type: 'text/javascript; charset=utf-8',
+    },
+  };
+  const hit = files[clean];
+  if (!hit) return false;
+  const file = path.join(dir, hit.name);
+  if (!fs.existsSync(file)) return false;
+  res.writeHead(200, { 'Content-Type': hit.type, 'Cache-Control': 'no-cache' });
+  res.end(fs.readFileSync(file));
+  return true;
+}
+
 export function createServer({ port = DEFAULT_HTTP_PORT } = {}) {
   const server = http.createServer((req, res) => {
     const url = (req.url || '/').split('?')[0];
-    if (url === '/' || url === '/index.html') {
-      const file = path.join(publicDir(), 'index.html');
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
-      res.end(fs.readFileSync(file));
-      return;
-    }
+    if (writePublicFile(res, url)) return;
     if (req.method === 'POST') {
       const chunks = [];
       req.on('data', (c) => chunks.push(c));
