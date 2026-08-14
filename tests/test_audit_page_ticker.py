@@ -15,6 +15,8 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 from audit_countdown import (  # noqa: E402
     audit_json_matches_product_monopin,
+    audit_md_catalog_version,
+    audit_md_matches_product_monopin,
     countdown_state,
     current_audit_rag_colour,
     format_countdown,
@@ -165,6 +167,61 @@ class TestUpstreamMonopinGuard(unittest.TestCase):
         st = current_audit_rag_colour(data=got)
         self.assertEqual(st["colour"], "Amber")
 
+    def test_wrong_pin_local_alone_returns_none(self):
+        """Wrong-pin local must not paint public ticker (false Red/Amber)."""
+        import audit_countdown as ac
+
+        monopin = product_monopin_for_audit() or "1.2.3"
+        stale = {
+            "generated_at": "2026-08-13T05:40:22Z",
+            "catalog_version": "0.3.6",
+            "package_rag": {"catalog_version": "0.3.6", "overall": "Red"},
+            "overall_ok": True,
+        }
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "security_audit_latest.json"
+            p.write_text(json.dumps(stale), encoding="utf-8")
+            with unittest.mock.patch.object(ac, "_DEFAULT_JSON", p):
+                with unittest.mock.patch.object(
+                    ac, "fetch_url_text", return_value=None
+                ):
+                    with unittest.mock.patch.object(
+                        ac, "product_monopin_for_audit", return_value=monopin
+                    ):
+                        got = load_security_audit_json_prefer_upstream(None)
+        self.assertIsNone(got)
+
+    def test_wrong_pin_rag_colour_is_unavailable(self):
+        """Stale residual Red for wrong catalog pin is not public Red."""
+        monopin = product_monopin_for_audit() or "1.2.3"
+        stale = {
+            "catalog_version": "0.3.6",
+            "package_rag": {"catalog_version": "0.3.6", "overall": "Red"},
+            "overall_ok": False,
+        }
+        with unittest.mock.patch(
+            "audit_countdown.product_monopin_for_audit", return_value=monopin
+        ):
+            st = current_audit_rag_colour(data=stale)
+        self.assertFalse(st["available"])
+        self.assertIsNone(st["colour"])
+
+    def test_audit_md_monopin_parse_and_match(self):
+        monopin = product_monopin_for_audit() or "1.2.3"
+        good = (
+            "| **Public catalog version** | **%s** |\n"
+            "## Installer package AUDIT STATE (catalog v%s)\n"
+            "**Catalog overall (worst package):** 🟧\n"
+        ) % (monopin, monopin)
+        bad = (
+            "| **Public catalog version** | **0.3.6** |\n"
+            "**Catalog overall (worst package):** 🟥\n"
+        )
+        self.assertEqual(audit_md_catalog_version(good), monopin)
+        self.assertEqual(audit_md_catalog_version(bad), "0.3.6")
+        self.assertTrue(audit_md_matches_product_monopin(good, monopin=monopin))
+        self.assertFalse(audit_md_matches_product_monopin(bad, monopin=monopin))
+
 
 class TestAuditPageTickerHtml(unittest.TestCase):
     def test_ticker_has_countdown_and_unique_ids(self):
@@ -308,7 +365,13 @@ class TestAuditDocumentInjectsTicker(unittest.TestCase):
         self.assertGreater(h1_end, 0)
         self.assertGreater(ticker_at, h1_end)
         self.assertIn("audit-page-countdown-value", page)
-        self.assertIn("The current audit run is", page)
+        # Colour line is present when monopin JSON is staged; wrong-pin residual
+        # inventory is honest-unavailable (not a fake Red).
+        self.assertTrue(
+            "The current audit run is" in page
+            or "The current audit run colour is" in page,
+            "ticker must expose current-run colour line",
+        )
         # CSS present
         self.assertIn("audit-page-ticker", page)
         self.assertIn("rag-green", page)  # CSS classes in shell

@@ -2088,6 +2088,45 @@ def publish_audit_artifacts(
         return out
     out["steps"].append({"action": "check_paths", "ok": True})
 
+    # Monopin guard: never scp residual 0.3.6 (or any wrong pin) all-Red inventory
+    # onto Helsinki public-audit. That permanently false-Reds the public ticker.
+    try:
+        json_gate = ROOT / "status_page" / "static" / "security_audit_latest.json"
+        raw_gate = json.loads(json_gate.read_text(encoding="utf-8"))
+        cat_gate = ""
+        if isinstance(raw_gate, dict):
+            cat_gate = str(raw_gate.get("catalog_version") or "").strip()
+            pr_gate = raw_gate.get("package_rag")
+            if not cat_gate and isinstance(pr_gate, dict):
+                cat_gate = str(pr_gate.get("catalog_version") or "").strip()
+        live_pin = load_catalog_version().strip()
+        if live_pin and cat_gate and cat_gate != live_pin:
+            out["error"] = (
+                f"refuse publish: audit catalog_version {cat_gate!r} "
+                f"!= product monopin {live_pin!r} (false Red guard)"
+            )
+            out["steps"].append(
+                {
+                    "action": "monopin_guard",
+                    "ok": False,
+                    "catalog_version": cat_gate,
+                    "monopin": live_pin,
+                }
+            )
+            return out
+        out["steps"].append(
+            {
+                "action": "monopin_guard",
+                "ok": True,
+                "catalog_version": cat_gate or live_pin,
+                "monopin": live_pin,
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        out["error"] = f"monopin guard failed: {exc}"
+        out["steps"].append({"action": "monopin_guard", "ok": False, "error": str(exc)})
+        return out
+
     # Optional SSH/rsync publish when RPT_AUDIT_STATUS_SSH is set (scp pair).
     # Residual timer uses this to push ONLY audit JSON + AUDIT.md to Helsinki
     # public-audit (status host prefers that upstream for last-run).

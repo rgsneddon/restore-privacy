@@ -141,7 +141,29 @@ elif [[ -f "${REPO_ROOT}/client/VERSION" ]]; then
   CATALOG_PIN="$(tr -d ' \t\r\n' <"${REPO_ROOT}/client/VERSION" | head -c 32 || true)"
 fi
 if [[ -z "${CATALOG_PIN}" ]]; then
-  CATALOG_PIN="${RPT_CATALOG_VERSION:-0.3.6}"
+  # Never default to historical residual 0.3.6 (false all-Red package RAG when
+  # paid_assets/0.3.6 is empty). Prefer env, then downloads monopin, else fail.
+  CATALOG_PIN="${RPT_CATALOG_VERSION:-}"
+fi
+if [[ -z "${CATALOG_PIN}" && -f "${REPO_ROOT}/status_page/downloads.py" ]]; then
+  CATALOG_PIN="$(
+    RPT_REPO_ROOT_FOR_PIN="${REPO_ROOT}" python3 - <<'PY' 2>/dev/null || true
+import os
+import sys
+from pathlib import Path
+root = Path(os.environ.get("RPT_REPO_ROOT_FOR_PIN") or ".")
+sys.path.insert(0, str(root / "status_page"))
+try:
+    from downloads import RELEASE_VERSION
+    print(str(RELEASE_VERSION).strip())
+except Exception:
+    pass
+PY
+  )"
+fi
+if [[ -z "${CATALOG_PIN}" ]]; then
+  echo "rpt-security-audit install: ERROR missing catalog monopin (client/VERSION or RPT_CATALOG_VERSION)" >&2
+  exit 1
 fi
 # Seed current audit document
 if [[ -f "${REPO_ROOT}/AUDIT.md" ]]; then

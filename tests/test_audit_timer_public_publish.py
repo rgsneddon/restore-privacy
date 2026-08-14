@@ -32,6 +32,10 @@ class TestTimerWritePathStructural(unittest.TestCase):
         self.assertIn("last_audit_write", text)
         self.assertIn("RPT_AUDIT_STATUS_SSH", text)
         self.assertIn("publish_audit_artifacts", text)
+        # Never hard-code historical residual 0.3.6 as catalog fallback
+        # (empty paid_assets/0.3.6 → permanent false Red package RAG).
+        self.assertNotIn('RPT_CATALOG_VERSION:-0.3.6', text)
+        self.assertIn("missing catalog monopin", text)
 
     def test_build_markdown_soft_fails_missing_uk_ping(self) -> None:
         src = (ROOT / "scripts" / "run_security_audit.py").read_text(encoding="utf-8")
@@ -111,9 +115,11 @@ class TestPublishTimerHelpers(unittest.TestCase):
 
     def test_live_repo_json_has_generated_at_parser_roundtrip(self) -> None:
         from audit_countdown import (
+            audit_json_matches_product_monopin,
             load_last_audit_generated_at,
             load_security_audit_json_prefer_upstream,
             parse_audit_generated_at,
+            product_monopin_for_audit,
         )
         from publish_timer_audit_to_status import generated_at_from_json_file
 
@@ -124,11 +130,18 @@ class TestPublishTimerHelpers(unittest.TestCase):
         self.assertTrue(raw)
         dt = parse_audit_generated_at(raw)
         self.assertIsNotNone(dt)
-        # Prefer-upstream may return a newer Helsinki stamp than git-local file —
-        # both must parse; last-run is never None when either is present.
+        # Prefer-upstream monopin-matches product; wrong-pin residual (e.g. 0.3.6
+        # on Helsinki) and wrong-pin local are discarded — last-run may be None
+        # until a monopin-matching --write is staged.
         last = load_last_audit_generated_at(path)
-        self.assertIsNotNone(last)
         preferred = load_security_audit_json_prefer_upstream(path)
+        local_raw = json.loads(path.read_text(encoding="utf-8"))
+        pin = product_monopin_for_audit()
+        if pin and not audit_json_matches_product_monopin(local_raw, monopin=pin):
+            # Honest: no monopin-matching inventory → no public last-run stamp.
+            self.assertIsNone(preferred)
+            return
+        self.assertIsNotNone(last)
         self.assertIsNotNone(preferred)
         pref_at = parse_audit_generated_at(str(preferred.get("generated_at") or ""))
         self.assertIsNotNone(pref_at)

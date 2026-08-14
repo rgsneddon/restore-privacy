@@ -177,6 +177,45 @@ def audit_json_matches_product_monopin(
     return cat == pin
 
 
+def audit_md_catalog_version(text: str | None) -> str:
+    """Catalog monopin embedded in an AUDIT.md document (public table or header)."""
+    if not text or not isinstance(text, str):
+        return ""
+    # | **Public catalog version** | **1.2.3** |  (markdown bold optional)
+    m = re.search(
+        r"Public catalog version\*?\*?\s*\|\s*\*?\*?([0-9]+\.[0-9]+(?:\.[0-9]+)?)",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        return m.group(1).strip()
+    # ## Installer package AUDIT STATE (catalog v1.2.3)
+    m = re.search(
+        r"catalog\s+v([0-9]+\.[0-9]+(?:\.[0-9]+)?)",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        return m.group(1).strip()
+    return ""
+
+
+def audit_md_matches_product_monopin(
+    text: str | None,
+    *,
+    monopin: str | None = None,
+) -> bool:
+    """True when AUDIT.md catalog pin matches product monopin (or monopin unknown)."""
+    pin = (monopin if monopin is not None else product_monopin_for_audit()) or ""
+    pin = pin.strip()
+    if not pin:
+        return True
+    cat = audit_md_catalog_version(text)
+    if not cat:
+        return False
+    return cat == pin
+
+
 def load_security_audit_json_prefer_upstream(
     path: Path | None = None,
     *,
@@ -196,9 +235,13 @@ def load_security_audit_json_prefer_upstream(
 
     **Monopin guard:** residual JSON whose ``catalog_version`` /
     ``package_rag.catalog_version`` does **not** match product monopin
-    (``client/VERSION`` / ``RELEASE_VERSION``) is **discarded**. Otherwise a
+    (``client/VERSION`` / ``RELEASE_VERSION``) is **discarded entirely**
+    (returns ``None`` when nothing monopin-matching remains). Otherwise a
     lean residual pin (e.g. 0.3.6 all-Red packages) permanently forces the
     public AUDIT ticker Red while the live catalog is 1.2.x.
+
+    Wrong-pin **local** is also discarded — never serve stale residual Red
+    (or wrong Amber) just because Helsinki is offline.
     """
     local_data: dict[str, Any] | None = None
     p = path if path is not None else _DEFAULT_JSON
@@ -223,11 +266,6 @@ def load_security_audit_json_prefer_upstream(
         return local_data
 
     monopin = product_monopin_for_audit()
-    if local_data is not None and not audit_json_matches_product_monopin(
-        local_data, monopin=monopin
-    ):
-        # Keep local only if nothing better; still try monopin-matching upstream.
-        pass
 
     up_url = upstream_url if upstream_url is not None else audit_upstream_json_url()
     remote_data: dict[str, Any] | None = None
@@ -249,12 +287,11 @@ def load_security_audit_json_prefer_upstream(
     if local_data is not None and not audit_json_matches_product_monopin(
         local_data, monopin=monopin
     ):
-        # Prefer monopin-matching remote over wrong-pin local.
-        if remote_data is not None:
-            return remote_data
-        # Both wrong or remote absent: still return local (operator visibility)
-        # but public monopin deploys should ship matching static JSON.
-        return local_data
+        # Never return wrong-pin local for public surfaces (false Red/Amber).
+        local_data = None
+
+    if remote_data is None and local_data is None:
+        return None
 
     local_at = parse_audit_generated_at(
         str((local_data or {}).get("generated_at") or "")
@@ -471,6 +508,10 @@ def current_audit_rag_colour(
     (True→Green, False→Red). When neither is available, ``available`` is False
     (honest unavailable — not a fake Green).
 
+    **Monopin guard:** when product monopin is known and the payload reports a
+    different ``catalog_version``, return unavailable. Stale residual 0.3.6
+    all-Red inventory must never paint the public ticker Red for monopin 1.2.x.
+
     Returns::
       {
         "available": bool,
@@ -481,6 +522,17 @@ def current_audit_rag_colour(
     """
     payload = data if data is not None else load_security_audit_latest(json_path)
     if not payload:
+        return {
+            "available": False,
+            "colour": None,
+            "css": None,
+            "label": "unavailable",
+        }
+    # Refuse wrong-pin residual (present catalog_version that != product monopin).
+    # Unversioned fixtures (unit tests) are still allowed when no catalog pin.
+    pin = product_monopin_for_audit()
+    cat = audit_json_catalog_version(payload)
+    if pin and cat and cat != pin:
         return {
             "available": False,
             "colour": None,

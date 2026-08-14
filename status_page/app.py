@@ -327,14 +327,26 @@ def audit_document_bytes() -> bytes | None:
 
     Prefer residual-timer Helsinki upstream when that document is present so
     /AUDIT.md tracks timer writes without a laptop publish.
+
+    **Monopin guard:** refuse upstream (or local) AUDIT.md whose public catalog
+    version does not match product monopin. Stale residual 0.3.6 all-Red
+    documents must never paint the public page Red for monopin 1.2.x.
     """
     try:
-        from audit_countdown import audit_upstream_audit_url, fetch_url_text
+        from audit_countdown import (
+            audit_md_matches_product_monopin,
+            audit_upstream_audit_url,
+            fetch_url_text,
+            product_monopin_for_audit,
+        )
 
+        monopin = product_monopin_for_audit()
         up = audit_upstream_audit_url()
         if up:
             text = fetch_url_text(up, timeout=5.0)
-            if text and len(text) > 200:
+            if text and len(text) > 200 and audit_md_matches_product_monopin(
+                text, monopin=monopin
+            ):
                 try:
                     from public_docs import _redact_public_doc_text
 
@@ -346,12 +358,38 @@ def audit_document_bytes() -> bytes | None:
         pass
     data = load_public_document_bytes("AUDIT.md", min_size=200)
     if data is not None:
-        return data
+        try:
+            from audit_countdown import (
+                audit_md_matches_product_monopin,
+                product_monopin_for_audit,
+            )
+
+            text = data.decode("utf-8", errors="replace")
+            if audit_md_matches_product_monopin(
+                text, monopin=product_monopin_for_audit()
+            ):
+                return data
+            # Wrong-pin local AUDIT.md — fall through rather than show false Red.
+        except Exception:
+            return data
     # Back-compat: RPT_AUDIT_PATH override
     extra = Path(os.environ.get("RPT_AUDIT_PATH", ""))
     try:
         if extra.is_file() and extra.stat().st_size > 200:
-            return extra.read_bytes()
+            raw = extra.read_bytes()
+            try:
+                from audit_countdown import (
+                    audit_md_matches_product_monopin,
+                    product_monopin_for_audit,
+                )
+
+                if audit_md_matches_product_monopin(
+                    raw.decode("utf-8", errors="replace"),
+                    monopin=product_monopin_for_audit(),
+                ):
+                    return raw
+            except Exception:
+                return raw
     except OSError:
         pass
     return None
