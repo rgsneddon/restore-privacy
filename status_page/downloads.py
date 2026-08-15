@@ -2110,45 +2110,43 @@ def _iter_inventory_releases(repo: dict[str, Any]) -> list[tuple[str, list[Any]]
 def list_github_release_map_rows(
     *, inventory_path: Path | None = None
 ) -> list[dict[str, str]]:
-    """Map rows for the newest GitHub Release of each product (latest tag only)."""
+    """Map rows for every published GitHub Release asset (not latest-only)."""
     rows: list[dict[str, str]] = []
     for repo in load_github_release_inventory(inventory_path):
         product = str(repo.get("product") or repo.get("repo") or "Other").strip()
-        latest = latest_inventory_release(_iter_inventory_releases(repo))
-        if latest is None:
-            continue
-        tag, assets = latest
-        for asset in assets:
-            if not isinstance(asset, dict):
-                continue
-            fname = str(asset.get("filename") or "").strip()
-            href = str(asset.get("href") or "").strip()
-            if not fname or not href:
-                continue
-            plat = str(asset.get("platform") or "other").strip() or "other"
-            ver = tag.lstrip("v")
-            rows.append(
-                {
-                    "product": product,
-                    "kind": "github_release",
-                    "platform": plat,
-                    "filename": fname,
-                    "href": href,
-                    "version": ver,
-                    "label": f"{fname} - {tag}" if tag else fname,
-                }
-            )
+        for tag, assets in _iter_inventory_releases(repo):
+            for asset in assets:
+                if not isinstance(asset, dict):
+                    continue
+                fname = str(asset.get("filename") or "").strip()
+                href = str(asset.get("href") or "").strip()
+                if not fname or not href:
+                    continue
+                plat = str(asset.get("platform") or "other").strip() or "other"
+                ver = tag.lstrip("v")
+                rows.append(
+                    {
+                        "product": product,
+                        "kind": "github_release",
+                        "platform": plat,
+                        "filename": fname,
+                        "href": href,
+                        "version": ver,
+                        "label": f"{fname} - {tag}" if tag else fname,
+                    }
+                )
     return rows
 
 
 def list_downloads_map_rows(
     *, version: str | None = None, inventory_path: Path | None = None
 ) -> list[dict[str, str]]:
-    """Downloads Map: Suite free_direct clients, then latest GitHub asset per product.
+    """Downloads Map: Suite free_direct clients, then every published GitHub asset.
 
     Suite rows stay on the Helsinki free_direct path (same as FREE DOWNLOAD).
     Other public rgsneddon repos are listed from
-    :func:`load_github_release_inventory` (newest release tag only).
+    :func:`load_github_release_inventory` (every release version with
+    downloadable assets, not latest-tag-only).
     """
     rows: list[dict[str, str]] = []
     for p in list_catalog_platform_packages(version=version):
