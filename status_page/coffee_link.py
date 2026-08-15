@@ -273,11 +273,11 @@ def render_site_footer_socials_html() -> str:
 """
 
 
-def render_site_copyright_footer_html() -> str:
+def render_site_copyright_footer_html(*, map_href: str | None = None) -> str:
     """Public footer: © Raskul (left), social icons (middle), download map (right)."""
     text = site_copyright_text()
     safe = _esc(text)
-    map_href = _esc(downloads_map_footer_href())
+    map_href = _esc(map_href or downloads_map_footer_href())
     map_label = _esc(downloads_map_footer_label())
     socials = render_site_footer_socials_html()
     return f"""

@@ -125,8 +125,7 @@ class TestDownloadsMapPage(unittest.TestCase):
         self.assertEqual(len(suite), len(available_downloads()))
         self.assertEqual(len(suite), 5)
         self.assertGreaterEqual(len(github), 1)
-        products = {r["product"] for r in suite}
-        self.assertEqual(products, {"Restore Privacy"})
+        self.assertEqual({r["product"] for r in suite}, {"Restore Privacy"})
         for r in suite:
             self.assertEqual(r["version"], map_platform_version(r["platform"]))
             self.assertTrue(r.get("filename"))
@@ -136,12 +135,19 @@ class TestDownloadsMapPage(unittest.TestCase):
             self.assertIn("free_direct=1", r["href"])
             self.assertIn(f"platform={r['platform']}", r["href"])
             self.assertNotIn("/pay", r["href"])
-        self.assertIn("Evolve", {r["product"] for r in rows})
+        products = {r["product"] for r in rows}
+        self.assertIn("Restore Privacy", products)
+        self.assertIn("Evolve", products)
         evolve_win = [
             r for r in github
             if r["filename"] == "evolve-v4.1.12-windows-x64-setup.exe"
         ]
         self.assertEqual(len(evolve_win), 1)
+        self.assertTrue(
+            evolve_win[0]["href"].endswith(
+                "/evolve/releases/download/v4.1.12/evolve-v4.1.12-windows-x64-setup.exe"
+            )
+        )
 
         page = render_downloads_map_page_html(default_platform="windows").decode("utf-8")
         self.assertIn("Downloads Map", page)
@@ -162,6 +168,45 @@ class TestDownloadsMapPage(unittest.TestCase):
         self.assertIn(map_platform_version("linux"), page)
         self.assertIn(f"Linux - v{map_platform_version('linux')}", page)
         self.assertEqual(map_platform_version("linux"), "1.2.7")
+
+    def test_map_lists_every_published_version_including_gnfp(self) -> None:
+        from downloads import list_downloads_map_rows, render_downloads_map_page_html
+
+        rows = list_downloads_map_rows()
+        products = {r["product"] for r in rows}
+        for name in (
+            "Restore Privacy",
+            "Evolve",
+            "MY PERC",
+            "perc-mine",
+            "beam-mine",
+            "GNFP wallet",
+        ):
+            self.assertIn(name, products)
+        gnfp = [r for r in rows if r["product"] == "GNFP wallet"]
+        gnfp_vers = {r["version"] for r in gnfp}
+        self.assertGreaterEqual(len(gnfp_vers), 2)
+        evolve_vers = {r["version"] for r in rows if r["product"] == "Evolve"}
+        self.assertGreaterEqual(len(evolve_vers), 2)
+        perc_vers = {r["version"] for r in rows if r["product"] == "perc-mine"}
+        self.assertGreaterEqual(len(perc_vers), 2)
+        page = render_downloads_map_page_html().decode("utf-8")
+        self.assertIn("GNFP", page)
+        self.assertIn("gnfp-wallet", page.lower())
+        scratch = Path(
+            __import__("os").environ.get(
+                "GROK_GOAL_SCRATCH",
+                r"C:\Users\rgsne\AppData\Local\Temp\grok-goal-b3bb74235a15\implementer",
+            )
+        )
+        scratch.mkdir(parents=True, exist_ok=True)
+        lines = [
+            f"{r['product']}\t{r['version']}\t{r['href']}"
+            for r in rows
+        ]
+        (scratch / "downloads-map-versions.txt").write_text(
+            "\n".join(lines) + "\n", encoding="utf-8"
+        )
 
 
 class TestFooterCopyrightAndMapLink(unittest.TestCase):

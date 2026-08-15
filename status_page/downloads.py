@@ -146,7 +146,7 @@ def load_downloads_map() -> dict[str, Any]:
 
 
 def load_downloads_map_public() -> dict[str, Any]:
-    """JSON-safe map for /downloads-map.json and rpAI/GOD (no secrets)."""
+    """JSON-safe map for /downloads-map.json and rpAI/Ned (no secrets)."""
     data = load_downloads_map()
     plats = data.get("platforms") if isinstance(data.get("platforms"), dict) else {}
     return {
@@ -2037,7 +2037,11 @@ def github_release_inventory_path() -> Path:
 
 
 def load_github_release_inventory() -> list[dict[str, Any]]:
-    """Latest published downloadable assets per public repo (no network)."""
+    """Published downloadable assets per public repo (no network).
+
+    Each repo may carry a single ``tag`` + ``assets`` (legacy latest-only)
+    or a ``releases`` list of ``{tag, assets}`` for every published version.
+    """
     path = github_release_inventory_path()
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -2053,46 +2057,65 @@ def load_github_release_inventory() -> list[dict[str, Any]]:
     return out
 
 
+def _iter_inventory_releases(repo: dict[str, Any]) -> list[tuple[str, list[Any]]]:
+    """Yield (tag, assets) for every published release on a repo entry."""
+    raw_rels = repo.get("releases")
+    if isinstance(raw_rels, list) and raw_rels:
+        pairs: list[tuple[str, list[Any]]] = []
+        for rel in raw_rels:
+            if not isinstance(rel, dict):
+                continue
+            tag = str(rel.get("tag") or "").strip()
+            assets = rel.get("assets")
+            if not isinstance(assets, list):
+                continue
+            pairs.append((tag, assets))
+        return pairs
+    tag = str(repo.get("tag") or "").strip()
+    assets = repo.get("assets")
+    if isinstance(assets, list):
+        return [(tag, assets)]
+    return []
+
+
 def list_github_release_map_rows() -> list[dict[str, str]]:
-    """Map rows for latest GitHub Release assets (sidecars already omitted)."""
+    """Map rows for every published GitHub Release asset (not latest-only)."""
     rows: list[dict[str, str]] = []
     for repo in load_github_release_inventory():
         product = str(repo.get("product") or repo.get("repo") or "Other").strip()
-        tag = str(repo.get("tag") or "").strip()
-        assets = repo.get("assets")
-        if not isinstance(assets, list):
-            continue
-        for asset in assets:
-            if not isinstance(asset, dict):
-                continue
-            fname = str(asset.get("filename") or "").strip()
-            href = str(asset.get("href") or "").strip()
-            if not fname or not href:
-                continue
-            plat = str(asset.get("platform") or "other").strip() or "other"
-            ver = tag.lstrip("v")
-            rows.append(
-                {
-                    "product": product,
-                    "kind": "github_release",
-                    "platform": plat,
-                    "filename": fname,
-                    "href": href,
-                    "version": ver,
-                    "label": f"{fname} - {tag}" if tag else fname,
-                }
-            )
+        for tag, assets in _iter_inventory_releases(repo):
+            for asset in assets:
+                if not isinstance(asset, dict):
+                    continue
+                fname = str(asset.get("filename") or "").strip()
+                href = str(asset.get("href") or "").strip()
+                if not fname or not href:
+                    continue
+                plat = str(asset.get("platform") or "other").strip() or "other"
+                ver = tag.lstrip("v")
+                rows.append(
+                    {
+                        "product": product,
+                        "kind": "github_release",
+                        "platform": plat,
+                        "filename": fname,
+                        "href": href,
+                        "version": ver,
+                        "label": f"{fname} - {tag}" if tag else fname,
+                    }
+                )
     return rows
 
 
 def list_downloads_map_rows(
     *, version: str | None = None
 ) -> list[dict[str, str]]:
-    """Downloads Map: Suite free_direct clients, then every latest GitHub asset.
+    """Downloads Map: Suite free_direct clients, then every published GitHub asset.
 
     Suite rows stay on the Helsinki free_direct path (same as FREE DOWNLOAD).
     Other public rgsneddon repos are listed from
-    :func:`load_github_release_inventory` (committed snapshot; no live HTTP).
+    :func:`load_github_release_inventory` (every release version with
+    downloadable assets, not latest-tag-only).
     """
     rows: list[dict[str, str]] = []
     for p in list_catalog_platform_packages(version=version):

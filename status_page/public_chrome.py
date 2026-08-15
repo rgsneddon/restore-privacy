@@ -1421,9 +1421,6 @@ SUITE_HOME_INTRO_ID = "suite-home-intro"
 # Neon typewriter lines (one-shot keystroke animation on page load)
 SUITE_HOME_WELCOME_TYPE = ".:WELCOME, ANON:."
 SUITE_HOME_CLOSING_TYPE = "YOUR PRIVACY, RESTORED"
-# Device-only retention line lives on in-client AUDIT, not the public homepage.
-SUITE_HOME_RETENTION_PREFIX = "your data is only retained by your own device. "
-SUITE_HOME_RETENTION_TYPE = "privacy, restored."
 # Normal CSS heading (not neon typewriter)
 SUITE_HOME_INTRO_HEADING = "...privacy you can actually use..."
 # Legacy alias for callers/tests that still import the short human title idea
@@ -1433,8 +1430,7 @@ SUITE_HOME_INTRO_BODY = (
     "Restore Privacy is a virtual private network for your device and personal use. "
     "Download the client free from the link below, try three days free with no "
     "obligation to pay, then keep your privacy restored with a Restore Privacy VPN "
-    "subscription (£3 a month or £30 a year). "
-    "Choose Germany or Singapore as your residual location in the app."
+    "subscription (£3 a month or £30 a year)."
 )
 # Foot retired: closing typewriter is the end line
 SUITE_HOME_INTRO_FOOT = ""
@@ -1612,6 +1608,7 @@ def public_brand_header_html(
     product_active: str = PRODUCT_VPN_KEY,
     include_product_tabs: bool = False,
     include_site_nav: bool = True,
+    include_theme_picker: bool = True,
     show_title_text: bool = False,
     mark: str = "banner",
 ) -> str:
@@ -1639,6 +1636,7 @@ def public_brand_header_html(
         public_product_tabs_html(active=product_active) if include_product_tabs else ""
     )
     nav_html = public_nav_links_html(active=active) if include_site_nav else ""
+    theme_html = public_theme_picker_html() if include_theme_picker else ""
     # Optional H1 only when explicitly requested (not default VPN heading text).
     title_html = ""
     if show_title_text:
@@ -1685,7 +1683,7 @@ def public_brand_header_html(
 {mark_html}
       <hr class="brand-header-rule" aria-hidden="true"/>
 {tagline_html}{nav_html}
-{public_theme_picker_html()}
+{theme_html}
     </header>
 """
 
@@ -1724,12 +1722,14 @@ def public_head_open(
 """
 
 
-def public_page_close() -> str:
+def public_page_close(*, downloads_map_href: str | None = None) -> str:
     """Close every public HTML shell with the shared copyright + map footer.
 
     Copyright left, downloads map link right - same line on all public pages
     that use this closer (home, downloads-map, docs, support, settings guide,
     product family landings, …). Admin routes do not use this helper.
+    Pass *downloads_map_href* to override the default ``/downloads-map`` path
+    (god.restoreprivacy.online must use the apex catalog URL).
     """
     try:
         from coffee_link import render_site_copyright_footer_html
@@ -1737,7 +1737,7 @@ def public_page_close() -> str:
         from status_page.coffee_link import (  # type: ignore
             render_site_copyright_footer_html,
         )
-    return f"""{render_site_copyright_footer_html()}
+    return f"""{render_site_copyright_footer_html(map_href=downloads_map_href)}
 </body>
 </html>
 """
