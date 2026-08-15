@@ -40,8 +40,9 @@ class TestSuitePayHrefBuilders(unittest.TestCase):
         from downloads import map_platform_version
 
         rows = list_downloads_map_rows()
-        self.assertEqual(len(rows), len(available_downloads()))
-        for r in rows:
+        suite = [r for r in rows if r["kind"] == "suite_client"]
+        self.assertEqual(len(suite), len(available_downloads()))
+        for r in suite:
             self.assertEqual(r["kind"], "suite_client")
             self.assertEqual(r["version"], map_platform_version(r["platform"]))
             self.assertEqual(r["product"], "Restore Privacy")
@@ -51,11 +52,8 @@ class TestSuitePayHrefBuilders(unittest.TestCase):
             self.assertIn(f"platform={r['platform']}", r["href"])
             self.assertNotIn("/pay", r["href"])
         kinds = {r["kind"] for r in rows}
-        self.assertEqual(kinds, {"suite_client"})
-        # No non-Suite products
-        blob = " ".join(r["product"] + r["kind"] + r["filename"] for r in rows).lower()
-        for banned in ("pens", "tables", "slides", "rpos", "browser", "extension", "beam"):
-            self.assertNotIn(banned, blob)
+        self.assertIn("suite_client", kinds)
+        self.assertIn("github_release", kinds)
 
 
 class TestHomeAndMapRender(unittest.TestCase):

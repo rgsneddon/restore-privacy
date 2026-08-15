@@ -1,0 +1,101 @@
+{
+  "updated": "2026-08-15",
+  "note": "Latest published downloadable assets per public rgsneddon repo. Sidecars and empty releases omitted. Rendered by list_downloads_map_rows.",
+  "repos": [
+    {
+      "product": "Evolve",
+      "repo": "evolve",
+      "tag": "v4.1.12",
+      "assets": [
+        {
+          "platform": "windows",
+          "filename": "evolve-v4.1.12-windows-x64-setup.exe",
+          "href": "https://github.com/rgsneddon/evolve/releases/download/v4.1.12/evolve-v4.1.12-windows-x64-setup.exe"
+        },
+        {
+          "platform": "android",
+          "filename": "evolve-v4.1.12-android-setup.apk",
+          "href": "https://github.com/rgsneddon/evolve/releases/download/v4.1.12/evolve-v4.1.12-android-setup.apk"
+        },
+        {
+          "platform": "macos",
+          "filename": "evolve-v4.1.12-macos-x64.zip",
+          "href": "https://github.com/rgsneddon/evolve/releases/download/v4.1.12/evolve-v4.1.12-macos-x64.zip"
+        },
+        {
+          "platform": "ios",
+          "filename": "evolve-v4.1.12-ios-setup.ipa",
+          "href": "https://github.com/rgsneddon/evolve/releases/download/v4.1.12/evolve-v4.1.12-ios-setup.ipa"
+        }
+      ]
+    },
+    {
+      "product": "MY PERC",
+      "repo": "perccent-wallet",
+      "tag": "v1.1.8",
+      "assets": [
+        {
+          "platform": "macos",
+          "filename": "perccent-wallet-v1.1.8-macos-setup.zip",
+          "href": "https://github.com/rgsneddon/perccent-wallet/releases/download/v1.1.8/perccent-wallet-v1.1.8-macos-setup.zip"
+        }
+      ]
+    },
+    {
+      "product": "perc-mine",
+      "repo": "perc-mine",
+      "tag": "v1.0.2",
+      "assets": [
+        {
+          "platform": "linux",
+          "filename": "perc-mine-1.0.2-linux.tar.gz",
+          "href": "https://github.com/rgsneddon/perc-mine/releases/download/v1.0.2/perc-mine-1.0.2-linux.tar.gz"
+        },
+        {
+          "platform": "macos",
+          "filename": "perc-mine-1.0.2-macos.tar.gz",
+          "href": "https://github.com/rgsneddon/perc-mine/releases/download/v1.0.2/perc-mine-1.0.2-macos.tar.gz"
+        },
+        {
+          "platform": "windows",
+          "filename": "perc-mine-1.0.2-windows.zip",
+          "href": "https://github.com/rgsneddon/perc-mine/releases/download/v1.0.2/perc-mine-1.0.2-windows.zip"
+        }
+      ]
+    },
+    {
+      "product": "beam-mine",
+      "repo": "beam-mine",
+      "tag": "v1.0.1",
+      "assets": [
+        {
+          "platform": "linux",
+          "filename": "beam-mine-1.0.1-linux-x64.tar.gz",
+          "href": "https://github.com/rgsneddon/beam-mine/releases/download/v1.0.1/beam-mine-1.0.1-linux-x64.tar.gz"
+        },
+        {
+          "platform": "macos",
+          "filename": "beam-mine-1.0.1-macos-universal.tar.gz",
+          "href": "https://github.com/rgsneddon/beam-mine/releases/download/v1.0.1/beam-mine-1.0.1-macos-universal.tar.gz"
+        },
+        {
+          "platform": "windows",
+          "filename": "beam-mine-1.0.1-windows-x64.zip",
+          "href": "https://github.com/rgsneddon/beam-mine/releases/download/v1.0.1/beam-mine-1.0.1-windows-x64.zip"
+        }
+      ]
+    },
+    {
+      "product": "666Stitches",
+      "repo": "666Stitches.mov",
+      "tag": "v1.0.0",
+      "assets": [
+        {
+          "platform": "video",
+          "filename": "666Stitches_Feature.mov",
+          "href": "https://github.com/rgsneddon/666Stitches.mov/releases/download/v1.0.0/666Stitches_Feature.mov"
+        }
+      ]
+    }
+  ]
+}

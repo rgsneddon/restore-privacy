@@ -85,6 +85,29 @@ class TestCtaLinkFallback(unittest.TestCase):
         self.assertNotIn('href="/pay', html_map)
 
 
+class TestGithubReleaseInventory(unittest.TestCase):
+    def test_inventory_loader_emits_latest_evolve_windows(self) -> None:
+        from downloads import (
+            load_github_release_inventory,
+            list_github_release_map_rows,
+        )
+
+        repos = load_github_release_inventory()
+        self.assertTrue(repos)
+        evolve = next(r for r in repos if r.get("repo") == "evolve")
+        names = {a["filename"] for a in evolve["assets"]}
+        self.assertIn("evolve-v4.1.12-windows-x64-setup.exe", names)
+        rows = list_github_release_map_rows()
+        hrefs = {r["href"] for r in rows}
+        self.assertTrue(
+            any(h.endswith("/v4.1.12/evolve-v4.1.12-windows-x64-setup.exe") for h in hrefs)
+        )
+        for r in rows:
+            self.assertEqual(r["kind"], "github_release")
+            self.assertTrue(r["href"].startswith("https://github.com/rgsneddon/"))
+            self.assertNotIn(".sha256", r["filename"])
+
+
 class TestDownloadsMapPage(unittest.TestCase):
     def test_map_enumerates_brand_products_and_hrefs(self) -> None:
         from downloads import (
@@ -95,15 +118,16 @@ class TestDownloadsMapPage(unittest.TestCase):
             suite_free_direct_download_href,
         )
 
-        # Map is Suite latest clients only → free_direct download per platform
+        # Suite clients stay on free_direct; GitHub inventory adds other products.
         rows = list_downloads_map_rows()
-        self.assertEqual(len(rows), len(available_downloads()))
-        self.assertEqual(len(rows), 5)
-        products = {r["product"] for r in rows}
+        suite = [r for r in rows if r["kind"] == "suite_client"]
+        github = [r for r in rows if r["kind"] == "github_release"]
+        self.assertEqual(len(suite), len(available_downloads()))
+        self.assertEqual(len(suite), 5)
+        self.assertGreaterEqual(len(github), 1)
+        products = {r["product"] for r in suite}
         self.assertEqual(products, {"Restore Privacy"})
-        kinds = {r["kind"] for r in rows}
-        self.assertEqual(kinds, {"suite_client"})
-        for r in rows:
+        for r in suite:
             self.assertEqual(r["version"], map_platform_version(r["platform"]))
             self.assertTrue(r.get("filename"))
             self.assertIn(r["version"], r["filename"])
@@ -112,10 +136,12 @@ class TestDownloadsMapPage(unittest.TestCase):
             self.assertIn("free_direct=1", r["href"])
             self.assertIn(f"platform={r['platform']}", r["href"])
             self.assertNotIn("/pay", r["href"])
-        # No companion product kinds
-        blob = " ".join(r["product"] + r["kind"] + r["filename"] for r in rows).lower()
-        for banned in ("pens", "tables", "slides", "rpos", "browser", "extension", "beam"):
-            self.assertNotIn(banned, blob)
+        self.assertIn("Evolve", {r["product"] for r in rows})
+        evolve_win = [
+            r for r in github
+            if r["filename"] == "evolve-v4.1.12-windows-x64-setup.exe"
+        ]
+        self.assertEqual(len(evolve_win), 1)
 
         page = render_downloads_map_page_html(default_platform="windows").decode("utf-8")
         self.assertIn("Downloads Map", page)
@@ -128,10 +154,9 @@ class TestDownloadsMapPage(unittest.TestCase):
                 page,
             )
         self.assertNotIn("/pay?product=suite&amp;platform=", page)
-        # Suite-only — no office pillars / companion products
-        self.assertNotIn('data-kind="pens"', page)
-        self.assertNotIn('data-kind="browser"', page)
-        self.assertNotIn("data-map-product=\"Pens\"", page)
+        self.assertIn('data-kind="github_release"', page)
+        self.assertIn('data-map-product="Evolve"', page)
+        self.assertIn("evolve-v4.1.12-windows-x64-setup.exe", page)
         self.assertIn("is-detected", page)  # windows suite link marked
         self.assertIn(map_platform_version("windows"), page)
         self.assertIn(map_platform_version("linux"), page)

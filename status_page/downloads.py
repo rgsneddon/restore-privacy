@@ -73,6 +73,7 @@ def current_catalog_version() -> str:
 
 
 DOWNLOADS_MAP_JSON_NAME = "downloads_map.json"
+GITHUB_RELEASE_INVENTORY_NAME = "github_release_inventory.json"
 _PLATFORM_FILE_SUFFIXES: dict[str, str] = {
     "windows": "windows-x64-setup.exe",
     "android": "android.apk",
@@ -2030,15 +2031,68 @@ def downloads_map_page_css() -> str:
 """
 
 
+def github_release_inventory_path() -> Path:
+    """On-disk latest-release inventory for every public rgsneddon repo."""
+    return Path(__file__).resolve().with_name(GITHUB_RELEASE_INVENTORY_NAME)
+
+
+def load_github_release_inventory() -> list[dict[str, Any]]:
+    """Latest published downloadable assets per public repo (no network)."""
+    path = github_release_inventory_path()
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return []
+    repos = raw.get("repos") if isinstance(raw, dict) else None
+    if not isinstance(repos, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for repo in repos:
+        if isinstance(repo, dict):
+            out.append(repo)
+    return out
+
+
+def list_github_release_map_rows() -> list[dict[str, str]]:
+    """Map rows for latest GitHub Release assets (sidecars already omitted)."""
+    rows: list[dict[str, str]] = []
+    for repo in load_github_release_inventory():
+        product = str(repo.get("product") or repo.get("repo") or "Other").strip()
+        tag = str(repo.get("tag") or "").strip()
+        assets = repo.get("assets")
+        if not isinstance(assets, list):
+            continue
+        for asset in assets:
+            if not isinstance(asset, dict):
+                continue
+            fname = str(asset.get("filename") or "").strip()
+            href = str(asset.get("href") or "").strip()
+            if not fname or not href:
+                continue
+            plat = str(asset.get("platform") or "other").strip() or "other"
+            ver = tag.lstrip("v")
+            rows.append(
+                {
+                    "product": product,
+                    "kind": "github_release",
+                    "platform": plat,
+                    "filename": fname,
+                    "href": href,
+                    "version": ver,
+                    "label": f"{fname} - {tag}" if tag else fname,
+                }
+            )
+    return rows
+
+
 def list_downloads_map_rows(
     *, version: str | None = None
 ) -> list[dict[str, str]]:
-    """Downloads Map rows: Suite latest clients → free_direct download (like FREE DOWNLOAD).
+    """Downloads Map: Suite free_direct clients, then every latest GitHub asset.
 
-    Each row is one Suite platform at its Downloads Map version (or *version*
-    when an operator override is passed). Non-Suite products are not listed.
-    Package links use free_direct so selection starts the installer immediately
-    (same path as the homepage FREE DOWNLOAD CTA).
+    Suite rows stay on the Helsinki free_direct path (same as FREE DOWNLOAD).
+    Other public rgsneddon repos are listed from
+    :func:`load_github_release_inventory` (committed snapshot; no live HTTP).
     """
     rows: list[dict[str, str]] = []
     for p in list_catalog_platform_packages(version=version):
@@ -2056,6 +2110,7 @@ def list_downloads_map_rows(
                 "label": f"{platform_face_title(plat)} - v{ver}",
             }
         )
+    rows.extend(list_github_release_map_rows())
     return rows
 
 
