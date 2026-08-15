@@ -176,15 +176,19 @@ class TestDownloadsMapPage(unittest.TestCase):
         self.assertIn(f"Linux - v{map_platform_version('linux')}", page)
         self.assertEqual(map_platform_version("linux"), "1.2.7")
 
-    def test_map_lists_every_published_version_including_gnfp(self) -> None:
+    def test_map_lists_only_newest_version_per_github_product(self) -> None:
         from downloads import (
+            _iter_inventory_releases,
+            latest_inventory_release,
             list_downloads_map_rows,
+            list_github_release_map_rows,
             load_github_release_inventory,
             render_downloads_map_page_html,
         )
 
-        rows = list_downloads_map_rows()
-        products = {r["product"] for r in rows}
+        rows = list_github_release_map_rows()
+        all_rows = list_downloads_map_rows()
+        products = {r["product"] for r in all_rows}
         for name in (
             "Restore Privacy",
             "Evolve",
@@ -194,38 +198,58 @@ class TestDownloadsMapPage(unittest.TestCase):
             "GNFP wallet",
         ):
             self.assertIn(name, products)
-        gnfp = [r for r in rows if r["product"] == "GNFP wallet"]
-        gnfp_vers = {r["version"] for r in gnfp}
-        self.assertGreaterEqual(len(gnfp_vers), 2)
-        evolve_vers = {r["version"] for r in rows if r["product"] == "Evolve"}
-        self.assertGreaterEqual(len(evolve_vers), 2)
-        perc_vers = {r["version"] for r in rows if r["product"] == "perc-mine"}
-        self.assertGreaterEqual(len(perc_vers), 2)
+        by_product: dict[str, set[str]] = {}
+        for r in rows:
+            by_product.setdefault(r["product"], set()).add(r["version"])
+        for product, vers in by_product.items():
+            self.assertEqual(len(vers), 1, (product, vers))
+
+        newest_hrefs: list[str] = []
+        older_hrefs: list[str] = []
+        for repo in load_github_release_inventory():
+            pairs = _iter_inventory_releases(repo)
+            latest = latest_inventory_release(pairs)
+            if not latest:
+                continue
+            newest_tag, newest_assets = latest
+            newest_ver = newest_tag.lstrip("v")
+            product = str(repo.get("product") or repo.get("repo") or "").strip()
+            row_vers = {r["version"] for r in rows if r["product"] == product}
+            self.assertEqual(row_vers, {newest_ver}, product)
+            newest_hrefs.extend(
+                str(a["href"])
+                for a in newest_assets
+                if isinstance(a, dict) and a.get("href")
+            )
+            if len(pairs) > 1:
+                for tag, assets in pairs:
+                    if tag == newest_tag:
+                        continue
+                    older_hrefs.extend(
+                        str(a["href"])
+                        for a in assets
+                        if isinstance(a, dict) and a.get("href")
+                    )
+        self.assertTrue(newest_hrefs)
+        self.assertTrue(older_hrefs)
         page = render_downloads_map_page_html().decode("utf-8")
         self.assertIn("GNFP", page)
         self.assertIn("gnfp-wallet", page.lower())
-        hrefs = []
-        for repo in load_github_release_inventory():
-            for rel in repo.get("releases") or []:
-                for asset in rel.get("assets") or []:
-                    if asset.get("href"):
-                        hrefs.append(asset["href"])
-        self.assertTrue(hrefs)
         row_hrefs = {r["href"] for r in rows}
-        for href in hrefs:
+        for href in newest_hrefs:
             self.assertIn(href, row_hrefs)
             self.assertIn(href, page)
+        for href in older_hrefs:
+            self.assertNotIn(href, row_hrefs)
+            self.assertNotIn(href, page)
         scratch = Path(
             __import__("os").environ.get(
                 "GROK_GOAL_SCRATCH",
-                r"C:\Users\rgsne\AppData\Local\Temp\grok-goal-b3bb74235a15\implementer",
+                r"C:\Users\rgsne\AppData\Local\Temp\grok-goal-7ca2f8d2fe42\implementer",
             )
         )
         scratch.mkdir(parents=True, exist_ok=True)
-        lines = [
-            f"{r['product']}\t{r['version']}\t{r['href']}"
-            for r in rows
-        ]
+        lines = [f"{r['product']}\t{r['version']}\t{r['href']}" for r in rows]
         (scratch / "downloads-map-versions.txt").write_text(
             "\n".join(lines) + "\n", encoding="utf-8"
         )
