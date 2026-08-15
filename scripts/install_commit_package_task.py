@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Install a git pre-commit hook that assures current per-device packages.
+"""Install a git pre-commit hook for package currency + downloads-map refresh.
 
-Every local commit runs ``python scripts/assure_current_packages.py --check``
-so the catalog pin, client/VERSION, and five platform installer names stay
-aligned — buyers always pay for the **current** device package identity.
+Every local commit runs:
+
+1. ``python scripts/refresh_downloads_map_inventory.py --stage``
+   (shipped GitHub inventory updater — downloads-map cannot stay behind)
+2. ``python scripts/assure_current_packages.py --check``
+   (catalog pin / client VERSION / five platform installer names)
 
 Usage (from repo root)::
 
@@ -23,10 +26,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 HOOK_MARKER = "assure_current_packages.py"
+DOWNLOADS_MAP_HOOK_MARKER = "refresh_downloads_map_inventory.py"
 HOOK_BODY = """#!/bin/sh
-# restore-privacy: assure current per-device paid packages on every commit
+# restore-privacy: refresh downloads-map inventory + assure packages on every commit
 # Installed by: python scripts/install_commit_package_task.py
 # Marker: assure_current_packages.py
+# Marker: refresh_downloads_map_inventory.py
 set -e
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 if [ -z "$ROOT" ]; then
@@ -39,21 +44,21 @@ if command -v python3 >/dev/null 2>&1; then
 elif command -v python >/dev/null 2>&1; then
   PY=python
 else
-  echo "pre-commit: python not found; cannot assure current packages" >&2
+  echo "pre-commit: python not found; cannot refresh downloads-map / assure packages" >&2
   exit 1
 fi
+"$PY" scripts/refresh_downloads_map_inventory.py --stage
 exec "$PY" scripts/assure_current_packages.py --check
 """
 
 
 def hooks_dir(repo_root: Path | None = None) -> Path:
     root = repo_root or ROOT
-    # Honour core.hooksPath if set to a relative path inside the repo
     try:
         import subprocess
 
         r = subprocess.run(
-            ["git", "-C", str(root), "config", "--get", "core.hooksPath"],
+            ["git", "-C", str(root), "rev-parse", "--git-path", "hooks"],
             capture_output=True,
             text=True,
             timeout=15,
@@ -76,16 +81,13 @@ def install_pre_commit(
     """Write ``pre-commit`` hook that runs the package currency check. Returns path."""
     root = repo_root or ROOT
     hdir = hooks_dir(root)
-    if not hdir.parent.is_dir() and hdir.name == "hooks":
-        # .git missing (not a clone) — still allow writing for tests into a temp tree
-        hdir.mkdir(parents=True, exist_ok=True)
-    else:
-        hdir.mkdir(parents=True, exist_ok=True)
+    hdir.mkdir(parents=True, exist_ok=True)
     hook_path = hdir / "pre-commit"
     if hook_path.is_file() and not force:
         existing = hook_path.read_text(encoding="utf-8", errors="replace")
         if HOOK_MARKER in existing:
-            # already our hook
+            if DOWNLOADS_MAP_HOOK_MARKER not in existing:
+                hook_path.write_text(HOOK_BODY, encoding="utf-8", newline="\n")
             _chmod_exec(hook_path)
             return hook_path
         raise FileExistsError(
@@ -111,6 +113,13 @@ def hook_invokes_assure(hook_path: Path) -> bool:
         return False
     text = hook_path.read_text(encoding="utf-8", errors="replace")
     return HOOK_MARKER in text and "--check" in text
+
+
+def hook_invokes_downloads_map_refresh(hook_path: Path) -> bool:
+    if not hook_path.is_file():
+        return False
+    text = hook_path.read_text(encoding="utf-8", errors="replace")
+    return DOWNLOADS_MAP_HOOK_MARKER in text and "--stage" in text
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -139,9 +148,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
     print(f"installed {path}")
+    if hook_invokes_downloads_map_refresh(path):
+        print("hook invokes: python scripts/refresh_downloads_map_inventory.py --stage")
     if hook_invokes_assure(path):
         print("hook invokes: python scripts/assure_current_packages.py --check")
-    print("Every commit will fail if catalog / client VERSION / device packages drift.")
+    print("Every commit refreshes downloads-map inventory and fails if catalog packages drift.")
     return 0
 
 

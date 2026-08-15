@@ -123,9 +123,11 @@ class TestInstallCommitHook(unittest.TestCase):
             self.assertTrue(path.is_file())
             self.assertEqual(path.name, "pre-commit")
             self.assertTrue(mod.hook_invokes_assure(path))
+            self.assertTrue(mod.hook_invokes_downloads_map_refresh(path))
             text = path.read_text(encoding="utf-8")
             self.assertIn("assure_current_packages.py", text)
             self.assertIn("--check", text)
+            self.assertIn("refresh_downloads_map_inventory.py", text)
 
     def test_install_cli_on_repo(self):
         mod = _load(
@@ -135,9 +137,10 @@ class TestInstallCommitHook(unittest.TestCase):
         # Install into the real repo (force so re-runs are idempotent)
         code = mod.main(["--force"])
         self.assertEqual(code, 0)
-        hook = ROOT / ".git" / "hooks" / "pre-commit"
+        hook = mod.hooks_dir(ROOT) / "pre-commit"
         self.assertTrue(hook.is_file())
         self.assertTrue(mod.hook_invokes_assure(hook))
+        self.assertTrue(mod.hook_invokes_downloads_map_refresh(hook))
 
 
 if __name__ == "__main__":

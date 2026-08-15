@@ -2036,13 +2036,15 @@ def github_release_inventory_path() -> Path:
     return Path(__file__).resolve().with_name(GITHUB_RELEASE_INVENTORY_NAME)
 
 
-def load_github_release_inventory() -> list[dict[str, Any]]:
+def load_github_release_inventory(
+    path: Path | None = None,
+) -> list[dict[str, Any]]:
     """Published downloadable assets per public repo (no network).
 
     Each repo may carry a single ``tag`` + ``assets`` (legacy latest-only)
     or a ``releases`` list of ``{tag, assets}`` for every published version.
     """
-    path = github_release_inventory_path()
+    path = Path(path) if path is not None else github_release_inventory_path()
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
@@ -2078,10 +2080,12 @@ def _iter_inventory_releases(repo: dict[str, Any]) -> list[tuple[str, list[Any]]
     return []
 
 
-def list_github_release_map_rows() -> list[dict[str, str]]:
+def list_github_release_map_rows(
+    *, inventory_path: Path | None = None
+) -> list[dict[str, str]]:
     """Map rows for every published GitHub Release asset (not latest-only)."""
     rows: list[dict[str, str]] = []
-    for repo in load_github_release_inventory():
+    for repo in load_github_release_inventory(inventory_path):
         product = str(repo.get("product") or repo.get("repo") or "Other").strip()
         for tag, assets in _iter_inventory_releases(repo):
             for asset in assets:
@@ -2108,7 +2112,7 @@ def list_github_release_map_rows() -> list[dict[str, str]]:
 
 
 def list_downloads_map_rows(
-    *, version: str | None = None
+    *, version: str | None = None, inventory_path: Path | None = None
 ) -> list[dict[str, str]]:
     """Downloads Map: Suite free_direct clients, then every published GitHub asset.
 
@@ -2133,15 +2137,21 @@ def list_downloads_map_rows(
                 "label": f"{platform_face_title(plat)} - v{ver}",
             }
         )
-    rows.extend(list_github_release_map_rows())
+    rows.extend(list_github_release_map_rows(inventory_path=inventory_path))
     return rows
 
 
 def downloads_map_products(
     rows: list[dict[str, str]] | None = None,
+    *,
+    inventory_path: Path | None = None,
 ) -> list[tuple[str, list[dict[str, str]]]]:
     """Group map rows by product (stable order)."""
-    items = rows if rows is not None else list_downloads_map_rows()
+    items = (
+        rows
+        if rows is not None
+        else list_downloads_map_rows(inventory_path=inventory_path)
+    )
     order: list[str] = []
     groups: dict[str, list[dict[str, str]]] = {}
     for r in items:
@@ -2168,6 +2178,7 @@ def render_downloads_map_page_html(
     *,
     version: str = "",
     default_platform: str = "",
+    inventory_path: Path | None = None,
 ) -> bytes:
     """Downloads Map: every brand inventory installer, per platform.
 
@@ -2183,7 +2194,7 @@ def render_downloads_map_page_html(
     if def_plat and def_plat not in known:
         def_plat = ""
     sections_html: list[str] = []
-    for product, rows in downloads_map_products():
+    for product, rows in downloads_map_products(inventory_path=inventory_path):
         links: list[str] = []
         for r in rows:
             plat = str(r.get("platform") or "")

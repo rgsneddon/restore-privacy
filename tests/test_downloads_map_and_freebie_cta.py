@@ -95,7 +95,14 @@ class TestGithubReleaseInventory(unittest.TestCase):
         repos = load_github_release_inventory()
         self.assertTrue(repos)
         evolve = next(r for r in repos if r.get("repo") == "evolve")
-        names = {a["filename"] for a in evolve["assets"]}
+        from downloads import _iter_inventory_releases
+
+        names = {
+            a["filename"]
+            for _tag, assets in _iter_inventory_releases(evolve)
+            for a in assets
+            if isinstance(a, dict) and a.get("filename")
+        }
         self.assertIn("evolve-v4.1.12-windows-x64-setup.exe", names)
         rows = list_github_release_map_rows()
         hrefs = {r["href"] for r in rows}

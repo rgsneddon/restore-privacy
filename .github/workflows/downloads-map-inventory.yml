@@ -1,0 +1,49 @@
+name: downloads-map-inventory
+
+# Same entry as the pre-commit hook: scripts/refresh_downloads_map_inventory.py
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Refresh downloads-map inventory
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/refresh_downloads_map_inventory.py
+      - name: Commit inventory when it changed
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "raskul"
+          git config user.email "rus@restoreprivacy.online"
+          git add -- status_page/github_release_inventory.json
+          if git diff --cached --quiet; then
+            echo "inventory unchanged"
+          else
+            git commit -m "downloads-map: refresh GitHub release inventory"
+            git push
+          fi
+      - name: Require inventory current on pull requests
+        if: github.event_name == 'pull_request'
+        run: |
+          git add -- status_page/github_release_inventory.json
+          if git diff --cached --quiet; then
+            echo "inventory current"
+          else
+            echo "downloads-map inventory is stale; run python scripts/refresh_downloads_map_inventory.py"
+            git diff --cached --stat
+            exit 1
+          fi

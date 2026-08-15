@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Assure paid downloads use the **current** per-device package set.
 
-Run on every commit via the installed pre-commit hook (see
-``install_commit_package_task.py``), or manually::
+Run on every commit via the installed pre-commit hook (after
+``refresh_downloads_map_inventory.py``; see ``install_commit_package_task.py``),
+or manually::
 
   python scripts/assure_current_packages.py --list
   python scripts/assure_current_packages.py --check
