@@ -176,10 +176,18 @@ class TestDownloadsMapPage(unittest.TestCase):
         self.assertIn(f"Linux - v{map_platform_version('linux')}", page)
         self.assertEqual(map_platform_version("linux"), "1.2.7")
 
-    def test_map_lists_every_published_version_including_gnfp(self) -> None:
-        from downloads import list_downloads_map_rows, render_downloads_map_page_html
+    def test_map_lists_only_latest_version_per_product(self) -> None:
+        from downloads import (
+            _iter_inventory_releases,
+            latest_inventory_release,
+            list_downloads_map_rows,
+            load_github_release_inventory,
+            release_tag_sort_key,
+            render_downloads_map_page_html,
+        )
 
         rows = list_downloads_map_rows()
+        page = render_downloads_map_page_html().decode("utf-8")
         products = {r["product"] for r in rows}
         for name in (
             "Restore Privacy",
@@ -190,14 +198,30 @@ class TestDownloadsMapPage(unittest.TestCase):
             "GNFP wallet",
         ):
             self.assertIn(name, products)
-        gnfp = [r for r in rows if r["product"] == "GNFP wallet"]
-        gnfp_vers = {r["version"] for r in gnfp}
-        self.assertGreaterEqual(len(gnfp_vers), 2)
-        evolve_vers = {r["version"] for r in rows if r["product"] == "Evolve"}
-        self.assertGreaterEqual(len(evolve_vers), 2)
-        perc_vers = {r["version"] for r in rows if r["product"] == "perc-mine"}
-        self.assertGreaterEqual(len(perc_vers), 2)
-        page = render_downloads_map_page_html().decode("utf-8")
+        for repo in load_github_release_inventory():
+            pairs = _iter_inventory_releases(repo)
+            latest = latest_inventory_release(pairs)
+            if latest is None:
+                continue
+            tag, _assets = latest
+            product = str(repo.get("product") or repo.get("repo") or "")
+            mapped = [r for r in rows if r["product"] == product and r["kind"] == "github_release"]
+            versions = {r["version"] for r in mapped}
+            self.assertEqual(versions, {tag.lstrip("v")}, (product, versions, tag))
+            older = [
+                rel_tag
+                for rel_tag, _ in pairs
+                if release_tag_sort_key(rel_tag) < release_tag_sort_key(tag)
+            ]
+            for old in older:
+                for _otag, oassets in pairs:
+                    if _otag != old:
+                        continue
+                    for asset in oassets:
+                        href = str(asset.get("href") or "")
+                        if href:
+                            self.assertNotIn(href, page)
+        self.assertIn("data-downloads-map-page", page)
         self.assertIn("GNFP", page)
         self.assertIn("gnfp-wallet", page.lower())
         scratch = Path(

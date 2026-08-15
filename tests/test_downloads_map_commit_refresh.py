@@ -114,19 +114,40 @@ class TestCommitPathDownloadsMapRefresh(unittest.TestCase):
             self.assertTrue(multi, payload["repos"])
             repos = load_github_release_inventory(dest)
             self.assertEqual(len(repos), len(payload["repos"]))
-            hrefs = []
+            from downloads import (
+                _iter_inventory_releases,
+                latest_inventory_release,
+            )
+
+            latest_hrefs = []
+            older_hrefs = []
             for repo in repos:
-                for rel in repo.get("releases") or []:
-                    for asset in rel.get("assets") or []:
-                        hrefs.append(asset["href"])
-            self.assertTrue(hrefs)
+                pairs = _iter_inventory_releases(repo)
+                latest = latest_inventory_release(pairs)
+                self.assertIsNotNone(latest)
+                assert latest is not None
+                latest_tag, latest_assets = latest
+                for asset in latest_assets:
+                    if asset.get("href"):
+                        latest_hrefs.append(asset["href"])
+                for tag, assets in pairs:
+                    if tag == latest_tag:
+                        continue
+                    for asset in assets:
+                        if asset.get("href"):
+                            older_hrefs.append(asset["href"])
+            self.assertTrue(latest_hrefs)
+            self.assertTrue(older_hrefs)
             rows = list_downloads_map_rows(inventory_path=dest)
             row_hrefs = {r["href"] for r in rows}
             page = render_downloads_map_page_html(inventory_path=dest).decode("utf-8")
             self.assertIn("data-downloads-map-page", page)
-            for href in hrefs:
+            for href in latest_hrefs:
                 self.assertIn(href, row_hrefs)
                 self.assertIn(href, page)
+            for href in older_hrefs:
+                self.assertNotIn(href, row_hrefs)
+                self.assertNotIn(href, page)
 
     def test_offline_commit_path_keeps_existing_snapshot(self) -> None:
         refresh_mod = _load(
