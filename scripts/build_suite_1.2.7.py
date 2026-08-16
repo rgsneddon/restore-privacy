@@ -482,13 +482,19 @@ def package_ios_zip(runner: Path, dest: Path | None = None) -> Path:
         # Require host provision when present on disk (codesign path embedded it).
         require_prov = (runner / "embedded.mobileprovision").is_file()
         require_installable_ios_zip(dest, require_provision=require_prov)
+        from ios_sideload_package import write_ios_ipa_sibling  # type: ignore
+
+        ipa = write_ios_ipa_sibling(dest)
     except IosSideloadError as e:
         if dest.is_file():
             dest.unlink(missing_ok=True)
+        sib = dest.with_suffix(".ipa")
+        if sib.is_file() and sib != dest:
+            sib.unlink(missing_ok=True)
         raise RuntimeError(f"iOS catalog package refuse: {e}") from e
     print(
         f"staged {dest.name} IPA Payload zip sha256={sha256_file(dest)[:16]}… "
-        f"size={dest.stat().st_size}"
+        f"size={dest.stat().st_size} sibling={ipa.name}"
     )
     return dest
 

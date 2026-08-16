@@ -83,6 +83,44 @@ class IosSideloadPackageCurrent(unittest.TestCase):
                 names = zf.namelist()
             self.assertTrue(any(n.startswith("Payload/Runner.app/") for n in names))
             self.assertIn("Payload/Runner.app/embedded.mobileprovision", names)
+            ipa = self.pkg.ios_ipa_sibling_path(out)
+            self.assertTrue(ipa.is_file(), "catalog zip must emit sibling .ipa")
+            self.assertEqual(ipa.suffix, ".ipa")
+            self.assertEqual(ipa.read_bytes(), out.read_bytes())
+            self.pkg.require_installable_ios_zip(ipa, require_provision=True)
+
+    def test_ota_manifest_and_itms_services_href(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            dest = Path(td) / "manifest.plist"
+            ipa_url = "https://restoreprivacy.online/suite/ios.ipa"
+            out = self.pkg.write_ios_ota_manifest(
+                dest,
+                ipa_https_url=ipa_url,
+                bundle_version=PIN,
+            )
+            self.assertTrue(out.is_file())
+            import plistlib
+
+            pl = plistlib.loads(out.read_bytes())
+            item = pl["items"][0]
+            self.assertEqual(item["assets"][0]["kind"], "software-package")
+            self.assertEqual(item["assets"][0]["url"], ipa_url)
+            self.assertEqual(
+                item["metadata"]["bundle-identifier"],
+                self.pkg.HOST_BUNDLE_ID,
+            )
+            manifest_url = "https://restoreprivacy.online/suite/ios-manifest.plist"
+            href = self.pkg.ios_itms_services_href(manifest_url)
+            self.assertTrue(href.startswith("itms-services://?action=download-manifest&url="))
+            import urllib.parse
+
+            decoded = urllib.parse.unquote(href.split("url=", 1)[1])
+            self.assertEqual(decoded, manifest_url)
+            self.assertFalse(decoded.endswith(".zip"))
+            self.assertEqual(
+                self.pkg.ios_install_download_filename(f"restore-privacy-client-{PIN}-ios.zip"),
+                f"restore-privacy-client-{PIN}-ios.ipa",
+            )
 
     def test_require_installable_rejects_bare_runner_zip(self) -> None:
         with tempfile.TemporaryDirectory() as td:

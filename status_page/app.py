@@ -16,6 +16,7 @@ import mimetypes
 import os
 import shutil
 import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -1087,6 +1088,88 @@ class Handler(BaseHTTPRequestHandler):
                 render_downloads_map_page_html(default_platform=q_plat),
             )
             return
+        # iOS on-device installer (not a .zip attachment — Safari tap is inert).
+        if path in ("/suite/ios.ipa", "/suite/ios.ipa/"):
+            try:
+                from downloads import (
+                    catalog_filename_for,
+                    current_catalog_version,
+                    ios_catalog_ipa_filename,
+                )
+            except ImportError:  # pragma: no cover
+                from status_page.downloads import (  # type: ignore
+                    catalog_filename_for,
+                    current_catalog_version,
+                    ios_catalog_ipa_filename,
+                )
+            zip_name = catalog_filename_for("ios", current_catalog_version())
+            asset = open_release_asset(str(zip_name))
+            if asset is None:
+                self._send(
+                    502,
+                    "text/html; charset=utf-8",
+                    _html_page(
+                        "iOS IPA unavailable",
+                        "<p class=\"msg\">The iOS installer could not be fetched "
+                        "from the package store.</p>",
+                    ),
+                )
+                return
+            body_src = asset["body"]
+            ipa_name = ios_catalog_ipa_filename()
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header(
+                    "Content-Disposition", f'attachment; filename="{ipa_name}"'
+                )
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-RPT-Fulfilment", "suite-ios-ipa")
+                length = asset.get("content_length")
+                if length is not None:
+                    self.send_header("Content-Length", str(length))
+                self._security_headers()
+                self.end_headers()
+                if not self._is_head():
+                    if hasattr(body_src, "read"):
+                        shutil.copyfileobj(body_src, self.wfile)  # type: ignore[arg-type]
+                    else:
+                        self.wfile.write(body_src)  # type: ignore[arg-type]
+            finally:
+                try:
+                    if hasattr(body_src, "close"):
+                        body_src.close()
+                except Exception:  # noqa: BLE001
+                    pass
+            return
+        if path in ("/suite/ios-manifest.plist", "/suite/ios-manifest.plist/"):
+            try:
+                from downloads import current_catalog_version
+            except ImportError:  # pragma: no cover
+                from status_page.downloads import current_catalog_version  # type: ignore
+            host = (self.headers.get("Host") or "").strip() or "restoreprivacy.online"
+            proto = (self.headers.get("X-Forwarded-Proto") or "https").strip().lower()
+            if proto != "https":
+                proto = "https"
+            ipa_url = f"{proto}://{host}/suite/ios.ipa"
+            scripts = Path(__file__).resolve().parent.parent / "scripts"
+            sys.path.insert(0, str(scripts))
+            from ios_sideload_package import write_ios_ota_manifest  # type: ignore
+
+            td = tempfile.NamedTemporaryFile(prefix="ios-ota-", suffix=".plist", delete=False)
+            td.close()
+            dest = Path(td.name)
+            try:
+                write_ios_ota_manifest(
+                    dest,
+                    ipa_https_url=ipa_url,
+                    bundle_version=str(current_catalog_version()),
+                )
+                body = dest.read_bytes()
+            finally:
+                dest.unlink(missing_ok=True)
+            self._send(200, "text/xml; charset=utf-8", body)
+            return
         # Suite installer download — KEYGEN trial / active entitlement required,
         # except free_direct=1 (homepage FREE DOWNLOAD CTA only).
         if path in (SUITE_FREE_DOWNLOAD_PATH, f"{SUITE_FREE_DOWNLOAD_PATH}/"):
@@ -1135,6 +1218,40 @@ class Handler(BaseHTTPRequestHandler):
                     "reason": "free_direct_cta",
                     "http_status": 200,
                 }
+            # iPhone/iPad: do not attach a .zip (Safari/Files tap is inert).
+            if plat == "ios":
+                try:
+                    from downloads import (
+                        detect_platform_from_user_agent,
+                        render_ios_device_install_html,
+                    )
+                except ImportError:  # pragma: no cover
+                    from status_page.downloads import (  # type: ignore
+                        detect_platform_from_user_agent,
+                        render_ios_device_install_html,
+                    )
+                ua = (self.headers.get("User-Agent") or "").strip()
+                want_install_page = detect_platform_from_user_agent(ua) == "ios" or (
+                    (query.get("install") or "").strip().lower() in ("1", "true", "yes")
+                )
+                if want_install_page:
+                    host = (self.headers.get("Host") or "").strip() or "restoreprivacy.online"
+                    proto = (
+                        self.headers.get("X-Forwarded-Proto") or "https"
+                    ).strip().lower()
+                    if proto != "https":
+                        proto = "https"
+                    manifest = f"{proto}://{host}/suite/ios-manifest.plist"
+                    inner = render_ios_device_install_html(
+                        manifest_https_url=manifest,
+                        ipa_href="/suite/ios.ipa",
+                    )
+                    self._send(
+                        200,
+                        "text/html; charset=utf-8",
+                        _html_page("Install Restore Privacy", inner),
+                    )
+                    return
             # Prefer Helsinki host delivery (signed short-lived URL) after gate.
             # Soft-redirect: do not 502 when probe is flaky if a signed HTTPS URL
             # can still be minted (browser→Helsinki often works when Render→store probe fails).

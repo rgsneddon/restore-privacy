@@ -9,12 +9,15 @@ Buy Me a Coffee is tip/support only.
 
 Current catalog packages: Restore Privacy residual VPN **1.2.7**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
-iOS IPA-compatible Team-signed sideload zip — rename to ``.ipa``).
+iOS on-device installer: catalog ``*-ios.zip`` is IPA Payload bytes; the
+iPhone/iPad download surface serves ``itms-services`` + a sibling ``.ipa``,
+not a tap-on-zip attachment).
 """
 
 from __future__ import annotations
 
 import json
+import sys
 import urllib.parse
 from dataclasses import dataclass
 from datetime import date
@@ -487,7 +490,7 @@ RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     ),
     DownloadAsset(
         platform="ios",
-        label="iOS - IPA-compatible package (.zip → rename .ipa, Team-signed sideload)",
+        label="iOS - Install on iPhone/iPad (OTA) or download .ipa (Team-signed)",
         filename=IOS_ZIP_FILENAME,
     ),
     DownloadAsset(
@@ -1465,21 +1468,12 @@ try:
         COMMERCIAL_SUITE_PRODUCT_KEY as _COMMERCIAL_KEY,
         COMMERCIAL_SUITE_PRODUCT_LINE as _COMMERCIAL_LINE,
     )
-except ImportError:  # pragma: no cover
-    try:
-        from status_page.payments import (  # type: ignore
-            COMMERCIAL_SUITE_CHECKOUT_PATH as _COMMERCIAL_CHECKOUT,
-            COMMERCIAL_SUITE_NODE_PRICE_LABEL as _COMMERCIAL_PRICE,
-            COMMERCIAL_SUITE_NODE_PRICE_PENCE as _COMMERCIAL_PENCE,
-            COMMERCIAL_SUITE_PRODUCT_KEY as _COMMERCIAL_KEY,
-            COMMERCIAL_SUITE_PRODUCT_LINE as _COMMERCIAL_LINE,
-        )
-    except ImportError:  # pragma: no cover
-        _COMMERCIAL_CHECKOUT = "/pay/commercial-suite"
-        _COMMERCIAL_PRICE = "£3000"
-        _COMMERCIAL_PENCE = 300_000
-        _COMMERCIAL_KEY = "commercial_suite_node"
-        _COMMERCIAL_LINE = "commercial_suite"
+except ImportError:  # pragma: no cover — circular import while payments loads
+    _COMMERCIAL_CHECKOUT = "/pay/commercial-suite"
+    _COMMERCIAL_PRICE = "£3000"
+    _COMMERCIAL_PENCE = 300_000
+    _COMMERCIAL_KEY = "commercial_suite_node"
+    _COMMERCIAL_LINE = "commercial_suite"
 
 # Private retained Service page path - not advertised from public customer HTML.
 NODE_PREFERENCE_COMMERCIAL_HREF = "/service"
@@ -1540,6 +1534,63 @@ def suite_free_direct_download_href(platform: str) -> str:
     return (
         f"{SUITE_FREE_DOWNLOAD_PATH}?platform={plat}"
         f"&{SUITE_FREE_DIRECT_QUERY}=1"
+    )
+
+
+SUITE_IOS_IPA_PATH = "/suite/ios.ipa"
+SUITE_IOS_MANIFEST_PATH = "/suite/ios-manifest.plist"
+
+
+def ios_catalog_ipa_filename(version: str | None = None) -> str:
+    """Sibling installer name iPhone/iPad can treat as an IPA."""
+    ver = (version or current_catalog_version()).strip() or RELEASE_VERSION
+    zip_name = catalog_filename_for("ios", ver) or IOS_ZIP_FILENAME
+    if zip_name.lower().endswith(".zip"):
+        return zip_name[: -len(".zip")] + ".ipa"
+    return zip_name
+
+
+def ios_itms_services_install_href(manifest_https_url: str) -> str:
+    """Drive shipped ``ios_sideload_package.ios_itms_services_href``."""
+    scripts = Path(__file__).resolve().parents[1] / "scripts"
+    sideload = scripts / "ios_sideload_package.py"
+    if not sideload.is_file():
+        # Fallback only when scripts tree is absent (status-only deploy).
+        return "itms-services://?action=download-manifest&url=" + urllib.parse.quote(
+            (manifest_https_url or "").strip(), safe=""
+        )
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("ios_sideload_package", sideload)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return str(mod.ios_itms_services_href(manifest_https_url))
+
+
+def render_ios_device_install_html(
+    *,
+    manifest_https_url: str,
+    ipa_href: str = SUITE_IOS_IPA_PATH,
+    version: str | None = None,
+) -> str:
+    """On-device install page. A tap here opens itms-services, not a .zip."""
+    ver = (version or current_catalog_version()).strip() or RELEASE_VERSION
+    install = ios_itms_services_install_href(manifest_https_url)
+    ipa_name = ios_catalog_ipa_filename(ver)
+    return (
+        "<h1>Install Restore Privacy on this iPhone or iPad</h1>"
+        "<p class=\"msg\">Safari cannot install a <code>.zip</code>. "
+        "Tap <strong>Install</strong> to open the iOS installer "
+        "(itms-services). After install, trust the developer in "
+        "Settings → General → VPN &amp; Device Management.</p>"
+        f'<p><a class="dl" href="{install}">Install Restore Privacy {ver}</a></p>'
+        f'<p class="msg">Computer sideload (Finder / Apple Configurator): '
+        f'<a href="{ipa_href}">{ipa_name}</a></p>'
+        "<p class=\"msg\">This package is Team-signed Apple Development. "
+        "It installs only on devices listed in the embedded provisioning "
+        "profile. An unregistered iPhone or iPad will refuse the install.</p>"
     )
 
 

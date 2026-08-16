@@ -24,7 +24,7 @@ from calendar import monthrange
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Dict, Tuple
 
 from downloads import RELEASE_ASSETS, available_downloads
 
@@ -7064,7 +7064,7 @@ def wait_for_grant_by_session(
         sleeper(interval_sec)
 
 
-HttpGetFn = Callable[[str, dict[str, str]], tuple[int, bytes]]
+HttpGetFn = Callable[[str, Dict[str, str]], Tuple[int, bytes]]
 
 
 def _default_http_get(url: str, headers: dict[str, str]) -> tuple[int, bytes]:
@@ -7176,7 +7176,7 @@ def paid_session_needs_platform_picker(
 # --- Stripe Checkout (stdlib HTTP) -----------------------------------------------
 
 
-HttpPostFn = Callable[[str, dict[str, str], bytes], tuple[int, bytes]]
+HttpPostFn = Callable[[str, Dict[str, str], bytes], Tuple[int, bytes]]
 
 
 def _default_http_post(

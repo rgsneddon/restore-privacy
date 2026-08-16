@@ -22,6 +22,7 @@ import plistlib
 import shutil
 import subprocess
 import tempfile
+import urllib.parse
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -281,6 +282,90 @@ def package_ios_ipa_zip(runner: Path, dest: Path, *, app_name: str = "Runner.app
     ):
         # Tiny fixture zips OK in tests; real Flutter apps exceed 1MB
         pass
+    write_ios_ipa_sibling(dest)
+    return dest
+
+
+def ios_ipa_sibling_path(zip_path: Path) -> Path:
+    """Catalog ``*-ios.zip`` → sibling ``*-ios.ipa`` (same IPA bytes)."""
+    p = Path(zip_path)
+    if p.suffix.lower() == ".ipa":
+        return p
+    return p.with_suffix(".ipa")
+
+
+def write_ios_ipa_sibling(zip_path: Path) -> Path:
+    """Copy catalog zip bytes to a ``.ipa`` sibling so iOS/sideload UTIs match.
+
+    The zip is already IPA ``Payload/`` layout; iPhone/iPad will not treat
+    ``.zip`` as an installer. Fail closed if the zip is missing.
+    """
+    src = Path(zip_path)
+    if not src.is_file():
+        raise IosSideloadError(f"iOS zip missing for IPA sibling: {src}")
+    dest = ios_ipa_sibling_path(src)
+    if dest.resolve() != src.resolve():
+        shutil.copy2(src, dest)
+    return dest
+
+
+def ios_install_download_filename(catalog_name: str) -> str:
+    """On-device download name: ``…-ios.zip`` → ``…-ios.ipa``."""
+    name = (catalog_name or "").strip()
+    if name.lower().endswith(".zip"):
+        return name[: -len(".zip")] + ".ipa"
+    if name.lower().endswith(".ipa"):
+        return name
+    return name + ".ipa" if name else "restore-privacy-client.ipa"
+
+
+def ios_itms_services_href(manifest_https_url: str) -> str:
+    """OTA install URL. Safari on iPhone/iPad opens this; a raw .zip tap does not."""
+    url = (manifest_https_url or "").strip()
+    if not url:
+        raise IosSideloadError("itms-services manifest URL is empty")
+    return "itms-services://?action=download-manifest&url=" + urllib.parse.quote(
+        url, safe=""
+    )
+
+
+def write_ios_ota_manifest(
+    dest: Path,
+    *,
+    ipa_https_url: str,
+    bundle_id: str = HOST_BUNDLE_ID,
+    bundle_version: str = "",
+    title: str = "Restore Privacy",
+) -> Path:
+    """Write Apple OTA ``manifest.plist`` for *ipa_https_url* (itms-services)."""
+    ipa_url = (ipa_https_url or "").strip()
+    if not ipa_url:
+        raise IosSideloadError("OTA manifest missing IPA HTTPS URL")
+    bid = (bundle_id or HOST_BUNDLE_ID).strip() or HOST_BUNDLE_ID
+    ver = (bundle_version or "").strip() or "1.0"
+    title_s = (title or "Restore Privacy").strip() or "Restore Privacy"
+    plist = {
+        "items": [
+            {
+                "assets": [
+                    {
+                        "kind": "software-package",
+                        "url": ipa_url,
+                    }
+                ],
+                "metadata": {
+                    "bundle-identifier": bid,
+                    "bundle-version": ver,
+                    "kind": "software",
+                    "title": title_s,
+                },
+            }
+        ]
+    }
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with dest.open("wb") as f:
+        plistlib.dump(plist, f)
     return dest
 
 
