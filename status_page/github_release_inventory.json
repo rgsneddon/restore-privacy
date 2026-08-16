@@ -7,6 +7,81 @@
       "repo": "gnfp",
       "releases": [
         {
+          "tag": "v1.1.13",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-1.1.13-android.zip",
+              "href": "https://github.com/rgsneddon/gnfp/releases/download/v1.1.13/gnfp-wallet-1.1.13-android.zip"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-1.1.13-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp/releases/download/v1.1.13/gnfp-wallet-1.1.13-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-1.1.13-ios.zip",
+              "href": "https://github.com/rgsneddon/gnfp/releases/download/v1.1.13/gnfp-wallet-1.1.13-ios.zip"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-1.1.13-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp/releases/download/v1.1.13/gnfp-wallet-1.1.13-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-1.1.13-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp/releases/download/v1.1.13/gnfp-wallet-1.1.13-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-1.1.13-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp/releases/download/v1.1.13/gnfp-wallet-1.1.13-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.1.14",
+          "assets": [
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.1.14-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp/releases/download/v0.1.14/gnfp-wallet-0.1.14-macos.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.1.13",
+          "assets": [
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.1.13-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp/releases/download/v0.1.13/gnfp-wallet-0.1.13-macos.zip"
+            }
+          ]
+        },
+        {
+          "tag": "gnfp-mine-v1.0.0",
+          "assets": [
+            {
+              "platform": "linux",
+              "filename": "gnfp-mine-1.0.0-linux.tar.gz",
+              "href": "https://github.com/rgsneddon/gnfp/releases/download/gnfp-mine-v1.0.0/gnfp-mine-1.0.0-linux.tar.gz"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-mine-1.0.0-macos.tar.gz",
+              "href": "https://github.com/rgsneddon/gnfp/releases/download/gnfp-mine-v1.0.0/gnfp-mine-1.0.0-macos.tar.gz"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-mine-1.0.0-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp/releases/download/gnfp-mine-v1.0.0/gnfp-mine-1.0.0-windows.zip"
+            }
+          ]
+        },
+        {
           "tag": "v0.1.10",
           "assets": [
             {
