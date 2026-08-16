@@ -58,6 +58,7 @@ class TestIosOnDeviceInstallSurface(unittest.TestCase):
             version="1.2.7",
         )
         self.assertIn("itms-services://", html)
+        self.assertIn("testflight.apple.com/join/", html)
         self.assertIn("Install Restore Privacy", html)
         self.assertIn("/suite/ios.ipa", html)
         self.assertNotIn("rename", html.lower())
@@ -87,6 +88,7 @@ class TestIosOnDeviceInstallSurface(unittest.TestCase):
             self.assertNotIn(".zip", disp)
             body = h.wfile.getvalue().decode("utf-8", "replace")
             self.assertIn("itms-services://", body, msg=ua)
+            self.assertIn("testflight.apple.com/join/", body, msg=ua)
             self.assertIn("ios-manifest.plist", body, msg=ua)
 
     def test_desktop_ua_still_302s_catalog_zip_name(self) -> None:

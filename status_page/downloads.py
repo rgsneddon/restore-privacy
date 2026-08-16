@@ -1539,6 +1539,8 @@ def suite_free_direct_download_href(platform: str) -> str:
 
 SUITE_IOS_IPA_PATH = "/suite/ios.ipa"
 SUITE_IOS_MANIFEST_PATH = "/suite/ios-manifest.plist"
+# Public TestFlight (any iPhone/iPad after Apple beta review).
+SUITE_IOS_TESTFLIGHT_HREF = "https://testflight.apple.com/join/tT2C8UFe"
 
 
 def ios_catalog_ipa_filename(version: str | None = None) -> str:
@@ -1579,18 +1581,16 @@ def render_ios_device_install_html(
     ver = (version or current_catalog_version()).strip() or RELEASE_VERSION
     install = ios_itms_services_install_href(manifest_https_url)
     ipa_name = ios_catalog_ipa_filename(ver)
+    tf = SUITE_IOS_TESTFLIGHT_HREF
     return (
         "<h1>Install Restore Privacy on this iPhone or iPad</h1>"
-        "<p class=\"msg\">Safari cannot install a <code>.zip</code>. "
-        "Tap <strong>Install</strong> to open the iOS installer "
-        "(itms-services). After install, trust the developer in "
-        "Settings → General → VPN &amp; Device Management.</p>"
-        f'<p><a class="dl" href="{install}">Install Restore Privacy {ver}</a></p>'
-        f'<p class="msg">Computer sideload (Finder / Apple Configurator): '
-        f'<a href="{ipa_href}">{ipa_name}</a></p>'
-        "<p class=\"msg\">This package is Team-signed Apple Development. "
-        "It installs only on devices listed in the embedded provisioning "
-        "profile. An unregistered iPhone or iPad will refuse the install.</p>"
+        "<p class=\"msg\">Any iPhone or iPad can install via TestFlight "
+        "(Apple reviews the first join). Tap <strong>Install with TestFlight</strong>, "
+        "then allow Packet Tunnel when iOS asks and tap Connect.</p>"
+        f'<p><a class="dl" href="{tf}">Install with TestFlight</a></p>'
+        "<p class=\"msg\">Direct installer (Safari cannot open a <code>.zip</code>): "
+        f'<a href="{install}">itms-services install</a> · '
+        f'<a href="{ipa_href}">{ipa_name}</a> for Finder / Apple Configurator.</p>'
     )
 
 
