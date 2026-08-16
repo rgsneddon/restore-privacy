@@ -141,7 +141,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _processUsageText = formatSuiteProcessPercent(seed.processPercent);
     }
     RptConfig.setRuntimeMultiHop(_settings.privacyMultihop);
-    startEasterEggServer();
+    // Do not bind the loft HTTP server here. HttpServer.bind on macOS can
+    // stall behind the Application Firewall sheet or leave isolate timers;
+    // Settings must paint first. The loft tile starts the listener on tap.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _ensureLog();
       await _refreshLicenceAndPayment();

@@ -47,7 +47,7 @@ void main() {
   // Startup identity for operators / logs.
   // ignore: avoid_print
   print(kSuiteDisplayVersion);
-  // Loft binds on first Settings open — not at launch (idle CPU).
+  // Loft HTTP listener starts from the Settings loft tile, not at launch.
   runApp(const RestorePrivacyApp());
 }
 
@@ -276,6 +276,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         // Native already deminiaturizes/orders the window front (RptTrayController).
         // Rehydrate connection UI only — never disconnect on show-from-tray.
         _rehydrateSession(from: 'tray_show');
+      },
+      onOpenProductSettings: () {
+        unawaited(_openSettings());
       },
     );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -1245,8 +1248,14 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         }
       }
       if (!mounted) return;
-      final updated = await Navigator.of(context, rootNavigator: true)
-          .push<ProductSettings>(
+      final nav = Navigator.of(context, rootNavigator: true);
+      String? topName;
+      nav.popUntil((route) {
+        topName = route.settings.name;
+        return true;
+      });
+      if (topName == 'product_settings') return;
+      final updated = await nav.push<ProductSettings>(
         MaterialPageRoute(
           settings: const RouteSettings(name: 'product_settings'),
           builder: (_) => SettingsScreen(

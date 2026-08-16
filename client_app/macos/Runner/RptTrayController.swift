@@ -165,6 +165,13 @@ enum RptTrayController {
     channel.invokeMethod("trayShow", arguments: nil)
   }
 
+  /// App menu Settings… / Cmd+, — Flutter TunnelHome opens product Settings.
+  static func requestOpenProductSettings() {
+    guard let messenger else { return }
+    let channel = FlutterMethodChannel(name: channelName, binaryMessenger: messenger)
+    channel.invokeMethod("openProductSettings", arguments: nil)
+  }
+
   /// Menu / status-item target for NSStatusItem actions.
   final class StatusMenuTarget: NSObject {
     static let shared = StatusMenuTarget()

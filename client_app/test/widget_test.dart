@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:restore_privacy_client/easter_egg_server.dart';
 import 'package:restore_privacy_client/main.dart';
 import 'package:restore_privacy_client/rpt_config.dart';
 import 'package:restore_privacy_client/theme.dart';
@@ -149,6 +150,113 @@ void main() {
       isTrue,
       reason: 'Connect must enter busy or connected state',
     );
+  });
+
+  testWidgets('home Settings cog opens product Settings page', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const MaterialApp(home: TunnelHome()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(seconds: 1));
+
+    final acceptBtn = find.text('Accept licence');
+    if (acceptBtn.evaluate().isNotEmpty) {
+      await tester.tap(acceptBtn);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    final cog = find.byKey(const Key('main_settings_button'));
+    expect(cog, findsOneWidget);
+    await tester.ensureVisible(cog);
+    await tester.tap(cog);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+      find.byKey(const Key('product_settings_screen')),
+      findsOneWidget,
+      reason: 'tapping main_settings_button must push SettingsScreen',
+    );
+    expect(find.text('Settings'), findsWidgets);
+    expect(find.byType(TunnelHome), findsOneWidget);
+    expect(
+      easterEggServer.isRunning,
+      isFalse,
+      reason: 'Settings open must not bind loft HTTP',
+    );
+  });
+
+  testWidgets('Settings cog stays tappable while Connect is busy', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const MaterialApp(home: TunnelHome()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(seconds: 1));
+
+    final acceptBtn = find.text('Accept licence');
+    if (acceptBtn.evaluate().isNotEmpty) {
+      await tester.tap(acceptBtn);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    final connectFinder = find.text(connectButtonLabel(false));
+    expect(connectFinder, findsOneWidget);
+    await tester.ensureVisible(connectFinder);
+    await tester.tap(connectFinder);
+    await tester.pump();
+
+    final cog = find.byKey(const Key('main_settings_button'));
+    expect(cog, findsOneWidget);
+    final btn = tester.widget<IconButton>(cog);
+    expect(btn.onPressed, isNotNull, reason: 'Settings must stay enabled during _busy');
+    await tester.ensureVisible(cog);
+    await tester.tap(cog);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+      find.byKey(const Key('product_settings_screen')),
+      findsOneWidget,
+      reason: 'Settings must open while Connect is busy',
+    );
+    expect(find.text('Settings'), findsWidgets);
+  });
+
+  testWidgets('RestorePrivacyApp Settings cog opens Settings through SuiteShell',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const RestorePrivacyApp(entryInitiallyUnlocked: true),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(seconds: 1));
+
+    final acceptBtn = find.text('Accept licence');
+    if (acceptBtn.evaluate().isNotEmpty) {
+      await tester.tap(acceptBtn);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    final cog = find.byKey(const Key('main_settings_button'));
+    expect(cog, findsOneWidget);
+    await tester.ensureVisible(cog);
+    await tester.tap(cog);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+      find.byKey(const Key('product_settings_screen')),
+      findsOneWidget,
+      reason: 'SuiteShell must not swallow the Settings route',
+    );
+    expect(find.text('Settings'), findsWidgets);
   });
 
   test('connectButtonLabel toggles', () {

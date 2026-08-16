@@ -61,6 +61,39 @@ void main() {
       isFalse,
       reason: '_openSettings must not silent-return on null store',
     );
+    expect(
+      src.contains('onOpenProductSettings'),
+      isTrue,
+      reason: 'macOS App menu Settings must invoke _openSettings',
+    );
+  });
+
+  test('SettingsScreen init does not bind loft HTTP on open', () {
+    final src = File('lib/settings_screen.dart').readAsStringSync();
+    final start = src.indexOf('void initState()');
+    expect(start, greaterThanOrEqualTo(0));
+    final end = src.indexOf('Future<void> _loadParts', start);
+    final body = src.substring(start, end > start ? end : src.length);
+    expect(
+      body.contains('startEasterEggServer'),
+      isFalse,
+      reason: 'loft bind must not run in SettingsScreen.initState',
+    );
+    expect(src.contains('_openEasterEggLoft'), isTrue);
+    expect(src.contains('easterEggServer.start()'), isTrue);
+  });
+
+  test('macOS App menu Preferences is wired to showPreferences', () {
+    final xib = File('macos/Runner/Base.lproj/MainMenu.xib').readAsStringSync();
+    expect(xib, contains('title="Preferences'));
+    expect(xib, contains('keyEquivalent=","'));
+    expect(xib, contains('selector="showPreferences:"'));
+    final app = File('macos/Runner/AppDelegate.swift').readAsStringSync();
+    expect(app, contains('func showPreferences'));
+    expect(app, contains('requestOpenProductSettings'));
+    final tray = File('macos/Runner/RptTrayController.swift').readAsStringSync();
+    expect(tray, contains('static func requestOpenProductSettings'));
+    expect(tray, contains('openProductSettings'));
   });
 
   test('RptVpnChannel prepare always attempts loadOrCreateManager', () {

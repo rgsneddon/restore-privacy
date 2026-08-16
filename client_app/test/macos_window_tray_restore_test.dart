@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/macos_window.dart';
 
@@ -25,6 +26,35 @@ void main() {
       expect(plan.deminiaturize, isFalse);
       expect(plan.orderFront, isTrue);
       expect(plan.disconnectTunnel, isFalse);
+    });
+
+    test('openProductSettings dispatches to product Settings handler', () {
+      var opened = 0;
+      var shown = 0;
+      var disconnected = 0;
+      dispatchMacWindowCall(
+        const MethodCall(kMacWindowOpenProductSettings),
+        onOpenProductSettings: () => opened++,
+        onTrayShow: () => shown++,
+        onTrayDisconnect: () => disconnected++,
+      );
+      expect(opened, 1);
+      expect(shown, 0);
+      expect(disconnected, 0);
+
+      dispatchMacWindowCall(
+        const MethodCall(kMacWindowTrayShow),
+        onOpenProductSettings: () => opened++,
+        onTrayShow: () => shown++,
+      );
+      expect(opened, 1);
+      expect(shown, 1);
+
+      dispatchMacWindowCall(
+        const MethodCall('unknownNativeMethod'),
+        onOpenProductSettings: () => opened++,
+      );
+      expect(opened, 1);
     });
 
     test('dock reopen when tray mode or no visible windows', () {

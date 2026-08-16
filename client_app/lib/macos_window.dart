@@ -60,6 +60,34 @@ bool shouldHandleDockReopenToShowWindow({
   return trayMode || !hasVisibleWindows;
 }
 
+/// Native → Flutter window-channel methods the Mac menu / tray may invoke.
+const String kMacWindowOpenProductSettings = 'openProductSettings';
+const String kMacWindowTrayDisconnect = 'trayDisconnect';
+const String kMacWindowTrayShow = 'trayShow';
+
+/// Dispatch a native window-channel call. Pure (no I/O) so tests drive the
+/// shipped handler: App menu Settings / Cmd+, must open product Settings.
+void dispatchMacWindowCall(
+  MethodCall call, {
+  void Function()? onTrayDisconnect,
+  void Function()? onTrayShow,
+  void Function()? onOpenProductSettings,
+}) {
+  switch (call.method) {
+    case kMacWindowTrayDisconnect:
+      onTrayDisconnect?.call();
+      return;
+    case kMacWindowTrayShow:
+      onTrayShow?.call();
+      return;
+    case kMacWindowOpenProductSettings:
+      onOpenProductSettings?.call();
+      return;
+    default:
+      return;
+  }
+}
+
 class MacWindowController {
   MacWindowController({MethodChannel? channel})
       : _channel = channel ?? const MethodChannel(kMacWindowChannelName);
@@ -69,23 +97,21 @@ class MacWindowController {
   /// Whether this process can use the macOS tray/window channel.
   static bool get isSupported => !kIsWeb && Platform.isMacOS;
 
-  /// Register native → Flutter callbacks (tray menu Disconnect / Show).
+  /// Register native → Flutter callbacks (tray menu Disconnect / Show / Settings).
   void setHandlers({
     void Function()? onTrayDisconnect,
     void Function()? onTrayShow,
+    void Function()? onOpenProductSettings,
   }) {
     if (!isSupported) return;
     _channel.setMethodCallHandler((call) async {
-      switch (call.method) {
-        case 'trayDisconnect':
-          onTrayDisconnect?.call();
-          return null;
-        case 'trayShow':
-          onTrayShow?.call();
-          return null;
-        default:
-          return null;
-      }
+      dispatchMacWindowCall(
+        call,
+        onTrayDisconnect: onTrayDisconnect,
+        onTrayShow: onTrayShow,
+        onOpenProductSettings: onOpenProductSettings,
+      );
+      return null;
     });
   }
 

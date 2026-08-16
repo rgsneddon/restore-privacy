@@ -12,6 +12,13 @@ class AppDelegate: FlutterAppDelegate {
     return true
   }
 
+  /// App menu Settings… / Preferences… / Cmd+, — open the in-app Settings page.
+  /// Ventura+ relabels the XIB “Preferences…” item to “Settings…”.
+  @IBAction func showPreferences(_ sender: Any?) {
+    RptTrayController.showMainWindow()
+    RptTrayController.requestOpenProductSettings()
+  }
+
   /// Dock icon click / Cmd-Tab reopen while windows are hidden, ordered-out, or miniaturized.
   /// Restores the main Flutter window without disconnecting Packet Tunnel.
   override func applicationShouldHandleReopen(
