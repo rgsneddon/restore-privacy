@@ -51,16 +51,17 @@ class TestIosOnDeviceInstallSurface(unittest.TestCase):
         self.assertFalse(name.endswith(".zip"))
         self.assertIn("1.2.7", name)
 
-    def test_install_html_uses_itms_services_not_zip_attachment(self) -> None:
+    def test_install_html_uses_testflight_not_sideload(self) -> None:
         html = render_ios_device_install_html(
             manifest_https_url="https://restoreprivacy.online/suite/ios-manifest.plist",
             ipa_href="/suite/ios.ipa",
             version="1.2.7",
         )
-        self.assertIn("itms-services://", html)
+        self.assertNotIn("itms-services://", html)
         self.assertIn("testflight.apple.com/join/", html)
         self.assertIn("Install Restore Privacy", html)
-        self.assertIn("/suite/ios.ipa", html)
+        self.assertNotIn("/suite/ios.ipa", html)
+        self.assertIn("cannot be installed", html)
         self.assertNotIn("rename", html.lower())
         self.assertNotIn(".zip →", html)
 
@@ -87,9 +88,9 @@ class TestIosOnDeviceInstallSurface(unittest.TestCase):
             disp = h.sent_headers.get("Content-Disposition") or ""
             self.assertNotIn(".zip", disp)
             body = h.wfile.getvalue().decode("utf-8", "replace")
-            self.assertIn("itms-services://", body, msg=ua)
+            self.assertNotIn("itms-services://", body, msg=ua)
             self.assertIn("testflight.apple.com/join/", body, msg=ua)
-            self.assertIn("ios-manifest.plist", body, msg=ua)
+            self.assertNotIn("ios-manifest.plist", body, msg=ua)
 
     def test_desktop_ua_still_302s_catalog_zip_name(self) -> None:
         def fake_plan(filename: str, **_kwargs):

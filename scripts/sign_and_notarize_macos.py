@@ -554,21 +554,13 @@ def launch_probe_alive(app: Path, *, settle_s: float = 2.5) -> dict:
 
 
 def package_zip(app: Path, dest: Path) -> Path:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists():
-        dest.unlink()
-    run(
-        [
-            "ditto",
-            "-c",
-            "-k",
-            "--sequesterRsrc",
-            "--keepParent",
-            str(app),
-            str(dest),
-        ]
-    )
-    return dest
+    """Catalog zip with install-to-Applications wrapper (app seal unchanged)."""
+    scripts = ROOT / "scripts"
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    from macos_catalog_zip import package_macos_catalog_zip  # noqa: WPS433
+
+    return package_macos_catalog_zip(app, dest)
 
 
 def main(argv: list[str] | None = None) -> int:

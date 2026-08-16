@@ -174,30 +174,12 @@ def build_android() -> Path | None:
 
 
 def _package_app_ditto_zip(app: Path, dest: Path) -> None:
-    """ditto-zip *app* as ``restore_privacy_client.app`` under *dest* (preserves seal)."""
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists():
-        dest.unlink()
-    # Stage under canonical catalog app name so extract UX is consistent
-    # even when source is restore_privacy_client.residual-team.app.
-    import tempfile
+    """Catalog zip: sealed app + install-to-Applications wrapper (preserves seal)."""
+    if str(ROOT / "scripts") not in sys.path:
+        sys.path.insert(0, str(ROOT / "scripts"))
+    from macos_catalog_zip import package_macos_catalog_zip  # noqa: WPS433
 
-    with tempfile.TemporaryDirectory(prefix="rpt_macos_zip_") as td:
-        staged = Path(td) / "restore_privacy_client.app"
-        if staged.exists():
-            shutil.rmtree(staged)
-        shutil.copytree(app, staged, symlinks=True)
-        _run(
-            [
-                "ditto",
-                "-c",
-                "-k",
-                "--sequesterRsrc",
-                "--keepParent",
-                str(staged),
-                str(dest),
-            ]
-        )
+    package_macos_catalog_zip(app, dest)
 
 
 def build_macos() -> Path | None:

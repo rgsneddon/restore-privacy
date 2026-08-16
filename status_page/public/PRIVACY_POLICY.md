@@ -2,7 +2,7 @@
 
 **Last updated:** 14 August 2026  
 **Product:** Restore Privacy — a dedicated residual virtual private network and the public shop  
-**Current packages (catalog v1.2.7):** free installers on [restoreprivacy.online](https://restoreprivacy.online/). The public **Downloads Map** (`/downloads-map` and `/downloads-map.json`) is the source of truth for which installer version each platform gets. Residual Connect needs a free device trial or a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **macOS** is **Developer ID** + notarized when sealed (Team **SFCBP95595**). **iOS** ships as an IPA-compatible Team-signed zip (`Payload/Runner.app` + embedded provisions; rename to `.ipa` for sideload; same Team **SFCBP95595**). Public GitHub Pages ship docs only — not operator admin.
+**Current packages (catalog v1.2.7):** free installers on [restoreprivacy.online](https://restoreprivacy.online/). The public **Downloads Map** (`/downloads-map` and `/downloads-map.json`) is the source of truth for which installer version each platform gets. Residual Connect needs a free device trial or a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **macOS** is **Developer ID** + notarized when sealed (Team **SFCBP95595**); unzip and install to Applications before opening. **iOS** any-user install is TestFlight / App Store (Team **SFCBP95595**). The catalog zip remains an IPA-compatible Team-signed archive (`Payload/Runner.app`); it is not an itms-services sideload. Public GitHub Pages ship docs only — not operator admin.
 
 ---
 
@@ -37,7 +37,7 @@ Before residual Connect, you **accept the end-user licence** on this device (loc
 
 - The homepage **FREE DOWNLOAD** button and `/downloads-map` read your browser **User-Agent** only to guess OS (Windows, macOS, iOS, Android, Linux). That string is used for the current request so we can highlight and start the matching installer. We do not store User-Agent as an account profile.
 - You get the **latest installer for that OS that is listed on the Downloads Map** (fulfilled from the Helsinki package store). The current map lists Windows, Android, macOS, iOS, and Linux on **1.2.7**. Platforms can sit on different versions until that platform is rebuilt and the map is updated.
-- **Platform requirements we check against:** Windows 10 or later, 64-bit (x64) for the `.exe` installer; Android 8+ for the APK; macOS 12+ x86_64/arm64 for the notarized zip; iOS 15+ for the Team-signed sideload zip (rename to `.ipa`); Linux x86_64 for the `.tar.gz`. We do not collect hardware inventories. If your device does not match, the installer may refuse to run — we do not silently give you another OS package.
+- **Platform requirements we check against:** Windows 10 or later, 64-bit (x64) for the `.exe` installer; Android 8+ for the APK; macOS 12+ x86_64/arm64 for the notarized zip (unzip, then Install Restore Privacy / drag to Applications — do not open the app from the zip); iOS 15+ via TestFlight / App Store; Linux x86_64 for the `.tar.gz`. We do not collect hardware inventories. If your device does not match, the installer may refuse to run — we do not silently give you another OS package.
 - The same map is published at `/downloads-map.json` (version + filename per platform, no personal data).
 
 ### Payment / shop host

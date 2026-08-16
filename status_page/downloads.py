@@ -8,10 +8,9 @@ assets) so fulfilment works when the restore-privacy repo is **private**.
 Buy Me a Coffee is tip/support only.
 
 Current catalog packages: Restore Privacy residual VPN **1.2.7**
-(Windows setup needs no separate Python install; macOS Developer ID notarized;
-iOS on-device installer: catalog ``*-ios.zip`` is IPA Payload bytes; the
-iPhone/iPad download surface serves ``itms-services`` + a sibling ``.ipa``,
-not a tap-on-zip attachment).
+(Windows setup needs no separate Python install; macOS Developer ID notarized
+zip installs to Applications; iOS any-user install is TestFlight / App Store —
+an App Store IPA cannot be sideloaded via itms-services).
 """
 
 from __future__ import annotations
@@ -485,12 +484,12 @@ RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     ),
     DownloadAsset(
         platform="macos",
-        label="macOS - App package (.zip, Developer ID + notarized)",
+        label="macOS - App package (.zip, drag to Applications, Developer ID + notarized)",
         filename=MACOS_ZIP_FILENAME,
     ),
     DownloadAsset(
         platform="ios",
-        label="iOS - Install on iPhone/iPad (OTA) or download .ipa (Team-signed)",
+        label="iOS - Install on iPhone/iPad via TestFlight",
         filename=IOS_ZIP_FILENAME,
     ),
     DownloadAsset(
@@ -1577,10 +1576,8 @@ def render_ios_device_install_html(
     ipa_href: str = SUITE_IOS_IPA_PATH,
     version: str | None = None,
 ) -> str:
-    """On-device install page. A tap here opens itms-services, not a .zip."""
-    ver = (version or current_catalog_version()).strip() or RELEASE_VERSION
-    install = ios_itms_services_install_href(manifest_https_url)
-    ipa_name = ios_catalog_ipa_filename(ver)
+    """On-device install page. TestFlight only — App Store IPAs cannot sideload."""
+    del manifest_https_url, ipa_href, version
     tf = SUITE_IOS_TESTFLIGHT_HREF
     return (
         "<h1>Install Restore Privacy on this iPhone or iPad</h1>"
@@ -1588,9 +1585,9 @@ def render_ios_device_install_html(
         "(Apple reviews the first join). Tap <strong>Install with TestFlight</strong>, "
         "then allow Packet Tunnel when iOS asks and tap Connect.</p>"
         f'<p><a class="dl" href="{tf}">Install with TestFlight</a></p>'
-        "<p class=\"msg\">Direct installer (Safari cannot open a <code>.zip</code>): "
-        f'<a href="{install}">itms-services install</a> · '
-        f'<a href="{ipa_href}">{ipa_name}</a> for Finder / Apple Configurator.</p>'
+        "<p class=\"msg\">App Store listing follows Apple review. "
+        "An App Store or TestFlight IPA cannot be installed with itms-services "
+        "or Apple Configurator.</p>"
     )
 
 

@@ -33,8 +33,8 @@ Traffic shaping, outer obfuscation, multi-hop extras, and kill switch are **off 
 |----------|------|
 | Windows | `restore-privacy-client-1.2.7-windows-x64-setup.exe` |
 | Android | `restore-privacy-client-1.2.7-android.apk` |
-| macOS | `restore-privacy-client-1.2.7-macos.zip` — Notarized Developer ID + residual Packet Tunnel **systemextension** host NE |
-| iOS | `restore-privacy-client-1.2.7-ios.zip` — IPA `Payload/Runner.app` + embedded provisions (Team-signed sideload; rename to `.ipa`) |
+| macOS | `restore-privacy-client-1.2.7-macos.zip` — Notarized Developer ID; unzip and run **Install Restore Privacy** (or drag to Applications). Do not open the app from inside the zip. |
+| iOS | TestFlight (any iPhone/iPad after Apple review): https://testflight.apple.com/join/tT2C8UFe — catalog `restore-privacy-client-1.2.7-ios.zip` is a Team-signed App Store IPA layout, not a sideload installer |
 | Linux | `restore-privacy-client-1.2.7-linux-x64.tar.gz` |
 
 ## Operator build

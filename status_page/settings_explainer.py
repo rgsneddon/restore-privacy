@@ -705,7 +705,9 @@ def render_install_howto_box_html() -> str:
           Windows: run the setup exe.
           Android: allow the APK source, then install.
           Linux: extract the tar.gz and run the entry script.
-          macOS / iOS: follow the package notes (signed / sideload).</li>
+          macOS: unzip, run Install Restore Privacy (or drag the app to
+          Applications), then open it from Applications — not from the zip.
+          iOS: TestFlight (Apple reviews the first join).</li>
         <li><strong>Accept the end-user licence</strong> on first use
           (local only — Connect waits until you accept).</li>
         <li><strong>Press Connect</strong> on the main screen. Approve any system VPN

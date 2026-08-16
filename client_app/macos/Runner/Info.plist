@@ -30,5 +30,7 @@
 	<string>NSApplication</string>
 	<key>NSSystemExtensionUsageDescription</key>
 	<string>Restore Privacy needs a Network system extension to create the residual Packet Tunnel. Choose Allow if macOS asks.</string>
+	<key>FLTEnableImpeller</key>
+	<false/>
 </dict>
 </plist>
