@@ -26,6 +26,16 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Restore Privacy uses the camera to scan a KEYGEN or node QR code so you can unlock or join without typing. The image stays on this device.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Restore Privacy can use Face ID to unlock stored KEYGEN or vault secrets on this device.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Restore Privacy can read a photo you choose so you can import a KEYGEN or QR image. Nothing is uploaded.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Restore Privacy can save an export you choose (for example a local connection log) to Photos on this device.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Some on-device scanner libraries declare microphone access. Restore Privacy does not record audio for VPN Connect.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

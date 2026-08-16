@@ -205,6 +205,51 @@ def write_entitlements_plist(profile: ProvisionProfile, dest: Path) -> Path:
     return dest
 
 
+# App Store Connect rejects binaries that link camera/auth/photo APIs without
+# a purpose string (ITMS-90683). Flutter plugins in this client do that.
+_IOS_PRIVACY_USAGE = {
+    "NSCameraUsageDescription": (
+        "Restore Privacy uses the camera to scan a KEYGEN or node QR code so "
+        "you can unlock or join without typing. The image stays on this device."
+    ),
+    "NSFaceIDUsageDescription": (
+        "Restore Privacy can use Face ID to unlock stored KEYGEN or vault "
+        "secrets on this device."
+    ),
+    "NSPhotoLibraryUsageDescription": (
+        "Restore Privacy can read a photo you choose so you can import a "
+        "KEYGEN or QR image. Nothing is uploaded."
+    ),
+    "NSPhotoLibraryAddUsageDescription": (
+        "Restore Privacy can save an export you choose (for example a local "
+        "connection log) to Photos on this device."
+    ),
+    "NSMicrophoneUsageDescription": (
+        "Some on-device scanner libraries declare microphone access. Restore "
+        "Privacy does not record audio for VPN Connect."
+    ),
+}
+
+
+def ensure_ios_privacy_usage_keys(info_plist: Path) -> list[str]:
+    """Insert missing App Store purpose strings. Returns keys that were added."""
+    if not info_plist.is_file():
+        raise IosSideloadError(f"Info.plist missing: {info_plist}")
+    with info_plist.open("rb") as f:
+        pl = plistlib.load(f)
+    if not isinstance(pl, dict):
+        raise IosSideloadError(f"Info.plist is not a dict: {info_plist}")
+    added: list[str] = []
+    for key, text in _IOS_PRIVACY_USAGE.items():
+        if not str(pl.get(key) or "").strip():
+            pl[key] = text
+            added.append(key)
+    if added:
+        with info_plist.open("wb") as f:
+            plistlib.dump(pl, f)
+    return added
+
+
 def _ensure_tunnel_version_keys(runner: Path, appex: Path) -> None:
     """App Store requires CFBundleVersion + CFBundleShortVersionString on the appex."""
     host_pl = runner / "Info.plist"
@@ -279,6 +324,7 @@ def codesign_ios_runner_with_profiles(
         raise IosSideloadError(f"Runner.app missing: {runner}")
 
     host_identity = identity_for_profile(host_profile)
+    ensure_ios_privacy_usage_keys(runner / "Info.plist")
     embed_mobileprovision(runner, host_profile)
 
     td = work_dir or Path(tempfile.mkdtemp(prefix="ios-ents-"))

@@ -148,6 +148,21 @@ class IosSideloadPackageCurrent(unittest.TestCase):
             "nested .bundle must be codesigned before parent .framework",
         )
 
+    def test_ensure_ios_privacy_usage_keys_adds_camera(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            plist = Path(td) / "Info.plist"
+            import plistlib
+
+            with plist.open("wb") as f:
+                plistlib.dump({"CFBundleIdentifier": "vpn.restoreprivacy.online"}, f)
+            added = self.pkg.ensure_ios_privacy_usage_keys(plist)
+            self.assertIn("NSCameraUsageDescription", added)
+            with plist.open("rb") as f:
+                pl = plistlib.load(f)
+            self.assertTrue(str(pl["NSCameraUsageDescription"]).strip())
+            again = self.pkg.ensure_ios_privacy_usage_keys(plist)
+            self.assertEqual(again, [])
+
     def test_ios_app_store_entitlements_drop_hotspot_provider(self) -> None:
         ents = {
             "com.apple.developer.networking.networkextension": [
