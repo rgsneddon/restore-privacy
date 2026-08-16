@@ -180,11 +180,59 @@ def identity_for_profile(
     return dist
 
 
+# iOS App Store rejects some macOS-only / newer NE tokens baked into
+# MAC_APP_DIRECT / IOS_APP_STORE templates (ITMS-90046).
+_IOS_UNSUPPORTED_NE = frozenset({"hotspot-provider"})
+
+
+def ios_app_store_entitlements(ents: dict) -> dict:
+    """Copy profile entitlements, dropping iOS-invalid Network Extension tokens."""
+    out = dict(ents)
+    ne = out.get("com.apple.developer.networking.networkextension")
+    if isinstance(ne, list):
+        filtered = [x for x in ne if x not in _IOS_UNSUPPORTED_NE]
+        if filtered:
+            out["com.apple.developer.networking.networkextension"] = filtered
+        else:
+            out.pop("com.apple.developer.networking.networkextension", None)
+    return out
+
+
 def write_entitlements_plist(profile: ProvisionProfile, dest: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     with dest.open("wb") as f:
-        plistlib.dump(profile.entitlements, f)
+        plistlib.dump(ios_app_store_entitlements(profile.entitlements), f)
     return dest
+
+
+def _ensure_tunnel_version_keys(runner: Path, appex: Path) -> None:
+    """App Store requires CFBundleVersion + CFBundleShortVersionString on the appex."""
+    host_pl = runner / "Info.plist"
+    tun_pl = appex / "Info.plist"
+    host = {}
+    if host_pl.is_file():
+        with host_pl.open("rb") as f:
+            loaded = plistlib.load(f)
+            if isinstance(loaded, dict):
+                host = loaded
+    short = str(host.get("CFBundleShortVersionString") or "").strip() or "1.0"
+    build = str(host.get("CFBundleVersion") or "").strip() or "1"
+    if not tun_pl.is_file():
+        return
+    with tun_pl.open("rb") as f:
+        tun = plistlib.load(f)
+    if not isinstance(tun, dict):
+        return
+    changed = False
+    if not str(tun.get("CFBundleShortVersionString") or "").strip():
+        tun["CFBundleShortVersionString"] = short
+        changed = True
+    if not str(tun.get("CFBundleVersion") or "").strip():
+        tun["CFBundleVersion"] = build
+        changed = True
+    if changed:
+        with tun_pl.open("wb") as f:
+            plistlib.dump(tun, f)
 
 
 def embed_mobileprovision(bundle: Path, profile: ProvisionProfile) -> Path:
@@ -203,6 +251,7 @@ def _codesign(path: Path, identity: str, entitlements: Path | None = None) -> No
         "codesign",
         "--force",
         "--timestamp",
+        "--generate-entitlement-der",
         "--sign",
         identity,
     ]
@@ -236,14 +285,19 @@ def codesign_ios_runner_with_profiles(
     td.mkdir(parents=True, exist_ok=True)
     host_ent = write_entitlements_plist(host_profile, td / "host.entitlements")
 
-    # Nested frameworks / plugin bundles first
+    # Inside-out: plugin .bundle nested in a .framework must be signed before
+    # the parent framework. Signing the bundle afterwards invalidates the
+    # framework seal (ITMS-90035 sealed resource missing or invalid).
+    for bundle in sorted(
+        (p for p in runner.rglob("*.bundle") if p.is_dir() and "PlugIns" not in p.parts),
+        key=lambda p: len(p.parts),
+        reverse=True,
+    ):
+        _codesign(bundle, host_identity)
     fw_dir = runner / "Frameworks"
     if fw_dir.is_dir():
         for fw in sorted(fw_dir.glob("*.framework")):
             _codesign(fw, host_identity)
-    for bundle in sorted(runner.rglob("*.bundle")):
-        if bundle.is_dir() and "PlugIns" not in bundle.parts:
-            _codesign(bundle, host_identity)
 
     appex = runner / "PlugIns" / "PacketTunnel.appex"
     if appex.is_dir():
@@ -251,6 +305,7 @@ def codesign_ios_runner_with_profiles(
             raise IosSideloadError(
                 "PacketTunnel.appex present but no tunnel provisioning profile"
             )
+        _ensure_tunnel_version_keys(runner, appex)
         tunnel_identity = identity_for_profile(tunnel_profile)
         embed_mobileprovision(appex, tunnel_profile)
         tunnel_ent = write_entitlements_plist(

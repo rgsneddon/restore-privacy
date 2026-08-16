@@ -138,6 +138,30 @@ class IosSideloadPackageCurrent(unittest.TestCase):
             with self.assertRaises(self.pkg.IosSideloadError):
                 self.pkg.require_installable_ios_zip(zpath, require_provision=True)
 
+    def test_codesign_order_signs_nested_bundle_before_framework(self) -> None:
+        src = (ROOT / "scripts" / "ios_sideload_package.py").read_text(encoding="utf-8")
+        start = src.find("def codesign_ios_runner_with_profiles")
+        body = src[start : src.find("\ndef package_ios_ipa_zip", start)]
+        self.assertLess(
+            body.find('rglob("*.bundle")'),
+            body.find('glob("*.framework")'),
+            "nested .bundle must be codesigned before parent .framework",
+        )
+
+    def test_ios_app_store_entitlements_drop_hotspot_provider(self) -> None:
+        ents = {
+            "com.apple.developer.networking.networkextension": [
+                "packet-tunnel-provider",
+                "hotspot-provider",
+                "dns-settings",
+            ],
+            "com.apple.application-identifier": "SFCBP95595.vpn.restoreprivacy.online",
+        }
+        out = self.pkg.ios_app_store_entitlements(ents)
+        self.assertIn("packet-tunnel-provider", out["com.apple.developer.networking.networkextension"])
+        self.assertNotIn("hotspot-provider", out["com.apple.developer.networking.networkextension"])
+        self.assertIn("dns-settings", out["com.apple.developer.networking.networkextension"])
+
     def test_prepare_signed_fail_closed_without_profiles(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             runner = Path(td) / "Runner.app"
