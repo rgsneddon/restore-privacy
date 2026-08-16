@@ -1,6 +1,6 @@
 {
-  "updated": "2026-08-14",
-  "note": "Source of truth for FREE DOWNLOAD, /downloads-map, and Helsinki fulfilment. 1.2.7 Windows/Linux built here; Apple/Android stay 1.2.6 until Mac ships.",
+  "updated": "2026-08-16",
+  "note": "Source of truth for FREE DOWNLOAD, /downloads-map, and Helsinki fulfilment. Catalog pin 1.2.7 all five platforms. iOS any-user install is TestFlight/App Store; catalog zip is Apple Distribution IPA layout.",
   "platforms": {
     "windows": {
       "version": "1.2.7",
