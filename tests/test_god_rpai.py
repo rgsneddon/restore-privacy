@@ -286,8 +286,10 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertIn(GOD_BANNER_SRC, html)
         self.assertNotIn('id="god-main-title"', html)
         self.assertNotIn("0.1.13", html)
-        self.assertNotIn("gnfp-wallet-0.0.5-windows.zip", html)
-        self.assertNotIn("gnfp-wallet-0.0.5-linux.zip", html)
+        self.assertIn("gnfp-wallet-0.0.5-windows.zip", html)
+        self.assertIn("gnfp-wallet-0.0.5-linux.zip", html)
+        gnfp_labels = [label for label, _href in products[1]["hrefs"]]
+        self.assertEqual(gnfp_labels[0], "Windows")
         for product in products:
             self.assertIn(product["name"], html)
             self.assertIn(product["version"], html)

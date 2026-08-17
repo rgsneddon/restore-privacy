@@ -2155,6 +2155,115 @@ def _iter_inventory_releases(repo: dict[str, Any]) -> list[tuple[str, list[Any]]
     return []
 
 
+GNFP_WALLET_REPO = "gnfp-wallet"
+GNFP_WALLET_RELEASES = f"https://github.com/rgsneddon/{GNFP_WALLET_REPO}/releases"
+_GNFP_HUB_LABELS = (
+    ("windows", "Windows", "-windows.zip"),
+    ("macos", "macOS", "-macos.zip"),
+    ("linux", "Linux", "-linux.zip"),
+    ("ios", "iPhone", "-ios.ipa"),
+    ("ios", "iPad", "-ipad.ipa"),
+    ("linux", "Arch", "-archlinux.zip"),
+    ("android", "Android", "-android.zip"),
+)
+
+
+def gnfp_wallet_asset_href(pin: str, filename: str) -> str:
+    """Canonical GitHub download URL for a gnfp-wallet installer."""
+    ver = str(pin or "").strip().lstrip("v")
+    name = str(filename or "").strip()
+    return f"{GNFP_WALLET_RELEASES}/download/v{ver}/{name}"
+
+
+def _gnfp_wallet_releases_from_inventory(
+    inventory_path: Path | None = None,
+) -> list[dict[str, Any]]:
+    for repo in load_github_release_inventory(inventory_path):
+        if str(repo.get("repo") or "") == GNFP_WALLET_REPO:
+            pairs = _iter_inventory_releases(repo)
+            return [{"tag": tag, "assets": assets} for tag, assets in pairs]
+    return []
+
+
+def latest_gnfp_wallet_pin_with_windows(
+    releases: list[dict[str, Any]] | None = None,
+    *,
+    inventory_path: Path | None = None,
+) -> str:
+    """Newest gnfp-wallet tag that actually has a ``*-windows.zip``."""
+    rows = releases if releases is not None else _gnfp_wallet_releases_from_inventory(
+        inventory_path
+    )
+    candidates: list[str] = []
+    for rel in rows:
+        if not isinstance(rel, dict):
+            continue
+        tag = str(rel.get("tag") or "").strip()
+        assets = rel.get("assets")
+        if not tag or not isinstance(assets, list):
+            continue
+        names = {
+            str(a.get("filename") or "").lower()
+            for a in assets
+            if isinstance(a, dict)
+        }
+        if any(n.endswith("-windows.zip") or n.endswith("windows.zip") for n in names):
+            if "gnfp-wallet-" in " ".join(names) or any(
+                "windows.zip" in n for n in names
+            ):
+                candidates.append(tag)
+    if not candidates:
+        return ""
+    best = max(candidates, key=release_tag_sort_key)
+    return best.lstrip("v")
+
+
+def list_gnfp_wallet_hub_hrefs(
+    releases: list[dict[str, Any]] | None = None,
+    *,
+    inventory_path: Path | None = None,
+) -> list[tuple[str, str]]:
+    """Public GOD hub links for the latest gnfp-wallet pin that has Windows.
+
+    Windows is always first when present. Other platforms on that same pin
+    follow. Does not emit an older Windows zip once a newer pin has one.
+    """
+    pin = latest_gnfp_wallet_pin_with_windows(
+        releases, inventory_path=inventory_path
+    )
+    if not pin:
+        return []
+    rows = releases if releases is not None else _gnfp_wallet_releases_from_inventory(
+        inventory_path
+    )
+    names: set[str] = set()
+    href_by_name: dict[str, str] = {}
+    for rel in rows:
+        if not isinstance(rel, dict):
+            continue
+        tag = str(rel.get("tag") or "").strip().lstrip("v")
+        if tag != pin:
+            continue
+        for asset in rel.get("assets") or []:
+            if not isinstance(asset, dict):
+                continue
+            fname = str(asset.get("filename") or "").strip()
+            href = str(asset.get("href") or "").strip()
+            if not fname:
+                continue
+            names.add(fname)
+            href_by_name[fname] = href or gnfp_wallet_asset_href(pin, fname)
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for _plat, label, suffix in _GNFP_HUB_LABELS:
+        fname = f"gnfp-wallet-{pin}{suffix}"
+        if fname not in names or fname in seen:
+            continue
+        seen.add(fname)
+        out.append((label, href_by_name.get(fname) or gnfp_wallet_asset_href(pin, fname)))
+    return out
+
+
 def _github_inventory_helpers():
     """Skip/filter helpers shared with the inventory refresh module."""
     try:

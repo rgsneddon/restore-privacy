@@ -39,12 +39,88 @@ def _vpn_href(platform: str) -> str:
     return VPN_FREE.format(platform=platform)
 
 
-def _gnfp_href(filename: str) -> str:
-    return f"{GNFP_REL}/download/v{GNFP_WALLET_PIN}/{filename}"
+def _gnfp_href(filename: str, pin: str | None = None) -> str:
+    ver = str(pin or GNFP_WALLET_PIN).strip().lstrip("v")
+    return f"{GNFP_REL}/download/v{ver}/{filename}"
 
 
 def _evolve_href(filename: str) -> str:
     return f"{EVOLVE_REL}/download/v{EVOLVE_PIN}/{filename}"
+
+
+def _gnfp_publisher():
+    try:
+        from downloads import (
+            GNFP_WALLET_RELEASES,
+            gnfp_wallet_asset_href,
+            latest_gnfp_wallet_pin_with_windows,
+            list_gnfp_wallet_hub_hrefs,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.downloads import (  # type: ignore
+            GNFP_WALLET_RELEASES,
+            gnfp_wallet_asset_href,
+            latest_gnfp_wallet_pin_with_windows,
+            list_gnfp_wallet_hub_hrefs,
+        )
+    return (
+        GNFP_WALLET_RELEASES,
+        gnfp_wallet_asset_href,
+        latest_gnfp_wallet_pin_with_windows,
+        list_gnfp_wallet_hub_hrefs,
+    )
+
+
+def gnfp_wallet_hub_product(
+    *, inventory_path: Any = None, releases: list | None = None
+) -> dict[str, Any]:
+    """GOD hub card for $GNFP privacy wallet — Windows href from shipped pin."""
+    _rel, asset_href, latest_pin, list_hrefs = _gnfp_publisher()
+    pin = latest_pin(releases, inventory_path=inventory_path) or GNFP_WALLET_PIN
+    hrefs = list_hrefs(releases, inventory_path=inventory_path)
+    if not hrefs:
+        hrefs = [
+            ("Windows", asset_href(pin, f"gnfp-wallet-{pin}-windows.zip")),
+            ("macOS", asset_href(pin, f"gnfp-wallet-{pin}-macos.zip")),
+            ("Linux", asset_href(pin, f"gnfp-wallet-{pin}-linux.zip")),
+            ("iPhone", asset_href(pin, f"gnfp-wallet-{pin}-ios.ipa")),
+            ("iPad", asset_href(pin, f"gnfp-wallet-{pin}-ipad.ipa")),
+            ("Arch", asset_href(pin, f"gnfp-wallet-{pin}-archlinux.zip")),
+        ]
+    return {
+        "id": "gnfp",
+        "name": "GNFP",
+        "version": pin,
+        "blurb": (
+            f"$GNFP privacy wallet {pin} on a chronoflux book. "
+            "Session address is perpetual in your wallet."
+        ),
+        "release": f"{_rel}/tag/v{pin}",
+        "hrefs": tuple(hrefs),
+    }
+
+
+def render_god_wallet_hub_html(
+    *, inventory_path: Any = None, releases: list | None = None
+) -> str:
+    product = gnfp_wallet_hub_product(
+        inventory_path=inventory_path, releases=releases
+    )
+    links = "".join(
+        f'<li><a href="{html.escape(href, quote=True)}" '
+        f'data-hub-installer="gnfp" '
+        f'data-hub-platform="{html.escape(label, quote=True)}">'
+        f"{html.escape(label)}</a></li>"
+        for label, href in product["hrefs"]
+    )
+    return (
+        f'<article class="panel-card god-hub-card" id="god-hub-gnfp" '
+        f'data-hub-product="gnfp">'
+        f'<h3>{html.escape(product["name"])}</h3>'
+        f'<p class="god-hub-ver">v{html.escape(product["version"])}</p>'
+        f'<p class="hint">{html.escape(product["blurb"])}</p>'
+        f'<ul class="god-hub-links">{links}</ul></article>'
+    )
 
 
 def hub_menu_links() -> tuple[tuple[str, str], ...]:
@@ -58,7 +134,7 @@ def hub_menu_links() -> tuple[tuple[str, str], ...]:
 
 
 def hub_products() -> tuple[dict[str, Any], ...]:
-    """Current public installer set. Missing GNFP 0.0.5 Windows/Linux stay off."""
+    """Current public installer set. GNFP lists Windows when that zip exists."""
     return (
         {
             "id": "vpn",
@@ -78,22 +154,7 @@ def hub_products() -> tuple[dict[str, Any], ...]:
                 ("iOS", _vpn_href("ios")),
             ),
         },
-        {
-            "id": "gnfp",
-            "name": "GNFP",
-            "version": GNFP_WALLET_PIN,
-            "blurb": (
-                f"$GNFP privacy wallet {GNFP_WALLET_PIN} on a chronoflux book. "
-                "Session address is perpetual in your wallet."
-            ),
-            "release": f"{GNFP_REL}/tag/v{GNFP_WALLET_PIN}",
-            "hrefs": (
-                ("macOS", _gnfp_href(f"gnfp-wallet-{GNFP_WALLET_PIN}-macos.zip")),
-                ("iPhone", _gnfp_href(f"gnfp-wallet-{GNFP_WALLET_PIN}-ios.ipa")),
-                ("iPad", _gnfp_href(f"gnfp-wallet-{GNFP_WALLET_PIN}-ipad.ipa")),
-                ("Arch", _gnfp_href(f"gnfp-wallet-{GNFP_WALLET_PIN}-archlinux.zip")),
-            ),
-        },
+        gnfp_wallet_hub_product(),
         {
             "id": "evolve",
             "name": "Evolve",
