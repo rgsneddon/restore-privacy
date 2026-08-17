@@ -53,7 +53,7 @@ def hub_menu_links() -> tuple[tuple[str, str], ...]:
         ("GNFP POOL", "https://gnfp.restoreprivacy.online"),
         ("GNFP EXPLORER", "https://explorer.restoreprivacy.online"),
         ("RESTORE PRIVACY VPN", "https://www.restoreprivacy.online"),
-        ("EVOLVE", "https://evolve.restorepirvacy.online"),
+        ("EVOLVE", "https://evolve.restoreprivacy.online"),
     )
 
 
