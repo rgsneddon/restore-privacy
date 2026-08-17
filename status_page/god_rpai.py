@@ -74,8 +74,7 @@ def hub_products() -> tuple[dict[str, Any], ...]:
             "version": GNFP_WALLET_PIN,
             "blurb": (
                 f"$GNFP privacy wallet {GNFP_WALLET_PIN} on a chronoflux book. "
-                "Session address and Germany-book balance carry forward. macOS "
-                "is Developer ID notarized. Windows and Linux are not on this pin yet."
+                "Session address is perpetual in your wallet."
             ),
             "release": f"{GNFP_REL}/tag/v{GNFP_WALLET_PIN}",
             "hrefs": (

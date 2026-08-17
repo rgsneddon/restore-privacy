@@ -301,6 +301,11 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertIn("PEDRO", html)
         self.assertIn("god-learn-input", html)
         self.assertIn("/goal · goalbuilder app", html)
+        self.assertIn("Session address is perpetual in your wallet", html)
+        self.assertNotIn("Developer ID", html)
+        self.assertNotIn("Windows and Linux are not on this pin", html)
+        self.assertNotIn("GOD is the rpAI agent and overall leader", html)
+        self.assertNotIn("Grokbot reports to GOD and chaperones", html)
         scratch = Path(
             __import__("os").environ.get(
                 "GROK_GOAL_SCRATCH",
