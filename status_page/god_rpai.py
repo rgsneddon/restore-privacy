@@ -47,6 +47,16 @@ def _evolve_href(filename: str) -> str:
     return f"{EVOLVE_REL}/download/v{EVOLVE_PIN}/{filename}"
 
 
+def hub_menu_links() -> tuple[tuple[str, str], ...]:
+    """Visitor menu above the installer boxes. Evolve href is as specified."""
+    return (
+        ("GNFP POOL", "https://gnfp.restoreprivacy.online"),
+        ("GNFP EXPLORER", "https://explorer.restoreprivacy.online"),
+        ("RESTORE PRIVACY VPN", "https://www.restoreprivacy.online"),
+        ("EVOLVE", "https://evolve.restorepirvacy.online"),
+    )
+
+
 def hub_products() -> tuple[dict[str, Any], ...]:
     """Current public installer set. Missing GNFP 0.0.5 Windows/Linux stay off."""
     return (
@@ -361,6 +371,24 @@ def god_rpai_css() -> str:
 .god-hub-card .god-hub-ver { color: #00e5ff; font-weight: 750; }
 .god-hub-links { display: flex; flex-wrap: wrap; gap: 0.4rem 0.65rem; margin: 0.55rem 0 0; padding: 0; list-style: none; }
 .god-hub-links a { color: #00e5ff; font-weight: 700; }
+#god-hub-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.75rem;
+  list-style: none;
+  border: 1px solid #2694e8;
+  background: #14171c;
+}
+#god-hub-menu a {
+  color: #00e5ff;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+#god-hub-menu a:hover { text-decoration: underline; }
 #god-input-box { text-align: center; }
 #god-input-box h3, #god-input-box .hint, #god-input-box label { text-align: center; }
 #god-input-box textarea, #god-input-box label {
@@ -451,6 +479,19 @@ def _learn_surface_html(dash: dict[str, Any]) -> str:
     return render_explorer_agent_stats_html(dash.get("surface"))
 
 
+def render_god_hub_menu_html() -> str:
+    items = "".join(
+        f'<li><a href="{html.escape(href, quote=True)}" '
+        f'data-hub-menu="{html.escape(label, quote=True)}">'
+        f"{html.escape(label)}</a></li>"
+        for label, href in hub_menu_links()
+    )
+    return (
+        f'<nav class="god-hub-menu" id="god-hub-menu" aria-label="Restore Privacy">'
+        f"{items}</nav>"
+    )
+
+
 def render_god_hub_html() -> str:
     """Prominent VPN / GNFP / Evolve installer block."""
     cards = []
@@ -477,6 +518,7 @@ def render_god_hub_html() -> str:
         "<h2 id=\"god-hub-title\">Start here</h2>"
         '<p class="hint" id="god-hub-lead">Three Restore Privacy products, '
         "current installers. Pick the package for the machine you are on.</p>"
+        f"{render_god_hub_menu_html()}"
         f'<div class="god-hub-grid" id="god-hub-grid">{"".join(cards)}</div>'
         "</section>"
     )

@@ -306,14 +306,43 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertNotIn("Windows and Linux are not on this pin", html)
         self.assertNotIn("GOD is the rpAI agent and overall leader", html)
         self.assertNotIn("Grokbot reports to GOD and chaperones", html)
+
+    def test_hub_menu_bar_sits_above_installer_boxes(self) -> None:
+        from god_rpai import (
+            hub_menu_links,
+            hub_products,
+            render_god_hub_html,
+            render_god_hub_menu_html,
+            render_god_rpai_page_html,
+        )
+
+        links = hub_menu_links()
+        self.assertEqual(len(links), 4)
+        html = render_god_rpai_page_html()
+        menu = render_god_hub_menu_html()
+        hub = render_god_hub_html()
+        self.assertIn(menu, html)
+        self.assertIn(menu, hub)
+        menu_at = html.index('id="god-hub-menu"')
+        grid_at = html.index('id="god-hub-grid"')
+        self.assertLess(menu_at, grid_at)
+        self.assertEqual(
+            [label for label, _href in links],
+            ["GNFP POOL", "GNFP EXPLORER", "RESTORE PRIVACY VPN", "EVOLVE"],
+        )
+        for label, href in links:
+            self.assertIn(label, html)
+            self.assertIn(html_mod.escape(href, quote=True), html)
+        for product in hub_products():
+            self.assertIn(f'id="god-hub-{product["id"]}"', html)
         scratch = Path(
             __import__("os").environ.get(
                 "GROK_GOAL_SCRATCH",
-                "/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-e374255b52da/implementer",
+                "/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-8b39b622cbc6/implementer",
             )
         )
         scratch.mkdir(parents=True, exist_ok=True)
-        (scratch / "god-hub.html").write_text(html, encoding="utf-8")
+        (scratch / "god-menubar.html").write_text(html, encoding="utf-8")
 
 
 if __name__ == "__main__":
