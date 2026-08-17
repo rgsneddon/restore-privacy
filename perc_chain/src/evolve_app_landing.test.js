@@ -19,7 +19,9 @@ describe('evolve.restoreprivacy.online is the Evolve app', () => {
     assert.match(html, /evolve-v4\.2\.1-archlinux-x86_64\.pkg\.tar\.zst/);
     assert.match(html, /evolve-v4\.2\.1-android-setup\.apk/);
     assert.match(html, /evolve-v4\.2\.1-ios-setup\.ipa/);
-    assert.match(html, /rgsneddon\.github\.io\/evolve/);
+    assert.match(html, /iframe[\s\S]*src="\/app\/"/);
+    assert.match(html, /href="\/app\/"/);
+    assert.doesNotMatch(html, /href="https:\/\/rgsneddon\.github\.io\/evolve\/"/);
     assert.match(html, /hero\.jpg" width="1600" height="640"/);
     assert.match(html, /devices\.jpg" width="1280" height="720"/);
     assert.match(html, /orb\.jpg" width="1024" height="1024"/);
@@ -37,6 +39,8 @@ describe('evolve.restoreprivacy.online is the Evolve app', () => {
     assert.match(conf, /proxy_pass http:\/\/127\.0\.0\.1:9478\/api\//);
     assert.match(conf, /proxy_pass http:\/\/127\.0\.0\.1:9478\/perc\//);
     assert.match(conf, /proxy_pass http:\/\/127\.0\.0\.1:9478\/explorer/);
+    assert.match(conf, /location \^~ \/app\//);
+    assert.match(conf, /try_files \$uri \$uri\/ \/app\/index\.html/);
     assert.doesNotMatch(conf, /proxy_pass http:\/\/127\.0\.0\.1:8014/);
     assert.doesNotMatch(conf, /location \/ \{\s*proxy_pass http:\/\/127\.0\.0\.1:9478\//);
   });

@@ -330,6 +330,22 @@
       box-shadow: var(--shadow);
     }
 
+    .app-frame {
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      background: #0d0f14;
+    }
+    .app-frame iframe {
+      width: 100%;
+      height: min(86vh, 980px);
+      min-height: 640px;
+      border: 0;
+      display: block;
+      background: #0d0f14;
+    }
+
     .dl-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -433,10 +449,11 @@
         <b>EVOLVE</b>
       </a>
       <div class="nav-links">
+        <a href="#analyse">Analyse</a>
         <a href="#what">The app</a>
         <a href="#how">How it works</a>
         <a href="#download">Download</a>
-        <a href="https://rgsneddon.github.io/evolve/" target="_blank" rel="noopener noreferrer">Web app</a>
+        <a href="/app/">Full screen</a>
         <a href="/explorer">Explorer</a>
       </div>
     </nav>
@@ -452,8 +469,8 @@
           actions for the person who has to answer for it.
         </p>
         <div class="cta-row">
-          <a class="btn btn-gold" href="#download">Download the app</a>
-          <a class="btn btn-ghost" href="https://rgsneddon.github.io/evolve/" target="_blank" rel="noopener noreferrer">Open in the browser</a>
+          <a class="btn btn-gold" href="#analyse">Open in the browser</a>
+          <a class="btn btn-ghost" href="#download">Download the app</a>
         </div>
         <p class="meta-line">Windows · macOS · Linux · Arch · Android · iOS / iPad · Web. Core math stays on your device.</p>
         <div class="symbols" aria-label="Chronoflux constructs">
@@ -468,6 +485,27 @@
         <img class="orb" src="assets/orb.jpg" width="1024" height="1024" alt="">
       </div>
     </header>
+
+    <section class="section" id="analyse">
+      <h2>Analyse in this page</h2>
+      <p class="sub">
+        The full Evolve Chronoflux analyser is embedded below. Core math
+        runs in your browser — it still works if the rest of the network
+        drops. Grok construal on the web stays heuristic (@evolve_web);
+        it fills blank ω / σ / Iτ / Jμ fields from your question only.
+      </p>
+      <div class="cta-row" style="margin-bottom:18px">
+        <a class="btn btn-ghost" href="/app/">Open full screen</a>
+      </div>
+      <div class="app-frame">
+        <iframe
+          src="/app/"
+          title="Evolve Chronoflux analyser"
+          allow="clipboard-write"
+          loading="lazy"
+        ></iframe>
+      </div>
+    </section>
 
     <section class="section" id="what">
       <h2>What the app is</h2>
@@ -582,7 +620,7 @@
         <h3>Install notes</h3>
         <ul>
           <li><strong>This host is the Evolve app.</strong> The $GNFP pool lives at <a href="https://gnfp.restoreprivacy.online">gnfp.restoreprivacy.online</a>. Perccent mining is at <a href="https://mineperc.restoreprivacy.online">mineperc.restoreprivacy.online</a>.</li>
-          <li><strong>Web:</strong> the live browser build is <a href="https://rgsneddon.github.io/evolve/">rgsneddon.github.io/evolve</a>. Chronoflux still runs locally; web Grok construal is heuristic unless a remote proxy is configured.</li>
+          <li><strong>Web:</strong> the analyser is on this host at <a href="/app/">/app/</a> and embedded above. Chronoflux runs in the browser. Web Grok construal is heuristic unless a remote proxy is configured. The old GitHub Pages shell at rgsneddon.github.io/evolve is a broken <code>base href</code> leftover — do not use it.</li>
           <li><strong>Integrity:</strong> Android is release-key signed. macOS is Developer ID + notarized (Team SFCBP95595). Windows is checksum-verified. Sidecars and <a href="https://github.com/rgsneddon/evolve/releases/download/v4.2.1/CHECKSUMS.sha256">CHECKSUMS.sha256</a> sit on the <a href="https://github.com/rgsneddon/evolve/releases/tag/v4.2.1">v4.2.1</a> release.</li>
           <li><strong>Principia:</strong> the Chronoflux Principia, realised by Roy D Herbert, is the mechanical foundation of the analysis engine. License and attribution are inside the app.</li>
         </ul>
