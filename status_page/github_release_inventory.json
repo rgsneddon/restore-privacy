@@ -25,9 +25,19 @@
               "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.5/gnfp-wallet-0.0.5-ipad.ipa"
             },
             {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.0.5-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.5/gnfp-wallet-0.0.5-linux.zip"
+            },
+            {
               "platform": "macos",
               "filename": "gnfp-wallet-0.0.5-macos.zip",
               "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.5/gnfp-wallet-0.0.5-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.0.5-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.5/gnfp-wallet-0.0.5-windows.zip"
             }
           ]
         },
