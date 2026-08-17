@@ -1,11 +1,11 @@
 """Dedicated GOD · rpAI page (god.restoreprivacy.online[:1474]).
 
-Wholly rpAI: hierarchy, four-agent learning, outputs, and learn-from-input.
-Not the shop, not the ticket form, not Perc mining. Grokbot (Grok Build)
-chaperones; GOD leads.
+GNFP coin landing first (what / mine / wallet / explorer / links /
+community), then the AI Oracle and Evolve dashboard. Not the shop, not a
+ticket form, not Perc mining. Grokbot (Grok Build) chaperones; GOD leads.
 
-Port 1474 sits beside mineperc :1466 as the GOD control plane — it is not
-Beam :1974 and not a VPN dataplane.
+Port 1474 sits beside mineperc :1466 as the $GNFP BeamHash III stratum —
+it is not Beam :1974 and not a VPN dataplane.
 """
 
 from __future__ import annotations
@@ -32,6 +32,15 @@ EVOLVE_PIN = "4.2.1"
 
 VPN_FREE = "https://restoreprivacy.online/suite/download?platform={platform}&free_direct=1"
 GNFP_REL = "https://github.com/rgsneddon/gnfp-wallet/releases"
+GNFP_POOL_HREF = "https://gnfp.restoreprivacy.online"
+GNFP_EXPLORER_HREF = "https://explorer.restoreprivacy.online"
+GNFP_MINE_HREF = "https://github.com/rgsneddon/gnfp-mine"
+GNFP_BOOK = "de.restoreprivacy.online:1474"
+GNFP_FRONT_SG = "sg.restoreprivacy.online:1474"
+GNFP_FRONT_HEL = "hel.restoreprivacy.online:1474"
+GNFP_DISCORD_HREF = "https://discord.gg/H9TdGyCUCa"
+GNFP_TELEGRAM_HREF = "https://t.me/gnfp1"
+GNFP_ANN_HREF = "https://bitcointalk.org/index.php?topic=5591310.0"
 EVOLVE_REL = "https://github.com/rgsneddon/evolve/releases"
 
 
@@ -126,10 +135,29 @@ def render_god_wallet_hub_html(
 def hub_menu_links() -> tuple[tuple[str, str], ...]:
     """Visitor menu above the installer boxes. Evolve href is as specified."""
     return (
-        ("GNFP POOL", "https://gnfp.restoreprivacy.online"),
-        ("GNFP EXPLORER", "https://explorer.restoreprivacy.online"),
+        ("GNFP POOL", GNFP_POOL_HREF),
+        ("GNFP EXPLORER", GNFP_EXPLORER_HREF),
         ("RESTORE PRIVACY VPN", "https://www.restoreprivacy.online"),
         ("EVOLVE", "https://evolve.restoreprivacy.online"),
+    )
+
+
+def gnfp_official_links() -> tuple[tuple[str, str], ...]:
+    """Live public GNFP destinations — pool, explorer, wallet first."""
+    return (
+        ("Pool", GNFP_POOL_HREF),
+        ("Explorer", GNFP_EXPLORER_HREF),
+        ("Wallet", GNFP_REL),
+        ("Miner", GNFP_MINE_HREF),
+        ("Bitcointalk ANN", GNFP_ANN_HREF),
+    )
+
+
+def gnfp_community_links() -> tuple[tuple[str, str], ...]:
+    """Real invites from the live Bitcointalk ANN. Do not invent extras."""
+    return (
+        ("Discord", GNFP_DISCORD_HREF),
+        ("Telegram", GNFP_TELEGRAM_HREF),
     )
 
 
@@ -381,23 +409,106 @@ def _family_from_text(text: str) -> str:
     return "evolve_suite"
 
 
-def render_god_ticket_box_html() -> str:
-    """Bottom box: email rus@restoreprivacy.online via the public support form."""
-    inbox = "rus@restoreprivacy.online"
+def render_gnfp_intro_html(
+    *, inventory_path: Any = None, releases: list | None = None
+) -> str:
+    """GNFP coin landing: what / mine / wallet / explorer / links / community."""
+    product = gnfp_wallet_hub_product(
+        inventory_path=inventory_path, releases=releases
+    )
+    wallet_links = "".join(
+        f'<li><a href="{html.escape(href, quote=True)}" '
+        f'data-gnfp-wallet="{html.escape(label, quote=True)}">'
+        f"{html.escape(label)}</a></li>"
+        for label, href in product["hrefs"]
+    )
+    official = "".join(
+        f'<li><a href="{html.escape(href, quote=True)}" '
+        f'data-gnfp-official="{html.escape(label, quote=True)}">'
+        f"{html.escape(label)}</a></li>"
+        for label, href in gnfp_official_links()
+    )
+    community = "".join(
+        f'<li><a href="{html.escape(href, quote=True)}" '
+        f'data-gnfp-community="{html.escape(label, quote=True)}">'
+        f"{html.escape(label)}</a></li>"
+        for label, href in gnfp_community_links()
+    )
+    pin = html.escape(str(product["version"]))
+    book = html.escape(GNFP_BOOK)
+    front_sg = html.escape(GNFP_FRONT_SG)
+    front_hel = html.escape(GNFP_FRONT_HEL)
+    mine_href = html.escape(GNFP_MINE_HREF, quote=True)
+    wallet_rel = html.escape(GNFP_REL, quote=True)
+    explorer_href = html.escape(GNFP_EXPLORER_HREF, quote=True)
+    pool_href = html.escape(GNFP_POOL_HREF, quote=True)
     return f"""
-<section class="panel-card" id="god-ticket-box" data-god-ticket="1">
-  <h3 id="god-ticket-title">Support</h3>
-  <p class="hint">Need a human? Mail <strong>{html.escape(inbox)}</strong>. We will not ask for KEYGENs, cards, or passwords.</p>
-  <form class="support-form" method="post" action="https://restoreprivacy.online/support" id="god-ticket-form">
-    <label for="support-email">Your email *</label>
-    <input id="support-email" name="email" type="email" required autocomplete="email" placeholder="you@example.com"/>
-    <label for="support-subject">Subject *</label>
-    <input id="support-subject" name="subject" type="text" required maxlength="200" placeholder="Short summary"/>
-    <label for="support-message">Message *</label>
-    <textarea id="support-message" name="message" required maxlength="8000" placeholder="How can we help?"></textarea>
-    <p class="hint">Please allow up to 48 hours.</p>
-    <button type="submit" id="god-ticket-submit">Email {html.escape(inbox)}</button>
-  </form>
+<section class="gnfp-intro" id="gnfp-intro" data-gnfp-intro="1">
+  <p class="gnfp-skip"><a href="#god-oracle-evolve">Skip to AI Oracle · Evolve</a></p>
+  <header class="gnfp-hero" id="gnfp-hero">
+    <p class="gnfp-kicker" id="gnfp-kicker"><span class="gnfp-pulse" aria-hidden="true"></span>
+      $GNFP · BeamHash III · CPU only</p>
+    <h1 id="gnfp-intro-title">GNFP</h1>
+    <p class="gnfp-tagline" id="gnfp-intro-lead">God's coin. Private by default.
+      Chronoflux underneath. Proof of work only — no stake, no masternodes,
+      no ICO. You hash. You get GNFP. Nobody else needs your name.</p>
+  </header>
+  <div class="gnfp-section-grid" id="gnfp-section-grid">
+    <article class="gnfp-card" id="gnfp-what" data-gnfp-section="what">
+      <p class="gnfp-step">01</p>
+      <h2>What it is</h2>
+      <p><strong>$GNFP</strong> is a CPU-mined privacy coin on
+      <strong>BeamHash III</strong>. Addresses start with
+      <code>gnfp1</code>. Spendable GNFP lives on those addresses; the
+      public pages show hashes, not wallets, IPs, or logins.</p>
+      <ul class="gnfp-facts">
+        <li><span>Ticker</span> GNFP</li>
+        <li><span>Privacy</span> Private by default</li>
+        <li><span>Architecture</span> Chronoflux</li>
+        <li><span>Consensus</span> PoW only</li>
+      </ul>
+    </article>
+    <article class="gnfp-card" id="gnfp-mining" data-gnfp-section="mining">
+      <p class="gnfp-step">02</p>
+      <h2>How mining works</h2>
+      <p>Point <a href="{mine_href}">gnfp-mine</a> at the Germany book.
+      CPU workers only — GPU-shaped 208-hex / 104-byte solutions are
+      refused. A valid hash pays 1 micro (0.00000001 GNFP). Each block
+      is a 1 GNFP pot, split by who actually hashed.</p>
+      <pre class="gnfp-cmd" id="gnfp-mine-cmd">gnfp-mine --pool {book} --user gnfp1YOURADDRESS.worker --threads 8</pre>
+      <p class="hint">Book <code>{book}</code> (plain TCP, no TLS).
+      Fronts <code>{front_sg}</code> · <code>{front_hel}</code>.</p>
+    </article>
+    <article class="gnfp-card" id="gnfp-wallet" data-gnfp-section="wallet">
+      <p class="gnfp-step">03</p>
+      <h2>Wallet</h2>
+      <p>You are a seed and a <code>gnfp1</code>. The session address is
+      perpetual in your wallet. Current pin <strong>v{pin}</strong> —
+      Windows, macOS, Linux, iPhone, iPad.</p>
+      <p class="hint"><a href="{wallet_rel}">All wallet releases</a></p>
+      <ul class="gnfp-chip-links" id="gnfp-wallet-links">{wallet_links}</ul>
+    </article>
+    <article class="gnfp-card" id="gnfp-explorer" data-gnfp-section="explorer">
+      <p class="gnfp-step">04</p>
+      <h2>Explorer</h2>
+      <p>Glance, don't decode: height, nodes online, hashrate, difficulty,
+      block ETA, last transfers, coins in circulation. Top holders are
+      <code>party-xxxxxxxx</code> tags. That is all public. Your
+      <code>gnfp1</code> is not.</p>
+      <p><a class="gnfp-go" href="{explorer_href}">Open the explorer</a>
+      · <a href="{pool_href}">Open the pool</a></p>
+    </article>
+  </div>
+  <nav class="gnfp-official" id="gnfp-official-links" data-gnfp-links="1" aria-label="GNFP official links">
+    <h2>Official links</h2>
+    <ul class="gnfp-chip-links">{official}</ul>
+  </nav>
+  <aside class="gnfp-community" id="gnfp-community" data-gnfp-community="1">
+    <h2>Community</h2>
+    <p>Questions, rants, and miner talk live on Discord. Telegram is
+    the same crowd on the other door. No email form on this page.</p>
+    <ul class="gnfp-chip-links gnfp-community-links">{community}</ul>
+  </aside>
 </section>
 """
 
@@ -461,8 +572,192 @@ def god_rpai_css() -> str:
   max-width: 36rem;
 }
 #god-input-box button { display: inline-block; margin: 0.55rem auto 0; }
-#god-ticket-box { margin-top: 1.2rem; }
 #theme-mode-control, .theme-mode-control { display: none !important; }
+#gnfp-intro {
+  position: relative;
+  overflow: hidden;
+  margin: 0 0 1.6rem;
+  padding: 1.15rem 1.05rem 1.3rem;
+  border: 1px solid #2694e8;
+  background:
+    radial-gradient(ellipse 80% 50% at 8% -8%, rgba(0,229,255,0.16), transparent 55%),
+    radial-gradient(ellipse 46% 36% at 100% 0%, rgba(57,255,106,0.08), transparent 50%),
+    linear-gradient(180deg, #161a20 0%, #101217 100%);
+  box-shadow: 0 0 28px rgba(0, 229, 255, 0.12);
+}
+#gnfp-intro::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.16;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.18) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: linear-gradient(180deg, #000 0%, transparent 80%);
+}
+#gnfp-intro > * { position: relative; z-index: 1; }
+.gnfp-skip { margin: 0 0 0.55rem; }
+.gnfp-skip a { color: #9aa8b5; font-size: 0.82rem; font-weight: 700; }
+.gnfp-hero { text-align: center; margin: 0 0 1.05rem; }
+.gnfp-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.55rem;
+  padding: 0.28rem 0.7rem;
+  border: 1px solid rgba(0,229,255,0.45);
+  background: rgba(0,229,255,0.08);
+  color: #00e5ff;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.gnfp-pulse {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #39ff6a;
+  box-shadow: 0 0 10px #39ff6a;
+  animation: gnfp-pulse 1.6s ease-in-out infinite;
+}
+@keyframes gnfp-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.78); }
+}
+#gnfp-intro-title {
+  margin: 0.15rem 0 0.4rem;
+  color: #00e5ff;
+  font-size: clamp(2.4rem, 7vw, 4.2rem);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-shadow: 0 0 22px rgba(0,229,255,0.55);
+}
+.gnfp-tagline {
+  margin: 0 auto;
+  max-width: 40rem;
+  color: #c8d4de;
+  line-height: 1.5;
+  font-size: 1.02rem;
+}
+.gnfp-section-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+  margin: 0 0 1rem;
+}
+@media (min-width: 48rem) {
+  .gnfp-section-grid { grid-template-columns: 1fr 1fr; }
+}
+.gnfp-card {
+  margin: 0;
+  padding: 0.85rem 0.9rem 0.95rem;
+  border: 1px solid #2694e8;
+  background: rgba(20, 23, 28, 0.82);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.08);
+}
+.gnfp-card h2 {
+  margin: 0 0 0.4rem;
+  color: #00e5ff;
+  letter-spacing: 0.04em;
+  font-size: 1.08rem;
+}
+.gnfp-step {
+  margin: 0 0 0.2rem;
+  color: #39ff6a;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+}
+.gnfp-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem 0.6rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.gnfp-facts li {
+  padding: 0.35rem 0.45rem;
+  border: 1px solid rgba(38,148,232,0.45);
+  background: #14171c;
+  font-weight: 700;
+}
+.gnfp-facts span {
+  display: block;
+  color: #9aa8b5;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.gnfp-cmd {
+  margin: 0.65rem 0 0.45rem;
+  padding: 0.6rem 0.7rem;
+  overflow-x: auto;
+  background: #2b2b2b;
+  color: #00e5ff;
+  font-weight: 700;
+  font-family: ui-monospace, Consolas, "Cascadia Code", monospace;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.16);
+}
+.gnfp-chip-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.gnfp-chip-links a, .gnfp-go {
+  display: inline-block;
+  padding: 0.32rem 0.65rem;
+  border: 1px solid #00e5ff;
+  background: #14171c;
+  color: #00e5ff;
+  font-weight: 800;
+  text-decoration: none;
+  letter-spacing: 0.03em;
+}
+.gnfp-chip-links a:hover, .gnfp-go:hover {
+  background: rgba(0,229,255,0.12);
+  text-shadow: 0 0 8px rgba(0,229,255,0.85);
+}
+.gnfp-official, .gnfp-community {
+  margin: 0.85rem 0 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #2694e8;
+  background: #14171c;
+}
+.gnfp-official h2, .gnfp-community h2 {
+  margin: 0 0 0.35rem;
+  color: #00e5ff;
+  letter-spacing: 0.05em;
+  font-size: 1.02rem;
+}
+.gnfp-community-links a[data-gnfp-community="Discord"] {
+  border-color: #39ff6a;
+  color: #39ff6a;
+}
+#god-oracle-evolve { margin: 0 0 0.4rem; }
+#god-oracle-kicker {
+  margin: 0 0 0.35rem;
+  color: #00e5ff;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.76rem;
+}
+#god-oracle-title {
+  margin: 0 0 0.35rem;
+  color: #00e5ff;
+  letter-spacing: 0.04em;
+}
 #god-cli-box {
   margin: 1rem 0 1.2rem;
   padding: 0.75rem 0.9rem 0.85rem;
@@ -579,9 +874,9 @@ def render_god_hub_html() -> str:
     return (
         '<section class="panel-card" id="god-hub" data-god-hub="1">'
         f"{render_god_hub_menu_html()}"
-        "<h2 id=\"god-hub-title\">Start here</h2>"
-        '<p class="hint" id="god-hub-lead">Three Restore Privacy products, '
-        "current installers. Pick the package for the machine you are on.</p>"
+        "<h2 id=\"god-hub-title\">VPN · Wallet · Evolve</h2>"
+        '<p class="hint" id="god-hub-lead">The rest of the Restore Privacy '
+        "suite — current installers for the machine you are on.</p>"
         f'<div class="god-hub-grid" id="god-hub-grid">{"".join(cards)}</div>'
         "</section>"
     )
@@ -623,7 +918,7 @@ def render_god_rpai_page_html() -> str:
     close = public_page_close(downloads_map_href=GOD_DOWNLOADS_MAP_HREF)
     god_box = render_god_support_box_html()
     goal_box = render_goal_builder_box_html()
-    ticket_box = render_god_ticket_box_html()
+    intro = render_gnfp_intro_html()
     agent_cards = []
     for row in dash["agents"]:
         name = html.escape(str(row.get("name") or ""))
@@ -661,6 +956,13 @@ def render_god_rpai_page_html() -> str:
   <div class="page-shell" id="god-rpai-shell" data-page="god-rpai" data-god-port="{GOD_RPAI_PORT}">
 {header}
 <main class="support-wrap panel-card" id="god-rpai-main" data-chrome="pro" data-rpai-surface="1">
+  {intro}
+  <section class="panel-card" id="god-oracle-evolve" data-god-oracle="1">
+    <p class="gnfp-kicker" id="god-oracle-kicker">After the coin</p>
+    <h2 id="god-oracle-title">AI Oracle · Evolve</h2>
+    <p class="hint" id="god-oracle-lead">Ask GOD, build a goal, and watch the
+    four agents learn. This is the rpAI dashboard — the coin is above.</p>
+  </section>
   {hub}
   <section class="panel-card" id="god-port-box">
     <h3>god.restoreprivacy.online:{GOD_RPAI_PORT}</h3>
@@ -697,7 +999,6 @@ def render_god_rpai_page_html() -> str:
     <h3>Outputs · recently learned</h3>
     <ol class="god-output-list" id="god-output-list">{recent}</ol>
   </section>
-  {ticket_box}
 </main>
   </div>
 <script src="/static/god_rpai.js" defer></script>

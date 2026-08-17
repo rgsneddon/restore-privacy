@@ -87,8 +87,9 @@ GOD_KNOWN: tuple[tuple[str, str], ...] = (
     ),
     (
         "support",
-        "The ticket form below emails rus@restoreprivacy.online. Allow up to "
-        "48 hours. Do not paste passwords, cards, or KEYGENs.",
+        "Community contact is Discord (https://discord.gg/H9TdGyCUCa). "
+        "Email tickets live on restoreprivacy.online/support, not the GOD "
+        "page. Do not paste passwords, cards, or KEYGENs.",
     ),
     (
         "privacy",
@@ -634,8 +635,8 @@ def answer_god_question(
             "who": GOD_NAME,
             "error": (
                 "GOD is still researching that from product docs and public "
-                "pages — no invented answer. Ask again shortly, or use the "
-                "ticket form below for account help."
+                "pages — no invented answer. Ask again shortly, or find us "
+                "on Discord."
             ),
             "source": "researching",
             "learned": learned_count(),

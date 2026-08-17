@@ -16,6 +16,71 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "status_page"))
 sys.path.insert(0, str(ROOT))
 
+SCRATCH = Path(
+    "/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-fe6a0861d1b3/implementer"
+)
+
+GNFP_MARKERS = (
+    'id="gnfp-what"',
+    'id="gnfp-mining"',
+    'id="gnfp-wallet"',
+    'id="gnfp-explorer"',
+    'id="gnfp-official-links"',
+    'id="gnfp-community"',
+)
+ORACLE_MARKERS = (
+    'id="god-support-box"',
+    'id="goal-builder-box"',
+    'id="god-cli-box"',
+    'id="god-input-box"',
+    "data-agent-learned",
+)
+SUPPORT_FORM_MARKERS = (
+    "god-ticket-box",
+    "god-ticket-form",
+    'id="support-email"',
+    'id="support-subject"',
+    'id="support-message"',
+    'name="email"',
+    'name="subject"',
+    'name="message"',
+    'action="https://restoreprivacy.online/support"',
+    'action="/support"',
+)
+
+
+def _assert_gnfp_first_landing(test: unittest.TestCase, html: str) -> None:
+    from god_rpai import (
+        GNFP_DISCORD_HREF,
+        GNFP_EXPLORER_HREF,
+        GNFP_POOL_HREF,
+        GNFP_REL,
+        GNFP_TELEGRAM_HREF,
+    )
+
+    low = html.lower()
+    for marker in GNFP_MARKERS:
+        test.assertIn(marker, html)
+    test.assertIn("what it is", low)
+    test.assertIn("how mining works", low)
+    test.assertIn("beamhash iii", low)
+    test.assertIn("gnfp1", low)
+    test.assertIn("wallet", low)
+    test.assertIn("explorer", low)
+    test.assertIn(GNFP_POOL_HREF, html)
+    test.assertIn(GNFP_EXPLORER_HREF, html)
+    test.assertIn(GNFP_REL, html)
+    test.assertIn(GNFP_DISCORD_HREF, html)
+    test.assertIn("Discord", html)
+    test.assertIn(GNFP_TELEGRAM_HREF, html)
+    intro_at = html.index('id="gnfp-intro"')
+    for marker in ORACLE_MARKERS:
+        test.assertIn(marker, html)
+        test.assertLess(intro_at, html.index(marker), marker)
+    for marker in SUPPORT_FORM_MARKERS:
+        test.assertNotIn(marker, html)
+    test.assertNotIn("rus@restoreprivacy.online", html)
+
 
 class TestGodRpaiPage(unittest.TestCase):
     def setUp(self) -> None:
@@ -46,7 +111,7 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertIn("Restore Privacy VPN", html)
         self.assertIn("GNFP", html)
         self.assertIn("Evolve", html)
-        self.assertIn("god-ticket-box", html)
+        _assert_gnfp_first_landing(self, html)
         self.assertIn("/goal · goalbuilder app", html)
         self.assertNotIn("/goal · Grok Build", html)
         self.assertIn("god-cli-box", html)
@@ -57,7 +122,6 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertIn("x.com", html)
         self.assertIn("#2b2b2b", html)
         self.assertIn("#00e5ff", html)
-        self.assertIn("rus@restoreprivacy.online", html)
         self.assertIn("god-input-box", html)
         self.assertIn("text-align: center", html)
         self.assertNotIn('id="doc-links"', html)
@@ -189,6 +253,7 @@ class TestGodRpaiPage(unittest.TestCase):
             self.assertIn("bannerall.jpg", page)
             self.assertIn("1474", page)
             self.assertIn("god-hub", page)
+            _assert_gnfp_first_landing(self, page)
             api = json.loads(
                 urllib.request.urlopen(
                     f"http://127.0.0.1:{port}/api/rpai", timeout=5
@@ -353,6 +418,61 @@ class TestGodRpaiPage(unittest.TestCase):
         )
         scratch.mkdir(parents=True, exist_ok=True)
         (scratch / "god-menubar.html").write_text(html, encoding="utf-8")
+
+    def test_gnfp_intro_precedes_oracle_and_has_no_ticket_form(self) -> None:
+        from god_rpai import (
+            GNFP_BOOK,
+            gnfp_community_links,
+            gnfp_official_links,
+            render_gnfp_intro_html,
+            render_god_rpai_page_html,
+        )
+
+        intro = render_gnfp_intro_html()
+        html = render_god_rpai_page_html()
+        self.assertIn(intro, html)
+        self.assertIn(GNFP_BOOK, intro)
+        self.assertIn('data-gnfp-section="what"', intro)
+        self.assertIn('data-gnfp-section="mining"', intro)
+        self.assertIn('data-gnfp-section="wallet"', intro)
+        self.assertIn('data-gnfp-section="explorer"', intro)
+        for label, href in gnfp_official_links():
+            self.assertIn(label, intro)
+            self.assertIn(html_mod.escape(href, quote=True), intro)
+        for label, href in gnfp_community_links():
+            self.assertIn(label, intro)
+            self.assertIn(html_mod.escape(href, quote=True), intro)
+        _assert_gnfp_first_landing(self, html)
+        self.assertNotIn("telegram.me/fake", html)
+        self.assertNotIn("discord.gg/fake", html)
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        (SCRATCH / "god-page.html").write_text(html, encoding="utf-8")
+
+    def test_god_handler_serves_gnfp_first_twice(self) -> None:
+        from god_port import GodRpaiHandler
+
+        bodies: list[str] = []
+        for run in (1, 2):
+            httpd = ThreadingHTTPServer(("127.0.0.1", 0), GodRpaiHandler)
+            thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            thread.start()
+            try:
+                port = httpd.server_address[1]
+                resp = urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/", timeout=8
+                )
+                self.assertEqual(resp.status, 200)
+                body = resp.read().decode("utf-8")
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+            _assert_gnfp_first_landing(self, body)
+            bodies.append(body)
+            SCRATCH.mkdir(parents=True, exist_ok=True)
+            (SCRATCH / f"god-launch-{run}.html").write_text(body, encoding="utf-8")
+        self.assertEqual(len(bodies), 2)
+        _assert_gnfp_first_landing(self, bodies[0])
+        _assert_gnfp_first_landing(self, bodies[1])
 
 
 if __name__ == "__main__":
