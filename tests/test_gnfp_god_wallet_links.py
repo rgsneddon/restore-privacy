@@ -29,7 +29,7 @@ def _rel(tag: str, names: list[str]) -> dict:
     }
 
 
-CURRENT_PIN = "0.0.5"
+CURRENT_PIN = "0.0.6"
 WIN_NAME = f"gnfp-wallet-{CURRENT_PIN}-windows.zip"
 WIN_HREF = (
     "https://github.com/rgsneddon/gnfp-wallet/releases/download/"
@@ -51,16 +51,16 @@ class TestGnfpGodWalletLinks(unittest.TestCase):
                 ["gnfp-wallet-0.0.2-windows.zip", "gnfp-wallet-0.0.2-macos.zip"],
             ),
             _rel(
-                "v0.0.5",
+                "v0.0.6",
                 [
-                    "gnfp-wallet-0.0.5-windows.zip",
-                    "gnfp-wallet-0.0.5-linux.zip",
-                    "gnfp-wallet-0.0.5-macos.zip",
-                    "gnfp-wallet-0.0.5-ios.ipa",
-                    "gnfp-wallet-0.0.5-archlinux.zip",
+                    "gnfp-wallet-0.0.6-windows.zip",
+                    "gnfp-wallet-0.0.6-linux.zip",
+                    "gnfp-wallet-0.0.6-macos.zip",
+                    "gnfp-wallet-0.0.6-ios.ipa",
+                    "gnfp-wallet-0.0.6-archlinux.zip",
                 ],
             ),
-            _rel("v0.0.4", ["gnfp-wallet-0.0.4-macos.zip"]),
+            _rel("v0.0.5", ["gnfp-wallet-0.0.5-macos.zip"]),
         ]
         pin = latest_gnfp_wallet_pin_with_windows(releases)
         self.assertEqual(pin, CURRENT_PIN)
@@ -86,10 +86,10 @@ class TestGnfpGodWalletLinks(unittest.TestCase):
         from downloads import latest_gnfp_wallet_pin_with_windows
 
         releases = [
-            _rel("v0.0.6", ["gnfp-wallet-0.0.6-macos.zip"]),
-            _rel("v0.0.5", ["gnfp-wallet-0.0.5-windows.zip"]),
+            _rel("v0.0.7", ["gnfp-wallet-0.0.7-macos.zip"]),
+            _rel("v0.0.6", ["gnfp-wallet-0.0.6-windows.zip"]),
         ]
-        self.assertEqual(latest_gnfp_wallet_pin_with_windows(releases), "0.0.5")
+        self.assertEqual(latest_gnfp_wallet_pin_with_windows(releases), "0.0.6")
 
     def test_god_page_embeds_current_windows_zip(self) -> None:
         from god_rpai import gnfp_wallet_hub_product, render_god_wallet_hub_html
@@ -97,11 +97,11 @@ class TestGnfpGodWalletLinks(unittest.TestCase):
 
         releases = [
             _rel(
-                "v0.0.5",
+                "v0.0.6",
                 [
-                    "gnfp-wallet-0.0.5-windows.zip",
-                    "gnfp-wallet-0.0.5-linux.zip",
-                    "gnfp-wallet-0.0.5-macos.zip",
+                    "gnfp-wallet-0.0.6-windows.zip",
+                    "gnfp-wallet-0.0.6-linux.zip",
+                    "gnfp-wallet-0.0.6-macos.zip",
                 ],
             )
         ]

@@ -342,7 +342,7 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertEqual(products[1]["version"], GNFP_WALLET_PIN)
         self.assertEqual(products[2]["version"], EVOLVE_PIN)
         self.assertEqual(VPN_CATALOG_VERSION, "1.2.7")
-        self.assertEqual(GNFP_WALLET_PIN, "0.0.5")
+        self.assertEqual(GNFP_WALLET_PIN, "0.0.6")
         self.assertEqual(EVOLVE_PIN, "4.2.1")
 
         html = render_god_rpai_page_html()
@@ -351,8 +351,8 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertIn(GOD_BANNER_SRC, html)
         self.assertNotIn('id="god-main-title"', html)
         self.assertNotIn("0.1.13", html)
-        self.assertIn("gnfp-wallet-0.0.5-windows.zip", html)
-        self.assertIn("gnfp-wallet-0.0.5-linux.zip", html)
+        self.assertIn("gnfp-wallet-0.0.6-windows.zip", html)
+        self.assertIn("gnfp-wallet-0.0.6-linux.zip", html)
         gnfp_labels = [label for label, _href in products[1]["hrefs"]]
         self.assertEqual(gnfp_labels[0], "Windows")
         for product in products:

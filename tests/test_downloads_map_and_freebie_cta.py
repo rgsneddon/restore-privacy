@@ -178,7 +178,7 @@ class TestDownloadsMapPage(unittest.TestCase):
         self.assertNotIn("mishi-v", page.lower())
         self.assertNotIn("666Stitches", page)
         self.assertNotIn("1.1.13", page)
-        self.assertIn("gnfp-wallet-0.0.5-macos.zip", page)
+        self.assertIn("gnfp-wallet-0.0.6-macos.zip", page)
         self.assertIn("is-detected", page)  # windows suite link marked
         self.assertIn(map_platform_version("windows"), page)
         self.assertIn(map_platform_version("linux"), page)

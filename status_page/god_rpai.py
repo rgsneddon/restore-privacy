@@ -27,7 +27,7 @@ GOD_BANNER_SRC = "/bannerall.jpg"
 GOD_BANNER_FILE = "bannerall.jpg"
 
 VPN_CATALOG_VERSION = "1.2.7"
-GNFP_WALLET_PIN = "0.0.5"
+GNFP_WALLET_PIN = "0.0.6"
 EVOLVE_PIN = "4.2.1"
 
 VPN_FREE = "https://restoreprivacy.online/suite/download?platform={platform}&free_direct=1"
