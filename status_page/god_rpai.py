@@ -374,6 +374,8 @@ def god_rpai_css() -> str:
 #god-hub-menu {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
+  text-align: center;
   gap: 0.45rem 1rem;
   margin: 0 0 0.85rem;
   padding: 0.55rem 0.75rem;
@@ -515,10 +517,10 @@ def render_god_hub_html() -> str:
         )
     return (
         '<section class="panel-card" id="god-hub" data-god-hub="1">'
+        f"{render_god_hub_menu_html()}"
         "<h2 id=\"god-hub-title\">Start here</h2>"
         '<p class="hint" id="god-hub-lead">Three Restore Privacy products, '
         "current installers. Pick the package for the machine you are on.</p>"
-        f"{render_god_hub_menu_html()}"
         f'<div class="god-hub-grid" id="god-hub-grid">{"".join(cards)}</div>'
         "</section>"
     )
@@ -542,11 +544,9 @@ def render_god_rpai_page_html() -> str:
     try:
         from god_support import render_god_support_box_html
         from goal_builder import render_goal_builder_box_html
-        from grokbot import HIERARCHY
     except ImportError:  # pragma: no cover
         from status_page.god_support import render_god_support_box_html  # type: ignore
         from status_page.goal_builder import render_goal_builder_box_html  # type: ignore
-        from status_page.grokbot import HIERARCHY  # type: ignore
 
     dash = rpai_dashboard_payload()
     head = public_head_open(
@@ -600,7 +600,6 @@ def render_god_rpai_page_html() -> str:
   <div class="page-shell" id="god-rpai-shell" data-page="god-rpai" data-god-port="{GOD_RPAI_PORT}">
 {header}
 <main class="support-wrap panel-card" id="god-rpai-main" data-chrome="pro" data-rpai-surface="1">
-  <p class="support-lead" id="god-rpai-lead">{html.escape(HIERARCHY["line"])}</p>
   {hub}
   <section class="panel-card" id="god-port-box">
     <h3>god.restoreprivacy.online:{GOD_RPAI_PORT}</h3>

@@ -324,8 +324,16 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertIn(menu, html)
         self.assertIn(menu, hub)
         menu_at = html.index('id="god-hub-menu"')
+        start_at = html.index('id="god-hub-title"')
         grid_at = html.index('id="god-hub-grid"')
-        self.assertLess(menu_at, grid_at)
+        self.assertLess(menu_at, start_at)
+        self.assertLess(start_at, grid_at)
+        self.assertNotIn(
+            "GOD sits at the top of rpAI",
+            html,
+        )
+        self.assertNotIn('id="god-rpai-lead"', html)
+        self.assertIn("justify-content: center", html)
         self.assertEqual(
             [label for label, _href in links],
             ["GNFP POOL", "GNFP EXPLORER", "RESTORE PRIVACY VPN", "EVOLVE"],
