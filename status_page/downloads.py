@@ -2155,20 +2155,37 @@ def _iter_inventory_releases(repo: dict[str, Any]) -> list[tuple[str, list[Any]]
     return []
 
 
+def _github_inventory_helpers():
+    """Skip/filter helpers shared with the inventory refresh module."""
+    try:
+        from _refresh_github_release_inventory import (  # type: ignore
+            MAP_SKIP_REPOS,
+            select_release_installers,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page._refresh_github_release_inventory import (  # type: ignore
+            MAP_SKIP_REPOS,
+            select_release_installers,
+        )
+    return MAP_SKIP_REPOS, select_release_installers
+
+
 def list_github_release_map_rows(
     *, inventory_path: Path | None = None
 ) -> list[dict[str, str]]:
-    """Map rows for the newest published GitHub Release of each inventory app."""
+    """Map rows for the newest published installer of each inventory app."""
+    skip_repos, select_installers = _github_inventory_helpers()
     rows: list[dict[str, str]] = []
     for repo in load_github_release_inventory(inventory_path):
-        product = str(repo.get("product") or repo.get("repo") or "Other").strip()
+        repo_name = str(repo.get("repo") or "").strip()
+        if repo_name in skip_repos:
+            continue
+        product = str(repo.get("product") or repo_name or "Other").strip()
         latest = latest_inventory_release(_iter_inventory_releases(repo))
         if not latest:
             continue
         tag, assets = latest
-        for asset in assets:
-            if not isinstance(asset, dict):
-                continue
+        for asset in select_installers(tag, assets):
             fname = str(asset.get("filename") or "").strip()
             href = str(asset.get("href") or "").strip()
             if not fname or not href:
@@ -2192,12 +2209,13 @@ def list_github_release_map_rows(
 def list_downloads_map_rows(
     *, version: str | None = None, inventory_path: Path | None = None
 ) -> list[dict[str, str]]:
-    """Downloads Map: Suite free_direct clients, then newest GitHub asset per app.
+    """Downloads Map: Suite free_direct clients, then newest GitHub installer per app.
 
     Suite rows stay on the Helsinki free_direct path (same as FREE DOWNLOAD).
     Other public rgsneddon repos are listed from
-    :func:`load_github_release_inventory` (newest tag only, every platform
-    installer on that tag).
+    :func:`load_github_release_inventory` (newest tag only, installer packages
+    on that tag). Old GitHub Restore Privacy clients, checksums, and private
+    or deleted repos are omitted.
     """
     rows: list[dict[str, str]] = []
     for p in list_catalog_platform_packages(version=version):

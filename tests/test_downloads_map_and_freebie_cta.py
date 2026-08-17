@@ -103,16 +103,20 @@ class TestGithubReleaseInventory(unittest.TestCase):
             for a in assets
             if isinstance(a, dict) and a.get("filename")
         }
-        self.assertIn("evolve-v4.1.12-windows-x64-setup.exe", names)
+        self.assertIn("evolve-v4.2.1-windows-x64-setup.exe", names)
         rows = list_github_release_map_rows()
         hrefs = {r["href"] for r in rows}
         self.assertTrue(
-            any(h.endswith("/v4.1.12/evolve-v4.1.12-windows-x64-setup.exe") for h in hrefs)
+            any(h.endswith("/v4.2.1/evolve-v4.2.1-windows-x64-setup.exe") for h in hrefs)
         )
         for r in rows:
             self.assertEqual(r["kind"], "github_release")
             self.assertTrue(r["href"].startswith("https://github.com/rgsneddon/"))
             self.assertNotIn(".sha256", r["filename"])
+            self.assertNotIn(".sha512", r["filename"])
+            self.assertNotIn("mishi", r["href"])
+            self.assertNotIn("666Stitches", r["href"])
+            self.assertNotIn("restore-privacy-client-1.2.5", r["filename"])
 
 
 class TestDownloadsMapPage(unittest.TestCase):
@@ -147,12 +151,12 @@ class TestDownloadsMapPage(unittest.TestCase):
         self.assertIn("Evolve", products)
         evolve_win = [
             r for r in github
-            if r["filename"] == "evolve-v4.1.12-windows-x64-setup.exe"
+            if r["filename"] == "evolve-v4.2.1-windows-x64-setup.exe"
         ]
         self.assertEqual(len(evolve_win), 1)
         self.assertTrue(
             evolve_win[0]["href"].endswith(
-                "/evolve/releases/download/v4.1.12/evolve-v4.1.12-windows-x64-setup.exe"
+                "/evolve/releases/download/v4.2.1/evolve-v4.2.1-windows-x64-setup.exe"
             )
         )
 
@@ -169,7 +173,12 @@ class TestDownloadsMapPage(unittest.TestCase):
         self.assertNotIn("/pay?product=suite&amp;platform=", page)
         self.assertIn('data-kind="github_release"', page)
         self.assertIn('data-map-product="Evolve"', page)
-        self.assertIn("evolve-v4.1.12-windows-x64-setup.exe", page)
+        self.assertIn("evolve-v4.2.1-windows-x64-setup.exe", page)
+        self.assertNotIn("restore-privacy-client-1.2.5", page)
+        self.assertNotIn("mishi-v", page.lower())
+        self.assertNotIn("666Stitches", page)
+        self.assertNotIn("1.1.13", page)
+        self.assertIn("gnfp-wallet-0.0.5-macos.zip", page)
         self.assertIn("is-detected", page)  # windows suite link marked
         self.assertIn(map_platform_version("windows"), page)
         self.assertIn(map_platform_version("linux"), page)

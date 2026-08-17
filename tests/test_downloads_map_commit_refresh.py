@@ -170,6 +170,49 @@ class TestCommitPathDownloadsMapRefresh(unittest.TestCase):
             self.assertFalse(second["wrote"])
             self.assertEqual(dest.read_text(encoding="utf-8"), before)
 
+    def test_select_release_installers_drops_sidecars_and_old_pins(self) -> None:
+        shipped = _load(
+            "_refresh_github_release_inventory",
+            ROOT / "status_page" / "_refresh_github_release_inventory.py",
+        )
+        self.assertTrue(shipped.skip_asset("CHECKSUMS.sha512"))
+        self.assertTrue(shipped.skip_asset("checksums.json"))
+        self.assertTrue(shipped.skip_asset("evolve-v4.2.1-windows-x64-setup.exe.sha512"))
+        self.assertFalse(shipped.skip_asset("evolve-v4.2.1-windows-x64-setup.exe"))
+        self.assertIn("restore-privacy", shipped.MAP_SKIP_REPOS)
+        self.assertIn("mishi", shipped.MAP_SKIP_REPOS)
+        self.assertIn("666Stitches.mov", shipped.MAP_SKIP_REPOS)
+        picked = shipped.select_release_installers(
+            "v0.0.5",
+            [
+                {
+                    "name": "gnfp-wallet-0.0.5-macos.zip",
+                    "browser_download_url": "https://example/macos.zip",
+                },
+                {
+                    "name": "gnfp-wallet-0.0.5-ios.ipa",
+                    "browser_download_url": "https://example/ios.ipa",
+                },
+                {
+                    "name": "gnfp-wallet-0.0.5-ios.zip",
+                    "browser_download_url": "https://example/ios.zip",
+                },
+                {
+                    "name": "gnfp-wallet-0.0.2-windows.zip",
+                    "browser_download_url": "https://example/old.zip",
+                },
+                {
+                    "name": "checksums.json",
+                    "browser_download_url": "https://example/checksums.json",
+                },
+            ],
+        )
+        names = [a["filename"] for a in picked]
+        self.assertEqual(
+            names,
+            ["gnfp-wallet-0.0.5-macos.zip", "gnfp-wallet-0.0.5-ios.ipa"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
