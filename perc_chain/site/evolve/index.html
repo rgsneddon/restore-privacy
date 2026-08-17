@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Evolve Chronoflux — social science scenario analysis that runs locally on your device. Download for Windows, macOS, Linux, Android, and iOS.">
+  <meta name="theme-color" content="#070812">
+  <title>Evolve Chronoflux — the app</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070812;
+      --bg-2: #0d1020;
+      --panel: rgba(16, 20, 36, 0.72);
+      --panel-solid: #14182a;
+      --line: rgba(255, 214, 120, 0.18);
+      --text: #f4efe4;
+      --muted: #a9b0c7;
+      --gold: #f0c14b;
+      --gold-2: #ffe7a3;
+      --cyan: #3de7ff;
+      --violet: #7c6cff;
+      --ok: #3dffb0;
+      --radius: 22px;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: Outfit, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.55;
+      overflow-x: hidden;
+    }
+
+    canvas#flux {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .glow {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 70% 45% at 15% -10%, rgba(124, 108, 255, 0.28), transparent 60%),
+        radial-gradient(ellipse 50% 40% at 90% 8%, rgba(61, 231, 255, 0.16), transparent 55%),
+        radial-gradient(ellipse 40% 30% at 70% 100%, rgba(240, 193, 75, 0.1), transparent 50%);
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 0 22px 80px;
+    }
+
+    a { color: var(--cyan); }
+    a:hover { color: var(--gold-2); }
+
+    .skip {
+      position: absolute;
+      left: -999px;
+      top: 8px;
+      background: var(--gold);
+      color: #1a1404;
+      padding: 8px 14px;
+      border-radius: 8px;
+      z-index: 9;
+    }
+    .skip:focus { left: 12px; }
+
+    nav.top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 0 10px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .brand img {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      box-shadow: 0 0 24px rgba(61, 231, 255, 0.35);
+    }
+    .brand b {
+      font-family: Cinzel, serif;
+      letter-spacing: 0.14em;
+      font-size: 1.05rem;
+    }
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      justify-content: flex-end;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+    .nav-links a:hover { color: var(--gold-2); }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 36px;
+      align-items: center;
+      padding: 28px 0 18px;
+    }
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--gold);
+      border: 1px solid rgba(240, 193, 75, 0.35);
+      background: rgba(240, 193, 75, 0.08);
+      border-radius: 999px;
+      padding: 6px 12px;
+      margin-bottom: 16px;
+    }
+    .kicker i {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 10px var(--ok);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    h1 {
+      font-family: Cinzel, serif;
+      font-size: clamp(2.4rem, 6vw, 4.4rem);
+      line-height: 0.95;
+      letter-spacing: 0.04em;
+      background: linear-gradient(180deg, #fff6d6 0%, #f0c14b 55%, #b88920 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 16px;
+      text-shadow: 0 0 40px rgba(240, 193, 75, 0.15);
+    }
+    .lede {
+      font-size: 1.12rem;
+      color: var(--muted);
+      max-width: 38rem;
+      margin-bottom: 22px;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 13px 20px;
+      border-radius: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
+    }
+    .btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
+    .btn-gold {
+      background: linear-gradient(135deg, #ffe7a3, #f0c14b 40%, #c4891a);
+      color: #1a1404;
+      box-shadow: 0 10px 30px rgba(240, 193, 75, 0.28);
+    }
+    .btn-ghost {
+      background: rgba(61, 231, 255, 0.08);
+      color: var(--cyan);
+      border-color: rgba(61, 231, 255, 0.35);
+    }
+    .meta-line {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .meta-line strong { color: var(--text); }
+
+    .hero-art {
+      position: relative;
+      min-height: 320px;
+    }
+    .hero-art img.hero-shot {
+      width: 100%;
+      border-radius: 28px;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow), 0 0 80px rgba(124, 108, 255, 0.18);
+      display: block;
+    }
+    .orb {
+      position: absolute;
+      width: 118px;
+      height: 118px;
+      right: -18px;
+      bottom: -22px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid rgba(240, 193, 75, 0.45);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 30px rgba(61, 231, 255, 0.35);
+      animation: floaty 6s ease-in-out infinite;
+    }
+
+    .symbols {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    .sym {
+      font-family: Cinzel, serif;
+      font-size: 0.82rem;
+      letter-spacing: 0.08em;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(124, 108, 255, 0.12);
+      border: 1px solid rgba(124, 108, 255, 0.28);
+      color: #d9d4ff;
+    }
+
+    .section { padding: 56px 0 8px; }
+    .section h2 {
+      font-family: Cinzel, serif;
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+    .section .sub {
+      color: var(--muted);
+      max-width: 40rem;
+      margin-bottom: 26px;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .card {
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 22px 20px 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover {
+      transform: translateY(-4px) rotate(-0.2deg);
+      border-color: rgba(61, 231, 255, 0.4);
+      box-shadow: 0 16px 40px rgba(61, 231, 255, 0.08);
+    }
+    .card h3 { font-size: 1.08rem; margin-bottom: 8px; }
+    .card p { color: var(--muted); font-size: 0.94rem; }
+    .glyph {
+      font-family: Cinzel, serif;
+      font-size: 1.4rem;
+      color: var(--gold);
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .how {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 22px;
+      align-items: center;
+    }
+    .steps { display: grid; gap: 12px; }
+    .step {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 14px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(20, 24, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .num {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--violet), #3de7ff);
+      color: #081018;
+    }
+    .devices {
+      width: 100%;
+      border-radius: 24px;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .dl-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .dl {
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+    .dl.suggested {
+      border-color: rgba(240, 193, 75, 0.55);
+      box-shadow: 0 0 0 1px rgba(240, 193, 75, 0.25), 0 16px 40px rgba(240, 193, 75, 0.12);
+    }
+    .dl .os {
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gold);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .dl h3 { margin-bottom: 8px; }
+    .dl p { flex: 1; margin-bottom: 14px; }
+    .file {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+      word-break: break-word;
+    }
+    .sha {
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 0.68rem;
+      color: #8d95ad;
+      word-break: break-all;
+      margin-top: 10px;
+    }
+    .btn-block { width: 100%; }
+
+    .notes {
+      margin-top: 28px;
+      padding: 22px 22px 8px;
+      border-radius: var(--radius);
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+    .notes h3 { margin-bottom: 10px; }
+    .notes li {
+      color: var(--muted);
+      margin: 0 0 10px 18px;
+      font-size: 0.92rem;
+    }
+
+    footer {
+      margin-top: 56px;
+      padding-top: 22px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--muted);
+      font-size: 0.88rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      justify-content: space-between;
+    }
+    footer .links { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+    @keyframes floaty {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-10px) rotate(8deg); }
+    }
+
+    @media (max-width: 900px) {
+      .hero, .how, .features, .dl-grid { grid-template-columns: 1fr; }
+      .orb { width: 88px; height: 88px; right: 8px; bottom: -16px; }
+    }
+    @media (min-width: 700px) and (max-width: 1100px) {
+      .dl-grid, .features { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#download">Skip to downloads</a>
+  <canvas id="flux" aria-hidden="true"></canvas>
+  <div class="glow" aria-hidden="true"></div>
+
+  <div class="wrap">
+    <nav class="top" aria-label="Evolve">
+      <a class="brand" href="#top">
+        <img src="assets/icon-192.png" width="42" height="42" alt="">
+        <b>EVOLVE</b>
+      </a>
+      <div class="nav-links">
+        <a href="#what">The app</a>
+        <a href="#how">How it works</a>
+        <a href="#download">Download</a>
+        <a href="https://rgsneddon.github.io/evolve/" target="_blank" rel="noopener noreferrer">Web app</a>
+        <a href="/explorer">Explorer</a>
+      </div>
+    </nav>
+
+    <header class="hero" id="top">
+      <div>
+        <div class="kicker"><i></i> Free · v4.2.1 · build 181</div>
+        <h1>EVOLVE</h1>
+        <p class="lede">
+          Chronoflux scenario analysis for the real world. Pose a question,
+          pick a region, and watch local hydrodynamic constructs turn
+          social tension into a percent chance, a cohesion score, and five
+          actions for the person who has to answer for it.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-gold" href="#download">Download the app</a>
+          <a class="btn btn-ghost" href="https://rgsneddon.github.io/evolve/" target="_blank" rel="noopener noreferrer">Open in the browser</a>
+        </div>
+        <p class="meta-line">Windows · macOS · Linux · Arch · Android · iOS / iPad · Web. Core math stays on your device.</p>
+        <div class="symbols" aria-label="Chronoflux constructs">
+          <span class="sym">ω vortex</span>
+          <span class="sym">σ shear</span>
+          <span class="sym">Iτ resistance</span>
+          <span class="sym">Jμ flow</span>
+        </div>
+      </div>
+      <div class="hero-art">
+        <img class="hero-shot" src="assets/hero.jpg" width="1600" height="900" alt="Evolve running across a laptop, phones, and a tablet inside a gold and cyan Chronoflux vortex">
+        <img class="orb" src="assets/orb.jpg" width="236" height="236" alt="">
+      </div>
+    </header>
+
+    <section class="section" id="what">
+      <h2>What the app is</h2>
+      <p class="sub">
+        Evolve is a cross-platform Chronoflux workshop. It is not a mining
+        pool and not a chain explorer. It is the place you ask
+        “what is the chance of…?” and get a local, inspectable answer.
+      </p>
+      <div class="features">
+        <article class="card">
+          <span class="glyph">%</span>
+          <h3>Percent chance</h3>
+          <p>Calibrated ~% headlines with regressive / progressive lean, continuum conclusion, and the historical cases that formed the base rate.</p>
+        </article>
+        <article class="card">
+          <span class="glyph">SCS</span>
+          <h3>Social cohesion</h3>
+          <p>Full PART ONE / TWO / THREE reports. Paste a narrative link, score attributed quotes, and watch cohesion move.</p>
+        </article>
+        <article class="card">
+          <span class="glyph">5</span>
+          <h3>Five actions</h3>
+          <p>Every run ends with five numbered actions for the accountable figurehead — mayor, minister, agency lead — plus copy and export.</p>
+        </article>
+        <article class="card">
+          <span class="glyph">⌘</span>
+          <h3>Local first</h3>
+          <p>All core Chronoflux calculations run on your device. No account is required to analyse a scenario offline.</p>
+        </article>
+        <article class="card">
+          <span class="glyph">✶</span>
+          <h3>Optional Grok</h3>
+          <p>Slide GROK CONSTRUE to fill blank σ / Iτ / Jμ / ω fields. Fields you already typed are never overwritten.</p>
+        </article>
+        <article class="card">
+          <span class="glyph">FCG</span>
+          <h3>Community governance</h3>
+          <p>A quantitative companion to Full Community Governance — ward debate, SSUCF cohesion voting, and PERC parish tools in one suite.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="how">
+      <h2>How a run feels</h2>
+      <p class="sub">Same pipeline on every platform. Region first, question second, constructs only if you want to bias the flow.</p>
+      <div class="how">
+        <div class="steps">
+          <div class="step"><div class="num">1</div><div><strong>Pick a region and language.</strong><br><span class="meta-line">Scopes observations and construct language. Not Global unless you choose Global.</span></div></div>
+          <div class="step"><div class="num">2</div><div><strong>Pose the question (ω).</strong><br><span class="meta-line">“What is the chance of sporadic civil unrest near-term?” Optional shear, resistance, and flow sit underneath.</span></div></div>
+          <div class="step"><div class="num">3</div><div><strong>Calculate.</strong><br><span class="meta-line">Local Chronoflux continuum, then five establishment actions. Export PDF, Markdown, or copy the synopsis.</span></div></div>
+          <div class="step"><div class="num">4</div><div><strong>Read the honesty layer.</strong><br><span class="meta-line">Every conclusion lists the registry filter, horizon, and each OR-xxxx case used in the base rate.</span></div></div>
+        </div>
+        <img class="devices" src="assets/devices.jpg" width="1600" height="900" alt="Phone and laptop floating in gold and cyan Chronoflux waveforms">
+      </div>
+    </section>
+
+    <section class="section" id="download">
+      <h2>Download Evolve 4.2.1</h2>
+      <p class="sub">Installers live on GitHub Releases. Checksums below are the published SHA-256 for this pin.</p>
+      <div class="dl-grid">
+        <article class="card dl" data-os="windows">
+          <div class="os">Windows</div>
+          <h3>Setup installer</h3>
+          <p>Start Menu shortcut and uninstaller. SmartScreen may ask you to confirm until Authenticode-signed builds ship.</p>
+          <p class="file">evolve-v4.2.1-windows-x64-setup.exe · 13.5 MB</p>
+          <a class="btn btn-gold btn-block" href="https://github.com/rgsneddon/evolve/releases/download/v4.2.1/evolve-v4.2.1-windows-x64-setup.exe">Download Windows</a>
+          <p class="sha">SHA-256 04df924df2ecca70ba677a84c9a195f7876dd37c83dd0e0511645603ee768975</p>
+        </article>
+        <article class="card dl" data-os="macos">
+          <div class="os">macOS</div>
+          <h3>Universal app zip</h3>
+          <p>Apple silicon and Intel. Developer ID signed, hardened runtime, notarized. Unzip and open Evolve.app.</p>
+          <p class="file">evolve-v4.2.1-macos-x64.zip · 21.3 MB</p>
+          <a class="btn btn-gold btn-block" href="https://github.com/rgsneddon/evolve/releases/download/v4.2.1/evolve-v4.2.1-macos-x64.zip">Download macOS</a>
+          <p class="sha">SHA-256 27f2fbdf7f4999ba8c93d8ff6aa8bcf00c38190bc3f5b184b6724237bb8a5b27</p>
+        </article>
+        <article class="card dl" data-os="linux">
+          <div class="os">Linux</div>
+          <h3>x64 tarball</h3>
+          <p>Extract and run the desktop binary. Same Chronoflux engine as the other desktop pins.</p>
+          <p class="file">evolve-v4.2.1-linux-x64.tar.gz · 11.4 MB</p>
+          <a class="btn btn-gold btn-block" href="https://github.com/rgsneddon/evolve/releases/download/v4.2.1/evolve-v4.2.1-linux-x64.tar.gz">Download Linux</a>
+          <p class="sha">SHA-256 592f3dc42cc0f3f8092be3f4774bb3e74bf7799a51ce63d04d03db620cbb36e0</p>
+        </article>
+        <article class="card dl" data-os="arch">
+          <div class="os">Arch</div>
+          <h3>pacman package</h3>
+          <p>Install with <code>pacman -U</code>. Built for x86_64. See the Linux/Arch handover on GitHub for packaging notes.</p>
+          <p class="file">evolve-v4.2.1-archlinux-x86_64.pkg.tar.zst · 9.2 MB</p>
+          <a class="btn btn-gold btn-block" href="https://github.com/rgsneddon/evolve/releases/download/v4.2.1/evolve-v4.2.1-archlinux-x86_64.pkg.tar.zst">Download Arch</a>
+          <p class="sha">SHA-256 b0de557a33a8bc8fae9a3c8ac875ef04562e97fceb532ae6892dee369c209d39</p>
+        </article>
+        <article class="card dl" data-os="android">
+          <div class="os">Android</div>
+          <h3>Release APK</h3>
+          <p>Android 7.0+ (API 24). Enable “Install unknown apps”. Uninstall any old debug-signed Evolve first.</p>
+          <p class="file">evolve-v4.2.1-android-setup.apk · 76.6 MB · arm64 / arm32 / x86_64</p>
+          <a class="btn btn-gold btn-block" href="https://github.com/rgsneddon/evolve/releases/download/v4.2.1/evolve-v4.2.1-android-setup.apk">Download Android</a>
+          <p class="sha">SHA-256 be0a7051e74c29f978494c987b9de400c69012d39e399363c672f3802da40705</p>
+        </article>
+        <article class="card dl" data-os="ios">
+          <div class="os">iOS / iPad</div>
+          <h3>Universal IPA</h3>
+          <p>One IPA for iPhone and iPad. Sideload with AltStore, Apple Configurator, or a registered device profile. iOS 13+.</p>
+          <p class="file">evolve-v4.2.1-ios-setup.ipa · 22.2 MB</p>
+          <a class="btn btn-gold btn-block" href="https://github.com/rgsneddon/evolve/releases/download/v4.2.1/evolve-v4.2.1-ios-setup.ipa">Download iOS</a>
+          <p class="sha">SHA-256 9073a7bd5a9d15d3b080a4d011a5ef2295cf2494bbeb90085fbb913662c52865</p>
+        </article>
+      </div>
+
+      <div class="notes">
+        <h3>Install notes</h3>
+        <ul>
+          <li><strong>This host is the Evolve app.</strong> The $GNFP pool lives at <a href="https://gnfp.restoreprivacy.online">gnfp.restoreprivacy.online</a>. Perccent mining is at <a href="https://mineperc.restoreprivacy.online">mineperc.restoreprivacy.online</a>.</li>
+          <li><strong>Web:</strong> the live browser build is <a href="https://rgsneddon.github.io/evolve/">rgsneddon.github.io/evolve</a>. Chronoflux still runs locally; web Grok construal is heuristic unless a remote proxy is configured.</li>
+          <li><strong>Integrity:</strong> Android is release-key signed. macOS is Developer ID + notarized (Team SFCBP95595). Windows is checksum-verified. Sidecars and <a href="https://github.com/rgsneddon/evolve/releases/download/v4.2.1/CHECKSUMS.sha256">CHECKSUMS.sha256</a> sit on the <a href="https://github.com/rgsneddon/evolve/releases/tag/v4.2.1">v4.2.1</a> release.</li>
+          <li><strong>Principia:</strong> the Chronoflux Principia, realised by Roy D Herbert, is the mechanical foundation of the analysis engine. License and attribution are inside the app.</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer>
+      <div>© 2026 Evolve Chronoflux · pin 4.2.1</div>
+      <div class="links">
+        <a href="https://github.com/rgsneddon/evolve">Source</a>
+        <a href="https://github.com/rgsneddon/evolve/releases/tag/v4.2.1">Releases</a>
+        <a href="https://rgsneddon.github.io/evolve/fcg_white_paper.html">FCG white paper</a>
+        <a href="https://bitcointalk.org/index.php?topic=5587544.msg66906190#msg66906190">BitcoinTalk ANN</a>
+        <a href="/explorer">Perccent explorer</a>
+        <a href="https://rgsneddon.github.io/evolve/privacy_policy.txt">Privacy</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      const ua = navigator.userAgent || "";
+      let key = "";
+      if (/Android/i.test(ua)) key = "android";
+      else if (/iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) key = "ios";
+      else if (/Win/i.test(ua)) key = "windows";
+      else if (/Mac/i.test(ua)) key = "macos";
+      else if (/Arch|Manjaro/i.test(ua + " " + (navigator.userAgentData && navigator.userAgentData.platform || ""))) key = "arch";
+      else if (/Linux/i.test(ua)) key = "linux";
+      if (key) {
+        const card = document.querySelector('.dl[data-os="' + key + '"]');
+        if (card) {
+          card.classList.add("suggested");
+          const os = card.querySelector(".os");
+          if (os && !os.dataset.marked) {
+            os.dataset.marked = "1";
+            os.textContent = os.textContent + " · your device";
+          }
+        }
+      }
+
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const canvas = document.getElementById("flux");
+      if (!canvas || reduce) return;
+      const ctx = canvas.getContext("2d");
+      const dots = [];
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      function spawn() {
+        dots.length = 0;
+        const n = Math.min(90, Math.floor((canvas.width * canvas.height) / 18000));
+        for (let i = 0; i < n; i++) {
+          dots.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            r: Math.random() * 1.6 + 0.3,
+            vx: (Math.random() - 0.5) * 0.28,
+            vy: (Math.random() - 0.5) * 0.18,
+            c: Math.random() > 0.55 ? "rgba(61,231,255,0.55)" : "rgba(240,193,75,0.45)",
+          });
+        }
+      }
+      function tick() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (const d of dots) {
+          d.x += d.vx;
+          d.y += d.vy;
+          if (d.x < 0) d.x = canvas.width;
+          if (d.x > canvas.width) d.x = 0;
+          if (d.y < 0) d.y = canvas.height;
+          if (d.y > canvas.height) d.y = 0;
+          ctx.beginPath();
+          ctx.fillStyle = d.c;
+          ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        requestAnimationFrame(tick);
+      }
+      resize();
+      spawn();
+      tick();
+      window.addEventListener("resize", function () { resize(); spawn(); });
+    })();
+  </script>
+</body>
+</html>

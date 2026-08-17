@@ -97,7 +97,8 @@ GOD_KNOWN: tuple[tuple[str, str], ...] = (
     ),
     (
         "evolve",
-        "evolve.restoreprivacy.online is the Perccent explorer. GOD is the "
+        "evolve.restoreprivacy.online is the Evolve Chronoflux app landing "
+        "(downloads + info). /explorer is the Perccent explorer. GOD is the "
         "identity; NED leads under GOD; FRED and PEDRO report to NED.",
     ),
     (

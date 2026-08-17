@@ -59,6 +59,7 @@ def _stage_dir(out: Path) -> Path:
         "mineperc",
         "fixtures",
         "deploy",
+        "site",
         "DEPLOY_HELSINKI.md",
     ):
         src = CHAIN_SRC / name
@@ -286,6 +287,8 @@ def upload_and_install(tarball: Path, install_service: bool) -> None:
                 f"curl -fsS {DEFAULT_PUBLIC_ENDPOINT}/health || curl -fsS http://127.0.0.1:{DEFAULT_PORT}/health || true",
                 f"cp -f {DEFAULT_REMOTE_ROOT}/deploy/nginx-evolve.restoreprivacy.online.conf /etc/nginx/sites-available/evolve.restoreprivacy.online.conf",
                 "ln -sfn /etc/nginx/sites-available/evolve.restoreprivacy.online.conf /etc/nginx/sites-enabled/evolve.restoreprivacy.online.conf",
+                "mkdir -p /var/www/evolve.restoreprivacy.online",
+                f"cp -a {DEFAULT_REMOTE_ROOT}/site/evolve/. /var/www/evolve.restoreprivacy.online/",
                 "nginx -t && systemctl reload nginx || true",
                 f"curl -fsS -H 'Host: {EVOLVE_EXPLORER_HOST}' http://127.0.0.1/health || true",
                 f"curl -fsS {EVOLVE_EXPLORER_URL}/health || true",
