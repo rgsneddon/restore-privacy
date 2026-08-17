@@ -671,11 +671,10 @@ def render_god_support_box_html() -> str:
   <h3 id="god-support-title">GOD</h3>
   <p class="god-support-lead" id="god-support-lead">
     Ask GOD anything — product, rpAI mind, or the wider world. GOD finds
-    answers before it replies (product docs, residual suite map, public
-    pages). Users do not teach GOD. FRED still runs Helsinki scenarios
-    every two hours. NED leads under GOD. PEDRO observes X.com via Grok at
-    minute 34 for the @rgsneddon Evolve wallet so the chain averages three
-    blocks an hour.
+    an answer before it speaks. Visitors do not teach GOD. FRED still
+    runs Helsinki scenarios every two hours. PEDRO reads x.com through Grok
+    at minute 34. GOD is the rpAI leader; Grokbot (Grok Build) stays with
+    GOD, NED, FRED, and PEDRO.
   </p>
   <p class="hint" id="god-support-stats">
     Learned topics: <strong id="god-learned-count">{html.escape(str(count))}</strong>

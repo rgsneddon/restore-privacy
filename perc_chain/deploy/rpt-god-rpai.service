@@ -1,0 +1,14 @@
+[Unit]
+Description=GOD rpAI page (god_port.py :8013)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/restore-privacy/status_page
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/restore-privacy/status_page/god_port.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

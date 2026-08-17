@@ -1,0 +1,14 @@
+[Unit]
+Description=GNFP pool HTTP + stratum (:1474 / :8014)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/restore-privacy
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/node /opt/restore-privacy/scripts/gnfp_pool.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -9,6 +9,7 @@ import unittest
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
+import html as html_mod
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,9 +38,14 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertEqual(GOD_RPAI_HOST, "god.restoreprivacy.online")
         self.assertEqual(GOD_RPAI_PORT, 1474)
         html = render_god_rpai_page_html()
-        self.assertIn("god-main-title", html)
-        self.assertIn("God's GNPF crypto-coin", html)
-        self.assertIn("god_banner.jpg", html)
+        self.assertNotIn('id="god-main-title"', html)
+        self.assertNotIn("God's GNPF crypto-coin", html)
+        self.assertNotIn("GOD another AI learning Oracle", html)
+        self.assertIn("bannerall.jpg", html)
+        self.assertIn("god-hub", html)
+        self.assertIn("Restore Privacy VPN", html)
+        self.assertIn("GNFP", html)
+        self.assertIn("Evolve", html)
         self.assertIn("god-ticket-box", html)
         self.assertIn("/goal · goalbuilder app", html)
         self.assertNotIn("/goal · Grok Build", html)
@@ -69,7 +75,7 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertIn("data-agent-learned", html)
         self.assertIn("Grokbot", html)
         self.assertIn("1474", html)
-        self.assertIn("135.181.152.10", html)
+        self.assertNotIn("135.181.152.10", html)
         self.assertNotIn("NED leads under GOD", html)
         self.assertNotIn("Send support ticket", html)
         self.assertGreaterEqual(len(PORT_1474_BENEFITS), 4)
@@ -178,9 +184,11 @@ class TestGodRpaiPage(unittest.TestCase):
             page = urllib.request.urlopen(
                 f"http://127.0.0.1:{port}/", timeout=5
             ).read().decode("utf-8")
-            self.assertIn("god-main-title", page)
-            self.assertIn("GNPF", page)
+            self.assertNotIn('id="god-main-title"', page)
+            self.assertNotIn("GNPF", page)
+            self.assertIn("bannerall.jpg", page)
             self.assertIn("1474", page)
+            self.assertIn("god-hub", page)
             api = json.loads(
                 urllib.request.urlopen(
                     f"http://127.0.0.1:{port}/api/rpai", timeout=5
@@ -242,6 +250,65 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertIn("/god", app)
         self.assertIn("/api/learn", app)
         self.assertIn("god_rpai.js", app)
+
+    def test_hub_uses_bannerall_and_current_installers(self) -> None:
+        from god_rpai import (
+            EVOLVE_PIN,
+            GNFP_WALLET_PIN,
+            GOD_BANNER_FILE,
+            GOD_BANNER_SRC,
+            VPN_CATALOG_VERSION,
+            hub_products,
+            render_god_hub_html,
+            render_god_rpai_page_html,
+        )
+
+        banner = ROOT / "status_page" / "static" / GOD_BANNER_FILE
+        replaced = ROOT / "status_page" / "static" / "god_banner.jpg"
+        self.assertTrue(banner.is_file(), banner)
+        self.assertTrue(replaced.is_file(), replaced)
+        self.assertEqual(banner.read_bytes(), replaced.read_bytes())
+        self.assertGreater(banner.stat().st_size, 1000)
+        self.assertEqual(GOD_BANNER_SRC, "/bannerall.jpg")
+
+        products = hub_products()
+        self.assertEqual([p["name"] for p in products], ["Restore Privacy VPN", "GNFP", "Evolve"])
+        self.assertEqual(products[0]["version"], VPN_CATALOG_VERSION)
+        self.assertEqual(products[1]["version"], GNFP_WALLET_PIN)
+        self.assertEqual(products[2]["version"], EVOLVE_PIN)
+        self.assertEqual(VPN_CATALOG_VERSION, "1.2.7")
+        self.assertEqual(GNFP_WALLET_PIN, "0.0.5")
+        self.assertEqual(EVOLVE_PIN, "4.2.1")
+
+        html = render_god_rpai_page_html()
+        hub = render_god_hub_html()
+        self.assertIn(hub, html)
+        self.assertIn(GOD_BANNER_SRC, html)
+        self.assertNotIn('id="god-main-title"', html)
+        self.assertNotIn("0.1.13", html)
+        self.assertNotIn("gnfp-wallet-0.0.5-windows.zip", html)
+        self.assertNotIn("gnfp-wallet-0.0.5-linux.zip", html)
+        for product in products:
+            self.assertIn(product["name"], html)
+            self.assertIn(product["version"], html)
+            self.assertIn(product["release"], html)
+            for _label, href in product["hrefs"]:
+                self.assertIn(html_mod.escape(href, quote=True), html)
+        self.assertIn("Grokbot", html)
+        self.assertIn("GOD", html)
+        self.assertIn("NED", html)
+        self.assertIn("FRED", html)
+        self.assertIn("PEDRO", html)
+        self.assertIn("god-learn-input", html)
+        self.assertIn("/goal · goalbuilder app", html)
+        scratch = Path(
+            __import__("os").environ.get(
+                "GROK_GOAL_SCRATCH",
+                "/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-e374255b52da/implementer",
+            )
+        )
+        scratch.mkdir(parents=True, exist_ok=True)
+        (scratch / "god-hub.html").write_text(html, encoding="utf-8")
 
 
 if __name__ == "__main__":

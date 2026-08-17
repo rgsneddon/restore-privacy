@@ -22,41 +22,120 @@ GOD_LEARN_PATH = "/api/learn"
 GOD_RPAI_API = "/api/rpai"
 # Only apex restoreprivacy.online map href allowed on this host (god. /downloads-map 404s).
 GOD_DOWNLOADS_MAP_HREF = "https://restoreprivacy.online/downloads-map"
-GOD_MAIN_TITLE = (
-    "God's GNPF crypto-coin. Private by default on a chronoflux "
-    "blockchain architecture."
-)
+GOD_PAGE_TITLE = "GOD · Restore Privacy"
+GOD_BANNER_SRC = "/bannerall.jpg"
+GOD_BANNER_FILE = "bannerall.jpg"
+
+VPN_CATALOG_VERSION = "1.2.7"
+GNFP_WALLET_PIN = "0.0.5"
+EVOLVE_PIN = "4.2.1"
+
+VPN_FREE = "https://restoreprivacy.online/suite/download?platform={platform}&free_direct=1"
+GNFP_REL = "https://github.com/rgsneddon/gnfp-wallet/releases"
+EVOLVE_REL = "https://github.com/rgsneddon/evolve/releases"
+
+
+def _vpn_href(platform: str) -> str:
+    return VPN_FREE.format(platform=platform)
+
+
+def _gnfp_href(filename: str) -> str:
+    return f"{GNFP_REL}/download/v{GNFP_WALLET_PIN}/{filename}"
+
+
+def _evolve_href(filename: str) -> str:
+    return f"{EVOLVE_REL}/download/v{EVOLVE_PIN}/{filename}"
+
+
+def hub_products() -> tuple[dict[str, Any], ...]:
+    """Current public installer set. Missing GNFP 0.0.5 Windows/Linux stay off."""
+    return (
+        {
+            "id": "vpn",
+            "name": "Restore Privacy VPN",
+            "version": VPN_CATALOG_VERSION,
+            "blurb": (
+                "Residual VPN client, catalog "
+                f"{VPN_CATALOG_VERSION}. Download is free; Connect uses a "
+                "three-day device trial, then a KEYGEN."
+            ),
+            "release": "https://restoreprivacy.online/downloads-map",
+            "hrefs": (
+                ("Windows", _vpn_href("windows")),
+                ("macOS", _vpn_href("macos")),
+                ("Linux", _vpn_href("linux")),
+                ("Android", _vpn_href("android")),
+                ("iOS", _vpn_href("ios")),
+            ),
+        },
+        {
+            "id": "gnfp",
+            "name": "GNFP",
+            "version": GNFP_WALLET_PIN,
+            "blurb": (
+                f"$GNFP privacy wallet {GNFP_WALLET_PIN} on a chronoflux book. "
+                "Session address and Germany-book balance carry forward. macOS "
+                "is Developer ID notarized. Windows and Linux are not on this pin yet."
+            ),
+            "release": f"{GNFP_REL}/tag/v{GNFP_WALLET_PIN}",
+            "hrefs": (
+                ("macOS", _gnfp_href(f"gnfp-wallet-{GNFP_WALLET_PIN}-macos.zip")),
+                ("iPhone", _gnfp_href(f"gnfp-wallet-{GNFP_WALLET_PIN}-ios.ipa")),
+                ("iPad", _gnfp_href(f"gnfp-wallet-{GNFP_WALLET_PIN}-ipad.ipa")),
+                ("Arch", _gnfp_href(f"gnfp-wallet-{GNFP_WALLET_PIN}-archlinux.zip")),
+            ),
+        },
+        {
+            "id": "evolve",
+            "name": "Evolve",
+            "version": EVOLVE_PIN,
+            "blurb": (
+                f"Evolve {EVOLVE_PIN} — the suite that builds. Installers for "
+                "every desktop and phone we currently ship."
+            ),
+            "release": f"{EVOLVE_REL}/tag/v{EVOLVE_PIN}",
+            "hrefs": (
+                ("Windows", _evolve_href(f"evolve-v{EVOLVE_PIN}-windows-x64-setup.exe")),
+                ("macOS", _evolve_href(f"evolve-v{EVOLVE_PIN}-macos-x64.zip")),
+                ("Linux", _evolve_href(f"evolve-v{EVOLVE_PIN}-linux-x64.tar.gz")),
+                ("Android", _evolve_href(f"evolve-v{EVOLVE_PIN}-android-setup.apk")),
+                ("iOS", _evolve_href(f"evolve-v{EVOLVE_PIN}-ios-setup.ipa")),
+                ("Arch", _evolve_href(f"evolve-v{EVOLVE_PIN}-archlinux-x86_64.pkg.tar.zst")),
+            ),
+        },
+    )
+
 
 PORT_1474_BENEFITS: tuple[tuple[str, str], ...] = (
     (
         "rpAI control plane",
-        "A host and port that only speak GOD, Grokbot, NED, FRED, and PEDRO — "
-        "no shop, no KEYGEN form, no ticket queue.",
+        "This host talks only to GOD, Grokbot, NED, FRED, and PEDRO. No shop "
+        "checkout, no KEYGEN form, no ticket queue on this surface.",
     ),
     (
         "Learn-from-input ingest",
-        "Ask GOD, /goal builds, and observe fields POST here. Grokbot writes "
-        "a distinct part for each agent. Same product+action does not grow twice.",
+        "Questions, /goal briefs, and observe lines land here. Each agent "
+        "gets its own part. The same product plus action does not grow twice.",
     ),
     (
         "Output feed",
-        "GET /api/rpai returns each agent's learned count, last line, and "
-        "recent parts so evolve.restoreprivacy.online can stay current.",
+        "GET /api/rpai lists learned counts, last lines, and recent parts so "
+        "evolve.restoreprivacy.online can stay in step.",
     ),
     (
         "Beside mineperc, not mining",
-        "1466 is Perc BeamHash. 1474 is GOD. 1690/1974 stay on Beam. "
-        "Opening 1474 does not open a miner and does not read tunnel payloads.",
+        "Perc BeamHash lives on 1466. GOD is this page plus the $GNFP "
+        "stratum on 1474. Opening 1474 does not read tunnel payloads.",
     ),
     (
         "Grok Build channel",
-        "Grokbot chaperones /goal the way Evolve Grok construe uses Grok — "
-        "build a thing, then the four agents learn the brief.",
+        "Press Build after a brief. The four agents take that brief; the "
+        "CLI box stays on this page until an installer is sealed.",
     ),
     (
         "Quiet when closed",
-        "If 1474 is not open, HTTPS /god on the main host still serves the "
-        "same page. Opening the port is extra ingest, not a second chatbot.",
+        "If the stratum port is shut, HTTPS still serves this page. Opening "
+        "the port adds ingest — it is not a second chatbot.",
     ),
 )
 
@@ -238,7 +317,7 @@ def render_god_ticket_box_html() -> str:
     return f"""
 <section class="panel-card" id="god-ticket-box" data-god-ticket="1">
   <h3 id="god-ticket-title">Support</h3>
-  <p class="hint">Write to <strong>{html.escape(inbox)}</strong>. We never ask for KEYGENs, cards, or passwords.</p>
+  <p class="hint">Need a human? Mail <strong>{html.escape(inbox)}</strong>. We will not ask for KEYGENs, cards, or passwords.</p>
   <form class="support-form" method="post" action="https://restoreprivacy.online/support" id="god-ticket-form">
     <label for="support-email">Your email *</label>
     <input id="support-email" name="email" type="email" required autocomplete="email" placeholder="you@example.com"/>
@@ -271,18 +350,18 @@ def god_rpai_css() -> str:
 .god-agent-card .value { font-size: 1.45rem; font-weight: 750; }
 .god-port-benefits li { margin: 0.35rem 0; line-height: 1.45; }
 .god-output-list { margin: 0.4rem 0 0; padding-left: 1.2rem; }
-#god-main-title {
-  margin: 0 0 0.85rem;
-  color: #00e5ff;
-  font-size: clamp(1.2rem, 3.1vw, 1.85rem);
-  font-weight: 750;
-  letter-spacing: 0.03em;
-  line-height: 1.25;
-  text-shadow:
-    0 0 8px rgba(0, 229, 255, 0.9),
-    0 0 18px rgba(38, 148, 232, 0.55),
-    0 0 32px rgba(0, 229, 255, 0.35);
+#god-hub { margin: 0 0 1.2rem; }
+#god-hub-title { margin: 0 0 0.4rem; color: #00e5ff; letter-spacing: 0.04em; }
+.god-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.85rem;
+  margin: 0.75rem 0 0;
 }
+.god-hub-card h3 { margin: 0 0 0.35rem; color: #00e5ff; }
+.god-hub-card .god-hub-ver { color: #00e5ff; font-weight: 750; }
+.god-hub-links { display: flex; flex-wrap: wrap; gap: 0.4rem 0.65rem; margin: 0.55rem 0 0; padding: 0; list-style: none; }
+.god-hub-links a { color: #00e5ff; font-weight: 700; }
 #god-input-box { text-align: center; }
 #god-input-box h3, #god-input-box .hint, #god-input-box label { text-align: center; }
 #god-input-box textarea, #god-input-box label {
@@ -373,6 +452,37 @@ def _learn_surface_html(dash: dict[str, Any]) -> str:
     return render_explorer_agent_stats_html(dash.get("surface"))
 
 
+def render_god_hub_html() -> str:
+    """Prominent VPN / GNFP / Evolve installer block."""
+    cards = []
+    for product in hub_products():
+        links = "".join(
+            f'<li><a href="{html.escape(href, quote=True)}" '
+            f'data-hub-installer="{html.escape(product["id"], quote=True)}" '
+            f'data-hub-platform="{html.escape(label, quote=True)}">'
+            f"{html.escape(label)}</a></li>"
+            for label, href in product["hrefs"]
+        )
+        cards.append(
+            f'<article class="panel-card god-hub-card" id="god-hub-{html.escape(product["id"])}" '
+            f'data-hub-product="{html.escape(product["id"])}">'
+            f'<h3>{html.escape(product["name"])}</h3>'
+            f'<p class="god-hub-ver">v{html.escape(product["version"])}</p>'
+            f'<p class="hint">{html.escape(product["blurb"])}</p>'
+            f'<p class="hint"><a href="{html.escape(product["release"], quote=True)}">'
+            f"All current packages</a></p>"
+            f'<ul class="god-hub-links">{links}</ul></article>'
+        )
+    return (
+        '<section class="panel-card" id="god-hub" data-god-hub="1">'
+        "<h2 id=\"god-hub-title\">Start here</h2>"
+        '<p class="hint" id="god-hub-lead">Three Restore Privacy products, '
+        "current installers. Pick the package for the machine you are on.</p>"
+        f'<div class="god-hub-grid" id="god-hub-grid">{"".join(cards)}</div>'
+        "</section>"
+    )
+
+
 def render_god_rpai_page_html() -> str:
     try:
         from public_chrome import (
@@ -399,14 +509,14 @@ def render_god_rpai_page_html() -> str:
 
     dash = rpai_dashboard_payload()
     head = public_head_open(
-        title=GOD_MAIN_TITLE,
+        title=GOD_PAGE_TITLE,
         extra_css=god_rpai_css(),
     )
     header = public_brand_header_html(
         active=None,
         include_site_nav=False,
         include_theme_picker=False,
-        banner_src="/god_banner.jpg",
+        banner_src=GOD_BANNER_SRC,
     )
     close = public_page_close(downloads_map_href=GOD_DOWNLOADS_MAP_HREF)
     god_box = render_god_support_box_html()
@@ -443,19 +553,19 @@ def render_god_rpai_page_html() -> str:
             for p in reversed(parts)
         )
     else:
-        recent = '<li class="ned-learned-empty">No learned parts yet.</li>'
+        recent = '<li class="ned-learned-empty">Nothing learned yet.</li>'
+    hub = render_god_hub_html()
     return f"""{head}
   <div class="page-shell" id="god-rpai-shell" data-page="god-rpai" data-god-port="{GOD_RPAI_PORT}">
 {header}
 <main class="support-wrap panel-card" id="god-rpai-main" data-chrome="pro" data-rpai-surface="1">
-  <h1 id="god-main-title">{html.escape(GOD_MAIN_TITLE)}</h1>
   <p class="support-lead" id="god-rpai-lead">{html.escape(HIERARCHY["line"])}</p>
+  {hub}
   <section class="panel-card" id="god-port-box">
     <h3>god.restoreprivacy.online:{GOD_RPAI_PORT}</h3>
-    <p class="hint">Dedicated rpAI host at 135.181.152.10. HTTPS is this page.
-    Port {GOD_RPAI_PORT} is the $GNFP BeamHash III CPU stratum — same perc miner
-    as mineperc:1466, proof of work only. Miner tags are hashed; no public
-    user info. <a href="/gnfp">$GNFP pool</a> ·
+    <p class="hint">HTTPS is this page. Port {GOD_RPAI_PORT} is the $GNFP BeamHash III
+    CPU stratum — proof of work only, miner tags hashed, no public user info.
+    <a href="/gnfp">$GNFP pool</a> ·
     <a href="/gnfp/explorer">explorer</a> ·
     <a href="/gnfp/api/network">network</a>.</p>
     <ul class="god-port-benefits" id="god-port-benefits">{benefits}</ul>
@@ -470,13 +580,13 @@ def render_god_rpai_page_html() -> str:
   </div>
   <section class="panel-card" id="god-cli-box" data-god-cli="1">
     <h3>Grok Build · CLI</h3>
-    <pre id="god-cli" aria-live="polite">idle — press Build. Stay on this page until the installer is sealed.</pre>
+    <pre id="god-cli" aria-live="polite">idle — press Build. Remain here until the installer is sealed.</pre>
     <p class="hint" id="god-cli-stay">Evolve Suite is the surface. The four agents have the brief.</p>
     <a id="god-cli-download" class="btn" href="#">Download installer</a>
   </section>
   <section class="panel-card" id="god-input-box">
     <h3>Learn from input</h3>
-    <p class="hint">Any public line here is a distinct action. Secrets are refused.</p>
+    <p class="hint">A public observation becomes a distinct action. Secrets are refused.</p>
     <label for="god-learn-input">Input</label>
     <textarea id="god-learn-input" maxlength="800" placeholder="observe: open analysis surface"></textarea>
     <button type="button" id="god-learn-submit">Teach the four agents</button>

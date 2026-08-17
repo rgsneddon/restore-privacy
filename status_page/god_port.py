@@ -34,15 +34,18 @@ _STATIC_TYPES = {
     ".zip": "application/zip",
 }
 _BRAND_PATHS = {
+    "/bannerall.jpg": "bannerall.jpg",
     "/god_banner.jpg": "god_banner.jpg",
-    "/banner.jpg": "god_banner.jpg",
+    "/banner.jpg": "bannerall.jpg",
     "/favicon.ico": "god_favicon.ico",
     "/favicon.png": "god_favicon.png",
     "/apple-touch-icon.png": "god_apple_touch.png",
     "/god_icon.png": "god_icon.png",
     "/logo_transparent.png": "god_icon.png",
     "/logo.png": "god_icon.png",
-    "/static/banner.jpg": "god_banner.jpg",
+    "/static/banner.jpg": "bannerall.jpg",
+    "/static/bannerall.jpg": "bannerall.jpg",
+    "/static/god_banner.jpg": "god_banner.jpg",
     "/static/god_icon.png": "god_icon.png",
     "/static/data_path_motif.svg": "data_path_motif.svg",
 }

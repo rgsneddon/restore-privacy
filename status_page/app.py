@@ -149,6 +149,12 @@ STATIC_ROUTES: dict[str, str] = {
     LOGO_PATH: "logo.png",
     LOGO_TRANSPARENT_PATH: "logo_transparent.png",
     BANNER_PATH: "banner.jpg",
+    "/bannerall.jpg": "bannerall.jpg",
+    "/god_banner.jpg": "god_banner.jpg",
+    "/static/bannerall.jpg": "bannerall.jpg",
+    "/static/god_banner.jpg": "god_banner.jpg",
+    "/static/god_rpai.js": "god_rpai.js",
+    "/static/god_build.js": "god_build.js",
     "/freebie.jpg": "freebie.jpg",
     "/static/favicon.ico": "favicon.ico",
     "/static/favicon.png": "favicon.png",
@@ -1019,6 +1025,16 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path in ("/vault", "/vault/"):
             self._send(200, "text/html; charset=utf-8", render_vault_page_html())
+            return
+        if path in ("/god", "/god/"):
+            try:
+                from god_rpai import render_god_rpai_page_html
+            except ImportError:  # pragma: no cover
+                from status_page.god_rpai import render_god_rpai_page_html  # type: ignore
+            self._send(200, "text/html; charset=utf-8", render_god_rpai_page_html())
+            return
+        if path in ("/api/learn", "/api/learn/"):
+            self.send_error(405, "POST only")
             return
         if path in ("/support", "/support/"):
             try:
@@ -2833,6 +2849,22 @@ class Handler(BaseHTTPRequestHandler):
         path, _query = _parse_query(self.path)
         body = self._read_body()
 
+        if path in ("/api/learn", "/api/learn/"):
+            try:
+                from god_rpai import learn_from_input
+            except ImportError:  # pragma: no cover
+                from status_page.god_rpai import learn_from_input  # type: ignore
+            try:
+                payload = json.loads(body.decode("utf-8", errors="replace") or "{}")
+            except json.JSONDecodeError:
+                payload = {}
+            result = learn_from_input(payload if isinstance(payload, dict) else {})
+            self._send(
+                200 if result.get("ok") else 400,
+                "application/json; charset=utf-8",
+                json.dumps(result).encode("utf-8"),
+            )
+            return
         if path in ("/support/god-ask", "/support/god-ask/"):
             try:
                 from god_support import answer_god_question
