@@ -20,6 +20,11 @@ describe('evolve.restoreprivacy.online is the Evolve app', () => {
     assert.match(html, /evolve-v4\.2\.1-android-setup\.apk/);
     assert.match(html, /evolve-v4\.2\.1-ios-setup\.ipa/);
     assert.match(html, /rgsneddon\.github\.io\/evolve/);
+    assert.match(html, /hero\.jpg" width="1600" height="640"/);
+    assert.match(html, /devices\.jpg" width="1280" height="720"/);
+    assert.match(html, /orb\.jpg" width="1024" height="1024"/);
+    assert.match(html, /aspect-ratio: 1600 \/ 640/);
+    assert.match(html, /aspect-ratio: 1280 \/ 720/);
     assert.doesNotMatch(html, /<title>\$GNFP pool/);
     assert.doesNotMatch(html, /gnfp-mine --pool/);
     assert.doesNotMatch(html, /id="gnfp-pool-main"/);
