@@ -7,8 +7,12 @@ The commit/ship path calls :func:`refresh_github_release_inventory` via
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
+import tempfile
+import urllib.error
+import urllib.request
 from datetime import date
 from pathlib import Path
 from typing import Any, Callable
@@ -217,8 +221,33 @@ def _gh_json(args: list[str]) -> Any:
     return None
 
 
-def fetch_releases(repo: str) -> list[dict]:
-    """Published installer releases via ``gh release`` (more reliable than /releases API)."""
+def fetch_releases_http(repo: str) -> list[dict]:
+    """Published installer releases via the public GitHub API (no ``gh`` needed)."""
+    url = (
+        "https://api.github.com/repos/rgsneddon/"
+        f"{repo}/releases?per_page=20"
+    )
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "restore-privacy-god-inventory",
+    }
+    token = (os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=40) as res:
+            raw = json.loads(res.read().decode("utf-8"))
+    except urllib.error.HTTPError as err:
+        body = err.read().decode("utf-8", errors="replace")
+        if err.code == 404 or _output_says_gone(body):
+            raise RepoGone(body.strip()[:240]) from err
+        raise
+    return normalize_release_assets(raw)
+
+
+def fetch_releases_gh(repo: str) -> list[dict]:
+    """Published installer releases via ``gh release``."""
     listed = _gh_json(
         [
             "gh",
@@ -276,6 +305,19 @@ def fetch_releases(repo: str) -> list[dict]:
     return normalize_release_assets(raw_releases)
 
 
+def fetch_releases(repo: str) -> list[dict]:
+    """HTTP first (Helsinki has no ``gh``), then ``gh`` if the API is down."""
+    try:
+        rows = fetch_releases_http(repo)
+        if rows:
+            return rows
+    except RepoGone:
+        raise
+    except Exception as exc:  # noqa: BLE001 — fall through to gh
+        print(f"  (http {exc})", flush=True)
+    return fetch_releases_gh(repo)
+
+
 def load_existing_repos(dest: Path) -> list[dict[str, Any]]:
     if not dest.is_file():
         return []
@@ -298,8 +340,22 @@ def build_inventory_payload(repos: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def write_inventory(payload: dict[str, Any], dest: Path) -> Path:
+    dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    text = json.dumps(payload, indent=2) + "\n"
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=dest.name + ".", suffix=".tmp", dir=str(dest.parent)
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(tmp_name, dest)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
     return dest
 
 

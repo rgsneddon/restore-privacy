@@ -2156,7 +2156,17 @@ def _iter_inventory_releases(repo: dict[str, Any]) -> list[tuple[str, list[Any]]
 
 
 GNFP_WALLET_REPO = "gnfp-wallet"
+EVOLVE_REPO = "evolve"
 GNFP_WALLET_RELEASES = f"https://github.com/rgsneddon/{GNFP_WALLET_REPO}/releases"
+_HUB_LABEL_ORDER = (
+    "Windows",
+    "macOS",
+    "Linux",
+    "iPhone",
+    "iPad",
+    "Android",
+    "Arch",
+)
 _GNFP_HUB_LABELS = (
     ("windows", "Windows", "-windows.zip"),
     ("macos", "macOS", "-macos.zip"),
@@ -2164,25 +2174,137 @@ _GNFP_HUB_LABELS = (
     ("ios", "iPhone", "-ios.ipa"),
     ("ios", "iPad", "-ipad.ipa"),
     ("linux", "Arch", "-archlinux.zip"),
+    ("android", "Android", "-android.apk"),
     ("android", "Android", "-android.zip"),
 )
 
 
-def gnfp_wallet_asset_href(pin: str, filename: str) -> str:
-    """Canonical GitHub download URL for a gnfp-wallet installer."""
+def github_release_href(repo: str, pin: str, filename: str) -> str:
+    """Canonical GitHub download URL for a published installer."""
     ver = str(pin or "").strip().lstrip("v")
     name = str(filename or "").strip()
-    return f"{GNFP_WALLET_RELEASES}/download/v{ver}/{name}"
+    return f"https://github.com/rgsneddon/{repo}/releases/download/v{ver}/{name}"
+
+
+def gnfp_wallet_asset_href(pin: str, filename: str) -> str:
+    """Canonical GitHub download URL for a gnfp-wallet installer."""
+    return github_release_href(GNFP_WALLET_REPO, pin, filename)
+
+
+def _repo_releases_from_inventory(
+    repo: str,
+    inventory_path: Path | None = None,
+) -> list[dict[str, Any]]:
+    want = str(repo or "").strip()
+    for entry in load_github_release_inventory(inventory_path):
+        if str(entry.get("repo") or "") == want:
+            pairs = _iter_inventory_releases(entry)
+            return [{"tag": tag, "assets": assets} for tag, assets in pairs]
+    return []
 
 
 def _gnfp_wallet_releases_from_inventory(
     inventory_path: Path | None = None,
 ) -> list[dict[str, Any]]:
-    for repo in load_github_release_inventory(inventory_path):
-        if str(repo.get("repo") or "") == GNFP_WALLET_REPO:
-            pairs = _iter_inventory_releases(repo)
-            return [{"tag": tag, "assets": assets} for tag, assets in pairs]
-    return []
+    return _repo_releases_from_inventory(GNFP_WALLET_REPO, inventory_path)
+
+
+def latest_repo_pin(
+    repo: str,
+    releases: list[dict[str, Any]] | None = None,
+    *,
+    inventory_path: Path | None = None,
+) -> str:
+    """Newest published tag for *repo* that has at least one installer."""
+    rows = (
+        releases
+        if releases is not None
+        else _repo_releases_from_inventory(repo, inventory_path)
+    )
+    candidates: list[str] = []
+    for rel in rows:
+        if not isinstance(rel, dict):
+            continue
+        tag = str(rel.get("tag") or "").strip()
+        assets = rel.get("assets")
+        if not tag or not isinstance(assets, list) or not assets:
+            continue
+        candidates.append(tag)
+    if not candidates:
+        return ""
+    return max(candidates, key=release_tag_sort_key).lstrip("v")
+
+
+def _hub_label_for_asset(filename: str, platform: str = "") -> str:
+    name = str(filename or "").lower()
+    plat = str(platform or "").lower()
+    if "archlinux" in name or name.endswith(".pkg.tar.zst"):
+        return "Arch"
+    if "ipad" in name:
+        return "iPad"
+    if plat == "ipad":
+        return "iPad"
+    if plat == "ios" or name.endswith(".ipa") or "-ios." in name:
+        return "iPhone"
+    if plat == "android" or name.endswith(".apk") or "android" in name:
+        return "Android"
+    if plat == "windows" or "windows" in name or name.endswith(".exe"):
+        return "Windows"
+    if plat == "macos" or "macos" in name or "darwin" in name:
+        return "macOS"
+    if plat == "linux" or "linux" in name:
+        return "Linux"
+    return ""
+
+
+def list_repo_hub_hrefs(
+    repo: str,
+    releases: list[dict[str, Any]] | None = None,
+    *,
+    inventory_path: Path | None = None,
+    pin: str | None = None,
+) -> list[tuple[str, str]]:
+    """GOD hub links for the newest installer tag of *repo*.
+
+    Windows is first when that pin has a Windows asset. A newer Darwin-only
+    pin still becomes current so the Mac laptop can ship without waiting.
+    """
+    want = str(repo or "").strip()
+    ver = (pin or latest_repo_pin(want, releases, inventory_path=inventory_path)).strip()
+    if not ver:
+        return []
+    rows = (
+        releases
+        if releases is not None
+        else _repo_releases_from_inventory(want, inventory_path)
+    )
+    labeled: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+    for rel in rows:
+        if not isinstance(rel, dict):
+            continue
+        tag = str(rel.get("tag") or "").strip().lstrip("v")
+        if tag != ver:
+            continue
+        for asset in rel.get("assets") or []:
+            if not isinstance(asset, dict):
+                continue
+            fname = str(asset.get("filename") or "").strip()
+            href = str(asset.get("href") or "").strip()
+            if not fname or fname in seen:
+                continue
+            label = _hub_label_for_asset(fname, str(asset.get("platform") or ""))
+            if not label:
+                continue
+            seen.add(fname)
+            labeled.append(
+                (label, href or github_release_href(want, ver, fname), fname)
+            )
+    by_label: dict[str, tuple[str, str]] = {}
+    for label, href, _fname in labeled:
+        if label not in by_label:
+            by_label[label] = (label, href)
+    return [by_label[label] for label in _HUB_LABEL_ORDER if label in by_label]
 
 
 def latest_gnfp_wallet_pin_with_windows(
@@ -2223,16 +2345,24 @@ def list_gnfp_wallet_hub_hrefs(
     *,
     inventory_path: Path | None = None,
 ) -> list[tuple[str, str]]:
-    """Public GOD hub links for the latest gnfp-wallet pin that has Windows.
+    """Public GOD hub links for the latest gnfp-wallet pin.
 
-    Windows is always first when present. Other platforms on that same pin
-    follow. Does not emit an older Windows zip once a newer pin has one.
+    Uses the newest published tag (Mac can ship Darwin first). Windows is
+    first when that pin has a Windows zip.
     """
-    pin = latest_gnfp_wallet_pin_with_windows(
-        releases, inventory_path=inventory_path
+    pin = latest_repo_pin(
+        GNFP_WALLET_REPO, releases, inventory_path=inventory_path
     )
     if not pin:
         return []
+    hrefs = list_repo_hub_hrefs(
+        GNFP_WALLET_REPO,
+        releases,
+        inventory_path=inventory_path,
+        pin=pin,
+    )
+    if hrefs:
+        return hrefs
     rows = releases if releases is not None else _gnfp_wallet_releases_from_inventory(
         inventory_path
     )

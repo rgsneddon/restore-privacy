@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh GOD installer links every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+Persistent=true
+AccuracySec=30s
+Unit=rpt-god-inventory.service
+
+[Install]
+WantedBy=timers.target

@@ -27,7 +27,7 @@ GOD_BANNER_SRC = "/bannerall.jpg"
 GOD_BANNER_FILE = "bannerall.jpg"
 
 VPN_CATALOG_VERSION = "1.2.7"
-GNFP_WALLET_PIN = "0.0.6"
+GNFP_WALLET_PIN = "0.0.7"
 EVOLVE_PIN = "4.2.1"
 
 VPN_FREE = "https://restoreprivacy.online/suite/download?platform={platform}&free_direct=1"
@@ -57,44 +57,88 @@ def _evolve_href(filename: str) -> str:
     return f"{EVOLVE_REL}/download/v{EVOLVE_PIN}/{filename}"
 
 
-def _gnfp_publisher():
+def _inventory_publisher():
     try:
         from downloads import (
+            EVOLVE_REPO,
             GNFP_WALLET_RELEASES,
+            GNFP_WALLET_REPO,
+            RELEASE_VERSION,
             gnfp_wallet_asset_href,
-            latest_gnfp_wallet_pin_with_windows,
+            github_release_href,
+            latest_repo_pin,
             list_gnfp_wallet_hub_hrefs,
+            list_repo_hub_hrefs,
         )
     except ImportError:  # pragma: no cover
         from status_page.downloads import (  # type: ignore
+            EVOLVE_REPO,
             GNFP_WALLET_RELEASES,
+            GNFP_WALLET_REPO,
+            RELEASE_VERSION,
             gnfp_wallet_asset_href,
-            latest_gnfp_wallet_pin_with_windows,
+            github_release_href,
+            latest_repo_pin,
             list_gnfp_wallet_hub_hrefs,
+            list_repo_hub_hrefs,
         )
-    return (
-        GNFP_WALLET_RELEASES,
-        gnfp_wallet_asset_href,
-        latest_gnfp_wallet_pin_with_windows,
-        list_gnfp_wallet_hub_hrefs,
-    )
+    return {
+        "evolve_repo": EVOLVE_REPO,
+        "gnfp_rel": GNFP_WALLET_RELEASES,
+        "gnfp_repo": GNFP_WALLET_REPO,
+        "catalog": RELEASE_VERSION,
+        "gnfp_href": gnfp_wallet_asset_href,
+        "asset_href": github_release_href,
+        "latest_pin": latest_repo_pin,
+        "gnfp_hrefs": list_gnfp_wallet_hub_hrefs,
+        "repo_hrefs": list_repo_hub_hrefs,
+    }
+
+
+def vpn_hub_product() -> dict[str, Any]:
+    """VPN card — version follows the live suite catalog, not a GitHub tag."""
+    pub = _inventory_publisher()
+    ver = str(pub["catalog"] or VPN_CATALOG_VERSION)
+    return {
+        "id": "vpn",
+        "name": "Restore Privacy VPN",
+        "version": ver,
+        "blurb": (
+            "Residual VPN client, catalog "
+            f"{ver}. Download is free; Connect uses a "
+            "three-day device trial, then a KEYGEN."
+        ),
+        "release": "https://restoreprivacy.online/downloads-map",
+        "hrefs": (
+            ("Windows", _vpn_href("windows")),
+            ("macOS", _vpn_href("macos")),
+            ("Linux", _vpn_href("linux")),
+            ("Android", _vpn_href("android")),
+            ("iOS", _vpn_href("ios")),
+        ),
+    }
 
 
 def gnfp_wallet_hub_product(
     *, inventory_path: Any = None, releases: list | None = None
 ) -> dict[str, Any]:
-    """GOD hub card for $GNFP privacy wallet — Windows href from shipped pin."""
-    _rel, asset_href, latest_pin, list_hrefs = _gnfp_publisher()
-    pin = latest_pin(releases, inventory_path=inventory_path) or GNFP_WALLET_PIN
-    hrefs = list_hrefs(releases, inventory_path=inventory_path)
+    """GOD hub card for $GNFP privacy wallet — latest published pin."""
+    pub = _inventory_publisher()
+    pin = (
+        pub["latest_pin"](
+            pub["gnfp_repo"], releases, inventory_path=inventory_path
+        )
+        or GNFP_WALLET_PIN
+    )
+    hrefs = pub["gnfp_hrefs"](releases, inventory_path=inventory_path)
     if not hrefs:
         hrefs = [
-            ("Windows", asset_href(pin, f"gnfp-wallet-{pin}-windows.zip")),
-            ("macOS", asset_href(pin, f"gnfp-wallet-{pin}-macos.zip")),
-            ("Linux", asset_href(pin, f"gnfp-wallet-{pin}-linux.zip")),
-            ("iPhone", asset_href(pin, f"gnfp-wallet-{pin}-ios.ipa")),
-            ("iPad", asset_href(pin, f"gnfp-wallet-{pin}-ipad.ipa")),
-            ("Arch", asset_href(pin, f"gnfp-wallet-{pin}-archlinux.zip")),
+            ("Windows", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-windows.zip")),
+            ("macOS", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-macos.zip")),
+            ("Linux", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-linux.zip")),
+            ("iPhone", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-ios.ipa")),
+            ("iPad", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-ipad.ipa")),
+            ("Arch", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-archlinux.zip")),
         ]
     return {
         "id": "gnfp",
@@ -104,7 +148,43 @@ def gnfp_wallet_hub_product(
             f"$GNFP privacy wallet {pin} on a chronoflux book. "
             "Session address is perpetual in your wallet."
         ),
-        "release": f"{_rel}/tag/v{pin}",
+        "release": f"{pub['gnfp_rel']}/tag/v{pin}",
+        "hrefs": tuple(hrefs),
+    }
+
+
+def evolve_hub_product(
+    *, inventory_path: Any = None, releases: list | None = None
+) -> dict[str, Any]:
+    """GOD hub card for Evolve — latest published pin from inventory."""
+    pub = _inventory_publisher()
+    pin = (
+        pub["latest_pin"](
+            pub["evolve_repo"], releases, inventory_path=inventory_path
+        )
+        or EVOLVE_PIN
+    )
+    hrefs = pub["repo_hrefs"](
+        pub["evolve_repo"], releases, inventory_path=inventory_path, pin=pin
+    )
+    if not hrefs:
+        hrefs = [
+            ("Windows", _evolve_href(f"evolve-v{pin}-windows-x64-setup.exe")),
+            ("macOS", _evolve_href(f"evolve-v{pin}-macos-x64.zip")),
+            ("Linux", _evolve_href(f"evolve-v{pin}-linux-x64.tar.gz")),
+            ("Android", _evolve_href(f"evolve-v{pin}-android-setup.apk")),
+            ("iOS", _evolve_href(f"evolve-v{pin}-ios-setup.ipa")),
+            ("Arch", _evolve_href(f"evolve-v{pin}-archlinux-x86_64.pkg.tar.zst")),
+        ]
+    return {
+        "id": "evolve",
+        "name": "Evolve",
+        "version": pin,
+        "blurb": (
+            f"Evolve {pin} — the suite that builds. Installers for "
+            "every desktop and phone we currently ship."
+        ),
+        "release": f"{EVOLVE_REL}/tag/v{pin}",
         "hrefs": tuple(hrefs),
     }
 
@@ -162,45 +242,11 @@ def gnfp_community_links() -> tuple[tuple[str, str], ...]:
 
 
 def hub_products() -> tuple[dict[str, Any], ...]:
-    """Current public installer set. GNFP lists Windows when that zip exists."""
+    """Current public installer set from live inventory / suite catalog."""
     return (
-        {
-            "id": "vpn",
-            "name": "Restore Privacy VPN",
-            "version": VPN_CATALOG_VERSION,
-            "blurb": (
-                "Residual VPN client, catalog "
-                f"{VPN_CATALOG_VERSION}. Download is free; Connect uses a "
-                "three-day device trial, then a KEYGEN."
-            ),
-            "release": "https://restoreprivacy.online/downloads-map",
-            "hrefs": (
-                ("Windows", _vpn_href("windows")),
-                ("macOS", _vpn_href("macos")),
-                ("Linux", _vpn_href("linux")),
-                ("Android", _vpn_href("android")),
-                ("iOS", _vpn_href("ios")),
-            ),
-        },
+        vpn_hub_product(),
         gnfp_wallet_hub_product(),
-        {
-            "id": "evolve",
-            "name": "Evolve",
-            "version": EVOLVE_PIN,
-            "blurb": (
-                f"Evolve {EVOLVE_PIN} — the suite that builds. Installers for "
-                "every desktop and phone we currently ship."
-            ),
-            "release": f"{EVOLVE_REL}/tag/v{EVOLVE_PIN}",
-            "hrefs": (
-                ("Windows", _evolve_href(f"evolve-v{EVOLVE_PIN}-windows-x64-setup.exe")),
-                ("macOS", _evolve_href(f"evolve-v{EVOLVE_PIN}-macos-x64.zip")),
-                ("Linux", _evolve_href(f"evolve-v{EVOLVE_PIN}-linux-x64.tar.gz")),
-                ("Android", _evolve_href(f"evolve-v{EVOLVE_PIN}-android-setup.apk")),
-                ("iOS", _evolve_href(f"evolve-v{EVOLVE_PIN}-ios-setup.ipa")),
-                ("Arch", _evolve_href(f"evolve-v{EVOLVE_PIN}-archlinux-x86_64.pkg.tar.zst")),
-            ),
-        },
+        evolve_hub_product(),
     )
 
 

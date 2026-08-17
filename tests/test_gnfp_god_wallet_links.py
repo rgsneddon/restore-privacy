@@ -29,7 +29,7 @@ def _rel(tag: str, names: list[str]) -> dict:
     }
 
 
-CURRENT_PIN = "0.0.6"
+CURRENT_PIN = "0.0.7"
 WIN_NAME = f"gnfp-wallet-{CURRENT_PIN}-windows.zip"
 WIN_HREF = (
     "https://github.com/rgsneddon/gnfp-wallet/releases/download/"
@@ -41,7 +41,7 @@ class TestGnfpGodWalletLinks(unittest.TestCase):
     def test_publisher_picks_latest_pin_that_has_windows_zip(self) -> None:
         from downloads import (
             gnfp_wallet_asset_href,
-            latest_gnfp_wallet_pin_with_windows,
+            latest_repo_pin,
             list_gnfp_wallet_hub_hrefs,
         )
 
@@ -51,18 +51,18 @@ class TestGnfpGodWalletLinks(unittest.TestCase):
                 ["gnfp-wallet-0.0.2-windows.zip", "gnfp-wallet-0.0.2-macos.zip"],
             ),
             _rel(
-                "v0.0.6",
+                "v0.0.7",
                 [
-                    "gnfp-wallet-0.0.6-windows.zip",
-                    "gnfp-wallet-0.0.6-linux.zip",
-                    "gnfp-wallet-0.0.6-macos.zip",
-                    "gnfp-wallet-0.0.6-ios.ipa",
-                    "gnfp-wallet-0.0.6-archlinux.zip",
+                    "gnfp-wallet-0.0.7-windows.zip",
+                    "gnfp-wallet-0.0.7-linux.zip",
+                    "gnfp-wallet-0.0.7-macos.zip",
+                    "gnfp-wallet-0.0.7-ios.ipa",
+                    "gnfp-wallet-0.0.7-archlinux.zip",
                 ],
             ),
             _rel("v0.0.5", ["gnfp-wallet-0.0.5-macos.zip"]),
         ]
-        pin = latest_gnfp_wallet_pin_with_windows(releases)
+        pin = latest_repo_pin("gnfp-wallet", releases)
         self.assertEqual(pin, CURRENT_PIN)
         hrefs = list_gnfp_wallet_hub_hrefs(releases)
         labels = [label for label, _href in hrefs]
@@ -82,14 +82,53 @@ class TestGnfpGodWalletLinks(unittest.TestCase):
         )
         self.assertFalse(any("0.0.2-windows.zip" in u for u in urls))
 
-    def test_newer_pin_without_windows_is_not_primary(self) -> None:
-        from downloads import latest_gnfp_wallet_pin_with_windows
+    def test_newer_pin_without_windows_is_still_primary(self) -> None:
+        from downloads import latest_repo_pin, list_repo_hub_hrefs
 
         releases = [
             _rel("v0.0.7", ["gnfp-wallet-0.0.7-macos.zip"]),
             _rel("v0.0.6", ["gnfp-wallet-0.0.6-windows.zip"]),
         ]
-        self.assertEqual(latest_gnfp_wallet_pin_with_windows(releases), "0.0.6")
+        self.assertEqual(latest_repo_pin("gnfp-wallet", releases), "0.0.7")
+        hrefs = list_repo_hub_hrefs("gnfp-wallet", releases)
+        self.assertEqual(hrefs[0][0], "macOS")
+        self.assertTrue(hrefs[0][1].endswith("gnfp-wallet-0.0.7-macos.zip"))
+
+    def test_evolve_hub_follows_latest_inventory_pin(self) -> None:
+        from downloads import latest_repo_pin, list_repo_hub_hrefs
+
+        releases = [
+            {
+                "tag": "v4.2.1",
+                "assets": [
+                    {
+                        "platform": "windows",
+                        "filename": "evolve-v4.2.1-windows-x64-setup.exe",
+                        "href": (
+                            "https://github.com/rgsneddon/evolve/releases/"
+                            "download/v4.2.1/evolve-v4.2.1-windows-x64-setup.exe"
+                        ),
+                    }
+                ],
+            },
+            {
+                "tag": "v4.2.2",
+                "assets": [
+                    {
+                        "platform": "macos",
+                        "filename": "evolve-v4.2.2-macos-x64.zip",
+                        "href": (
+                            "https://github.com/rgsneddon/evolve/releases/"
+                            "download/v4.2.2/evolve-v4.2.2-macos-x64.zip"
+                        ),
+                    }
+                ],
+            },
+        ]
+        self.assertEqual(latest_repo_pin("evolve", releases), "4.2.2")
+        hrefs = list_repo_hub_hrefs("evolve", releases)
+        self.assertEqual(hrefs[0][0], "macOS")
+        self.assertIn("evolve-v4.2.2-macos-x64.zip", hrefs[0][1])
 
     def test_god_page_embeds_current_windows_zip(self) -> None:
         from god_rpai import gnfp_wallet_hub_product, render_god_wallet_hub_html
@@ -97,11 +136,11 @@ class TestGnfpGodWalletLinks(unittest.TestCase):
 
         releases = [
             _rel(
-                "v0.0.6",
+                "v0.0.7",
                 [
-                    "gnfp-wallet-0.0.6-windows.zip",
-                    "gnfp-wallet-0.0.6-linux.zip",
-                    "gnfp-wallet-0.0.6-macos.zip",
+                    "gnfp-wallet-0.0.7-windows.zip",
+                    "gnfp-wallet-0.0.7-linux.zip",
+                    "gnfp-wallet-0.0.7-macos.zip",
                 ],
             )
         ]

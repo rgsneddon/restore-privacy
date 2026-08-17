@@ -1,0 +1,14 @@
+[Unit]
+Description=Refresh GOD / Downloads Map GitHub installer inventory
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/restore-privacy
+Environment=PYTHONPATH=/opt/restore-privacy:/opt/restore-privacy/status_page
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/restore-privacy/scripts/refresh_god_release_links.py
+StandardOutput=journal
+StandardError=journal
