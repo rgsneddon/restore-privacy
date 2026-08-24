@@ -1,7 +1,7 @@
 """Dedicated GOD · rpAI page (god.restoreprivacy.online[:1474]).
 
-GNFP coin landing first (what / mine / wallet / explorer / links /
-community), then the AI Oracle and Evolve dashboard. Not the shop, not a
+Shear succession landing first (announcement, GNFP→SHEAR how-to, vortice
+keys), then the AI Oracle and Evolve dashboard. Not the shop, not a
 ticket form, not Perc mining. Grokbot (Grok Build) chaperones; GOD leads.
 
 Port 1474 sits beside mineperc :1466 as the $GNFP BeamHash III stratum —
@@ -23,8 +23,17 @@ GOD_RPAI_API = "/api/rpai"
 # Only apex restoreprivacy.online map href allowed on this host (god. /downloads-map 404s).
 GOD_DOWNLOADS_MAP_HREF = "https://restoreprivacy.online/downloads-map"
 GOD_PAGE_TITLE = "GOD · Restore Privacy"
-GOD_BANNER_SRC = "/bannerall.jpg"
+GOD_BANNER_SRC = "/static/SHEAR_light.png"
 GOD_BANNER_FILE = "bannerall.jpg"
+SHEAR_BANNER_LIGHT = "/static/SHEAR_light.png"
+SHEAR_BANNER_DARK = "/static/SHEAR_dark.png"
+SHEAR_WORDMARK_LIGHT = "/static/shear-wordmark-light.png"
+SHEAR_WORDMARK_DARK = "/static/shear-wordmark-dark.png"
+SHEAR_SITE_HREF = "https://shear.digital"
+SHEAR_POOL_HREF = "https://pool.shear.digital"
+SHEAR_EXPLORER_HREF = "https://explorer.shear.digital"
+SHEAR_WALLET_REL = "https://github.com/rgsneddon/shear/releases"
+SHEAR_WALLET_PIN = "0.0.7"
 
 VPN_CATALOG_VERSION = "1.2.7"
 GNFP_WALLET_PIN = "0.0.7"
@@ -34,7 +43,7 @@ VPN_FREE = "https://restoreprivacy.online/suite/download?platform={platform}&fre
 GNFP_REL = "https://github.com/rgsneddon/gnfp-wallet/releases"
 GNFP_POOL_HREF = "https://gnfp.restoreprivacy.online"
 GNFP_EXPLORER_HREF = "https://explorer.restoreprivacy.online"
-GNFP_MINE_HREF = "https://github.com/rgsneddon/gnfp-mine"
+GNFP_MINE_HREF = "https://github.com/rgsneddon/GNFPHash"
 GNFP_BOOK = "de.restoreprivacy.online:1474"
 GNFP_FRONT_SG = "sg.restoreprivacy.online:1474"
 GNFP_FRONT_HEL = "hel.restoreprivacy.online:1474"
@@ -42,6 +51,53 @@ GNFP_DISCORD_HREF = "https://discord.gg/H9TdGyCUCa"
 GNFP_TELEGRAM_HREF = "https://t.me/gnfp1"
 GNFP_ANN_HREF = "https://bitcointalk.org/index.php?topic=5591310.0"
 EVOLVE_REL = "https://github.com/rgsneddon/evolve/releases"
+
+# Same-origin how-to paths served on the GOD host (and mirrored as public docs).
+GNFP_PRIVACY_HOWTO_PATH = "/howto/gnfp-privacy"
+GNFP_CPU_MINE_HOWTO_PATH = "/howto/gnfp-cpu-mine"
+
+GNFP_HOWTO_GUIDES: tuple[dict[str, Any], ...] = (
+    {
+        "id": "privacy",
+        "path": GNFP_PRIVACY_HOWTO_PATH,
+        "title": "How to keep miner identity hashed",
+        "lead": (
+            "Recent book commits keep miner identities hashed. Public glance "
+            "pages never publish IPs, wallets, or logins."
+        ),
+        "steps": (
+            "Point gnfp-mine at the book. The pool stores a hashed miner tag "
+            "(miner-xxxxxxxx), not your name and not your gnfp1.",
+            "Public pages — this GOD surface, the pool, the explorer — show "
+            "hashed identities only. Holder rows are party-xxxxxxxx tags.",
+            "There are no IPs, wallets, or logins on public pages. Do not "
+            "paste a gnfp1 or a login into a public form; this page has none.",
+            "Keep the seed and session address in the wallet. Spendable GNFP "
+            "stays on gnfp1; the book never lists that address in the open.",
+        ),
+    },
+    {
+        "id": "cpu-mine",
+        "path": GNFP_CPU_MINE_HOWTO_PATH,
+        "title": "How to CPU-mine with gnfp-mine",
+        "lead": (
+            "The book credits only the gnfp-mine CPU work-hash path. GPU-shaped "
+            "solutions are refused. TLS is the default. --threads is capped at 256."
+        ),
+        "steps": (
+            "Install gnfp-mine and run it against the Germany book. TLS by "
+            "default — do not switch the book to plain TCP: "
+            "gnfp-mine --pool de.restoreprivacy.online:1474 "
+            "--user gnfp1YOURADDRESS.worker --threads 8",
+            "Stay on the CPU-only gnfp-mine work-hash path. A valid CPU hash "
+            "pays 1 micro (0.00000001 GNFP).",
+            "GPU-shaped 208-hex / 104-byte solutions are refused. GPU solvers "
+            "are not credited (GPU refused).",
+            "--threads starts real CPU workers and is capped at 256. Use the "
+            "hashrate box on this page to read expected H/s from 1 to 256 threads.",
+        ),
+    },
+)
 
 
 def _vpn_href(platform: str) -> str:
@@ -455,10 +511,41 @@ def _family_from_text(text: str) -> str:
     return "evolve_suite"
 
 
+def render_shear_god_header_html() -> str:
+    """Shear banner from shear.digital — wordmark bar plus the SHEAR hero."""
+    light = html.escape(SHEAR_BANNER_LIGHT, quote=True)
+    dark = html.escape(SHEAR_BANNER_DARK, quote=True)
+    wm_light = html.escape(SHEAR_WORDMARK_LIGHT, quote=True)
+    wm_dark = html.escape(SHEAR_WORDMARK_DARK, quote=True)
+    site = html.escape(SHEAR_SITE_HREF, quote=True)
+    pool = html.escape(SHEAR_POOL_HREF, quote=True)
+    explorer = html.escape(SHEAR_EXPLORER_HREF, quote=True)
+    wallet = html.escape(SHEAR_WALLET_REL, quote=True)
+    return f"""
+<header class="shear-god-top" id="shear-god-top" data-shear-banner="1">
+  <div class="banner-brand">
+    <img class="banner-wordmark theme-img-light" alt="Shear" src="{wm_light}"/>
+    <img class="banner-wordmark theme-img-dark" alt="" src="{wm_dark}"/>
+  </div>
+  <nav class="nav" aria-label="Shear">
+    <a class="nav-btn" href="{site}">SHEAR</a>
+    <a class="nav-btn" href="{pool}">POOL</a>
+    <a class="nav-btn" href="{explorer}">EXPLORER</a>
+    <a class="nav-btn" href="{wallet}">WALLET</a>
+  </nav>
+</header>
+<div class="shear-hero" id="shear-hero">
+  <img class="theme-img-light" alt="Shear" src="{light}"/>
+  <img class="theme-img-dark" alt="" src="{dark}"/>
+</div>
+"""
+
+
 def render_gnfp_intro_html(
     *, inventory_path: Any = None, releases: list | None = None
 ) -> str:
-    """GNFP coin landing: what / mine / wallet / explorer / links / community."""
+    """Shear succession landing: announcement, join how-to, vortice keys."""
+    _ = inventory_path, releases
     product = gnfp_wallet_hub_product(
         inventory_path=inventory_path, releases=releases
     )
@@ -481,68 +568,103 @@ def render_gnfp_intro_html(
         for label, href in gnfp_community_links()
     )
     pin = html.escape(str(product["version"]))
-    book = html.escape(GNFP_BOOK)
-    front_sg = html.escape(GNFP_FRONT_SG)
-    front_hel = html.escape(GNFP_FRONT_HEL)
-    mine_href = html.escape(GNFP_MINE_HREF, quote=True)
+    shear_pin = html.escape(SHEAR_WALLET_PIN)
+    site = html.escape(SHEAR_SITE_HREF, quote=True)
+    pool = html.escape(SHEAR_POOL_HREF, quote=True)
+    explorer = html.escape(SHEAR_EXPLORER_HREF, quote=True)
+    shear_rel = html.escape(SHEAR_WALLET_REL, quote=True)
     wallet_rel = html.escape(GNFP_REL, quote=True)
-    explorer_href = html.escape(GNFP_EXPLORER_HREF, quote=True)
-    pool_href = html.escape(GNFP_POOL_HREF, quote=True)
     return f"""
-<section class="gnfp-intro" id="gnfp-intro" data-gnfp-intro="1">
+<section class="gnfp-intro" id="gnfp-intro" data-gnfp-intro="1" data-shear-landing="1">
   <p class="gnfp-skip"><a href="#god-oracle-evolve">Skip to AI Oracle · Evolve</a></p>
-  <header class="gnfp-hero" id="gnfp-hero">
-    <p class="gnfp-kicker" id="gnfp-kicker"><span class="gnfp-pulse" aria-hidden="true"></span>
-      $GNFP · BeamHash III · CPU only</p>
-    <h1 id="gnfp-intro-title">GNFP</h1>
-    <p class="gnfp-tagline" id="gnfp-intro-lead">God's coin. Private by default.
-      Chronoflux underneath. Proof of work only — no stake, no masternodes,
-      no ICO. You hash. You get GNFP. Nobody else needs your name.</p>
-  </header>
-  <div class="gnfp-section-grid" id="gnfp-section-grid">
-    <article class="gnfp-card" id="gnfp-what" data-gnfp-section="what">
-      <p class="gnfp-step">01</p>
-      <h2>What it is</h2>
-      <p><strong>$GNFP</strong> is a CPU-mined privacy coin on
-      <strong>BeamHash III</strong>. Addresses start with
-      <code>gnfp1</code>. Spendable GNFP lives on those addresses; the
-      public pages show hashes, not wallets, IPs, or logins.</p>
-      <ul class="gnfp-facts">
-        <li><span>Ticker</span> GNFP</li>
-        <li><span>Privacy</span> Private by default</li>
-        <li><span>Architecture</span> Chronoflux</li>
-        <li><span>Consensus</span> PoW only</li>
-      </ul>
+  <div class="shear-box-stack" id="shear-box-stack">
+    <article class="shear-box" id="shear-ann-box" data-shear-box="ann">
+      <img class="shear-box-img float-left" src="/static/shear-ann.jpg" alt="" width="880" height="660"/>
+      <p class="gnfp-kicker"><span class="gnfp-pulse" aria-hidden="true"></span>
+        Official notice</p>
+      <h1 id="gnfp-intro-title">SHEAR — notice of ledger succession and 1:1 holder claim</h1>
+      <p class="shear-lede">Firstly, thank you for your confidence in the GNFP project and the Chronoflux consensus. This announcement details the next steps in the project evolution.</p>
+      <p>We will be evolving GNFP into the full 1HASH=1TX framework which has been so painstakingly researched and in a rebranding switch, we will begin mining on a new chain. <strong>Shear is the successor to GNFP</strong> and it is currently in testnet. The live Shear testnet pool is already operational at <a href="{pool}">pool.shear.digital</a> and the public explorer is at <a href="{explorer}">explorer.shear.digital</a>. The website is <a href="{site}">shear.digital</a>.</p>
+      <h2>What is changing</h2>
+      <p>SHEAR takes the place of GNFP as the chain we will keep. Every holder of GNFP at the Shear mainnet genesis snapshot is entitled to the same number of SHE, one for one. The unit of account is the coin: one GNFP becomes one SHE. Nothing in this notice asks you to send coins to an operator, a bridge, or a third-party vault.</p>
+      <h2>How the claim works</h2>
+      <p>At the moment the Shear mainnet genesis block is sealed, a snapshot of GNFP spendable balances is taken from the book. That snapshot is the only list that matters. Coins still sitting in an unconfirmed round, or in the mempool, are not in it.</p>
+      <p>From that genesis timestamp you have <strong>ninety-nine days</strong>. In the GNFP wallet, under Backup, you export a migration key. That key is a signed claim for your snapshot amount. Treat it as a cheque. Anyone who pastes it can collect.</p>
+      <p>In the Shear wallet, open the Vortex tab and select The Join (a smart contract on SHEAR). Paste the key. The credit is paid to your own Shear destination address and shows as spendable on the Continuum tab once the claim is accepted. Each snapshot line can be claimed only once so you must be careful with your join key.</p>
+      <h2>After ninety-nine days</h2>
+      <p>Any SHE still sitting unclaimed in The Join vault is burned. It is not paid to miners, not paid to The Reserve, and not held for a later round. If you do not claim in the window, that allocation is gone.</p>
+      <h2>What this is not</h2>
+      <p>This is not a new mine, not a sale, and not a change to the one-SHE block pot or the per-hash bonus already running on pool.shear.digital. The Reserve (the 400-day staking vortice) is a separate programme. The Join does not print SHE after genesis. The vault is funded once, in the exact size of the snapshot, and then only pays claims or burns what is left.</p>
+      <h2>What you should do</h2>
+      <ol class="gnfp-howto-steps">
+        <li>Keep a copy of your GNFP twelve-word backup. The migration key is derived from the same wallet.</li>
+        <li>Wait for the published mainnet genesis time. Export the migration key after that snapshot, not from a guessed balance.</li>
+        <li>Install the Shear wallet from the Shear release, not from an unknown build. Unlock it, open Vortex → The Join, and paste the key within ninety-nine days.</li>
+        <li>Confirm the credit on Continuum and, if you wish, on <a href="{explorer}">explorer.shear.digital</a> against your dest — not against a rest-frame address.</li>
+      </ol>
+      <p><strong>Official places:</strong> <a href="{site}">shear.digital</a> · <a href="{pool}">pool.shear.digital</a> · <a href="{explorer}">explorer.shear.digital</a></p>
+      <p>No other domain, telegram, or “support desk” is authorised to take your key or your seed. The Shear wallet will never ask for your GNFP twelve words. The GNFP wallet will never ask for your Shear password.</p>
+      <p>We will publish the genesis height, the snapshot root, and the exact close of the ninety-nine day window when mainnet is opened. Until that publication, treat any “claim now” message as false.</p>
     </article>
-    <article class="gnfp-card" id="gnfp-mining" data-gnfp-section="mining">
-      <p class="gnfp-step">02</p>
-      <h2>How mining works</h2>
-      <p>Point <a href="{mine_href}">gnfp-mine</a> at the Germany book.
-      CPU workers only — GPU-shaped 208-hex / 104-byte solutions are
-      refused. A valid hash pays 1 micro (0.00000001 GNFP). Each block
-      is a 1 GNFP pot, split by who actually hashed.</p>
-      <pre class="gnfp-cmd" id="gnfp-mine-cmd">gnfp-mine --pool {book} --user gnfp1YOURADDRESS.worker --threads 8</pre>
-      <p class="hint">Book <code>{book}</code> (plain TCP, no TLS).
-      Fronts <code>{front_sg}</code> · <code>{front_hel}</code>.</p>
-    </article>
-    <article class="gnfp-card" id="gnfp-wallet" data-gnfp-section="wallet">
-      <p class="gnfp-step">03</p>
-      <h2>Wallet</h2>
-      <p>You are a seed and a <code>gnfp1</code>. The session address is
-      perpetual in your wallet. Current pin <strong>v{pin}</strong> —
-      Windows, macOS, Linux, iPhone, iPad.</p>
-      <p class="hint"><a href="{wallet_rel}">All wallet releases</a></p>
+    <article class="shear-box" id="shear-join-box" data-shear-box="join">
+      <img class="shear-box-img float-right" src="/static/shear-join.jpg" alt="" width="880" height="660"/>
+      <p class="gnfp-kicker"><span class="gnfp-pulse" aria-hidden="true"></span>
+        How-to · GNFP → SHEAR</p>
+      <h2 id="shear-join-title">How to claim your 1:1 SHEAR from GNFP</h2>
+      <p class="shear-lede">The Join is the only official path. You do not send GNFP to anyone. You export a signed migration key after the published snapshot, then paste it in the Shear wallet. One GNFP becomes one SHE.</p>
+      <h3>Before genesis</h3>
+      <ol class="gnfp-howto-steps">
+        <li>Keep your GNFP twelve-word backup offline. The join key is derived from that same wallet. If you lose the seed you cannot export the claim.</li>
+        <li>Install the current GNFP wallet (pin on this page is <strong>v{pin}</strong>) from <a href="{wallet_rel}">the official GNFP wallet releases</a>. Unlock it and confirm you can see your <code>gnfp1</code> balance. Do not export a migration key yet.</li>
+        <li>Install Shear wallet <strong>{shear_pin}</strong> from <a href="{shear_rel}">the official Shear release</a>. Unlock it. Offer <code>she1</code> (silent ID). Chain dests are revolving <code>shp1</code>. Do not share a rest-frame address.</li>
+        <li>Wait for the published Shear mainnet genesis time, the snapshot root, and the close of the ninety-nine day window. Until that notice is on <a href="{site}">shear.digital</a>, any “claim now” message is false.</li>
+      </ol>
+      <h3>After the snapshot is published</h3>
+      <ol class="gnfp-howto-steps" start="5">
+        <li>In the GNFP wallet open <strong>Backup</strong> and export the migration key. That key is a signed cheque for your snapshot amount. Anyone who pastes it can collect — treat it like cash.</li>
+        <li>Coins still sitting in an unconfirmed round or in the mempool are not in the snapshot. Only spendable book balances at genesis count.</li>
+        <li>In the Shear wallet open <strong>Vortex → The Join</strong>. Paste the key. A valid key is enough. The credit is paid to your own Shear destination and shows on Continuum once accepted.</li>
+        <li>Each snapshot line can be claimed only once. Confirm the credit on Continuum and on <a href="{explorer}">explorer.shear.digital</a> against your dest, not a rest-frame address.</li>
+      </ol>
+      <h3>The ninety-nine day window</h3>
+      <p>From genesis you have ninety-nine days. SHE still unclaimed in The Join vault at the close is burned. It is not paid to miners, not paid to The Reserve, and not held for a later round.</p>
+      <p>The Join does not print SHE after genesis. The vault is funded once, in the exact size of the snapshot. The 1 SHE block pot and the per-hash bonus on <a href="{pool}">pool.shear.digital</a> are a separate mine. The Reserve is a separate 400-day staking vortice.</p>
+      <p>The Shear wallet will never ask for your GNFP twelve words. The GNFP wallet will never ask for your Shear password. No telegram, no “support desk”, no other domain is authorised to take the key.</p>
+      <p class="hint"><a href="{wallet_rel}">GNFP wallet releases</a> · current pin v{pin}</p>
       <ul class="gnfp-chip-links" id="gnfp-wallet-links">{wallet_links}</ul>
     </article>
-    <article class="gnfp-card" id="gnfp-explorer" data-gnfp-section="explorer">
-      <p class="gnfp-step">04</p>
-      <h2>Explorer</h2>
-      <p>Glance, don't decode: height, nodes online, hashrate, difficulty,
-      block ETA, last transfers, coins in circulation. Top holders are
-      <code>party-xxxxxxxx</code> tags. That is all public. Your
-      <code>gnfp1</code> is not.</p>
-      <p><a class="gnfp-go" href="{explorer_href}">Open the explorer</a>
-      · <a href="{pool_href}">Open the pool</a></p>
+    <article class="shear-box" id="shear-vortice-box" data-shear-box="vortice">
+      <img class="shear-box-img float-left" src="/static/shear-vortice.jpg" alt="" width="880" height="660"/>
+      <p class="gnfp-kicker"><span class="gnfp-pulse" aria-hidden="true"></span>
+        Creators · vortice</p>
+      <h2 id="shear-vortice-title">SHEAR — how to mint a vortice deploy key</h2>
+      <p class="shear-lede">This note is for people who write a Vortex dapp. Shear does not host your dapp. You host it. The Shear node mints a <code>vort1.</code> deploy key that names your origin and pins a hash of the exact bytes you serve. Holders paste that key in Vortex. The wallet fetches your origin, checks the hash, and deploys the dapp locally. There is no catalog browse: no key, no dapp.</p>
+      <p>The Reserve and The Join are pinned. They are not minted this way.</p>
+      <h3>What you host</h3>
+      <p>Put the dapp body at a stable http or https URL. That body is what wallets download. If those bytes change, every key minted against the old body fails the hash check. Republish only when you intend to mint a new key.</p>
+      <p>Do not put Shear rest-frame shear1 addresses, view keys, or seeds in the hosted body.</p>
+      <h3>What you must not do</h3>
+      <ul class="gnfp-howto-steps">
+        <li>Use a reserved program id: <code>shear-reserve-v1</code>, <code>shear-join-v1</code>, <code>shear-join-watch-v1</code>.</li>
+        <li>Print SHE. Third-party vortice cannot mint. If you pay rewards, top them up from SHE already in circulation.</li>
+        <li>Ask users for a Shear password, twelve words, or a <code>join1.</code> migration key.</li>
+        <li>Ship a key that points at an origin you do not control.</li>
+      </ul>
+      <h3>Mint the key</h3>
+      <p>On a Shear node (testnet <code>shear-testnet-v1</code>), call <code>store.mintVorticeDeployKey</code> with the program id, a short display name, the origin URL, and the exact bytes the origin will serve:</p>
+      <pre class="gnfp-cmd" id="vortice-mint-cmd">store.mintVorticeDeployKey({{
+  programId: 'your-dapp-v1',
+  name: 'Your Dapp',
+  origin: 'https://your.host/vortice.json',
+  source: exactBytesYouServe,
+}})</pre>
+      <p>The same fields are accepted by <code>POST /api/vortex/mint</code>. If the origin is already live, <code>store.mintVorticeFromOrigin({{ programId, name, origin }})</code> fetches it and pins those bytes.</p>
+      <p>You receive a <code>vort1.</code> key. Give that string to users. The node remembers the origin and the hash. It does not keep a copy of your dapp. A program id can be minted once on a given node. Id must match <code>^[a-z0-9._-]{{3,64}}$</code>.</p>
+      <h3>What users do</h3>
+      <p>In the Shear wallet: Vortex → Add new vortice → paste the <code>vort1.</code> key. A valid key is enough; the wallet downloads your origin, checks the pin, and deploys. They never type a URL. They never pick you from a list.</p>
+      <h3>After mint</h3>
+      <p>Keep the origin serving the pinned bytes for as long as you want the key to work. A new body needs a new key. The 1 SHE block pot and the per-hash bonus are unchanged by any vortice you publish.</p>
+      <p><strong>Official places:</strong> <a href="{site}">shear.digital</a> · <a href="{pool}">pool.shear.digital</a> · <a href="{explorer}">explorer.shear.digital</a></p>
     </article>
   </div>
   <nav class="gnfp-official" id="gnfp-official-links" data-gnfp-links="1" aria-label="GNFP official links">
@@ -556,6 +678,146 @@ def render_gnfp_intro_html(
     <ul class="gnfp-chip-links gnfp-community-links">{community}</ul>
   </aside>
 </section>
+"""
+
+
+def gnfp_howto_guides() -> tuple[dict[str, Any], ...]:
+    """How-to copy the GOD renderer emits — privacy hash path + CPU harden."""
+    return GNFP_HOWTO_GUIDES
+
+
+def render_gnfp_hashrate_box_html(workers: Any = None) -> str:
+    """Distinct GOD box: expected GNFP hashrate from 1 thread through 256."""
+    try:
+        from gnfp import (
+            GNFP_HASHRATE_API,
+            expected_hashrate_table,
+            hashrate_table_payload,
+            load_snapshot_workers,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.gnfp import (  # type: ignore
+            GNFP_HASHRATE_API,
+            expected_hashrate_table,
+            hashrate_table_payload,
+            load_snapshot_workers,
+        )
+    if workers is not None:
+        payload = hashrate_table_payload(
+            workers=workers, store={}, record=True, persist=False
+        )
+    else:
+        payload = hashrate_table_payload(record=True, persist=True)
+    rows = list(payload.get("rows") or [])
+    if not rows:
+        rows = expected_hashrate_table(load_snapshot_workers())
+    body = "".join(
+        f'<tr data-threads="{int(row["threads"])}">'
+        f'<td>{int(row["threads"])} '
+        f'{"thread" if int(row["threads"]) == 1 else "threads"}</td>'
+        f'<td data-hashrate-expected="{int(row["threads"])}">'
+        f'{html.escape(str(row["expected"]))}</td></tr>'
+        for row in rows
+    )
+    api = html.escape(GNFP_HASHRATE_API, quote=True)
+    return f"""
+<section class="panel-card gnfp-hashrate-box" id="gnfp-hashrate-box" data-gnfp-hashrate="1" data-hashrate-live="1" data-hashrate-api="{api}">
+  <h2 id="gnfp-hashrate-title">Expected GNFP hashrate by thread count</h2>
+  <p class="gnfp-kicker" id="gnfp-hashrate-live"><span class="gnfp-pulse" aria-hidden="true"></span>
+    <span id="gnfp-hashrate-live-label">Live · updates from the book</span></p>
+  <p class="hint" id="gnfp-hashrate-lead">Observed from a selection of computers
+  already hashing on the book (hashed miner tags only — no IPs, wallets, or
+  logins). Values move as hashrates fluctuate. The range tightens as more
+  samples settle (idle/startup noise drops; EMAs track the live machines).</p>
+  <div class="gnfp-hashrate-table-wrap" id="gnfp-hashrate-table-wrap">
+    <table class="gnfp-hashrate-table" id="gnfp-hashrate-table">
+      <thead>
+        <tr><th scope="col">Threads</th><th scope="col">Expected hashrate</th></tr>
+      </thead>
+      <tbody id="gnfp-hashrate-tbody">{body}</tbody>
+    </table>
+  </div>
+</section>
+"""
+
+
+def render_gnfp_howto_box_html() -> str:
+    """Front-facing how-tos for hashed-identity privacy and CPU-only mining."""
+    articles = []
+    for guide in gnfp_howto_guides():
+        gid = html.escape(str(guide["id"]))
+        title = html.escape(str(guide["title"]))
+        lead = html.escape(str(guide["lead"]))
+        path = html.escape(str(guide["path"]), quote=True)
+        steps = "".join(
+            f"<li>{html.escape(str(step))}</li>" for step in guide["steps"]
+        )
+        articles.append(
+            f'<article class="gnfp-howto" id="howto-{gid}" data-howto="{gid}">'
+            f"<h3>{title}</h3>"
+            f'<p class="hint">{lead}</p>'
+            f'<ol class="gnfp-howto-steps">{steps}</ol>'
+            f'<p class="hint"><a href="{path}" data-howto-link="{gid}">'
+            f"Open this how-to</a></p>"
+            f"</article>"
+        )
+    return (
+        '<section class="panel-card gnfp-howto-box" id="gnfp-howto-box" '
+        'data-gnfp-howto="1">'
+        '<h2 id="gnfp-howto-title">How-to guides · privacy and CPU mining</h2>'
+        '<p class="hint" id="gnfp-howto-lead">The recent book and miner commits '
+        "preserve user privacy (hashed identities; no IPs, wallets, or logins "
+        "on public pages) and harden CPU mining (CPU-only gnfp-mine work-hash, "
+        "GPU refused, TLS by default, --threads capped at 256).</p>"
+        f'{"".join(articles)}'
+        "</section>"
+    )
+
+
+def render_gnfp_howto_page_html(howto_id: str) -> str | None:
+    """Same-origin standalone how-to the GOD page points at."""
+    guide = next((g for g in gnfp_howto_guides() if g["id"] == howto_id), None)
+    if guide is None:
+        return None
+    try:
+        from public_chrome import (
+            public_brand_header_html,
+            public_head_open,
+            public_page_close,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.public_chrome import (  # type: ignore
+            public_brand_header_html,
+            public_head_open,
+            public_page_close,
+        )
+    steps = "".join(
+        f"<li>{html.escape(str(step))}</li>" for step in guide["steps"]
+    )
+    title = html.escape(str(guide["title"]))
+    lead = html.escape(str(guide["lead"]))
+    gid = html.escape(str(guide["id"]))
+    head = public_head_open(title=f"{guide['title']} · GOD", extra_css=god_rpai_css())
+    header = public_brand_header_html(
+        active=None,
+        include_site_nav=False,
+        include_theme_picker=False,
+        banner_src=GOD_BANNER_SRC,
+    )
+    close = public_page_close(downloads_map_href=GOD_DOWNLOADS_MAP_HREF)
+    return f"""{head}
+  <div class="page-shell" id="god-howto-shell" data-page="god-howto" data-howto="{gid}">
+{header}
+<main class="support-wrap panel-card" id="god-howto-main">
+  <p class="hint"><a href="/">Back to GOD</a></p>
+  <article class="gnfp-howto" id="howto-{gid}" data-howto="{gid}">
+    <h1 id="howto-{gid}-title">{title}</h1>
+    <p class="hint">{lead}</p>
+    <ol class="gnfp-howto-steps">{steps}</ol>
+  </article>
+</main>
+  </div>
+{close}
 """
 
 
@@ -642,6 +904,92 @@ def god_rpai_css() -> str:
     linear-gradient(90deg, rgba(0,229,255,0.18) 1px, transparent 1px);
   background-size: 26px 26px;
   mask-image: linear-gradient(180deg, #000 0%, transparent 80%);
+}
+#data-path-layer { display: none; }
+.theme-img-dark { display: none; }
+html[data-theme="dark"] .theme-img-light { display: none; }
+html[data-theme="dark"] .theme-img-dark { display: block; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .theme-img-light { display: none; }
+  html:not([data-theme="light"]) .theme-img-dark { display: block; }
+}
+.shear-god-top {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-bottom: 1px solid rgba(26,111,181,.25);
+  background: #f7fbff;
+  position: relative;
+  z-index: 20;
+}
+html[data-theme="dark"] .shear-god-top { background: #06141f; }
+.shear-god-top .banner-brand { display: flex; align-items: center; }
+.shear-god-top .banner-wordmark { height: 36px; width: auto; display: block; }
+.shear-god-top .nav { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.shear-god-top a.nav-btn {
+  display: inline-flex; align-items: center; height: 36px; padding: 0 10px;
+  color: #0088a8; text-decoration: none;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-weight: 750; letter-spacing: .05em; font-size: .8rem; text-transform: uppercase;
+  border: 1px solid transparent;
+  background: linear-gradient(165deg, #ffffff 0%, #eef5fb 58%) padding-box,
+    linear-gradient(135deg, #4fd8e8, #4a9fe0, #5dcc7a) border-box;
+  background-origin: border-box; background-clip: padding-box, border-box;
+}
+html[data-theme="dark"] .shear-god-top a.nav-btn {
+  color: #4fd8e8;
+  background: linear-gradient(165deg, #1a3a5c 0%, #132a4a 58%) padding-box,
+    linear-gradient(135deg, #4fd8e8, #4a9fe0, #5dcc7a) border-box;
+  background-origin: border-box; background-clip: padding-box, border-box;
+}
+.shear-hero {
+  width: 100%;
+  margin: 0 0 1rem;
+  overflow: hidden;
+  line-height: 0;
+  background: #eef3f8;
+  text-align: center;
+}
+html[data-theme="dark"] .shear-hero { background: #0a1628; }
+.shear-hero img { width: 100%; height: auto; display: block; object-fit: contain; }
+.shear-box-stack { display: flex; flex-direction: column; gap: 1.1rem; margin: 0 0 1rem; }
+.shear-box {
+  overflow: hidden;
+  margin: 0;
+  padding: 1.05rem 1.1rem 1.15rem;
+  border: 1px solid #2694e8;
+  background: rgba(20, 23, 28, 0.92);
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.12);
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+.shear-box h1, .shear-box h2, .shear-box h3 {
+  color: #00e5ff;
+  letter-spacing: 0.03em;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+.shear-box h1 { font-size: clamp(1.45rem, 3.4vw, 2.15rem); font-weight: 900; margin: 0 0 0.55rem; line-height: 1.2; }
+.shear-box h2 { font-size: 1.18rem; font-weight: 800; margin: 0.85rem 0 0.4rem; }
+.shear-box h3 { font-size: 1.02rem; font-weight: 800; margin: 0.75rem 0 0.35rem; }
+.shear-lede { font-size: 1.05rem; line-height: 1.55; color: #e8eef5; }
+.shear-box p { overflow-wrap: anywhere; }
+.shear-box-img {
+  width: min(42%, 22rem);
+  max-width: 100%;
+  height: auto;
+  border: 1px solid rgba(38,148,232,0.45);
+}
+.shear-box-img.float-left { float: left; margin: 0 1.2rem 0.85rem 0; }
+.shear-box-img.float-right { float: right; margin: 0 0 0.85rem 1.2rem; }
+@media (max-width: 700px) {
+  .shear-box-img.float-left, .shear-box-img.float-right {
+    float: none; width: 100%; margin: 0 0 1rem;
+  }
+  .shear-god-top { grid-template-columns: 1fr; }
+  .shear-god-top .nav { justify-content: flex-start; }
 }
 #gnfp-intro > * { position: relative; z-index: 1; }
 .gnfp-skip { margin: 0 0 0.55rem; }
@@ -790,6 +1138,42 @@ def god_rpai_css() -> str:
   border-color: #39ff6a;
   color: #39ff6a;
 }
+#gnfp-hashrate-box, #gnfp-howto-box {
+  margin: 0 0 1.2rem;
+  padding: 0.95rem 1rem 1.05rem;
+  border: 1px solid #2694e8;
+  background: #14171c;
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.12);
+}
+#gnfp-hashrate-title, #gnfp-howto-title {
+  margin: 0 0 0.4rem;
+  color: #00e5ff;
+  letter-spacing: 0.04em;
+}
+.gnfp-hashrate-table-wrap { overflow-x: auto; margin: 0.7rem 0 0; }
+.gnfp-hashrate-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.gnfp-hashrate-table th, .gnfp-hashrate-table td {
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid rgba(38,148,232,0.45);
+}
+.gnfp-hashrate-table th {
+  color: #9aa8b5;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.gnfp-hashrate-table td { font-weight: 750; color: #e8eef5; }
+.gnfp-hashrate-table tr[data-threads="1"] td,
+.gnfp-hashrate-table tr[data-threads="256"] td { color: #00e5ff; }
+.gnfp-howto { margin: 0.85rem 0 0; padding: 0.75rem 0.8rem; border: 1px solid #2694e8; }
+.gnfp-howto h3 { margin: 0 0 0.35rem; color: #00e5ff; }
+.gnfp-howto-steps { margin: 0.45rem 0 0; padding-left: 1.2rem; }
+.gnfp-howto-steps li { margin: 0.4rem 0; line-height: 1.45; }
 #god-oracle-evolve { margin: 0 0 0.4rem; }
 #god-oracle-kicker {
   margin: 0 0 0.35rem;
@@ -928,7 +1312,7 @@ def render_god_hub_html() -> str:
     )
 
 
-def render_god_rpai_page_html() -> str:
+def render_god_rpai_page_html(*, workers: Any = None) -> str:
     try:
         from public_chrome import (
             PUBLIC_BRAND_TITLE,
@@ -955,16 +1339,14 @@ def render_god_rpai_page_html() -> str:
         title=GOD_PAGE_TITLE,
         extra_css=god_rpai_css(),
     )
-    header = public_brand_header_html(
-        active=None,
-        include_site_nav=False,
-        include_theme_picker=False,
-        banner_src=GOD_BANNER_SRC,
-    )
+    header = render_shear_god_header_html()
     close = public_page_close(downloads_map_href=GOD_DOWNLOADS_MAP_HREF)
     god_box = render_god_support_box_html()
     goal_box = render_goal_builder_box_html()
     intro = render_gnfp_intro_html()
+    _ = workers
+    hashrate_box = ""
+    howto_box = ""
     agent_cards = []
     for row in dash["agents"]:
         name = html.escape(str(row.get("name") or ""))
@@ -1003,6 +1385,8 @@ def render_god_rpai_page_html() -> str:
 {header}
 <main class="support-wrap panel-card" id="god-rpai-main" data-chrome="pro" data-rpai-surface="1">
   {intro}
+  {hashrate_box}
+  {howto_box}
   <section class="panel-card" id="god-oracle-evolve" data-god-oracle="1">
     <p class="gnfp-kicker" id="god-oracle-kicker">After the coin</p>
     <h2 id="god-oracle-title">AI Oracle · Evolve</h2>
@@ -1047,7 +1431,7 @@ def render_god_rpai_page_html() -> str:
   </section>
 </main>
   </div>
-<script src="/static/god_rpai.js" defer></script>
+<script src="/static/god_rpai.js?v=live-hashrate" defer></script>
 <script src="/static/god_build.js" defer></script>
 {close}
 """

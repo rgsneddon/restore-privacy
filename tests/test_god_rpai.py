@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import threading
 import unittest
@@ -17,16 +18,19 @@ sys.path.insert(0, str(ROOT / "status_page"))
 sys.path.insert(0, str(ROOT))
 
 SCRATCH = Path(
-    "/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-fe6a0861d1b3/implementer"
+    os.environ.get(
+        "GROK_GOAL_SCRATCH",
+        "/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-884fbe98563e/implementer",
+    )
 )
 
 GNFP_MARKERS = (
-    'id="gnfp-what"',
-    'id="gnfp-mining"',
-    'id="gnfp-wallet"',
-    'id="gnfp-explorer"',
+    'id="shear-ann-box"',
+    'id="shear-join-box"',
+    'id="shear-vortice-box"',
     'id="gnfp-official-links"',
     'id="gnfp-community"',
+    'id="gnfp-wallet-links"',
 )
 ORACLE_MARKERS = (
     'id="god-support-box"',
@@ -61,9 +65,9 @@ def _assert_gnfp_first_landing(test: unittest.TestCase, html: str) -> None:
     low = html.lower()
     for marker in GNFP_MARKERS:
         test.assertIn(marker, html)
-    test.assertIn("what it is", low)
-    test.assertIn("how mining works", low)
-    test.assertIn("beamhash iii", low)
+    test.assertIn("notice of ledger succession", low)
+    test.assertIn("how to claim your 1:1 shear", low)
+    test.assertIn("vortice deploy key", low)
     test.assertIn("gnfp1", low)
     test.assertIn("wallet", low)
     test.assertIn("explorer", low)
@@ -106,7 +110,7 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertNotIn('id="god-main-title"', html)
         self.assertNotIn("God's GNPF crypto-coin", html)
         self.assertNotIn("GOD another AI learning Oracle", html)
-        self.assertIn("bannerall.jpg", html)
+        self.assertIn("SHEAR_light.png", html)
         self.assertIn("god-hub", html)
         self.assertIn("Restore Privacy VPN", html)
         self.assertIn("GNFP", html)
@@ -250,7 +254,7 @@ class TestGodRpaiPage(unittest.TestCase):
             ).read().decode("utf-8")
             self.assertNotIn('id="god-main-title"', page)
             self.assertNotIn("GNPF", page)
-            self.assertIn("bannerall.jpg", page)
+            self.assertIn("SHEAR_light.png", page)
             self.assertIn("1474", page)
             self.assertIn("god-hub", page)
             _assert_gnfp_first_landing(self, page)
@@ -334,18 +338,20 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertTrue(replaced.is_file(), replaced)
         self.assertEqual(banner.read_bytes(), replaced.read_bytes())
         self.assertGreater(banner.stat().st_size, 1000)
-        self.assertEqual(GOD_BANNER_SRC, "/bannerall.jpg")
+        self.assertEqual(GOD_BANNER_SRC, "/static/SHEAR_light.png")
 
         from downloads import latest_repo_pin
 
         products = hub_products()
-        self.assertEqual([p["name"] for p in products], ["Restore Privacy VPN", "GNFP", "Evolve"])
-        self.assertEqual(products[0]["version"], VPN_CATALOG_VERSION)
         gnfp_pin = latest_repo_pin("gnfp-wallet") or GNFP_WALLET_PIN
         evolve_pin = latest_repo_pin("evolve") or EVOLVE_PIN
+        self.assertEqual([p["name"] for p in products], ["Restore Privacy VPN", "GNFP", "Evolve"])
+        self.assertEqual(products[0]["version"], VPN_CATALOG_VERSION)
         self.assertEqual(products[1]["version"], gnfp_pin)
         self.assertEqual(products[2]["version"], evolve_pin)
         self.assertEqual(VPN_CATALOG_VERSION, "1.2.7")
+        self.assertEqual(GNFP_WALLET_PIN, "0.0.5")
+        self.assertEqual(EVOLVE_PIN, "4.2.1")
 
         html = render_god_rpai_page_html()
         hub = render_god_hub_html()
@@ -423,7 +429,6 @@ class TestGodRpaiPage(unittest.TestCase):
 
     def test_gnfp_intro_precedes_oracle_and_has_no_ticket_form(self) -> None:
         from god_rpai import (
-            GNFP_BOOK,
             gnfp_community_links,
             gnfp_official_links,
             render_gnfp_intro_html,
@@ -433,11 +438,11 @@ class TestGodRpaiPage(unittest.TestCase):
         intro = render_gnfp_intro_html()
         html = render_god_rpai_page_html()
         self.assertIn(intro, html)
-        self.assertIn(GNFP_BOOK, intro)
-        self.assertIn('data-gnfp-section="what"', intro)
-        self.assertIn('data-gnfp-section="mining"', intro)
-        self.assertIn('data-gnfp-section="wallet"', intro)
-        self.assertIn('data-gnfp-section="explorer"', intro)
+        self.assertIn("ninety-nine days", intro)
+        self.assertIn('data-shear-box="ann"', intro)
+        self.assertIn('data-shear-box="join"', intro)
+        self.assertIn('data-shear-box="vortice"', intro)
+        self.assertIn("/static/shear-ann.jpg", intro)
         for label, href in gnfp_official_links():
             self.assertIn(label, intro)
             self.assertIn(html_mod.escape(href, quote=True), intro)
@@ -476,6 +481,174 @@ class TestGodRpaiPage(unittest.TestCase):
         _assert_gnfp_first_landing(self, bodies[0])
         _assert_gnfp_first_landing(self, bodies[1])
 
+    def test_hashrate_box_and_howtos_come_from_shipped_renderer(self) -> None:
+        from gnfp import expected_hashrate_table
+        from god_rpai import (
+            GNFP_CPU_MINE_HOWTO_PATH,
+            GNFP_PRIVACY_HOWTO_PATH,
+            render_gnfp_hashrate_box_html,
+            render_gnfp_howto_box_html,
+            render_gnfp_howto_page_html,
+            render_god_rpai_page_html,
+        )
+
+        workers = [
+            {"tag": "miner-aaaa1111", "hashrate": 80.0, "threads": 4},
+            {"tag": "miner-bbbb2222", "hashrate": 5.0, "threads": 1},
+        ]
+        rows = expected_hashrate_table(workers)
+        by_n = {int(r["threads"]): r for r in rows}
+        box = render_gnfp_hashrate_box_html(workers)
+        html = render_god_rpai_page_html(workers=workers)
+        self.assertIn('id="gnfp-hashrate-box"', box)
+        self.assertIn('data-threads="1"', box)
+        self.assertIn('data-threads="256"', box)
+        self.assertIn("1 thread", box)
+        self.assertIn("256 threads", box)
+        self.assertIn('data-hashrate-live="1"', box)
+        self.assertIn('data-hashrate-api="/api/gnfp-hashrate"', box)
+        self.assertIn(by_n[1]["expected"], box)
+        self.assertIn(by_n[256]["expected"], box)
+        self.assertNotIn('id="gnfp-hashrate-box"', html)
+        self.assertIn("god_rpai.js?v=live-hashrate", html)
+        js = (ROOT / "status_page" / "static" / "god_rpai.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("/api/gnfp-hashrate", js)
+        self.assertIn("setInterval", js)
+        self.assertIn("data-hashrate-expected", js)
+        self.assertNotIn("plain TCP, no TLS", html)
+
+        howto = render_gnfp_howto_box_html()
+        self.assertIn('id="gnfp-howto-box"', howto)
+        self.assertIn('id="howto-privacy"', howto)
+        self.assertIn('id="howto-cpu-mine"', howto)
+        self.assertIn("hashed identities", howto)
+        self.assertIn("no IPs", howto)
+        self.assertIn("wallets", howto)
+        self.assertIn("logins", howto)
+        self.assertIn("gnfp-mine", howto)
+        self.assertIn("CPU-only", howto)
+        self.assertIn("work-hash", howto)
+        self.assertIn("GPU refused", howto)
+        self.assertIn("TLS", howto)
+        self.assertIn("256", howto)
+        self.assertIn(GNFP_PRIVACY_HOWTO_PATH, howto)
+        self.assertIn(GNFP_CPU_MINE_HOWTO_PATH, howto)
+        self.assertNotIn('id="gnfp-howto-box"', html)
+
+        privacy = render_gnfp_howto_page_html("privacy")
+        cpu = render_gnfp_howto_page_html("cpu-mine")
+        self.assertIsNotNone(privacy)
+        self.assertIsNotNone(cpu)
+        assert privacy is not None and cpu is not None
+        self.assertIn("hashed identities", privacy)
+        self.assertIn("no IPs", privacy)
+        self.assertIn("wallets", privacy)
+        self.assertIn("logins", privacy)
+        self.assertIn("gnfp-mine", cpu)
+        self.assertIn("CPU-only", cpu)
+        self.assertIn("work-hash", cpu)
+        self.assertIn("GPU refused", cpu)
+        self.assertIn("TLS", cpu)
+        self.assertIn("256", cpu)
+
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        first = render_god_rpai_page_html(workers=workers)
+        second = render_god_rpai_page_html(workers=workers)
+        (SCRATCH / "god-page-1.html").write_text(first, encoding="utf-8")
+        (SCRATCH / "god-page-2.html").write_text(second, encoding="utf-8")
+        for body in (first, second):
+            self.assertIn('id="shear-ann-box"', body)
+            self.assertIn('id="shear-join-box"', body)
+            self.assertIn('id="shear-vortice-box"', body)
+            self.assertIn("/static/shear-ann.jpg", body)
+            self.assertIn("ninety-nine days", body)
+            self.assertIn("vort1.", body)
+            self.assertNotIn('id="gnfp-hashrate-box"', body)
+
+    def test_god_host_serves_same_origin_howtos(self) -> None:
+        from god_port import GodRpaiHandler
+        from god_rpai import GNFP_CPU_MINE_HOWTO_PATH, GNFP_PRIVACY_HOWTO_PATH
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), GodRpaiHandler)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            port = httpd.server_address[1]
+            privacy = (
+                urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}{GNFP_PRIVACY_HOWTO_PATH}", timeout=8
+                )
+                .read()
+                .decode("utf-8")
+            )
+            cpu = (
+                urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}{GNFP_CPU_MINE_HOWTO_PATH}", timeout=8
+                )
+                .read()
+                .decode("utf-8")
+            )
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+        self.assertIn("hashed identities", privacy)
+        self.assertIn("no IPs", privacy)
+        self.assertIn("gnfp-mine", cpu)
+        self.assertIn("work-hash", cpu)
+        self.assertIn("256", cpu)
+
+    def test_god_host_serves_live_hashrate_api_twice(self) -> None:
+        from god_port import GodRpaiHandler
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), GodRpaiHandler)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            port = httpd.server_address[1]
+            bodies = []
+            for _ in (1, 2):
+                raw = urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/api/gnfp-hashrate", timeout=8
+                ).read()
+                data = json.loads(raw.decode("utf-8"))
+                self.assertTrue(data["ok"])
+                self.assertTrue(data["live"])
+                threads = [int(r["threads"]) for r in data["rows"]]
+                self.assertIn(1, threads)
+                self.assertIn(256, threads)
+                self.assertTrue(data["rows"][0]["expected"])
+                bodies.append(data)
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+        self.assertGreaterEqual(bodies[1]["samples"], bodies[0]["samples"])
+
+
+class TestGnfpPublicHowtos(unittest.TestCase):
+    def test_public_docs_serve_privacy_and_cpu_howtos(self) -> None:
+        from public_docs import document_bytes_for_path
+
+        privacy = document_bytes_for_path("/howto/gnfp-privacy")
+        cpu = document_bytes_for_path("/howto/gnfp-cpu-mine")
+        self.assertIsNotNone(privacy)
+        self.assertIsNotNone(cpu)
+        assert privacy is not None and cpu is not None
+        phtml = privacy[0].decode("utf-8")
+        chtml = cpu[0].decode("utf-8")
+        self.assertIn("hashed identities", phtml)
+        self.assertIn("no IPs", phtml)
+        self.assertIn("wallets", phtml)
+        self.assertIn("logins", phtml)
+        self.assertIn("gnfp-mine", chtml)
+        self.assertIn("CPU-only", chtml)
+        self.assertIn("work-hash", chtml)
+        self.assertIn("GPU refused", chtml)
+        self.assertIn("TLS", chtml)
+        self.assertIn("256", chtml)
+
 
 if __name__ == "__main__":
     unittest.main()
+
