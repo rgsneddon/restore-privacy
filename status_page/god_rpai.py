@@ -512,29 +512,11 @@ def _family_from_text(text: str) -> str:
 
 
 def render_shear_god_header_html() -> str:
-    """Shear banner from shear.digital — wordmark bar plus the SHEAR hero."""
+    """Wide Shear banner from shear.digital — no skinny wordmark bar."""
     light = html.escape(SHEAR_BANNER_LIGHT, quote=True)
     dark = html.escape(SHEAR_BANNER_DARK, quote=True)
-    wm_light = html.escape(SHEAR_WORDMARK_LIGHT, quote=True)
-    wm_dark = html.escape(SHEAR_WORDMARK_DARK, quote=True)
-    site = html.escape(SHEAR_SITE_HREF, quote=True)
-    pool = html.escape(SHEAR_POOL_HREF, quote=True)
-    explorer = html.escape(SHEAR_EXPLORER_HREF, quote=True)
-    wallet = html.escape(SHEAR_WALLET_REL, quote=True)
     return f"""
-<header class="shear-god-top" id="shear-god-top" data-shear-banner="1">
-  <div class="banner-brand">
-    <img class="banner-wordmark theme-img-light" alt="Shear" src="{wm_light}"/>
-    <img class="banner-wordmark theme-img-dark" alt="" src="{wm_dark}"/>
-  </div>
-  <nav class="nav" aria-label="Shear">
-    <a class="nav-btn" href="{site}">SHEAR</a>
-    <a class="nav-btn" href="{pool}">POOL</a>
-    <a class="nav-btn" href="{explorer}">EXPLORER</a>
-    <a class="nav-btn" href="{wallet}">WALLET</a>
-  </nav>
-</header>
-<div class="shear-hero" id="shear-hero">
+<div class="shear-hero" id="shear-hero" data-shear-banner="1">
   <img class="theme-img-light" alt="Shear" src="{light}"/>
   <img class="theme-img-dark" alt="" src="{dark}"/>
 </div>
@@ -545,7 +527,6 @@ def render_gnfp_intro_html(
     *, inventory_path: Any = None, releases: list | None = None
 ) -> str:
     """Shear succession landing: announcement, join how-to, vortice keys."""
-    _ = inventory_path, releases
     product = gnfp_wallet_hub_product(
         inventory_path=inventory_path, releases=releases
     )
@@ -554,18 +535,6 @@ def render_gnfp_intro_html(
         f'data-gnfp-wallet="{html.escape(label, quote=True)}">'
         f"{html.escape(label)}</a></li>"
         for label, href in product["hrefs"]
-    )
-    official = "".join(
-        f'<li><a href="{html.escape(href, quote=True)}" '
-        f'data-gnfp-official="{html.escape(label, quote=True)}">'
-        f"{html.escape(label)}</a></li>"
-        for label, href in gnfp_official_links()
-    )
-    community = "".join(
-        f'<li><a href="{html.escape(href, quote=True)}" '
-        f'data-gnfp-community="{html.escape(label, quote=True)}">'
-        f"{html.escape(label)}</a></li>"
-        for label, href in gnfp_community_links()
     )
     pin = html.escape(str(product["version"]))
     shear_pin = html.escape(SHEAR_WALLET_PIN)
@@ -576,7 +545,6 @@ def render_gnfp_intro_html(
     wallet_rel = html.escape(GNFP_REL, quote=True)
     return f"""
 <section class="gnfp-intro" id="gnfp-intro" data-gnfp-intro="1" data-shear-landing="1">
-  <p class="gnfp-skip"><a href="#god-oracle-evolve">Skip to AI Oracle · Evolve</a></p>
   <div class="shear-box-stack" id="shear-box-stack">
     <article class="shear-box" id="shear-ann-box" data-shear-box="ann">
       <img class="shear-box-img float-left" src="/static/shear-ann.jpg" alt="" width="880" height="660"/>
@@ -667,16 +635,6 @@ def render_gnfp_intro_html(
       <p><strong>Official places:</strong> <a href="{site}">shear.digital</a> · <a href="{pool}">pool.shear.digital</a> · <a href="{explorer}">explorer.shear.digital</a></p>
     </article>
   </div>
-  <nav class="gnfp-official" id="gnfp-official-links" data-gnfp-links="1" aria-label="GNFP official links">
-    <h2>Official links</h2>
-    <ul class="gnfp-chip-links">{official}</ul>
-  </nav>
-  <aside class="gnfp-community" id="gnfp-community" data-gnfp-community="1">
-    <h2>Community</h2>
-    <p>Questions, rants, and miner talk live on Discord. Telegram is
-    the same crowd on the other door. No email form on this page.</p>
-    <ul class="gnfp-chip-links gnfp-community-links">{community}</ul>
-  </aside>
 </section>
 """
 
@@ -913,39 +871,6 @@ html[data-theme="dark"] .theme-img-dark { display: block; }
   html:not([data-theme="light"]) .theme-img-light { display: none; }
   html:not([data-theme="light"]) .theme-img-dark { display: block; }
 }
-.shear-god-top {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 44px;
-  padding: 6px 12px;
-  border-bottom: 1px solid rgba(26,111,181,.25);
-  background: #f7fbff;
-  position: relative;
-  z-index: 20;
-}
-html[data-theme="dark"] .shear-god-top { background: #06141f; }
-.shear-god-top .banner-brand { display: flex; align-items: center; }
-.shear-god-top .banner-wordmark { height: 36px; width: auto; display: block; }
-.shear-god-top .nav { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
-.shear-god-top a.nav-btn {
-  display: inline-flex; align-items: center; height: 36px; padding: 0 10px;
-  color: #0088a8; text-decoration: none;
-  font-family: "Segoe UI", system-ui, sans-serif;
-  font-weight: 750; letter-spacing: .05em; font-size: .8rem; text-transform: uppercase;
-  border: 1px solid transparent;
-  background: linear-gradient(165deg, #ffffff 0%, #eef5fb 58%) padding-box,
-    linear-gradient(135deg, #4fd8e8, #4a9fe0, #5dcc7a) border-box;
-  background-origin: border-box; background-clip: padding-box, border-box;
-}
-html[data-theme="dark"] .shear-god-top a.nav-btn {
-  color: #4fd8e8;
-  background: linear-gradient(165deg, #1a3a5c 0%, #132a4a 58%) padding-box,
-    linear-gradient(135deg, #4fd8e8, #4a9fe0, #5dcc7a) border-box;
-  background-origin: border-box; background-clip: padding-box, border-box;
-}
 .shear-hero {
   width: 100%;
   margin: 0 0 1rem;
@@ -965,6 +890,13 @@ html[data-theme="dark"] .shear-hero { background: #0a1628; }
   background: rgba(20, 23, 28, 0.92);
   box-shadow: 0 0 18px rgba(0, 229, 255, 0.12);
   font-family: "Segoe UI", system-ui, sans-serif;
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+}
+.shear-box p, .shear-box li, .shear-lede, .shear-box .hint {
+  text-align: justify;
+  text-justify: inter-word;
 }
 .shear-box h1, .shear-box h2, .shear-box h3 {
   color: #00e5ff;
@@ -988,8 +920,6 @@ html[data-theme="dark"] .shear-hero { background: #0a1628; }
   .shear-box-img.float-left, .shear-box-img.float-right {
     float: none; width: 100%; margin: 0 0 1rem;
   }
-  .shear-god-top { grid-template-columns: 1fr; }
-  .shear-god-top .nav { justify-content: flex-start; }
 }
 #gnfp-intro > * { position: relative; z-index: 1; }
 .gnfp-skip { margin: 0 0 0.55rem; }
@@ -1314,124 +1244,27 @@ def render_god_hub_html() -> str:
 
 def render_god_rpai_page_html(*, workers: Any = None) -> str:
     try:
-        from public_chrome import (
-            PUBLIC_BRAND_TITLE,
-            public_brand_header_html,
-            public_head_open,
-            public_page_close,
-        )
+        from public_chrome import public_head_open, public_page_close
     except ImportError:  # pragma: no cover
         from status_page.public_chrome import (  # type: ignore
-            PUBLIC_BRAND_TITLE,
-            public_brand_header_html,
             public_head_open,
             public_page_close,
         )
-    try:
-        from god_support import render_god_support_box_html
-        from goal_builder import render_goal_builder_box_html
-    except ImportError:  # pragma: no cover
-        from status_page.god_support import render_god_support_box_html  # type: ignore
-        from status_page.goal_builder import render_goal_builder_box_html  # type: ignore
 
-    dash = rpai_dashboard_payload()
+    _ = workers
     head = public_head_open(
         title=GOD_PAGE_TITLE,
         extra_css=god_rpai_css(),
     )
     header = render_shear_god_header_html()
     close = public_page_close(downloads_map_href=GOD_DOWNLOADS_MAP_HREF)
-    god_box = render_god_support_box_html()
-    goal_box = render_goal_builder_box_html()
     intro = render_gnfp_intro_html()
-    _ = workers
-    hashrate_box = ""
-    howto_box = ""
-    agent_cards = []
-    for row in dash["agents"]:
-        name = html.escape(str(row.get("name") or ""))
-        learned = html.escape(str(row.get("learned") or 0))
-        last = html.escape(str(row.get("lastLine") or "—"))
-        agent_cards.append(
-            f'<article class="panel-card god-agent-card" data-agent="{name}">'
-            f'<div class="label">{name}</div>'
-            f'<div class="value" data-agent-learned="{name}">{learned}</div>'
-            f'<p class="hint" data-agent-last="{name}">{last}</p></article>'
-        )
-    tip = int(dash.get("gnfpHeight") or dash.get("gnfp_height") or 0)
-    agent_cards.append(
-        '<article class="panel-card god-agent-card" id="gnfp-tip-card" data-gnfp-tip="1">'
-        '<div class="label">GNFP tip height</div>'
-        f'<div class="value" id="gnfp-tip-height" data-gnfp-height="1">{tip}</div>'
-        '<p class="hint">Most recent $GNFP block</p></article>'
-    )
-    benefits = "".join(
-        f"<li><strong>{html.escape(item['id'])}.</strong> {html.escape(item['text'])}</li>"
-        for item in dash["benefits"]
-    )
-    parts = dash.get("parts") or []
-    if parts:
-        recent = "".join(
-            f'<li data-part-key="{html.escape(str(p.get("key") or ""))}">'
-            f'{html.escape(str(p.get("family_label") or p.get("family") or ""))}: '
-            f'{html.escape(str(p.get("action") or ""))}</li>'
-            for p in reversed(parts)
-        )
-    else:
-        recent = '<li class="ned-learned-empty">Nothing learned yet.</li>'
-    hub = render_god_hub_html()
     return f"""{head}
   <div class="page-shell" id="god-rpai-shell" data-page="god-rpai" data-god-port="{GOD_RPAI_PORT}">
 {header}
 <main class="support-wrap panel-card" id="god-rpai-main" data-chrome="pro" data-rpai-surface="1">
   {intro}
-  {hashrate_box}
-  {howto_box}
-  <section class="panel-card" id="god-oracle-evolve" data-god-oracle="1">
-    <p class="gnfp-kicker" id="god-oracle-kicker">After the coin</p>
-    <h2 id="god-oracle-title">AI Oracle · Evolve</h2>
-    <p class="hint" id="god-oracle-lead">Ask GOD, build a goal, and watch the
-    four agents learn. This is the rpAI dashboard — the coin is above.</p>
-  </section>
-  {hub}
-  <section class="panel-card" id="god-port-box">
-    <h3>god.restoreprivacy.online:{GOD_RPAI_PORT}</h3>
-    <p class="hint">HTTPS is this page. Port {GOD_RPAI_PORT} is the $GNFP BeamHash III
-    CPU stratum — proof of work only, miner tags hashed, no public user info.
-    <a href="/gnfp">$GNFP pool</a> ·
-    <a href="/gnfp/explorer">explorer</a> ·
-    <a href="/gnfp/api/network">network</a>.</p>
-    <ul class="god-port-benefits" id="god-port-benefits">{benefits}</ul>
-  </section>
-  <div class="god-agent-grid" id="god-agent-grid">
-    {''.join(agent_cards)}
-  </div>
-  {_learn_surface_html(dash)}
-  <div class="rpai-support-row" id="rpai-support-row">
-  {god_box}
-  {goal_box}
-  </div>
-  <section class="panel-card" id="god-cli-box" data-god-cli="1">
-    <h3>Grok Build · CLI</h3>
-    <pre id="god-cli" aria-live="polite">idle — press Build. Remain here until the installer is sealed.</pre>
-    <p class="hint" id="god-cli-stay">Evolve Suite is the surface. The four agents have the brief.</p>
-    <a id="god-cli-download" class="btn" href="#">Download installer</a>
-  </section>
-  <section class="panel-card" id="god-input-box">
-    <h3>Learn from input</h3>
-    <p class="hint">A public observation becomes a distinct action. Secrets are refused.</p>
-    <label for="god-learn-input">Input</label>
-    <textarea id="god-learn-input" maxlength="800" placeholder="observe: open analysis surface"></textarea>
-    <button type="button" id="god-learn-submit">Teach the four agents</button>
-    <pre class="goal-builder-answer" id="god-learn-answer" hidden></pre>
-  </section>
-  <section class="panel-card rpai-agent-learn" id="rpai-agent-learn">
-    <h3>Outputs · recently learned</h3>
-    <ol class="god-output-list" id="god-output-list">{recent}</ol>
-  </section>
 </main>
   </div>
-<script src="/static/god_rpai.js?v=live-hashrate" defer></script>
-<script src="/static/god_build.js" defer></script>
 {close}
 """
