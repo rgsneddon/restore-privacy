@@ -954,9 +954,10 @@ html[data-theme="dark"] .shear-hero { background: #0a1628; }
 #gnfp-intro-title {
   margin: 0.15rem 0 0.4rem;
   color: #00e5ff;
-  font-size: clamp(2.4rem, 7vw, 4.2rem);
+  font-size: 1.32rem;
   font-weight: 900;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.03em;
+  line-height: 1.25;
   text-shadow: 0 0 22px rgba(0,229,255,0.55);
 }
 .gnfp-tagline {
