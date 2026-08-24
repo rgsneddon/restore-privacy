@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-17",
+  "updated": "2026-08-24",
   "note": "Newest installer packages per public rgsneddon app. Checksums, private repos, and superseded pins omitted. Rendered by list_downloads_map_rows.",
   "repos": [
     {
@@ -7,12 +7,617 @@
       "repo": "gnfp-wallet",
       "releases": [
         {
+          "tag": "v0.2.3",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.2.3-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.3/gnfp-wallet-0.2.3-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.2.3-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.3/gnfp-wallet-0.2.3-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.2.3-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.3/gnfp-wallet-0.2.3-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.2.3-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.3/gnfp-wallet-0.2.3-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.2.3-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.3/gnfp-wallet-0.2.3-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.2.3-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.3/gnfp-wallet-0.2.3-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.2.3-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.3/gnfp-wallet-0.2.3-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.2.2",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.2.2-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.2/gnfp-wallet-0.2.2-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.2.2-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.2/gnfp-wallet-0.2.2-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.2.2-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.2/gnfp-wallet-0.2.2-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.2.2-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.2/gnfp-wallet-0.2.2-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.2.2-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.2/gnfp-wallet-0.2.2-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.2.2-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.2/gnfp-wallet-0.2.2-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.2.2-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.2/gnfp-wallet-0.2.2-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.2.1",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.2.1-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.1/gnfp-wallet-0.2.1-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.2.1-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.1/gnfp-wallet-0.2.1-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.2.1-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.1/gnfp-wallet-0.2.1-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.2.1-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.1/gnfp-wallet-0.2.1-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.2.1-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.1/gnfp-wallet-0.2.1-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.2.1-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.1/gnfp-wallet-0.2.1-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.2.1-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.1/gnfp-wallet-0.2.1-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.2.0",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.2.0-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.0/gnfp-wallet-0.2.0-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.2.0-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.0/gnfp-wallet-0.2.0-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.2.0-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.0/gnfp-wallet-0.2.0-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.2.0-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.0/gnfp-wallet-0.2.0-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.2.0-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.0/gnfp-wallet-0.2.0-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.2.0-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.0/gnfp-wallet-0.2.0-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.2.0-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.2.0/gnfp-wallet-0.2.0-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.1.9",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.1.9-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.9/gnfp-wallet-0.1.9-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.9-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.9/gnfp-wallet-0.1.9-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.1.9-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.9/gnfp-wallet-0.1.9-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.1.9-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.9/gnfp-wallet-0.1.9-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.9-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.9/gnfp-wallet-0.1.9-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.1.9-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.9/gnfp-wallet-0.1.9-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.1.9-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.9/gnfp-wallet-0.1.9-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.1.8",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.1.8-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.8/gnfp-wallet-0.1.8-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.8-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.8/gnfp-wallet-0.1.8-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.1.8-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.8/gnfp-wallet-0.1.8-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.1.8-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.8/gnfp-wallet-0.1.8-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.8-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.8/gnfp-wallet-0.1.8-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.1.8-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.8/gnfp-wallet-0.1.8-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.1.8-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.8/gnfp-wallet-0.1.8-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.1.7",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.1.7-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.7/gnfp-wallet-0.1.7-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.7-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.7/gnfp-wallet-0.1.7-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.1.7-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.7/gnfp-wallet-0.1.7-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.1.7-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.7/gnfp-wallet-0.1.7-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.7-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.7/gnfp-wallet-0.1.7-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.1.7-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.7/gnfp-wallet-0.1.7-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.1.7-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.7/gnfp-wallet-0.1.7-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.1.6",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.1.6-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.6/gnfp-wallet-0.1.6-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.6-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.6/gnfp-wallet-0.1.6-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.1.6-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.6/gnfp-wallet-0.1.6-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.1.6-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.6/gnfp-wallet-0.1.6-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.6-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.6/gnfp-wallet-0.1.6-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.1.6-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.6/gnfp-wallet-0.1.6-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.1.6-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.6/gnfp-wallet-0.1.6-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.1.5",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.1.5-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.5/gnfp-wallet-0.1.5-android.apk"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.1.5-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.5/gnfp-wallet-0.1.5-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.1.5-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.5/gnfp-wallet-0.1.5-ipad.ipa"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.1.5-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.5/gnfp-wallet-0.1.5-macos.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.1.4",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.1.4-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.4/gnfp-wallet-0.1.4-android.apk"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.1.4-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.4/gnfp-wallet-0.1.4-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.1.4-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.4/gnfp-wallet-0.1.4-ipad.ipa"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.1.4-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.4/gnfp-wallet-0.1.4-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.1.4-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.4/gnfp-wallet-0.1.4-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.1.3",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.1.3-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.3/gnfp-wallet-0.1.3-android.apk"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.1.3-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.3/gnfp-wallet-0.1.3-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.1.3-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.3/gnfp-wallet-0.1.3-ipad.ipa"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.1.3-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.3/gnfp-wallet-0.1.3-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.1.3-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.3/gnfp-wallet-0.1.3-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.1.2",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.1.2-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.2/gnfp-wallet-0.1.2-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.2-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.2/gnfp-wallet-0.1.2-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.1.2-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.2/gnfp-wallet-0.1.2-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.1.2-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.2/gnfp-wallet-0.1.2-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.2-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.2/gnfp-wallet-0.1.2-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.1.2-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.2/gnfp-wallet-0.1.2-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.1.2-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.2/gnfp-wallet-0.1.2-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.1.1",
+          "assets": [
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.1-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.1/gnfp-wallet-0.1.1-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.1.1-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.1/gnfp-wallet-0.1.1-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.1.1-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.1/gnfp-wallet-0.1.1-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.1-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.1/gnfp-wallet-0.1.1-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.1.1-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.1/gnfp-wallet-0.1.1-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.1.1-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.1/gnfp-wallet-0.1.1-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.1.0",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.1.0-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.0/gnfp-wallet-0.1.0-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.0-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.0/gnfp-wallet-0.1.0-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.1.0-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.0/gnfp-wallet-0.1.0-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.1.0-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.0/gnfp-wallet-0.1.0-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.1.0-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.0/gnfp-wallet-0.1.0-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.1.0-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.0/gnfp-wallet-0.1.0-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.1.0-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.1.0/gnfp-wallet-0.1.0-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.0.9",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.0.9-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.9/gnfp-wallet-0.0.9-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.0.9-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.9/gnfp-wallet-0.0.9-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.0.9-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.9/gnfp-wallet-0.0.9-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.0.9-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.9/gnfp-wallet-0.0.9-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.0.9-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.9/gnfp-wallet-0.0.9-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.0.9-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.9/gnfp-wallet-0.0.9-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.0.9-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.9/gnfp-wallet-0.0.9-windows.zip"
+            }
+          ]
+        },
+        {
+          "tag": "v0.0.8",
+          "assets": [
+            {
+              "platform": "android",
+              "filename": "gnfp-wallet-0.0.8-android.apk",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.8/gnfp-wallet-0.0.8-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.0.8-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.8/gnfp-wallet-0.0.8-archlinux.zip"
+            },
+            {
+              "platform": "ios",
+              "filename": "gnfp-wallet-0.0.8-ios.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.8/gnfp-wallet-0.0.8-ios.ipa"
+            },
+            {
+              "platform": "ipad",
+              "filename": "gnfp-wallet-0.0.8-ipad.ipa",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.8/gnfp-wallet-0.0.8-ipad.ipa"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.0.8-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.8/gnfp-wallet-0.0.8-linux.zip"
+            },
+            {
+              "platform": "macos",
+              "filename": "gnfp-wallet-0.0.8-macos.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.8/gnfp-wallet-0.0.8-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.0.8-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.8/gnfp-wallet-0.0.8-windows.zip"
+            }
+          ]
+        },
+        {
           "tag": "v0.0.7",
           "assets": [
             {
               "platform": "android",
               "filename": "gnfp-wallet-0.0.7-android.apk",
               "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.7/gnfp-wallet-0.0.7-android.apk"
+            },
+            {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.0.7-archlinux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.7/gnfp-wallet-0.0.7-archlinux.zip"
             },
             {
               "platform": "ios",
@@ -25,9 +630,19 @@
               "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.7/gnfp-wallet-0.0.7-ipad.ipa"
             },
             {
+              "platform": "linux",
+              "filename": "gnfp-wallet-0.0.7-linux.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.7/gnfp-wallet-0.0.7-linux.zip"
+            },
+            {
               "platform": "macos",
               "filename": "gnfp-wallet-0.0.7-macos.zip",
               "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.7/gnfp-wallet-0.0.7-macos.zip"
+            },
+            {
+              "platform": "windows",
+              "filename": "gnfp-wallet-0.0.7-windows.zip",
+              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.7/gnfp-wallet-0.0.7-windows.zip"
             }
           ]
         },
@@ -110,11 +725,6 @@
           "tag": "v0.0.3",
           "assets": [
             {
-              "platform": "linux",
-              "filename": "gnfp-wallet-0.0.3-archlinux.zip",
-              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.3/gnfp-wallet-0.0.3-archlinux.zip"
-            },
-            {
               "platform": "ios",
               "filename": "gnfp-wallet-0.0.3-ios.ipa",
               "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.3/gnfp-wallet-0.0.3-ios.ipa"
@@ -128,41 +738,6 @@
               "platform": "macos",
               "filename": "gnfp-wallet-0.0.3-macos.zip",
               "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.3/gnfp-wallet-0.0.3-macos.zip"
-            }
-          ]
-        },
-        {
-          "tag": "v0.0.2",
-          "assets": [
-            {
-              "platform": "linux",
-              "filename": "gnfp-wallet-0.0.2-archlinux.zip",
-              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.2/gnfp-wallet-0.0.2-archlinux.zip"
-            },
-            {
-              "platform": "ios",
-              "filename": "gnfp-wallet-0.0.2-ios.ipa",
-              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.2/gnfp-wallet-0.0.2-ios.ipa"
-            },
-            {
-              "platform": "ipad",
-              "filename": "gnfp-wallet-0.0.2-ipad.ipa",
-              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.2/gnfp-wallet-0.0.2-ipad.ipa"
-            },
-            {
-              "platform": "linux",
-              "filename": "gnfp-wallet-0.0.2-linux.zip",
-              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.2/gnfp-wallet-0.0.2-linux.zip"
-            },
-            {
-              "platform": "macos",
-              "filename": "gnfp-wallet-0.0.2-macos.zip",
-              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.2/gnfp-wallet-0.0.2-macos.zip"
-            },
-            {
-              "platform": "windows",
-              "filename": "gnfp-wallet-0.0.2-windows.zip",
-              "href": "https://github.com/rgsneddon/gnfp-wallet/releases/download/v0.0.2/gnfp-wallet-0.0.2-windows.zip"
             }
           ]
         }
