@@ -25,10 +25,10 @@ SCRATCH = Path(
 )
 
 GNFP_MARKERS = (
-    'id="shear-ann-box"',
-    'id="shear-join-box"',
-    'id="shear-vortice-box"',
-    'id="shear-hero"',
+    'id="gnfp-ann-box"',
+    'id="gnfp-wallet-box"',
+    'id="gnfp-mine-box"',
+    'id="gnfp-hero"',
     'id="gnfp-wallet-links"',
 )
 ORACLE_MARKERS = (
@@ -61,14 +61,14 @@ def _assert_gnfp_first_landing(test: unittest.TestCase, html: str) -> None:
     low = html.lower()
     for marker in GNFP_MARKERS:
         test.assertIn(marker, html)
-    test.assertIn("move your gnfp to shear", low)
-    test.assertIn("how to move gnfp to shear at mainnet", low)
-    test.assertIn("vort1", low)
-    test.assertIn("six confirms", low)
-    test.assertIn("already claimed", low)
-    test.assertIn("ssa1", low)
-    test.assertNotIn("she1", low)
-    test.assertNotIn("shp1", low)
+    test.assertIn("gnfp — god's coin", low)
+    test.assertIn("install the gnfp wallet", low)
+    test.assertIn("cpu mine gnfp", low)
+    test.assertNotIn("the join", low)
+    test.assertNotIn("join1", low)
+    test.assertNotIn("ssa1", low)
+    test.assertNotIn("shear.digital", low)
+    test.assertNotIn("one for one", low)
     test.assertIn("text-align: justify", html)
     test.assertIn("gnfp1", low)
     test.assertIn("wallet", low)
@@ -93,22 +93,22 @@ class TestGodRpaiPage(unittest.TestCase):
             GOD_RPAI_HOST,
             GOD_RPAI_PORT,
             PORT_1474_BENEFITS,
-            SHEAR_WALLET_PIN,
             is_god_host,
             render_god_rpai_page_html,
         )
 
         self.assertTrue(is_god_host("god.restoreprivacy.online"))
         self.assertTrue(is_god_host("god.restoreprivacy.online:1474"))
-        self.assertTrue(is_god_host("admin.shear.digital"))
+        self.assertFalse(is_god_host("admin.shear.digital"))
         self.assertFalse(is_god_host("restoreprivacy.online"))
         self.assertFalse(is_god_host("shear.digital"))
         html = render_god_rpai_page_html()
-        self.assertIn("six confirms", html.lower())
-        self.assertIn("already claimed", html.lower())
-        self.assertIn("ssa1", html.lower())
-        self.assertIn(SHEAR_WALLET_PIN, html)
-        self.assertIn("shear-testnet", html)
+        self.assertIn("gnfp1", html.lower())
+        self.assertIn("cpu mine", html.lower())
+        self.assertNotIn("the join", html.lower())
+        self.assertNotIn("already claimed", html.lower())
+        self.assertNotIn("ssa1", html.lower())
+        self.assertNotIn("shear-testnet", html)
         self.assertNotIn("ios.ipa", html)
         self.assertNotIn("rgsneddon/shear/releases", html)
         self.assertEqual(GOD_RPAI_HOST, "god.restoreprivacy.online")
@@ -117,7 +117,7 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertNotIn('id="god-main-title"', html)
         self.assertNotIn("God's GNPF crypto-coin", html)
         self.assertNotIn("GOD another AI learning Oracle", html)
-        self.assertIn("SHEAR_light.png", html)
+        self.assertIn("bannerall.jpg", html)
         self.assertIn("GNFP", html)
         _assert_gnfp_first_landing(self, html)
         self.assertIn("#gnfp-intro-title", html)
@@ -133,7 +133,7 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertNotIn('id="doc-links"', html)
         self.assertNotIn('id="theme-mode-control"', html)
         self.assertIn("linear-gradient(135deg, #2694e8 0%, #00e5ff 100%)", html)
-        self.assertIn("ninety-nine days", html.lower())
+        self.assertIn("cpu mine gnfp", html.lower())
         self.assertIn("god-rpai-main", html)
         self.assertIn("panel-card", html)
         self.assertIn("1474", html)
@@ -246,7 +246,7 @@ class TestGodRpaiPage(unittest.TestCase):
             ).read().decode("utf-8")
             self.assertNotIn('id="god-main-title"', page)
             self.assertNotIn("GNPF", page)
-            self.assertIn("SHEAR_light.png", page)
+            self.assertIn("bannerall.jpg", page)
             self.assertIn("1474", page)
             self.assertNotIn('id="god-hub"', page)
             _assert_gnfp_first_landing(self, page)
@@ -306,7 +306,8 @@ class TestGodRpaiPage(unittest.TestCase):
             ROOT / "perc_chain" / "deploy" / "nginx-admin.shear.digital.conf"
         ).read_text(encoding="utf-8")
         self.assertIn("server_name admin.shear.digital", admin_nginx)
-        self.assertIn("8013", admin_nginx)
+        self.assertIn("/var/www/admin.shear.digital", admin_nginx)
+        self.assertNotIn("proxy_pass http://127.0.0.1:8013", admin_nginx)
         self.assertNotIn("135.181.152.10", nginx)
         self.assertIn("god_port.py", unit)
         self.assertIn("8013", unit)
@@ -335,7 +336,7 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertTrue(replaced.is_file(), replaced)
         self.assertEqual(banner.read_bytes(), replaced.read_bytes())
         self.assertGreater(banner.stat().st_size, 1000)
-        self.assertEqual(GOD_BANNER_SRC, "/static/SHEAR_light.png")
+        self.assertEqual(GOD_BANNER_SRC, "/static/bannerall.jpg")
 
         from downloads import latest_repo_pin
 
@@ -422,11 +423,12 @@ class TestGodRpaiPage(unittest.TestCase):
         intro = render_gnfp_intro_html()
         html = render_god_rpai_page_html()
         self.assertIn(intro, html)
-        self.assertIn("ninety-nine days", intro)
-        self.assertIn('data-shear-box="ann"', intro)
-        self.assertIn('data-shear-box="join"', intro)
-        self.assertIn('data-shear-box="vortice"', intro)
-        self.assertIn("/static/shear-ann.jpg", intro)
+        self.assertIn("CPU mine GNFP", intro)
+        self.assertIn('data-gnfp-box="ann"', intro)
+        self.assertIn('data-gnfp-box="wallet"', intro)
+        self.assertIn('data-gnfp-box="mine"', intro)
+        self.assertNotIn("The Join", intro)
+        self.assertNotIn("shear.digital", intro)
         self.assertNotIn('id="gnfp-official-links"', intro)
         self.assertNotIn('id="gnfp-community"', intro)
         _assert_gnfp_first_landing(self, html)
@@ -542,12 +544,12 @@ class TestGodRpaiPage(unittest.TestCase):
         (SCRATCH / "god-page-1.html").write_text(first, encoding="utf-8")
         (SCRATCH / "god-page-2.html").write_text(second, encoding="utf-8")
         for body in (first, second):
-            self.assertIn('id="shear-ann-box"', body)
-            self.assertIn('id="shear-join-box"', body)
-            self.assertIn('id="shear-vortice-box"', body)
-            self.assertIn("/static/shear-ann.jpg", body)
-            self.assertIn("ninety-nine days", body)
-            self.assertIn("vort1.", body)
+            self.assertIn('id="gnfp-ann-box"', body)
+            self.assertIn('id="gnfp-wallet-box"', body)
+            self.assertIn('id="gnfp-mine-box"', body)
+            self.assertIn("CPU mine GNFP", body)
+            self.assertNotIn("The Join", body)
+            self.assertNotIn("vort1.", body)
             self.assertNotIn('id="gnfp-hashrate-box"', body)
 
     def test_god_host_serves_same_origin_howtos(self) -> None:

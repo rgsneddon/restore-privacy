@@ -1,10 +1,9 @@
 """Dedicated GOD · rpAI page (god.restoreprivacy.online[:1474]).
 
-Shear succession landing first (announcement, GNFP→SHEAR how-to, vortice
-keys), then the AI Oracle and Evolve dashboard. Not the shop, not a
-ticket form, not Perc mining. Grokbot (Grok Build) chaperones; GOD leads.
+GNFP-only landing: wallet, CPU mining, pool and explorer. Not Shear.
+Not the shop, not a ticket form, not Perc mining.
 
-Port 1474 sits beside mineperc :1466 as the $GNFP BeamHash III stratum —
+Port 1474 sits beside mineperc :1466 as the $GNFP book stratum —
 it is not Beam :1974 and not a VPN dataplane.
 """
 
@@ -15,7 +14,7 @@ import json
 from typing import Any, Callable
 
 GOD_RPAI_HOST = "god.restoreprivacy.online"
-GOD_MIRROR_HOSTS = ("admin.shear.digital",)
+GOD_MIRROR_HOSTS = ()
 GOD_RPAI_PORT = 1474  # public: $GNFP BeamHash III stratum (perc miner)
 GOD_HTTP_PORT = 8013  # loopback: dedicated GOD · rpAI page
 GOD_RPAI_PATH = "/god"
@@ -24,10 +23,10 @@ GOD_RPAI_API = "/api/rpai"
 # Only apex restoreprivacy.online map href allowed on this host (god. /downloads-map 404s).
 GOD_DOWNLOADS_MAP_HREF = "https://restoreprivacy.online/downloads-map"
 GOD_PAGE_TITLE = "GOD · Restore Privacy"
-GOD_BANNER_SRC = "/static/SHEAR_light.png"
+GOD_BANNER_SRC = "/static/bannerall.jpg"
 GOD_BANNER_FILE = "bannerall.jpg"
-SHEAR_BANNER_LIGHT = "/static/SHEAR_light.png"
-SHEAR_BANNER_DARK = "/static/SHEAR_dark.png"
+SHEAR_BANNER_LIGHT = "/static/bannerall.jpg"
+SHEAR_BANNER_DARK = "/static/bannerall.jpg"
 SHEAR_WORDMARK_LIGHT = "/static/shear-wordmark-light.png"
 SHEAR_WORDMARK_DARK = "/static/shear-wordmark-dark.png"
 SHEAR_SITE_HREF = "https://shear.digital"
@@ -118,7 +117,7 @@ def _shear_wallet_href(filename: str, pin: str | None = None) -> str:
 
 
 def _public_join_wallet_hrefs(hrefs: list | tuple) -> list[tuple[str, str]]:
-    """Join how-to chips: current pin, macOS dmg over zip, no iOS."""
+    """Wallet chips: current pin, macOS dmg over zip, no iOS."""
     rows = [(str(label), str(href)) for label, href in hrefs]
     has_dmg = any(href.lower().endswith("-macos.dmg") for _label, href in rows)
     out: list[tuple[str, str]] = []
@@ -544,13 +543,12 @@ def _family_from_text(text: str) -> str:
 
 
 def render_shear_god_header_html() -> str:
-    """Wide Shear banner from shear.digital — no skinny wordmark bar."""
-    light = html.escape(SHEAR_BANNER_LIGHT, quote=True)
-    dark = html.escape(SHEAR_BANNER_DARK, quote=True)
+    """GOD / GNFP banner. Not a Shear surface."""
+    src = html.escape(GOD_BANNER_SRC, quote=True)
     return f"""
-<div class="shear-hero" id="shear-hero" data-shear-banner="1">
-  <img class="theme-img-light" alt="Shear" src="{light}"/>
-  <img class="theme-img-dark" alt="" src="{dark}"/>
+<div class="gnfp-hero" id="gnfp-hero" data-gnfp-banner="1">
+  <img class="theme-img-light" alt="$GNFP" src="{src}"/>
+  <img class="theme-img-dark" alt="" src="{src}"/>
 </div>
 """
 
@@ -558,7 +556,7 @@ def render_shear_god_header_html() -> str:
 def render_gnfp_intro_html(
     *, inventory_path: Any = None, releases: list | None = None
 ) -> str:
-    """Shear succession landing: announcement, join how-to, vortice keys."""
+    """GNFP-only landing: wallet, CPU mining, pool, explorer."""
     product = gnfp_wallet_hub_product(
         inventory_path=inventory_path, releases=releases
     )
@@ -568,87 +566,53 @@ def render_gnfp_intro_html(
         f"{html.escape(label)}</a></li>"
         for label, href in _public_join_wallet_hrefs(product["hrefs"])
     )
-    shear_links = "".join(
-        f'<li><a href="{html.escape(href, quote=True)}" '
-        f'data-shear-wallet="{html.escape(label, quote=True)}">'
-        f"{html.escape(label)}</a></li>"
-        for label, href in (
-            (
-                "macOS",
-                _shear_wallet_href(f"shear-wallet-{SHEAR_WALLET_PIN}-macos.dmg"),
-            ),
-            (
-                "Android",
-                _shear_wallet_href(f"shear-wallet-{SHEAR_WALLET_PIN}-android.apk"),
-            ),
-        )
-    )
     pin = html.escape(str(product["version"]))
-    shear_pin = html.escape(SHEAR_WALLET_PIN)
-    site = html.escape(SHEAR_SITE_HREF, quote=True)
-    pool = html.escape(SHEAR_POOL_HREF, quote=True)
-    explorer = html.escape(SHEAR_EXPLORER_HREF, quote=True)
-    dag = html.escape("https://dag.shear.digital", quote=True)
-    shear_rel = html.escape(SHEAR_WALLET_REL, quote=True)
+    pool = html.escape(GNFP_POOL_HREF, quote=True)
+    explorer = html.escape(GNFP_EXPLORER_HREF, quote=True)
+    mine = html.escape(GNFP_MINE_HREF, quote=True)
     wallet_rel = html.escape(GNFP_REL, quote=True)
+    book = html.escape(GNFP_BOOK)
+    sg = html.escape(GNFP_FRONT_SG)
+    discord = html.escape(GNFP_DISCORD_HREF, quote=True)
+    telegram = html.escape(GNFP_TELEGRAM_HREF, quote=True)
     return f"""
-<section class="gnfp-intro" id="gnfp-intro" data-gnfp-intro="1" data-shear-landing="1">
-  <div class="shear-box-stack" id="shear-box-stack">
-    <article class="shear-box" id="shear-ann-box" data-shear-box="ann">
-      <img class="shear-box-img float-left" src="/static/shear-ann.jpg" alt="" width="880" height="660"/>
+<section class="gnfp-intro" id="gnfp-intro" data-gnfp-intro="1">
+  <div class="gnfp-box-stack" id="gnfp-box-stack">
+    <article class="gnfp-box" id="gnfp-ann-box" data-gnfp-box="ann">
       <p class="gnfp-kicker"><span class="gnfp-pulse" aria-hidden="true"></span>
-        Official notice</p>
-      <h1 id="gnfp-intro-title">Move your GNFP to Shear at mainnet</h1>
-      <p class="shear-lede">Thank you for holding GNFP. Shear is the chain that continues from here. When Shear mainnet opens, every spendable GNFP on the book is matched <strong>one for one</strong> with SHE. You do not send coins to us, to a bridge, or to anyone else.</p>
-      <p>Shear is in <strong>testnet</strong> today. Mining and wallets are live so you can practise. The live pool is <a href="{pool}">pool.shear.digital</a>. The explorer is <a href="{explorer}">explorer.shear.digital</a>. The site is <a href="{site}">shear.digital</a>.</p>
-      <h2>What happens at mainnet</h2>
-      <p>When the Shear mainnet genesis block is sealed, we take a snapshot of spendable GNFP on the book. That list is the only list that counts. Coins still confirming, or sitting in the mempool, are not in it.</p>
-      <p>From that moment you have <strong>ninety-nine days</strong> to claim. In the GNFP wallet, open Backup and export your Join key. Treat it as a cheque: anyone who pastes it can collect.</p>
-      <p>In the Shear wallet, open Vortex and choose The Join. Paste the key. Shear pays your own destination (<code>ssa1…</code>). The credit first shows as pending on Continuum. It becomes spendable after <strong>six confirms</strong>. Each snapshot line can be claimed only once.</p>
-      <h2>If you miss the window</h2>
-      <p>SHE still unclaimed in The Join vault after ninety-nine days is burned. It is not paid to miners, not paid to The Reserve, and not held for later. If you do not claim in time, that allocation is gone.</p>
-      <h2>What this is not</h2>
-      <p>This is not a sale, not a new mine, and not a request for your seed. Leftover SHE in the vault is not your money — it stays in the vault until the window closes. The Join does not print SHE after genesis. Mining on <a href="{pool}">pool.shear.digital</a> is a separate activity. The Reserve is a separate staking programme.</p>
-      <p><strong>Official places:</strong> <a href="{site}">shear.digital</a> · <a href="{pool}">pool.shear.digital</a> · <a href="{explorer}">explorer.shear.digital</a> · <a href="{dag}">dag.shear.digital</a></p>
-      <p>The Shear wallet will never ask for your GNFP twelve words. The GNFP wallet will never ask for your Shear password. No telegram, no “support desk”, and no other domain is authorised to take your key or your seed.</p>
-      <p>We will publish the genesis time, the snapshot, and the exact close of the ninety-nine day window on <a href="{site}">shear.digital</a> when mainnet opens. Until that notice, treat any “claim now” message as false.</p>
+        $GNFP</p>
+      <h1 id="gnfp-intro-title">GNFP — God's coin</h1>
+      <p class="gnfp-lede">Private by default. CPU work. One chain. Addresses start with <code>gnfp1</code>. You hash, or you are paid by someone who already holds coin.</p>
+      <p>Each valid hash pays <strong>1 micro</strong> (0.00000001 GNFP). Each block closes a <strong>1 GNFP</strong> pot, split by who actually hashed that round. GPU-shaped solutions mint nothing.</p>
+      <p><strong>Official places:</strong> <a href="{pool}">gnfp.restoreprivacy.online</a> · <a href="{explorer}">explorer.restoreprivacy.online</a> · book <code>{book}</code> (TLS)</p>
+      <p>Discord <a href="{discord}">discord.gg/H9TdGyCUCa</a> · Telegram <a href="{telegram}">t.me/gnfp1</a></p>
     </article>
-    <article class="shear-box" id="shear-join-box" data-shear-box="join">
-      <img class="shear-box-img float-right" src="/static/shear-join.jpg" alt="" width="880" height="660"/>
+    <article class="gnfp-box" id="gnfp-wallet-box" data-gnfp-box="wallet">
       <p class="gnfp-kicker"><span class="gnfp-pulse" aria-hidden="true"></span>
-        How-to · GNFP → Shear</p>
-      <h2 id="shear-join-title">How to move GNFP to Shear at mainnet</h2>
-      <p class="shear-lede">The Join is the only official path. You keep your GNFP until the published snapshot, export a Join key, and paste it in your own Shear wallet. One GNFP becomes one SHE.</p>
-      <h3>Before mainnet</h3>
+        Wallet</p>
+      <h2 id="gnfp-wallet-title">Install the GNFP wallet</h2>
+      <p class="gnfp-lede">Current pin is <strong>v{pin}</strong>. Same <code>gnfp1</code> as before. Keep your twelve-word backup offline. This app does not mine.</p>
       <ol class="gnfp-howto-steps">
-        <li>Keep your GNFP twelve-word backup offline. The Join key comes from that same wallet. If the seed is lost, the claim cannot be exported.</li>
-        <li>Install the current GNFP wallet (this page lists <strong>v{pin}</strong>) from <a href="{wallet_rel}">the official GNFP wallet releases</a>. Open it and confirm your <code>gnfp1</code> balance. Do not export a Join key yet.</li>
-        <li>Install Shear wallet <strong>{shear_pin}</strong> from <a href="{shear_rel}">the official Shear testnet release</a> so you can practise. Unlock it. Your spendable address is an <code>ssa1</code> destination. Do not share rest-frame keys.</li>
-        <li>Wait for the mainnet notice on <a href="{site}">shear.digital</a>. It will name the genesis time, the snapshot, and when the ninety-nine day window closes. Until then, ignore anyone who says “claim now”.</li>
+        <li>Download from <a href="{wallet_rel}">the official GNFP wallet releases</a> only. macOS: open the disk image, drag the app onto Applications, eject, then launch from Applications.</li>
+        <li>Windows or Linux: unzip and open the app. Android: install the APK. Uninstall an older debug-signed build first if the phone already has one.</li>
+        <li>Create or restore from your twelve English words. Your spendable address is a <code>gnfp1</code>. That is the login the miner uses.</li>
+        <li>Receive and send on the live book. Do not send BEAM, PERC, or any other coin to a <code>gnfp1</code>.</li>
       </ol>
-      <h3>After the snapshot is published</h3>
-      <ol class="gnfp-howto-steps" start="5">
-        <li>In the GNFP wallet open <strong>Backup</strong> and export the Join key. Anyone who pastes it can collect — treat it like cash.</li>
-        <li>Only spendable GNFP on the book at genesis is in the snapshot. Coins still confirming, or in the mempool, are not.</li>
-        <li>In the Shear wallet open <strong>Vortex → The Join</strong>. Paste the key. Shear pays your own destination. Continuum shows it as pending first. It is spendable after six confirms. Your GNFP balance drops when the claim is accepted.</li>
-        <li>Each snapshot line can be claimed only once. Pasting the same key again returns <strong>already claimed</strong>. Confirm the credit on Continuum, and on <a href="{explorer}">explorer.shear.digital</a> against your <code>ssa1</code> dest — not a rest-frame address. Leftover SHE in the vault is not yours.</li>
-      </ol>
-      <h3>Ninety-nine days</h3>
-      <p>From genesis you have ninety-nine days. Unclaimed SHE in The Join vault is then burned. It is not paid to miners and not held for a later round.</p>
       <p class="hint"><a href="{wallet_rel}">GNFP wallet</a> · v{pin}</p>
       <ul class="gnfp-chip-links" id="gnfp-wallet-links">{wallet_links}</ul>
-      <p class="hint"><a href="{shear_rel}">Shear wallet</a> · {shear_pin} (testnet until mainnet is published)</p>
-      <ul class="gnfp-chip-links" id="shear-wallet-links">{shear_links}</ul>
     </article>
-    <article class="shear-box" id="shear-vortice-box" data-shear-box="vortice">
-      <img class="shear-box-img float-left" src="/static/shear-vortice.jpg" alt="" width="880" height="660"/>
+    <article class="gnfp-box" id="gnfp-mine-box" data-gnfp-box="mine">
       <p class="gnfp-kicker"><span class="gnfp-pulse" aria-hidden="true"></span>
-        For app creators</p>
-      <h2 id="shear-vortice-title">Vortex apps use a vort1 deploy key</h2>
-      <p class="shear-lede">If you write a Vortex app, you host it yourself. Shear mints a <code>vort1.</code> deploy key that names your URL and pins a hash of the bytes you serve. Holders paste that key in Vortex. There is no app store listing: no key, no app.</p>
-      <p>The Join and The Reserve are official programmes. They are not minted this way. Third-party apps cannot print SHE. Do not ask users for a Shear password, twelve words, or a Join key.</p>
-      <p>In the Shear wallet: Vortex → Add new vortice → paste the <code>vort1.</code> key. Keep the hosted bytes unchanged for as long as the key should work. A new body needs a new key.</p>
-      <p><strong>Official places:</strong> <a href="{site}">shear.digital</a> · <a href="{pool}">pool.shear.digital</a> · <a href="{explorer}">explorer.shear.digital</a></p>
+        Mine</p>
+      <h2 id="gnfp-mine-title">CPU mine GNFP</h2>
+      <p class="gnfp-lede">Official miner is <strong>GNFPHash</strong> / gnfp-cminer. Point it at Germany or Singapore. Leave TLS on. GPU and old miners earn nothing.</p>
+      <ol class="gnfp-howto-steps">
+        <li>Get the miner from <a href="{mine}">github.com/rgsneddon/GNFPHash</a>.</li>
+        <li>Login is your <code>gnfp1</code>, a dot, then a worker name: <code>gnfp1YOURADDRESS.worker</code>.</li>
+        <li>Germany: <code>{book}</code>. Singapore: <code>{sg}</code>. TLS is the default.</li>
+        <li><code>--threads</code> starts real CPU workers. Cap is this machine’s threads, hard stop 256.</li>
+      </ol>
+      <p>Pool <a href="{pool}">gnfp.restoreprivacy.online</a> · Explorer <a href="{explorer}">explorer.restoreprivacy.online</a></p>
     </article>
   </div>
 </section>
@@ -937,6 +901,26 @@ html[data-theme="dark"] .shear-hero { background: #0a1628; }
     float: none; width: 100%; margin: 0 0 1rem;
   }
 }
+.gnfp-hero {
+  width: 100%; margin: 0 0 1rem; overflow: hidden; line-height: 0;
+  background: #eef3f8; text-align: center;
+}
+html[data-theme="dark"] .gnfp-hero { background: #0a1628; }
+.gnfp-hero img { width: 100%; height: auto; display: block; object-fit: contain; }
+.gnfp-box-stack { display: flex; flex-direction: column; gap: 1.1rem; margin: 0 0 1rem; }
+.gnfp-box {
+  overflow: hidden; margin: 0; padding: 1.05rem 1.1rem 1.15rem;
+  border: 1px solid #2694e8; background: rgba(20, 23, 28, 0.92);
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.12);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  text-align: justify; text-justify: inter-word; hyphens: auto;
+}
+.gnfp-box p, .gnfp-box li, .gnfp-lede, .gnfp-box .hint { text-align: justify; text-justify: inter-word; }
+.gnfp-box h1, .gnfp-box h2, .gnfp-box h3 { color: #00e5ff; letter-spacing: 0.03em; }
+.gnfp-box h1 { font-size: clamp(1.45rem, 3.4vw, 2.15rem); font-weight: 900; margin: 0 0 0.55rem; line-height: 1.2; }
+.gnfp-box h2 { font-size: 1.18rem; font-weight: 800; margin: 0.85rem 0 0.4rem; }
+.gnfp-lede { font-size: 1.05rem; line-height: 1.55; color: #e8eef5; }
+.gnfp-box p { overflow-wrap: anywhere; }
 #gnfp-intro > * { position: relative; z-index: 1; }
 .gnfp-skip { margin: 0 0 0.55rem; }
 .gnfp-skip a { color: #9aa8b5; font-size: 0.82rem; font-weight: 700; }
