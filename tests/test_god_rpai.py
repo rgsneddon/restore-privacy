@@ -61,9 +61,14 @@ def _assert_gnfp_first_landing(test: unittest.TestCase, html: str) -> None:
     low = html.lower()
     for marker in GNFP_MARKERS:
         test.assertIn(marker, html)
-    test.assertIn("notice of ledger succession", low)
-    test.assertIn("how to claim your 1:1 shear", low)
-    test.assertIn("vortice deploy key", low)
+    test.assertIn("move your gnfp to shear", low)
+    test.assertIn("how to move gnfp to shear at mainnet", low)
+    test.assertIn("vort1", low)
+    test.assertIn("six confirms", low)
+    test.assertIn("already claimed", low)
+    test.assertIn("ssa1", low)
+    test.assertNotIn("she1", low)
+    test.assertNotIn("shp1", low)
     test.assertIn("text-align: justify", html)
     test.assertIn("gnfp1", low)
     test.assertIn("wallet", low)
@@ -88,13 +93,24 @@ class TestGodRpaiPage(unittest.TestCase):
             GOD_RPAI_HOST,
             GOD_RPAI_PORT,
             PORT_1474_BENEFITS,
+            SHEAR_WALLET_PIN,
             is_god_host,
             render_god_rpai_page_html,
         )
 
         self.assertTrue(is_god_host("god.restoreprivacy.online"))
         self.assertTrue(is_god_host("god.restoreprivacy.online:1474"))
+        self.assertTrue(is_god_host("admin.shear.digital"))
         self.assertFalse(is_god_host("restoreprivacy.online"))
+        self.assertFalse(is_god_host("shear.digital"))
+        html = render_god_rpai_page_html()
+        self.assertIn("six confirms", html.lower())
+        self.assertIn("already claimed", html.lower())
+        self.assertIn("ssa1", html.lower())
+        self.assertIn(SHEAR_WALLET_PIN, html)
+        self.assertIn("shear-testnet", html)
+        self.assertNotIn("ios.ipa", html)
+        self.assertNotIn("rgsneddon/shear/releases", html)
         self.assertEqual(GOD_RPAI_HOST, "god.restoreprivacy.online")
         self.assertEqual(GOD_RPAI_PORT, 1474)
         html = render_god_rpai_page_html()
@@ -117,7 +133,7 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertNotIn('id="doc-links"', html)
         self.assertNotIn('id="theme-mode-control"', html)
         self.assertIn("linear-gradient(135deg, #2694e8 0%, #00e5ff 100%)", html)
-        self.assertIn("chronoflux", html.lower())
+        self.assertIn("ninety-nine days", html.lower())
         self.assertIn("god-rpai-main", html)
         self.assertIn("panel-card", html)
         self.assertIn("1474", html)
@@ -286,7 +302,12 @@ class TestGodRpaiPage(unittest.TestCase):
         self.assertIn("1474", nginx)
         self.assertIn("8013", nginx)
         self.assertIn("8014", nginx)
-        self.assertIn("135.181.152.10", nginx)
+        admin_nginx = (
+            ROOT / "perc_chain" / "deploy" / "nginx-admin.shear.digital.conf"
+        ).read_text(encoding="utf-8")
+        self.assertIn("server_name admin.shear.digital", admin_nginx)
+        self.assertIn("8013", admin_nginx)
+        self.assertNotIn("135.181.152.10", nginx)
         self.assertIn("god_port.py", unit)
         self.assertIn("8013", unit)
         self.assertIn("1474", gnfp_unit)

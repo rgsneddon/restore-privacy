@@ -153,10 +153,10 @@ class TestGnfpGodWalletLinks(unittest.TestCase):
         self.assertIn("$GNFP privacy wallet", hub)
         self.assertNotIn("GNPF", hub)
         page = render_god_rpai_page_html()
-        self.assertIn("god-hub-gnfp", page)
+        self.assertIn("gnfp-wallet-links", page)
         self.assertIn("gnfp-wallet-", page)
-        self.assertIn("-windows.zip", page)
         self.assertNotIn("GNPF", page)
+        self.assertNotIn("ios.ipa", page)
 
 
 if __name__ == "__main__":

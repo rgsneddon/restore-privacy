@@ -15,6 +15,7 @@ import json
 from typing import Any, Callable
 
 GOD_RPAI_HOST = "god.restoreprivacy.online"
+GOD_MIRROR_HOSTS = ("admin.shear.digital",)
 GOD_RPAI_PORT = 1474  # public: $GNFP BeamHash III stratum (perc miner)
 GOD_HTTP_PORT = 8013  # loopback: dedicated GOD · rpAI page
 GOD_RPAI_PATH = "/god"
@@ -32,11 +33,12 @@ SHEAR_WORDMARK_DARK = "/static/shear-wordmark-dark.png"
 SHEAR_SITE_HREF = "https://shear.digital"
 SHEAR_POOL_HREF = "https://pool.shear.digital"
 SHEAR_EXPLORER_HREF = "https://explorer.shear.digital"
-SHEAR_WALLET_REL = "https://github.com/rgsneddon/shear/releases"
-SHEAR_WALLET_PIN = "0.0.7"
+SHEAR_WALLET_REL = "https://github.com/rgsneddon/shear-testnet/releases"
+SHEAR_WALLET_PIN = "0.11"
+SHEAR_WALLET_TAG = "0.11"
 
 VPN_CATALOG_VERSION = "1.2.7"
-GNFP_WALLET_PIN = "0.0.7"
+GNFP_WALLET_PIN = "0.2.6"
 EVOLVE_PIN = "4.2.1"
 
 VPN_FREE = "https://restoreprivacy.online/suite/download?platform={platform}&free_direct=1"
@@ -107,6 +109,34 @@ def _vpn_href(platform: str) -> str:
 def _gnfp_href(filename: str, pin: str | None = None) -> str:
     ver = str(pin or GNFP_WALLET_PIN).strip().lstrip("v")
     return f"{GNFP_REL}/download/v{ver}/{filename}"
+
+
+def _shear_wallet_href(filename: str, pin: str | None = None) -> str:
+    ver = str(pin or SHEAR_WALLET_PIN).strip().lstrip("v")
+    tag = SHEAR_WALLET_TAG if ver == SHEAR_WALLET_PIN else f"v{ver}"
+    return f"{SHEAR_WALLET_REL}/download/{tag}/{filename}"
+
+
+def _public_join_wallet_hrefs(hrefs: list | tuple) -> list[tuple[str, str]]:
+    """Join how-to chips: current pin, macOS dmg over zip, no iOS."""
+    rows = [(str(label), str(href)) for label, href in hrefs]
+    has_dmg = any(href.lower().endswith("-macos.dmg") for _label, href in rows)
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for label, href in rows:
+        low = href.lower()
+        if "ios.ipa" in low or "ipad.ipa" in low:
+            continue
+        if has_dmg and low.endswith("-macos.zip"):
+            continue
+        key = low.rsplit("/", 1)[-1]
+        if key in seen:
+            continue
+        seen.add(key)
+        if low.endswith("-macos.dmg"):
+            label = "macOS"
+        out.append((label, href))
+    return out
 
 
 def _evolve_href(filename: str) -> str:
@@ -189,12 +219,10 @@ def gnfp_wallet_hub_product(
     hrefs = pub["gnfp_hrefs"](releases, inventory_path=inventory_path)
     if not hrefs:
         hrefs = [
+            ("macOS", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-macos.dmg")),
+            ("Android", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-android.apk")),
             ("Windows", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-windows.zip")),
-            ("macOS", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-macos.zip")),
             ("Linux", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-linux.zip")),
-            ("iPhone", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-ios.ipa")),
-            ("iPad", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-ipad.ipa")),
-            ("Arch", pub["gnfp_href"](pin, f"gnfp-wallet-{pin}-archlinux.zip")),
         ]
     return {
         "id": "gnfp",
@@ -342,7 +370,11 @@ PORT_1474_BENEFITS: tuple[tuple[str, str], ...] = (
 
 def is_god_host(host: str) -> bool:
     raw = (host or "").strip().lower().split(":")[0]
-    return raw == GOD_RPAI_HOST or raw.startswith("god.")
+    return (
+        raw == GOD_RPAI_HOST
+        or raw.startswith("god.")
+        or raw in GOD_MIRROR_HOSTS
+    )
 
 
 def _learn_surface(state: Any = None, **hints: Any) -> dict[str, Any]:
@@ -534,13 +566,29 @@ def render_gnfp_intro_html(
         f'<li><a href="{html.escape(href, quote=True)}" '
         f'data-gnfp-wallet="{html.escape(label, quote=True)}">'
         f"{html.escape(label)}</a></li>"
-        for label, href in product["hrefs"]
+        for label, href in _public_join_wallet_hrefs(product["hrefs"])
+    )
+    shear_links = "".join(
+        f'<li><a href="{html.escape(href, quote=True)}" '
+        f'data-shear-wallet="{html.escape(label, quote=True)}">'
+        f"{html.escape(label)}</a></li>"
+        for label, href in (
+            (
+                "macOS",
+                _shear_wallet_href(f"shear-wallet-{SHEAR_WALLET_PIN}-macos.dmg"),
+            ),
+            (
+                "Android",
+                _shear_wallet_href(f"shear-wallet-{SHEAR_WALLET_PIN}-android.apk"),
+            ),
+        )
     )
     pin = html.escape(str(product["version"]))
     shear_pin = html.escape(SHEAR_WALLET_PIN)
     site = html.escape(SHEAR_SITE_HREF, quote=True)
     pool = html.escape(SHEAR_POOL_HREF, quote=True)
     explorer = html.escape(SHEAR_EXPLORER_HREF, quote=True)
+    dag = html.escape("https://dag.shear.digital", quote=True)
     shear_rel = html.escape(SHEAR_WALLET_REL, quote=True)
     wallet_rel = html.escape(GNFP_REL, quote=True)
     return f"""
@@ -550,88 +598,56 @@ def render_gnfp_intro_html(
       <img class="shear-box-img float-left" src="/static/shear-ann.jpg" alt="" width="880" height="660"/>
       <p class="gnfp-kicker"><span class="gnfp-pulse" aria-hidden="true"></span>
         Official notice</p>
-      <h1 id="gnfp-intro-title">SHEAR — notice of ledger succession and 1:1 holder claim</h1>
-      <p class="shear-lede">Firstly, thank you for your confidence in the GNFP project and the Chronoflux consensus. This announcement details the next steps in the project evolution.</p>
-      <p>We will be evolving GNFP into the full 1HASH=1TX framework which has been so painstakingly researched and in a rebranding switch, we will begin mining on a new chain. <strong>Shear is the successor to GNFP</strong> and it is currently in testnet. The live Shear testnet pool is already operational at <a href="{pool}">pool.shear.digital</a> and the public explorer is at <a href="{explorer}">explorer.shear.digital</a>. The website is <a href="{site}">shear.digital</a>.</p>
-      <h2>What is changing</h2>
-      <p>SHEAR takes the place of GNFP as the chain we will keep. Every holder of GNFP at the Shear mainnet genesis snapshot is entitled to the same number of SHE, one for one. The unit of account is the coin: one GNFP becomes one SHE. Nothing in this notice asks you to send coins to an operator, a bridge, or a third-party vault.</p>
-      <h2>How the claim works</h2>
-      <p>At the moment the Shear mainnet genesis block is sealed, a snapshot of GNFP spendable balances is taken from the book. That snapshot is the only list that matters. Coins still sitting in an unconfirmed round, or in the mempool, are not in it.</p>
-      <p>From that genesis timestamp you have <strong>ninety-nine days</strong>. In the GNFP wallet, under Backup, you export a migration key. That key is a signed claim for your snapshot amount. Treat it as a cheque. Anyone who pastes it can collect.</p>
-      <p>In the Shear wallet, open the Vortex tab and select The Join (a smart contract on SHEAR). Paste the key. The credit is paid to your own Shear destination address and shows as spendable on the Continuum tab once the claim is accepted. Each snapshot line can be claimed only once so you must be careful with your join key.</p>
-      <h2>After ninety-nine days</h2>
-      <p>Any SHE still sitting unclaimed in The Join vault is burned. It is not paid to miners, not paid to The Reserve, and not held for a later round. If you do not claim in the window, that allocation is gone.</p>
+      <h1 id="gnfp-intro-title">Move your GNFP to Shear at mainnet</h1>
+      <p class="shear-lede">Thank you for holding GNFP. Shear is the chain that continues from here. When Shear mainnet opens, every spendable GNFP on the book is matched <strong>one for one</strong> with SHE. You do not send coins to us, to a bridge, or to anyone else.</p>
+      <p>Shear is in <strong>testnet</strong> today. Mining and wallets are live so you can practise. The live pool is <a href="{pool}">pool.shear.digital</a>. The explorer is <a href="{explorer}">explorer.shear.digital</a>. The site is <a href="{site}">shear.digital</a>.</p>
+      <h2>What happens at mainnet</h2>
+      <p>When the Shear mainnet genesis block is sealed, we take a snapshot of spendable GNFP on the book. That list is the only list that counts. Coins still confirming, or sitting in the mempool, are not in it.</p>
+      <p>From that moment you have <strong>ninety-nine days</strong> to claim. In the GNFP wallet, open Backup and export your Join key. Treat it as a cheque: anyone who pastes it can collect.</p>
+      <p>In the Shear wallet, open Vortex and choose The Join. Paste the key. Shear pays your own destination (<code>ssa1…</code>). The credit first shows as pending on Continuum. It becomes spendable after <strong>six confirms</strong>. Each snapshot line can be claimed only once.</p>
+      <h2>If you miss the window</h2>
+      <p>SHE still unclaimed in The Join vault after ninety-nine days is burned. It is not paid to miners, not paid to The Reserve, and not held for later. If you do not claim in time, that allocation is gone.</p>
       <h2>What this is not</h2>
-      <p>This is not a new mine, not a sale, and not a change to the one-SHE block pot or the per-hash bonus already running on pool.shear.digital. The Reserve (the 400-day staking vortice) is a separate programme. The Join does not print SHE after genesis. The vault is funded once, in the exact size of the snapshot, and then only pays claims or burns what is left.</p>
-      <h2>What you should do</h2>
-      <ol class="gnfp-howto-steps">
-        <li>Keep a copy of your GNFP twelve-word backup. The migration key is derived from the same wallet.</li>
-        <li>Wait for the published mainnet genesis time. Export the migration key after that snapshot, not from a guessed balance.</li>
-        <li>Install the Shear wallet from the Shear release, not from an unknown build. Unlock it, open Vortex → The Join, and paste the key within ninety-nine days.</li>
-        <li>Confirm the credit on Continuum and, if you wish, on <a href="{explorer}">explorer.shear.digital</a> against your dest — not against a rest-frame address.</li>
-      </ol>
-      <p><strong>Official places:</strong> <a href="{site}">shear.digital</a> · <a href="{pool}">pool.shear.digital</a> · <a href="{explorer}">explorer.shear.digital</a></p>
-      <p>No other domain, telegram, or “support desk” is authorised to take your key or your seed. The Shear wallet will never ask for your GNFP twelve words. The GNFP wallet will never ask for your Shear password.</p>
-      <p>We will publish the genesis height, the snapshot root, and the exact close of the ninety-nine day window when mainnet is opened. Until that publication, treat any “claim now” message as false.</p>
+      <p>This is not a sale, not a new mine, and not a request for your seed. Leftover SHE in the vault is not your money — it stays in the vault until the window closes. The Join does not print SHE after genesis. Mining on <a href="{pool}">pool.shear.digital</a> is a separate activity. The Reserve is a separate staking programme.</p>
+      <p><strong>Official places:</strong> <a href="{site}">shear.digital</a> · <a href="{pool}">pool.shear.digital</a> · <a href="{explorer}">explorer.shear.digital</a> · <a href="{dag}">dag.shear.digital</a></p>
+      <p>The Shear wallet will never ask for your GNFP twelve words. The GNFP wallet will never ask for your Shear password. No telegram, no “support desk”, and no other domain is authorised to take your key or your seed.</p>
+      <p>We will publish the genesis time, the snapshot, and the exact close of the ninety-nine day window on <a href="{site}">shear.digital</a> when mainnet opens. Until that notice, treat any “claim now” message as false.</p>
     </article>
     <article class="shear-box" id="shear-join-box" data-shear-box="join">
       <img class="shear-box-img float-right" src="/static/shear-join.jpg" alt="" width="880" height="660"/>
       <p class="gnfp-kicker"><span class="gnfp-pulse" aria-hidden="true"></span>
-        How-to · GNFP → SHEAR</p>
-      <h2 id="shear-join-title">How to claim your 1:1 SHEAR from GNFP</h2>
-      <p class="shear-lede">The Join is the only official path. You do not send GNFP to anyone. You export a signed migration key after the published snapshot, then paste it in the Shear wallet. One GNFP becomes one SHE.</p>
-      <h3>Before genesis</h3>
+        How-to · GNFP → Shear</p>
+      <h2 id="shear-join-title">How to move GNFP to Shear at mainnet</h2>
+      <p class="shear-lede">The Join is the only official path. You keep your GNFP until the published snapshot, export a Join key, and paste it in your own Shear wallet. One GNFP becomes one SHE.</p>
+      <h3>Before mainnet</h3>
       <ol class="gnfp-howto-steps">
-        <li>Keep your GNFP twelve-word backup offline. The join key is derived from that same wallet. If you lose the seed you cannot export the claim.</li>
-        <li>Install the current GNFP wallet (pin on this page is <strong>v{pin}</strong>) from <a href="{wallet_rel}">the official GNFP wallet releases</a>. Unlock it and confirm you can see your <code>gnfp1</code> balance. Do not export a migration key yet.</li>
-        <li>Install Shear wallet <strong>{shear_pin}</strong> from <a href="{shear_rel}">the official Shear release</a>. Unlock it. Offer <code>she1</code> (silent ID). Chain dests are revolving <code>shp1</code>. Do not share a rest-frame address.</li>
-        <li>Wait for the published Shear mainnet genesis time, the snapshot root, and the close of the ninety-nine day window. Until that notice is on <a href="{site}">shear.digital</a>, any “claim now” message is false.</li>
+        <li>Keep your GNFP twelve-word backup offline. The Join key comes from that same wallet. If the seed is lost, the claim cannot be exported.</li>
+        <li>Install the current GNFP wallet (this page lists <strong>v{pin}</strong>) from <a href="{wallet_rel}">the official GNFP wallet releases</a>. Open it and confirm your <code>gnfp1</code> balance. Do not export a Join key yet.</li>
+        <li>Install Shear wallet <strong>{shear_pin}</strong> from <a href="{shear_rel}">the official Shear testnet release</a> so you can practise. Unlock it. Your spendable address is an <code>ssa1</code> destination. Do not share rest-frame keys.</li>
+        <li>Wait for the mainnet notice on <a href="{site}">shear.digital</a>. It will name the genesis time, the snapshot, and when the ninety-nine day window closes. Until then, ignore anyone who says “claim now”.</li>
       </ol>
       <h3>After the snapshot is published</h3>
       <ol class="gnfp-howto-steps" start="5">
-        <li>In the GNFP wallet open <strong>Backup</strong> and export the migration key. That key is a signed cheque for your snapshot amount. Anyone who pastes it can collect — treat it like cash.</li>
-        <li>Coins still sitting in an unconfirmed round or in the mempool are not in the snapshot. Only spendable book balances at genesis count.</li>
-        <li>In the Shear wallet open <strong>Vortex → The Join</strong>. Paste the key. A valid key is enough. The credit is paid to your own Shear destination and shows on Continuum once accepted.</li>
-        <li>Each snapshot line can be claimed only once. Confirm the credit on Continuum and on <a href="{explorer}">explorer.shear.digital</a> against your dest, not a rest-frame address.</li>
+        <li>In the GNFP wallet open <strong>Backup</strong> and export the Join key. Anyone who pastes it can collect — treat it like cash.</li>
+        <li>Only spendable GNFP on the book at genesis is in the snapshot. Coins still confirming, or in the mempool, are not.</li>
+        <li>In the Shear wallet open <strong>Vortex → The Join</strong>. Paste the key. Shear pays your own destination. Continuum shows it as pending first. It is spendable after six confirms. Your GNFP balance drops when the claim is accepted.</li>
+        <li>Each snapshot line can be claimed only once. Pasting the same key again returns <strong>already claimed</strong>. Confirm the credit on Continuum, and on <a href="{explorer}">explorer.shear.digital</a> against your <code>ssa1</code> dest — not a rest-frame address. Leftover SHE in the vault is not yours.</li>
       </ol>
-      <h3>The ninety-nine day window</h3>
-      <p>From genesis you have ninety-nine days. SHE still unclaimed in The Join vault at the close is burned. It is not paid to miners, not paid to The Reserve, and not held for a later round.</p>
-      <p>The Join does not print SHE after genesis. The vault is funded once, in the exact size of the snapshot. The 1 SHE block pot and the per-hash bonus on <a href="{pool}">pool.shear.digital</a> are a separate mine. The Reserve is a separate 400-day staking vortice.</p>
-      <p>The Shear wallet will never ask for your GNFP twelve words. The GNFP wallet will never ask for your Shear password. No telegram, no “support desk”, no other domain is authorised to take the key.</p>
-      <p class="hint"><a href="{wallet_rel}">GNFP wallet releases</a> · current pin v{pin}</p>
+      <h3>Ninety-nine days</h3>
+      <p>From genesis you have ninety-nine days. Unclaimed SHE in The Join vault is then burned. It is not paid to miners and not held for a later round.</p>
+      <p class="hint"><a href="{wallet_rel}">GNFP wallet</a> · v{pin}</p>
       <ul class="gnfp-chip-links" id="gnfp-wallet-links">{wallet_links}</ul>
+      <p class="hint"><a href="{shear_rel}">Shear wallet</a> · {shear_pin} (testnet until mainnet is published)</p>
+      <ul class="gnfp-chip-links" id="shear-wallet-links">{shear_links}</ul>
     </article>
     <article class="shear-box" id="shear-vortice-box" data-shear-box="vortice">
       <img class="shear-box-img float-left" src="/static/shear-vortice.jpg" alt="" width="880" height="660"/>
       <p class="gnfp-kicker"><span class="gnfp-pulse" aria-hidden="true"></span>
-        Creators · vortice</p>
-      <h2 id="shear-vortice-title">SHEAR — how to mint a vortice deploy key</h2>
-      <p class="shear-lede">This note is for people who write a Vortex dapp. Shear does not host your dapp. You host it. The Shear node mints a <code>vort1.</code> deploy key that names your origin and pins a hash of the exact bytes you serve. Holders paste that key in Vortex. The wallet fetches your origin, checks the hash, and deploys the dapp locally. There is no catalog browse: no key, no dapp.</p>
-      <p>The Reserve and The Join are pinned. They are not minted this way.</p>
-      <h3>What you host</h3>
-      <p>Put the dapp body at a stable http or https URL. That body is what wallets download. If those bytes change, every key minted against the old body fails the hash check. Republish only when you intend to mint a new key.</p>
-      <p>Do not put Shear rest-frame shear1 addresses, view keys, or seeds in the hosted body.</p>
-      <h3>What you must not do</h3>
-      <ul class="gnfp-howto-steps">
-        <li>Use a reserved program id: <code>shear-reserve-v1</code>, <code>shear-join-v1</code>, <code>shear-join-watch-v1</code>.</li>
-        <li>Print SHE. Third-party vortice cannot mint. If you pay rewards, top them up from SHE already in circulation.</li>
-        <li>Ask users for a Shear password, twelve words, or a <code>join1.</code> migration key.</li>
-        <li>Ship a key that points at an origin you do not control.</li>
-      </ul>
-      <h3>Mint the key</h3>
-      <p>On a Shear node (testnet <code>shear-testnet-v1</code>), call <code>store.mintVorticeDeployKey</code> with the program id, a short display name, the origin URL, and the exact bytes the origin will serve:</p>
-      <pre class="gnfp-cmd" id="vortice-mint-cmd">store.mintVorticeDeployKey({{
-  programId: 'your-dapp-v1',
-  name: 'Your Dapp',
-  origin: 'https://your.host/vortice.json',
-  source: exactBytesYouServe,
-}})</pre>
-      <p>The same fields are accepted by <code>POST /api/vortex/mint</code>. If the origin is already live, <code>store.mintVorticeFromOrigin({{ programId, name, origin }})</code> fetches it and pins those bytes.</p>
-      <p>You receive a <code>vort1.</code> key. Give that string to users. The node remembers the origin and the hash. It does not keep a copy of your dapp. A program id can be minted once on a given node. Id must match <code>^[a-z0-9._-]{{3,64}}$</code>.</p>
-      <h3>What users do</h3>
-      <p>In the Shear wallet: Vortex → Add new vortice → paste the <code>vort1.</code> key. A valid key is enough; the wallet downloads your origin, checks the pin, and deploys. They never type a URL. They never pick you from a list.</p>
-      <h3>After mint</h3>
-      <p>Keep the origin serving the pinned bytes for as long as you want the key to work. A new body needs a new key. The 1 SHE block pot and the per-hash bonus are unchanged by any vortice you publish.</p>
+        For app creators</p>
+      <h2 id="shear-vortice-title">Vortex apps use a vort1 deploy key</h2>
+      <p class="shear-lede">If you write a Vortex app, you host it yourself. Shear mints a <code>vort1.</code> deploy key that names your URL and pins a hash of the bytes you serve. Holders paste that key in Vortex. There is no app store listing: no key, no app.</p>
+      <p>The Join and The Reserve are official programmes. They are not minted this way. Third-party apps cannot print SHE. Do not ask users for a Shear password, twelve words, or a Join key.</p>
+      <p>In the Shear wallet: Vortex → Add new vortice → paste the <code>vort1.</code> key. Keep the hosted bytes unchanged for as long as the key should work. A new body needs a new key.</p>
       <p><strong>Official places:</strong> <a href="{site}">shear.digital</a> · <a href="{pool}">pool.shear.digital</a> · <a href="{explorer}">explorer.shear.digital</a></p>
     </article>
   </div>
